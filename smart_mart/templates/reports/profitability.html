@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Profitability — Smart Mart{% endblock %}
+{% block page_title %}Profitability Analysis{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Profitability</li>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body py-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small fw-medium mb-1">Start Date</label>
+          <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small fw-medium mb-1">End Date</label>
+          <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-funnel me-1"></i>Filter
+          </button>
+        </div>
+      </form>
+      <a href="{{ url_for('reports.export_profitability_csv') }}?start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-download me-1"></i>Export CSV
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle" id="profitTable">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>SKU</th>
+          <th class="text-end">Qty Sold</th>
+          <th class="text-end">Revenue (NPR)</th>
+          <th class="text-end">Cost (NPR)</th>
+          <th class="text-end">Profit (NPR)</th>
+          <th class="text-end">Margin %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr {% if row.profit < 0 %}style="background:#fef2f2;"{% endif %}>
+          <td class="fw-medium">{{ row.product.name }}</td>
+          <td><code class="text-muted">{{ row.product.sku }}</code></td>
+          <td class="text-end">{{ row.qty_sold }}</td>
+          <td class="text-end">{{ "%.2f"|format(row.revenue) }}</td>
+          <td class="text-end text-danger">{{ "%.2f"|format(row.cost) }}</td>
+          <td class="text-end fw-semibold {% if row.profit < 0 %}text-danger{% else %}text-success{% endif %}">
+            {% if row.profit >= 0 %}<i class="bi bi-arrow-up-short"></i>{% else %}<i class="bi bi-arrow-down-short"></i>{% endif %}
+            {{ "%.2f"|format(row.profit) }}
+          </td>
+          <td class="text-end">
+            <span class="badge rounded-pill {% if row.margin < 0 %}bg-danger{% elif row.margin < 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+              {{ "%.1f"|format(row.margin) }}%
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">
+            <i class="bi bi-bar-chart fs-2 d-block mb-2"></i>No results found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New Purchase — Smart Mart</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    :root { --accent: #6366f1; }
+    body { background: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .top-navbar { background: #0f172a; }
+    .top-navbar .navbar-brand { color: #fff; font-weight: 700; }
+    .card { border: none !important; border-radius: 12px !important; }
+    .card-header { background: #fff; border-bottom: 1px solid #f1f5f9; border-radius: 12px 12px 0 0 !important; }
+    .table thead th { background: #f8fafc; color: #475569; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
+    .table td { font-size: .875rem; border-color: #f1f5f9; vertical-align: middle; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); }
+    .btn-primary:hover { background: #4f46e5; border-color: #4f46e5; }
+    .btn-outline-primary { color: var(--accent); border-color: var(--accent); }
+    .btn-outline-primary:hover { background: var(--accent); border-color: var(--accent); }
+    .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(99,102,241,.15); }
+    .alert { border: none; border-radius: 10px; }
+    .total-bar { background: #0f172a; border-radius: 12px; padding: 1rem 1.5rem; }
+  </style>
+</head>
+<body>
+  <nav class="navbar top-navbar px-3 py-2">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm me-3" style="background:#1e293b;color:#94a3b8;border:none;">
+      <i class="bi bi-house-door me-1"></i>Dashboard
+    </a>
+    <a class="navbar-brand" href="#">
+      <i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart
+    </a>
+    <div class="d-flex gap-2 ms-auto">
+      <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
+        <i class="bi bi-arrow-left me-1"></i>Purchases
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </a>
+    </div>
+  </nav>
+
+  <div class="container py-4" style="max-width: 940px;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+          {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>
+          {% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>
+          {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+          <span>{{ message }}</span>
+          <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="mb-4">
+      <h4 class="fw-bold mb-0" style="color:#0f172a;">New Purchase</h4>
+      <p class="text-muted small mb-0">Record a new stock purchase</p>
+    </div>
+
+    <form method="post" action="{{ url_for('purchases.create_purchase') }}">
+      <!-- Purchase Details -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex align-items-center gap-2 py-3">
+          <i class="bi bi-info-circle text-primary"></i>
+          <span class="fw-semibold">Purchase Details</span>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Supplier <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <select name="supplier_id" class="form-select" required>
+                  <option value="">— Select supplier —</option>
+                  {% for s in suppliers %}
+                  <option value="{{ s.id }}">{{ s.name }}</option>
+                  {% endfor %}
+                </select>
+                <a href="{{ url_for('purchases.create_supplier') }}" class="btn btn-outline-secondary" title="Add Supplier">
+                  <i class="bi bi-plus-lg"></i>
+                </a>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Purchase Date <span class="text-danger">*</span></label>
+              <input type="date" name="purchase_date" class="form-control" value="{{ today }}" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex align-items-center gap-2 py-3">
+          <i class="bi bi-box-seam text-primary"></i>
+          <span class="fw-semibold">Items</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th style="width:110px;">Qty</th>
+                  <th style="width:170px;">Unit Cost (NPR)</th>
+                  <th style="width:150px;">Subtotal (NPR)</th>
+                  <th style="width:50px;"></th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card-footer bg-white">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addItemBtn">
+            <i class="bi bi-plus-lg me-1"></i>Add Item
+          </button>
+        </div>
+      </div>
+
+      <div class="total-bar d-flex justify-content-between align-items-center">
+        <span class="text-white-50">Total Cost</span>
+        <div class="d-flex align-items-center gap-3">
+          <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
+          <button type="submit" class="btn btn-success px-4 fw-semibold">
+            <i class="bi bi-check-circle me-1"></i>Confirm Purchase
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <script>
+    const PRODUCTS = [{% for p in products %}{ id: {{ p.id }}, name: {{ p.name | tojson }}, cost: {{ p.cost_price | float }} }{% if not loop.last %},{% endif %}{% endfor %}];
+    let rowIndex = 0;
+    const tsInstances = {};
+
+    function addRow() {
+      const idx = rowIndex++;
+      const tr = document.createElement('tr');
+      const selectId = `prod_sel_${idx}`;
+      const opts = PRODUCTS.map(p => `<option value="${p.id}" data-cost="${p.cost}">${p.name}</option>`).join('');
+      tr.innerHTML = `
+        <td><select id="${selectId}" class="form-select form-select-sm" name="items[${idx}][product_id]" required>
+          <option value="">— Select product —</option>${opts}</select></td>
+        <td><input type="number" class="form-control form-control-sm qty-input" name="items[${idx}][quantity]" min="1" value="1" required></td>
+        <td><input type="number" class="form-control form-control-sm cost-input" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required></td>
+        <td class="subtotal-cell text-end fw-medium">0.00</td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-btn"><i class="bi bi-trash"></i></button></td>`;
+      document.getElementById('itemsBody').appendChild(tr);
+
+      // Tom Select on product dropdown
+      const ts = new TomSelect(`#${selectId}`, {
+        placeholder: 'Search product…',
+        maxOptions: 50,
+        onChange(val) {
+          const p = PRODUCTS.find(x => x.id == val);
+          if (p) tr.querySelector('.cost-input').value = p.cost.toFixed(2);
+          updateRow(tr);
+        }
+      });
+      tsInstances[idx] = ts;
+
+      tr.querySelector('.qty-input').addEventListener('input', () => updateRow(tr));
+      tr.querySelector('.cost-input').addEventListener('input', () => updateRow(tr));
+      tr.querySelector('.remove-btn').addEventListener('click', () => { tr.remove(); recalc(); });
+    }
+
+    function updateRow(tr) {
+      const qty = parseFloat(tr.querySelector('.qty-input').value) || 0;
+      const cost = parseFloat(tr.querySelector('.cost-input').value) || 0;
+      tr.querySelector('.subtotal-cell').textContent = (qty * cost).toFixed(2);
+      recalc();
+    }
+    function recalc() {
+      let total = 0;
+      document.querySelectorAll('.subtotal-cell').forEach(c => total += parseFloat(c.textContent) || 0);
+      document.getElementById('grandTotal').textContent = total.toFixed(2);
+    }
+    document.getElementById('addItemBtn').addEventListener('click', addRow);
+    addRow();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

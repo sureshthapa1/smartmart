@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow — Smart Mart{% endblock %}
+{% block page_title %}Cash Flow{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Cash Flow</li>
+{% endblock %}
+
+{% block content %}
+<!-- Date Filter -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Metric Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm metric-card green h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:#f0fdf4;color:#22c55e;">
+          <i class="bi bi-arrow-up-circle fs-5"></i>
+        </div>
+        <div>
+          <div class="metric-label">Revenue</div>
+          <div class="metric-value text-success">{{ "%.2f"|format(data.revenue) }}</div>
+          <div class="text-muted" style="font-size:.7rem;">NPR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm metric-card" style="border-left:4px solid #ef4444 !important;" >
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:#fef2f2;color:#ef4444;">
+          <i class="bi bi-arrow-down-circle fs-5"></i>
+        </div>
+        <div>
+          <div class="metric-label">Cost of Goods Sold</div>
+          <div class="metric-value text-danger">{{ "%.2f"|format(data.cogs) }}</div>
+          <div class="text-muted" style="font-size:.7rem;">NPR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm metric-card orange h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:#fff7ed;color:#f97316;">
+          <i class="bi bi-receipt fs-5"></i>
+        </div>
+        <div>
+          <div class="metric-label">Other Expenses</div>
+          <div class="metric-value text-warning">{{ "%.2f"|format(data.other_expenses) }}</div>
+          <div class="text-muted" style="font-size:.7rem;">NPR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm metric-card purple h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:#faf5ff;color:#a855f7;">
+          <i class="bi bi-graph-up-arrow fs-5"></i>
+        </div>
+        <div>
+          <div class="metric-label">Net Profit</div>
+          <div class="metric-value {% if data.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ "%.2f"|format(data.profit) }}
+          </div>
+          <div class="text-muted" style="font-size:.7rem;">NPR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Balance Card -->
+<div class="card shadow-sm">
+  <div class="card-body d-flex align-items-center gap-3">
+    <div style="width:42px;height:42px;background:#f0fdf4;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+      <i class="bi bi-wallet2 text-success fs-5"></i>
+    </div>
+    <div>
+      <div class="text-muted small">Today's Cash Balance</div>
+      <div class="fs-4 fw-bold" style="color:#0f172a;">NPR {{ "%.2f"|format(balance) }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

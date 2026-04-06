@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Settings — Smart Mart{% endblock %}
+{% block page_title %}Shop Settings{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Settings</li>{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 rounded-3">
+      <div class="card-header bg-white border-bottom py-3 px-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-gear me-2 text-primary"></i>Shop Configuration</h5>
+        <p class="text-muted small mb-0 mt-1">These details appear on all invoices and reports.</p>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" action="{{ url_for('settings.index') }}">
+
+          <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
+            <i class="bi bi-shop me-1"></i>Business Information
+          </h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-8">
+              <label class="form-label fw-medium">Shop / Business Name <span class="text-danger">*</span></label>
+              <input type="text" name="shop_name" class="form-control" value="{{ s.shop_name or '' }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">PAN Number</label>
+              <input type="text" name="pan_number" class="form-control" value="{{ s.pan_number or '' }}" placeholder="e.g. 123456789">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium">Address</label>
+              <textarea name="address" class="form-control" rows="2" placeholder="Street, City, District, Province">{{ s.address or '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Phone</label>
+              <input type="text" name="phone" class="form-control" value="{{ s.phone or '' }}" placeholder="e.g. 01-4XXXXXX">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Email</label>
+              <input type="email" name="email" class="form-control" value="{{ s.email or '' }}" placeholder="shop@example.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Website</label>
+              <input type="text" name="website" class="form-control" value="{{ s.website or '' }}" placeholder="www.example.com">
+            </div>
+          </div>
+
+          <hr class="my-3">
+          <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
+            <i class="bi bi-receipt me-1"></i>Invoice Settings
+          </h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Invoice Prefix</label>
+              <input type="text" name="invoice_prefix" class="form-control" value="{{ s.invoice_prefix or 'INV' }}" placeholder="INV">
+              <div class="form-text">e.g. INV → INV-00001</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Current Counter</label>
+              <input type="text" class="form-control" value="{{ s.invoice_counter }}" disabled>
+              <div class="form-text">Auto-increments with each sale.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium">Invoice Footer Note</label>
+              <input type="text" name="footer_note" class="form-control" value="{{ s.footer_note or '' }}" placeholder="Thank you for shopping with us!">
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg me-1"></i>Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card shadow-sm border-0 rounded-3 mt-4">
+      <div class="card-header bg-white border-bottom py-3 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-eye me-2 text-muted"></i>Invoice Header Preview</h6>
+      </div>
+      <div class="card-body p-4">
+        <div class="border rounded-2 p-3" style="background:#f8fafc;">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-bold fs-5" style="color:#0f172a;">{{ s.shop_name or 'Smart Mart' }}</div>
+              {% if s.address %}<div class="text-muted small">{{ s.address }}</div>{% endif %}
+              {% if s.phone %}<div class="text-muted small">Tel: {{ s.phone }}</div>{% endif %}
+              {% if s.pan_number %}<div class="text-muted small">PAN: {{ s.pan_number }}</div>{% endif %}
+            </div>
+            <div class="text-end">
+              <div class="fw-bold fs-5" style="color:#6366f1;">INVOICE</div>
+              <div class="text-muted small">{{ s.invoice_prefix or 'INV' }}-{{ "%05d" % s.invoice_counter }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

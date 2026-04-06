@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ action }} Product — Smart Mart</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <style>
+    body{background:#f8fafc;}
+    .ts-wrapper.single .ts-control{border-radius:.375rem;}
+    .ts-dropdown{border-radius:.375rem;box-shadow:0 4px 20px rgba(0,0,0,.1);z-index:9999;}
+    .ts-dropdown .option{padding:.45rem .75rem;font-size:.875rem;}
+    .ts-dropdown .option:hover,.ts-dropdown .option.active{background:#6366f1;color:#fff;}
+    .ts-dropdown .create{color:#6366f1;font-weight:500;}
+    .ts-control input{font-size:.875rem!important;}
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark px-3" style="background:#0f172a;">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-light btn-sm me-2"><i class="bi bi-house"></i> Dashboard</a>
+    <span class="navbar-brand fw-bold mb-0">Smart Mart</span>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-light btn-sm">← Products</a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm">Logout</a>
+    </div>
+  </nav>
+
+  <div class="container mt-4" style="max-width:760px;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="card shadow-sm border-0 rounded-3">
+      <div class="card-header bg-white border-bottom py-3 px-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>{{ action }} Product</h5>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" id="productForm"
+              action="{% if product %}{{ url_for('inventory.edit_product', product_id=product.id) }}{% else %}{{ url_for('inventory.create_product') }}{% endif %}"
+              novalidate>
+
+          <!-- Hidden fields that receive the Tom Select values -->
+          <input type="hidden" name="name" id="nameHidden" value="{{ product.name if product else '' }}">
+          <input type="hidden" name="category" id="categoryHidden" value="{{ product.category if product else '' }}">
+          <input type="hidden" name="new_category" id="newCategoryHidden" value="">
+
+          <div class="row g-3">
+
+            <!-- Product Name — Tom Select with suggestions + free type -->
+            <div class="col-md-8">
+              <label class="form-label fw-medium">Product Name <span class="text-danger">*</span></label>
+              <select id="productNameSelect">
+                {% if product %}
+                <option value="{{ product.name }}" selected>{{ product.name }}</option>
+                {% endif %}
+              </select>
+              <div class="form-text text-muted">Search 200+ common items or type any custom name.</div>
+            </div>
+
+            <!-- SKU -->
+            <div class="col-md-4">
+              <label class="form-label fw-medium">SKU / Barcode <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="sku"
+                     value="{{ product.sku if product else '' }}" required placeholder="e.g. RICE-001">
+            </div>
+
+            <!-- Category — Tom Select with create -->
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Category</label>
+              <select id="categorySelect">
+                <option value="">— Select or type —</option>
+                {% for cat in categories %}
+                <option value="{{ cat.name }}"
+                  {% if product and product.category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text text-muted">Type a new name to create it on the fly.</div>
+            </div>
+
+            <!-- Supplier -->
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Supplier</label>
+              <select id="supplierSelect" name="supplier_id">
+                <option value="">— None —</option>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}"
+                  {% if product and product.supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Cost Price — admin only -->
+            {% if current_user.role == 'admin' %}
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Cost Price (NPR) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">NPR</span>
+                <input type="number" class="form-control" name="cost_price" step="0.01" min="0"
+                       value="{{ product.cost_price if product else '0.00' }}" required>
+              </div>
+            </div>
+            {% else %}
+            <input type="hidden" name="cost_price" value="{{ product.cost_price if product else '0' }}">
+            {% endif %}
+
+            <!-- Selling Price -->
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Selling Price (NPR) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">NPR</span>
+                <input type="number" class="form-control" name="selling_price" step="0.01" min="0"
+                       value="{{ product.selling_price if product else '0.00' }}" required>
+              </div>
+            </div>
+
+            <!-- Quantity -->
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Initial Quantity</label>
+              <input type="number" class="form-control" name="quantity" min="0"
+                     value="{{ product.quantity if product else 0 }}">
+            </div>
+
+            <!-- Expiry Date -->
+            <div class="col-md-4">
+              <label class="form-label fw-medium">Expiry Date</label>
+              <input type="date" class="form-control" name="expiry_date"
+                     value="{{ product.expiry_date.strftime('%Y-%m-%d') if product and product.expiry_date else '' }}">
+            </div>
+
+          </div>
+
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg me-1"></i>{{ action }} Product
+            </button>
+            <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <script>
+  const COMMON_PRODUCTS = [
+    "Basmati Rice","Sona Masoori Rice","Brown Rice","White Rice","Beaten Rice (Chiura)",
+    "Wheat Flour (Atta)","Maida","Semolina (Suji)","Corn Flour","Oats","Poha","Barley",
+    "Red Lentil (Masoor Dal)","Yellow Lentil (Moong Dal)","Black Lentil (Urad Dal)",
+    "Chickpeas (Chana)","Kidney Beans (Rajma)","Green Peas","Soybean",
+    "Mustard Oil","Sunflower Oil","Soybean Oil","Coconut Oil","Ghee","Dalda",
+    "Turmeric Powder","Red Chilli Powder","Coriander Powder","Cumin Seeds","Garam Masala",
+    "Black Pepper","Cardamom","Cinnamon","Bay Leaves","Fenugreek Seeds",
+    "Salt (Iodized)","Rock Salt","Vinegar","Soy Sauce","Tomato Ketchup",
+    "White Sugar","Brown Sugar","Jaggery (Gur)","Honey",
+    "Full Cream Milk","Toned Milk","Curd (Dahi)","Paneer","Butter","Cheese Slice",
+    "Cream","Condensed Milk","Milk Powder",
+    "Eggs (Dozen)","Chicken (Whole)","Chicken Breast","Mutton","Fish (Fresh)","Prawns",
+    "Tomato","Onion","Potato","Garlic","Ginger","Carrot","Cabbage","Cauliflower",
+    "Spinach","Brinjal","Bitter Gourd","Bottle Gourd","Pumpkin","Green Chilli",
+    "Capsicum","Cucumber","Radish","Beetroot","Mushroom","Corn",
+    "Banana","Apple","Mango","Orange","Papaya","Guava","Watermelon","Grapes",
+    "Pomegranate","Lemon","Pineapple","Strawberry",
+    "Mineral Water (500ml)","Mineral Water (1L)","Mineral Water (2L)",
+    "Coca Cola","Pepsi","Sprite","Fanta","7UP","Mountain Dew",
+    "Orange Juice","Apple Juice","Mango Juice","Mixed Fruit Juice",
+    "Green Tea","Black Tea","Coffee Powder","Nescafe","Horlicks","Bournvita","Complan",
+    "Bread (White)","Bread (Brown)","Biscuit (Marie)","Biscuit (Glucose)","Parle-G",
+    "Bourbon Biscuit","Oreo","Chips (Lays)","Kurkure","Popcorn","Peanuts",
+    "Cashew Nuts","Almonds","Raisins","Wai Wai Noodles","Maggi Noodles","Pasta",
+    "Dairy Milk Chocolate","KitKat","Munch","5 Star","Eclairs Toffee","Candy",
+    "Surf Excel","Ariel Detergent","Tide Detergent","Vim Bar","Vim Liquid",
+    "Harpic Toilet Cleaner","Lizol Floor Cleaner","Phenyl","Mosquito Coil","Hit Spray",
+    "Tissue Paper","Toilet Paper","Garbage Bags",
+    "Lux Soap","Dove Soap","Lifebuoy Soap","Dettol Soap",
+    "Head & Shoulders Shampoo","Pantene Shampoo","Dove Shampoo","Clinic Plus",
+    "Colgate Toothpaste","Pepsodent Toothpaste","Oral-B Toothbrush",
+    "Dettol Handwash","Lifebuoy Handwash","Savlon Antiseptic",
+    "Nivea Cream","Vaseline","Parachute Hair Oil","Whisper Pads","Stayfree Pads",
+    "Pampers Diapers","Huggies Diapers","Johnson Baby Powder","Cerelac",
+    "Ballpoint Pen","Pencil","Eraser","Notebook (A4)","Exercise Book","Marker Pen",
+    "AA Battery","AAA Battery","Phone Charger","USB Cable","LED Bulb (9W)","LED Bulb (15W)",
+    "Paracetamol","Aspirin","Antacid","ORS Sachet","Vitamin C","Cough Syrup",
+    "Bandage","Cotton","Antiseptic Cream",
+    "Cigarette","Lighter","Match Box","Candle","Incense Sticks (Agarbatti)"
+  ];
+
+  // ── Product Name: Tom Select on a <select>, create=true ─────────────────
+  const nameSel = new TomSelect('#productNameSelect', {
+    create: true,
+    createOnBlur: true,
+    persist: false,
+    maxOptions: 20,
+    placeholder: 'Type or search product name…',
+    options: COMMON_PRODUCTS.map(v => ({ value: v, text: v })),
+    {% if product %}items: [{{ product.name | tojson }}],{% endif %}
+    render: {
+      option_create(data, escape) {
+        return `<div class="create">✏️ Add "<strong>${escape(data.input)}</strong>" as new product</div>`;
+      }
+    },
+    onChange(val) {
+      document.getElementById('nameHidden').value = val || '';
+    }
+  });
+  // Set initial value
+  document.getElementById('nameHidden').value = nameSel.getValue() || '';
+
+  // ── Category: Tom Select with create ────────────────────────────────────
+  const existingCats = new Set([...document.querySelectorAll('#categorySelect option')]
+    .map(o => o.value).filter(Boolean));
+
+  const catSel = new TomSelect('#categorySelect', {
+    create: true,
+    createOnBlur: true,
+    persist: false,
+    placeholder: 'Search or type new category…',
+    render: {
+      option_create(data, escape) {
+        return `<div class="create">➕ Create category "<strong>${escape(data.input)}</strong>"</div>`;
+      }
+    },
+    onChange(val) {
+      if (val && !existingCats.has(val)) {
+        // New category — put in new_category, clear category
+        document.getElementById('categoryHidden').value = '';
+        document.getElementById('newCategoryHidden').value = val;
+      } else {
+        document.getElementById('categoryHidden').value = val || '';
+        document.getElementById('newCategoryHidden').value = '';
+      }
+    }
+  });
+  // Set initial
+  const initCat = {{ (product.category | tojson) if product and product.category else 'null' }};
+  if (initCat) {
+    document.getElementById('categoryHidden').value = initCat;
+  }
+
+  // ── Supplier: Tom Select searchable ─────────────────────────────────────
+  new TomSelect('#supplierSelect', {
+    allowEmptyOption: true,
+    placeholder: 'Search supplier…'
+  });
+
+  // ── On submit: validate name is filled ──────────────────────────────────
+  document.getElementById('productForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('nameHidden').value.trim();
+    if (!name) {
+      e.preventDefault();
+      alert('Please enter a product name.');
+      nameSel.focus();
+    }
+  });
+  </script>
+</body>
+</html>

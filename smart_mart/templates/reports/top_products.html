@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Smart Mart{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Top Products</li>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">Start Date</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">End Date</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:50px;">#</th>
+          <th>Product</th>
+          <th>SKU</th>
+          <th>Category</th>
+          <th class="text-end">Qty Sold</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            {% if loop.index == 1 %}
+              <span class="badge" style="background:#fef3c7;color:#92400e;">🥇 1</span>
+            {% elif loop.index == 2 %}
+              <span class="badge" style="background:#f1f5f9;color:#475569;">🥈 2</span>
+            {% elif loop.index == 3 %}
+              <span class="badge" style="background:#fef3c7;color:#78350f;">🥉 3</span>
+            {% else %}
+              <span class="text-muted">{{ loop.index }}</span>
+            {% endif %}
+          </td>
+          <td class="fw-medium">{{ row.product.name }}</td>
+          <td><code class="text-muted">{{ row.product.sku }}</code></td>
+          <td>
+            <span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;">
+              {{ row.product.category or '—' }}
+            </span>
+          </td>
+          <td class="text-end fw-semibold">{{ row.qty_sold }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-5">
+            <i class="bi bi-trophy fs-2 d-block mb-2"></i>No results found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

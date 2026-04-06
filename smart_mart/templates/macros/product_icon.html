@@ -1,0 +1,108 @@
+{% macro get_emoji(name, category) %}
+  {%- set n = (name ~ ' ' ~ (category or ''))|lower -%}
+  {%- if 'rice' in n -%}🌾
+  {%- elif 'flour' in n or 'wheat' in n or 'atta' in n -%}🌾
+  {%- elif 'milk' in n -%}🥛
+  {%- elif 'butter' in n -%}🧈
+  {%- elif 'cheese' in n -%}🧀
+  {%- elif 'yogurt' in n or 'curd' in n or 'dahi' in n -%}🥣
+  {%- elif 'egg' in n -%}🥚
+  {%- elif 'chicken' in n or 'poultry' in n -%}🍗
+  {%- elif 'meat' in n or 'mutton' in n or 'beef' in n or 'pork' in n -%}🥩
+  {%- elif 'fish' in n or 'seafood' in n -%}🐟
+  {%- elif 'water' in n -%}💧
+  {%- elif 'juice' in n -%}🧃
+  {%- elif 'cola' in n or 'soda' in n or 'pepsi' in n or 'coke' in n -%}🥤
+  {%- elif 'beer' in n or 'wine' in n or 'alcohol' in n -%}🍺
+  {%- elif 'tea' in n or 'chiya' in n -%}🍵
+  {%- elif 'coffee' in n -%}☕
+  {%- elif 'oil' in n or 'ghee' in n -%}🫙
+  {%- elif 'sugar' in n -%}🍬
+  {%- elif 'salt' in n -%}🧂
+  {%- elif 'spice' in n or 'masala' in n or 'pepper' in n or 'chilli' in n -%}🌶️
+  {%- elif 'garlic' in n -%}🧄
+  {%- elif 'onion' in n -%}🧅
+  {%- elif 'potato' in n or 'aloo' in n -%}🥔
+  {%- elif 'tomato' in n -%}🍅
+  {%- elif 'carrot' in n -%}🥕
+  {%- elif 'vegetable' in n or 'sabji' in n or 'sabzi' in n -%}🥦
+  {%- elif 'fruit' in n -%}🍎
+  {%- elif 'banana' in n -%}🍌
+  {%- elif 'apple' in n -%}🍎
+  {%- elif 'mango' in n -%}🥭
+  {%- elif 'lemon' in n or 'lime' in n -%}🍋
+  {%- elif 'bread' in n or 'roti' in n or 'chapati' in n -%}🍞
+  {%- elif 'noodle' in n or 'pasta' in n or 'wai wai' in n or 'maggi' in n -%}🍜
+  {%- elif 'biscuit' in n or 'cookie' in n -%}🍪
+  {%- elif 'cake' in n or 'pastry' in n -%}🎂
+  {%- elif 'chocolate' in n or 'choco' in n -%}🍫
+  {%- elif 'candy' in n or 'toffee' in n or 'sweet' in n -%}🍭
+  {%- elif 'chips' in n or 'crisp' in n or 'kurkure' in n -%}🥨
+  {%- elif 'snack' in n -%}🍿
+  {%- elif 'ice cream' in n or 'icecream' in n -%}🍦
+  {%- elif 'honey' in n -%}🍯
+  {%- elif 'jam' in n or 'jelly' in n -%}🫙
+  {%- elif 'sauce' in n or 'ketchup' in n -%}🥫
+  {%- elif 'soap' in n -%}🧼
+  {%- elif 'shampoo' in n or 'conditioner' in n -%}🧴
+  {%- elif 'toothpaste' in n or 'toothbrush' in n -%}🪥
+  {%- elif 'detergent' in n or 'washing' in n or 'surf' in n -%}🧺
+  {%- elif 'tissue' in n or 'toilet paper' in n or 'napkin' in n -%}🧻
+  {%- elif 'sanitizer' in n or 'disinfect' in n -%}🧴
+  {%- elif 'cleaning' in n or 'cleaner' in n or 'mop' in n -%}🧹
+  {%- elif 'medicine' in n or 'tablet' in n or 'capsule' in n or 'pill' in n -%}💊
+  {%- elif 'syrup' in n or 'tonic' in n -%}🍶
+  {%- elif 'bandage' in n or 'plaster' in n -%}🩹
+  {%- elif 'mask' in n or 'glove' in n -%}🧤
+  {%- elif 'vitamin' in n or 'supplement' in n -%}💊
+  {%- elif 'health' in n or 'pharma' in n -%}🏥
+  {%- elif 'phone' in n or 'mobile' in n or 'smartphone' in n -%}📱
+  {%- elif 'charger' in n or 'cable' in n or 'usb' in n -%}🔌
+  {%- elif 'battery' in n -%}🔋
+  {%- elif 'bulb' in n or 'light' in n or 'lamp' in n -%}💡
+  {%- elif 'fan' in n -%}🌀
+  {%- elif 'tv' in n or 'television' in n -%}📺
+  {%- elif 'laptop' in n or 'computer' in n -%}💻
+  {%- elif 'headphone' in n or 'earphone' in n -%}🎧
+  {%- elif 'camera' in n -%}📷
+  {%- elif 'electronic' in n or 'gadget' in n -%}🔌
+  {%- elif 'shirt' in n or 't-shirt' in n or 'tshirt' in n -%}👕
+  {%- elif 'pant' in n or 'trouser' in n or 'jeans' in n -%}👖
+  {%- elif 'shoe' in n or 'sandal' in n or 'slipper' in n -%}👟
+  {%- elif 'sock' in n -%}🧦
+  {%- elif 'jacket' in n or 'coat' in n or 'sweater' in n -%}🧥
+  {%- elif 'hat' in n or 'cap' in n -%}🧢
+  {%- elif 'bag' in n or 'backpack' in n -%}🎒
+  {%- elif 'cloth' in n or 'dress' in n or 'wear' in n or 'fashion' in n -%}👗
+  {%- elif 'pen' in n or 'pencil' in n -%}✏️
+  {%- elif 'notebook' in n or 'copy' in n or 'exercise book' in n -%}📓
+  {%- elif 'paper' in n -%}📄
+  {%- elif 'stationery' in n -%}📎
+  {%- elif 'book' in n -%}📚
+  {%- elif 'toy' in n -%}🧸
+  {%- elif 'game' in n -%}🎮
+  {%- elif 'ball' in n -%}⚽
+  {%- elif 'candle' in n -%}🕯️
+  {%- elif 'match' in n or 'lighter' in n -%}🔥
+  {%- elif 'umbrella' in n -%}☂️
+  {%- elif 'bottle' in n -%}🍶
+  {%- elif 'container' in n or 'box' in n -%}📦
+  {%- elif 'cigarette' in n or 'tobacco' in n -%}🚬
+  {%- elif 'dairy' in n -%}🥛
+  {%- elif 'beverage' in n or 'drink' in n -%}🥤
+  {%- elif 'grocery' in n or 'food' in n -%}🛒
+  {%- elif 'household' in n or 'home' in n -%}🏠
+  {%- elif 'personal care' in n or 'hygiene' in n -%}🪥
+  {%- else -%}📦
+  {%- endif %}
+{% endmacro %}
+
+{% macro product_icon_cell(name, category, bg_color='#f1f5f9') %}
+<div class="d-flex align-items-center gap-2">
+  <div class="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
+       style="width:36px;height:36px;background:{{ bg_color }};font-size:1.2rem;line-height:1;">
+    {{ get_emoji(name, category) }}
+  </div>
+  <span class="fw-medium">{{ name }}</span>
+</div>
+{% endmacro %}

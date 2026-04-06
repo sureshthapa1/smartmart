@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Management — Smart Mart</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root { --accent: #6366f1; }
+    body { background: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .top-navbar { background: #0f172a; }
+    .top-navbar .navbar-brand { color: #fff; font-weight: 700; }
+    .table thead th { background: #f8fafc; color: #475569; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
+    .table td { font-size: .875rem; color: #334155; border-color: #f1f5f9; vertical-align: middle; }
+    .table-hover tbody tr:hover { background: #f8fafc; }
+    .card { border: none !important; border-radius: 12px !important; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); }
+    .btn-primary:hover { background: #4f46e5; border-color: #4f46e5; }
+    .btn-outline-primary { color: var(--accent); border-color: var(--accent); }
+    .btn-outline-primary:hover { background: var(--accent); border-color: var(--accent); }
+    .alert { border: none; border-radius: 10px; }
+    .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(99,102,241,.15); }
+  </style>
+</head>
+<body>
+  <nav class="navbar top-navbar px-3 py-2">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm me-3" style="background:#1e293b;color:#94a3b8;border:none;">
+      <i class="bi bi-house-door me-1"></i>Dashboard
+    </a>
+    <a class="navbar-brand" href="#">
+      <i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart Admin
+    </a>
+    <div class="d-flex gap-2 ms-auto">
+      <a href="{{ url_for('admin.users') }}" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:none;">
+        <i class="bi bi-people me-1"></i>Users
+      </a>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </a>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-4 py-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
+          {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>
+          {% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>
+          {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+          <span>{{ message }}</span>
+          <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h4 class="fw-bold mb-0" style="color:#0f172a;">User Management</h4>
+        <p class="text-muted small mb-0">Manage system users and permissions</p>
+      </div>
+      <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
+        <i class="bi bi-person-plus me-1"></i>Create User
+      </a>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td><span class="badge" style="background:#f1f5f9;color:#475569;">{{ u.id }}</span></td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div style="width:32px;height:32px;background:#eef2ff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:600;color:#6366f1;">
+                    {{ u.username[0].upper() }}
+                  </div>
+                  <span class="fw-medium">{{ u.username }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge rounded-pill {% if u.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  <i class="bi {% if u.role == 'admin' %}bi-shield-fill{% else %}bi-person-fill{% endif %} me-1"></i>
+                  {{ u.role | capitalize }}
+                </span>
+              </td>
+              <td>
+                {% if u.is_active %}
+                  <span class="badge rounded-pill bg-success"><i class="bi bi-circle-fill me-1" style="font-size:.5rem;"></i>Active</span>
+                {% else %}
+                  <span class="badge rounded-pill bg-secondary"><i class="bi bi-circle me-1" style="font-size:.5rem;"></i>Inactive</span>
+                {% endif %}
+              </td>
+              <td class="text-muted small">{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{{ url_for('admin.edit_user', user_id=u.id) }}"
+                     class="btn btn-sm btn-outline-primary" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <button class="btn btn-sm btn-outline-warning" title="Reset Password"
+                          data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}">
+                    <i class="bi bi-key"></i>
+                  </button>
+                  <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline"
+                        onsubmit="return confirm('Delete user {{ u.username }}?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Reset Password Modal -->
+            <div class="modal fade" id="resetModal{{ u.id }}" tabindex="-1">
+              <div class="modal-dialog modal-sm">
+                <div class="modal-content" style="border-radius:12px;border:none;">
+                  <form method="post" action="{{ url_for('admin.reset_password', user_id=u.id) }}">
+                    <div class="modal-header border-0 pb-0">
+                      <h6 class="modal-title fw-bold">Reset Password</h6>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <p class="text-muted small mb-3">Set a new password for <strong>{{ u.username }}</strong></p>
+                      <label class="form-label fw-medium small">New Password</label>
+                      <input type="password" class="form-control" id="new_password_{{ u.id }}"
+                             name="new_password" required minlength="6" placeholder="Min. 6 characters">
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                      <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-key me-1"></i>Reset
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-5">
+                <i class="bi bi-people fs-2 d-block mb-2"></i>No users found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

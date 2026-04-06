@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Category Performance — Smart Mart{% endblock %}
+{% block page_title %}Category Performance{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Category Performance</li>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">Start Date</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">End Date</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th class="text-end">Qty Sold</th>
+          <th class="text-end">Revenue (NPR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <span class="badge rounded-pill" style="background:#eef2ff;color:#4f46e5;font-size:.8rem;">
+              <i class="bi bi-tag me-1"></i>{{ row.category }}
+            </span>
+          </td>
+          <td class="text-end">{{ row.qty_sold }}</td>
+          <td class="text-end fw-semibold">{{ "%.2f"|format(row.revenue) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="3" class="text-center text-muted py-5">
+            <i class="bi bi-tags fs-2 d-block mb-2"></i>No results found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
