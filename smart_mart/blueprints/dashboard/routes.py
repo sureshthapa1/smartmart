@@ -1,42 +1,200 @@
-"""Dashboard blueprint — key metrics and charts."""
+"""Dashboard blueprint — enhanced business insights."""
 
 from datetime import date, timedelta
 
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 from sqlalchemy import func
 
 from ...extensions import db
 from ...models.product import Product
-from ...models.sale import Sale
+from ...models.sale import Sale, SaleItem
+from ...models.expense import Expense
 from ...services import alert_engine, cash_flow_manager
 from ...services.decorators import login_required
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 
+def _parse_filter():
+    """Parse date filter from request args. Returns (start, end, filter_label)."""
+    f = request.args.get("filter", "today")
+    today = date.today()
+    if f == "today":
+        return today, today, "Today"
+    elif f == "week":
+        return today - timedelta(days=today.weekday()), today, "This Week"
+    elif f == "month":
+        return today.replace(day=1), today, "This Month"
+    elif f == "custom":
+        try:
+            start = date.fromisoformat(request.args.get("start", str(today)))
+            end = date.fromisoformat(request.args.get("end", str(today)))
+            return start, end, f"{start} – {end}"
+        except ValueError:
+            return today, today, "Today"
+    return today, today, "Today"
+
+
 @dashboard_bp.route("/")
 @login_required
 def index():
-    total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    filter_start, filter_end, filter_label = _parse_filter()
+    active_filter = request.args.get("filter", "today")
+
+    # ── Today metrics ─────────────────────────────────────────────────────
+    today_sales_amount = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(func.date(Sale.sale_date) == today)
+    ).scalar() or 0
+    today_sales_count = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(func.date(Sale.sale_date) == today)
+    ).scalar() or 0
+
+    # Today profit = today sales - cost of goods sold today
+    today_cogs_rows = db.session.execute(
+        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) == today)
+        .group_by(Product.id)
+    ).all()
+    today_cogs = sum(float(r.cost_price) * r.qty for r in today_cogs_rows)
+    today_profit = float(today_sales_amount) - today_cogs
+
+    # ── Weekly / Monthly ──────────────────────────────────────────────────
+    weekly_sales_amount = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(func.date(Sale.sale_date) >= week_start)
+    ).scalar() or 0
+    weekly_sales_count = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(func.date(Sale.sale_date) >= week_start)
+    ).scalar() or 0
+
+    monthly_sales_amount = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(func.date(Sale.sale_date) >= month_start)
+    ).scalar() or 0
+    monthly_sales_count = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(func.date(Sale.sale_date) >= month_start)
+    ).scalar() or 0
+
+    total_sales_count = db.session.execute(db.select(func.count(Sale.id))).scalar() or 0
+
+    # ── Cash Balance = total sales - total expenses ───────────────────────
+    total_revenue = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+    ).scalar() or 0
+    total_expenses = db.session.execute(
+        db.select(func.coalesce(func.sum(Expense.amount), 0))
+    ).scalar() or 0
+    cash_balance = float(total_revenue) - float(total_expenses)
+
+    # ── Stock value ───────────────────────────────────────────────────────
     stock_value = db.session.execute(
         db.select(func.coalesce(func.sum(Product.cost_price * Product.quantity), 0))
     ).scalar() or 0
-    today_sales = db.session.execute(
+
+    # ── Monthly profit ────────────────────────────────────────────────────
+    monthly_profit = cash_flow_manager.profit_loss(month_start, today)["profit"]
+
+    # ── Total products ────────────────────────────────────────────────────
+    total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
+
+    # ── Recent sales (last 8) ─────────────────────────────────────────────
+    recent_sales = db.session.execute(
+        db.select(Sale).order_by(Sale.sale_date.desc()).limit(8)
+    ).scalars().all()
+
+    # ── Top 5 selling products (this month) ──────────────────────────────
+    top5 = db.session.execute(
+        db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= month_start)
+        .group_by(Product.id)
+        .order_by(func.sum(SaleItem.quantity).desc())
+        .limit(5)
+    ).all()
+
+    # ── Dead/slow stock (no sales in 30 days) ────────────────────────────
+    cutoff_30 = today - timedelta(days=30)
+    sold_ids_30 = db.session.execute(
+        db.select(SaleItem.product_id.distinct())
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= cutoff_30)
+    ).scalars().all()
+    dead_stock = db.session.execute(
+        db.select(Product)
+        .where(Product.id.notin_(sold_ids_30) if sold_ids_30 else db.true())
+        .where(Product.quantity > 0)
+        .order_by(Product.quantity.desc())
+        .limit(5)
+    ).scalars().all()
+
+    # ── Smart insights ────────────────────────────────────────────────────
+    insights = []
+    # Sales trend vs last week
+    last_week_start = week_start - timedelta(days=7)
+    last_week_end = week_start - timedelta(days=1)
+    last_week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) == date.today())
+        .where(func.date(Sale.sale_date) >= last_week_start)
+        .where(func.date(Sale.sale_date) <= last_week_end)
     ).scalar() or 0
-    month_start = date.today().replace(day=1)
-    monthly_profit = cash_flow_manager.profit_loss(month_start, date.today())["profit"]
+    if last_week_sales > 0:
+        pct = ((float(weekly_sales_amount) - float(last_week_sales)) / float(last_week_sales)) * 100
+        if pct > 0:
+            insights.append({"type": "success", "icon": "bi-graph-up-arrow",
+                              "text": f"Sales up {pct:.1f}% vs last week"})
+        elif pct < -5:
+            insights.append({"type": "warning", "icon": "bi-graph-down-arrow",
+                              "text": f"Sales down {abs(pct):.1f}% vs last week"})
+
     alerts = alert_engine.get_all_alerts()
     low_stock = alerts["low_stock"]
+    if low_stock:
+        insights.append({"type": "warning", "icon": "bi-exclamation-triangle",
+                          "text": f"{len(low_stock)} product(s) running low on stock"})
+    if top5:
+        insights.append({"type": "info", "icon": "bi-trophy",
+                          "text": f"Top seller this month: {top5[0].Product.name}"})
+
     return render_template("dashboard/index.html",
+                           # Sales
+                           total_sales_count=total_sales_count,
+                           today_sales=float(today_sales_amount),
+                           today_sales_count=today_sales_count,
+                           today_profit=today_profit,
+                           cash_balance=cash_balance,
+                           weekly_sales=float(weekly_sales_amount),
+                           weekly_sales_count=weekly_sales_count,
+                           monthly_sales=float(monthly_sales_amount),
+                           monthly_sales_count=monthly_sales_count,
+                           # Other
                            total_products=total_products,
                            stock_value=float(stock_value),
-                           today_sales=float(today_sales),
                            monthly_profit=float(monthly_profit),
+                           # Widgets
+                           recent_sales=recent_sales,
+                           top5=top5,
+                           dead_stock=dead_stock,
+                           insights=insights,
+                           # Alerts
                            low_stock=low_stock,
                            alert_counts={
                                "low_stock": len(alerts["low_stock"]),
                                "expiry": len(alerts["expiry"]),
                                "high_demand": len(alerts["high_demand"]),
-                           })
+                           },
+                           # Filter
+                           active_filter=active_filter,
+                           filter_label=filter_label,
+                           filter_start=str(filter_start),
+                           filter_end=str(filter_end),
+                           )

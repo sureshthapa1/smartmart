@@ -41,6 +41,7 @@
       </div>
       <div class="card-body p-4">
         <form method="post" id="productForm"
+              enctype="multipart/form-data"
               action="{% if product %}{{ url_for('inventory.edit_product', product_id=product.id) }}{% else %}{{ url_for('inventory.create_product') }}{% endif %}"
               novalidate>
 
@@ -119,10 +120,22 @@
             </div>
 
             <!-- Quantity -->
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label fw-medium">Initial Quantity</label>
               <input type="number" class="form-control" name="quantity" min="0"
                      value="{{ product.quantity if product else 0 }}">
+            </div>
+
+            <!-- Unit -->
+            <div class="col-md-3">
+              <label class="form-label fw-medium">Unit <span class="text-danger">*</span></label>
+              <select class="form-select" name="unit">
+                {% set units = ['pcs', 'kg', 'g', 'mg', 'L', 'ml', 'dozen', 'box', 'pack', 'bag', 'bottle', 'can', 'carton', 'roll', 'sheet', 'pair', 'set', 'meter', 'cm'] %}
+                {% set current_unit = product.unit if product and product.unit else 'pcs' %}
+                {% for u in units %}
+                <option value="{{ u }}" {% if current_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <!-- Expiry Date -->
@@ -131,6 +144,49 @@
               <input type="date" class="form-control" name="expiry_date"
                      value="{{ product.expiry_date.strftime('%Y-%m-%d') if product and product.expiry_date else '' }}">
             </div>
+
+            <!-- Product Image (admin only) -->
+            {% if current_user.role == 'admin' %}
+            <div class="col-12">
+              <label class="form-label fw-medium">Product Image & Icon</label>
+              <div class="d-flex align-items-start gap-3 flex-wrap">
+                <!-- Current image preview -->
+                {% if product and product.image_filename %}
+                <div class="text-center" id="currentImageBox">
+                  <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_filename) }}"
+                       alt="{{ product.name }}" id="imagePreview"
+                       style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #e2e8f0;">
+                  <div class="mt-1">
+                    <label class="form-check-label small text-danger" style="cursor:pointer;">
+                      <input type="checkbox" name="remove_image" value="1" class="form-check-input me-1">
+                      Remove
+                    </label>
+                  </div>
+                </div>
+                {% else %}
+                <div id="imagePreviewBox"
+                     style="width:80px;height:80px;border-radius:10px;border:2px dashed #e2e8f0;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-size:1.8rem;">
+                  📦
+                </div>
+                {% endif %}
+                <div class="flex-grow-1">
+                  <input type="file" name="product_image" id="productImageInput"
+                         accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,image/*"
+                         class="form-control mb-2">
+                  <div class="form-text mb-2">JPG, PNG, WEBP supported. Leave empty to keep current.</div>
+                  <!-- Custom emoji override -->
+                  <div class="d-flex align-items-center gap-2">
+                    <label class="form-label fw-medium small mb-0">Custom Emoji Icon:</label>
+                    <input type="text" name="custom_emoji" id="customEmojiInput"
+                           class="form-control form-control-sm" style="width:80px;"
+                           placeholder="e.g. 🥜"
+                           value="{{ product.custom_emoji if product and product.custom_emoji else '' }}">
+                    <span class="text-muted small">This emoji will be used whenever this product name appears.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
 
           </div>
 
@@ -257,6 +313,27 @@
       nameSel.focus();
     }
   });
+
+  // ── Image preview ─────────────────────────────────────────────────────
+  const imgInput = document.getElementById('productImageInput');
+  if (imgInput) {
+    imgInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        // Update or create preview
+        let preview = document.getElementById('imagePreview');
+        let box = document.getElementById('imagePreviewBox');
+        if (preview) {
+          preview.src = e.target.result;
+        } else if (box) {
+          box.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;">`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   </script>
 </body>
 </html>

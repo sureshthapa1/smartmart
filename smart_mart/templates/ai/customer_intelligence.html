@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Customer Intelligence — Smart Mart{% endblock %}
+{% block page_title %}Customer Intelligence{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ai.insights') }}">AI</a></li>
+<li class="breadcrumb-item active">Customer Intelligence</li>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- Quick Nav -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  <a href="#tiers" class="btn btn-outline-primary btn-sm">💎 Customer Tiers</a>
+  <a href="#churn" class="btn btn-outline-danger btn-sm">🔮 Churn Risk</a>
+  <a href="#affinity" class="btn btn-outline-success btn-sm">🛒 Product Affinity</a>
+  <a href="#combos" class="btn btn-outline-warning btn-sm">📦 Smart Combos</a>
+  <a href="#profitability" class="btn btn-outline-info btn-sm">📈 Profitability</a>
+</div>
+
+<!-- ── TIER SUMMARY ──────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  {% for tier, icon, color in [('Platinum','💎','primary'),('Gold','🥇','warning'),('Silver','🥈','secondary'),('Bronze','🥉','danger')] %}
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm h-100" style="border-left:4px solid var(--bs-{{ color }})!important;">
+      <div class="card-body d-flex align-items-center gap-3">
+        <span style="font-size:1.8rem;">{{ icon }}</span>
+        <div>
+          <div class="text-muted small">{{ tier }}</div>
+          <div class="fs-3 fw-bold">{{ tiers.tier_counts.get(tier, 0) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── CUSTOMER TIERS TABLE ──────────────────────────────────────────────── -->
+<div id="tiers" class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>💎</span>Customer Tier Rankings
+    <span class="badge bg-primary rounded-pill ms-auto">{{ tiers.total }} customers</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr><th>#</th><th>Customer</th><th>Tier</th><th class="text-end">Total Spent</th><th class="text-end">Orders</th><th class="text-end">Avg Order</th><th>Last Visit</th><th>Score</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for c in tiers.customers[:20] %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td>
+            <div class="fw-medium">{{ c.name }}</div>
+            <div class="text-muted small">{{ c.phone or '—' }}</div>
+          </td>
+          <td><span class="badge bg-{{ c.tier_color }} rounded-pill">{{ c.tier_icon }} {{ c.tier }}</span></td>
+          <td class="text-end fw-semibold">NPR {{ "%.0f"|format(c.total_spent) }}</td>
+          <td class="text-end">{{ c.frequency }}</td>
+          <td class="text-end text-muted">NPR {{ "%.0f"|format(c.avg_order) }}</td>
+          <td class="text-muted small">{{ c.last_visit }}</td>
+          <td>
+            <div class="progress" style="height:6px;width:60px;">
+              <div class="progress-bar bg-primary" style="width:{{ [c.score, 100] | min }}%"></div>
+            </div>
+            <span class="text-muted" style="font-size:.7rem;">{{ c.score }}</span>
+          </td>
+          <td>
+            <a href="{{ url_for('ai.customer_profile', customer_name=c.name) }}"
+               class="btn btn-sm btn-outline-primary">View</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No customer data yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── CHURN RISK ─────────────────────────────────────────────────────────── -->
+<div id="churn" class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #ef4444!important;">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <span>🚨</span>Churned Customers
+        <span class="badge bg-danger rounded-pill ms-auto">{{ churn.churned_count }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Customer</th><th>Days Inactive</th><th>Spent</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for c in churn.churned[:8] %}
+            <tr>
+              <td><div class="fw-medium">{{ c.name }}</div><div class="text-muted small">{{ c.phone or '' }}</div></td>
+              <td><span class="badge bg-danger">{{ c.days_inactive }}d</span></td>
+              <td class="text-muted small">NPR {{ "%.0f"|format(c.total_spent) }}</td>
+              <td class="text-muted small" style="font-size:.75rem;">{{ c.action }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">✅ No churned customers.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #f59e0b!important;">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <span>⚠️</span>At-Risk Customers
+        <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ churn.at_risk_count }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Customer</th><th>Days Inactive</th><th>Trend</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for c in churn.at_risk[:8] %}
+            <tr>
+              <td><div class="fw-medium">{{ c.name }}</div><div class="text-muted small">{{ c.phone or '' }}</div></td>
+              <td><span class="badge bg-warning text-dark">{{ c.days_inactive }}d</span></td>
+              <td class="text-muted small">{{ c.frequency_drop }}</td>
+              <td class="text-muted small" style="font-size:.75rem;">{{ c.action }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">✅ No at-risk customers.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRODUCT AFFINITY ───────────────────────────────────────────────────── -->
+<div id="affinity" class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>🛒</span>Product Affinity — Frequently Bought Together
+    {% if affinity.insight %}
+    <span class="badge bg-success rounded-pill ms-auto" style="font-size:.75rem;">{{ affinity.insight }}</span>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Product A</th><th></th><th>Product B</th><th class="text-end">Co-purchases</th><th class="text-end">Confidence</th><th class="text-end">Combined Price</th></tr></thead>
+      <tbody>
+        {% for pair in affinity.top_pairs %}
+        <tr>
+          <td class="fw-medium">{{ pair.product_a }}</td>
+          <td class="text-center text-muted">+</td>
+          <td class="fw-medium">{{ pair.product_b }}</td>
+          <td class="text-end"><span class="badge bg-success">{{ pair.co_purchase_count }}</span></td>
+          <td class="text-end">{{ pair.confidence }}%</td>
+          <td class="text-end text-muted">NPR {{ "%.0f"|format(pair.combined_price) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Not enough multi-item sales for affinity analysis.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── SMART COMBOS ───────────────────────────────────────────────────────── -->
+<div id="combos" class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>📦</span>Smart Combo Bundles
+    <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ combos.total_combos }} combos</span>
+  </div>
+  <div class="row g-3 p-3">
+    {% for combo in combos.combos %}
+    <div class="col-md-6 col-xl-4">
+      <div class="border rounded-2 p-3 h-100">
+        <div class="fw-semibold mb-2">{{ combo.combo_name }}</div>
+        <div class="d-flex justify-content-between mb-1">
+          <span class="text-muted small">{{ combo.product_a.name }}</span>
+          <span class="text-muted small">NPR {{ "%.0f"|format(combo.product_a.price) }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted small">{{ combo.product_b.name }}</span>
+          <span class="text-muted small">NPR {{ "%.0f"|format(combo.product_b.price) }}</span>
+        </div>
+        <hr class="my-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <span class="text-decoration-line-through text-muted small">NPR {{ "%.0f"|format(combo.original_price) }}</span>
+            <span class="fw-bold text-success ms-2">NPR {{ "%.0f"|format(combo.combo_price) }}</span>
+          </div>
+          <span class="badge bg-danger">-{{ combo.discount_pct }}%</span>
+        </div>
+        <div class="text-muted small mt-1">Save NPR {{ "%.0f"|format(combo.savings) }} · Bought together {{ combo.co_purchase_count }}×</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center text-muted py-4">No combo data available yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── CUSTOMER PROFITABILITY ─────────────────────────────────────────────── -->
+<div id="profitability" class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>📈</span>Customer Profitability Analysis
+    <span class="badge bg-info rounded-pill ms-auto">{{ profitability.total_customers }} customers</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr><th>#</th><th>Customer</th><th>Segment</th><th class="text-end">Revenue</th><th class="text-end">COGS</th><th class="text-end">Gross Profit</th><th class="text-end">Margin %</th><th class="text-end">Discount</th></tr>
+      </thead>
+      <tbody>
+        {% for c in profitability.customers[:15] %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td><div class="fw-medium">{{ c.name }}</div><div class="text-muted small">{{ c.phone or '' }}</div></td>
+          <td><span class="badge bg-{{ c.segment_color }} rounded-pill">{{ c.segment }}</span></td>
+          <td class="text-end">NPR {{ "%.0f"|format(c.total_revenue) }}</td>
+          <td class="text-end text-muted">NPR {{ "%.0f"|format(c.cogs) }}</td>
+          <td class="text-end fw-semibold {% if c.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+            NPR {{ "%.0f"|format(c.gross_profit) }}
+          </td>
+          <td class="text-end">{{ c.margin_pct }}%</td>
+          <td class="text-end {% if c.total_discount > 0 %}text-danger{% endif %}">
+            {% if c.total_discount > 0 %}NPR {{ "%.0f"|format(c.total_discount) }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No customer profitability data.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

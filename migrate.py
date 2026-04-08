@@ -38,5 +38,14 @@ with app.app_context():
         safe_add("sales", "customer_name", "VARCHAR(120)")
         safe_add("sales", "customer_address", "VARCHAR(255)")
         safe_add("sales", "customer_phone", "VARCHAR(50)")
+        safe_add("sales", "payment_mode", "VARCHAR(20) DEFAULT 'cash'")
+        safe_add("sales", "discount_amount", "NUMERIC(10,2) DEFAULT 0")
+        safe_add("sales", "discount_note", "VARCHAR(120)")
+
+        # products — image and unit
+        safe_add("products", "image_filename", "VARCHAR(255)")
+        safe_add("products", "unit", "VARCHAR(20) DEFAULT 'pcs'")
+
+        # online orders — new tables created via db.create_all() above
 
     print("Migration complete.")

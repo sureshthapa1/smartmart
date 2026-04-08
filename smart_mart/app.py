@@ -35,6 +35,22 @@ def create_app(config_name="development"):
             app.logger.warning("db.create_all() failed: %s", exc)
         app.before_request_funcs[None].remove(create_tables)
 
+    # Track page views per active session
+    @app.before_request
+    def track_page_view():
+        from flask import session as flask_session, request
+        if request.endpoint and not request.endpoint.startswith("static"):
+            try:
+                activity_id = flask_session.get("activity_id")
+                if activity_id:
+                    from .models.user_activity import UserActivity
+                    act = db.session.get(UserActivity, activity_id)
+                    if act and act.logout_at is None:
+                        act.page_views = (act.page_views or 0) + 1
+                        db.session.commit()
+            except Exception:
+                pass
+
     # Root redirect
     @app.route("/")
     def index():
@@ -114,6 +130,18 @@ def _register_blueprints(app):
     try:
         from .blueprints.admin import admin_bp
         app.register_blueprint(admin_bp)
+    except ImportError:
+        pass
+
+    try:
+        from .blueprints.ai import ai_bp
+        app.register_blueprint(ai_bp)
+    except ImportError:
+        pass
+
+    try:
+        from .blueprints.online_orders import online_orders_bp
+        app.register_blueprint(online_orders_bp)
     except ImportError:
         pass
 

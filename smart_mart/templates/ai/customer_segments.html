@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Customer Segments — Smart Mart{% endblock %}
+{% block page_title %}Customer Segmentation AI{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('ai.insights') }}">AI</a></li><li class="breadcrumb-item active">Customers</li>{% endblock %}
+
+{% block content %}
+<!-- Segment Summary -->
+<div class="row g-3 mb-4">
+  {% set seg_config = [
+    ('VIP', 'warning', '👑', 'Top customers'),
+    ('Regular', 'success', '⭐', 'Consistent buyers'),
+    ('At-Risk', 'danger', '⚠️', 'Need win-back'),
+    ('One-Time', 'secondary', '🔵', 'Single purchase'),
+    ('New', 'info', '🆕', 'Recent customers'),
+  ] %}
+  {% for seg, color, icon, desc in seg_config %}
+  <div class="col-6 col-xl">
+    <div class="card shadow-sm border-0 h-100" style="border-left:4px solid var(--bs-{{ color }})!important;">
+      <div class="card-body text-center py-3">
+        <div style="font-size:1.5rem;">{{ icon }}</div>
+        <div class="fw-bold fs-4">{{ data.segments.get(seg, 0) }}</div>
+        <div class="fw-semibold small">{{ seg }}</div>
+        <div class="text-muted" style="font-size:.72rem;">{{ desc }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Customer Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-people-fill text-primary"></i>All Customers ({{ data.total_customers }})
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr><th>Customer</th><th>Segment</th><th class="text-end">Total Spent</th><th class="text-end">Visits</th><th class="text-end">Avg Order</th><th>Last Visit</th><th>Recommendation</th></tr>
+      </thead>
+      <tbody>
+        {% for c in data.all_customers %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0;">
+                {{ c.name[0].upper() }}
+              </div>
+              <div>
+                <div class="fw-medium">{{ c.name }}</div>
+                <div class="text-muted small">{{ c.phone or '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge bg-{{ c.segment_color }} rounded-pill">{{ c.segment_icon }} {{ c.segment }}</span></td>
+          <td class="text-end fw-semibold">NPR {{ "%.0f"|format(c.total_spent) }}</td>
+          <td class="text-end">{{ c.frequency }}</td>
+          <td class="text-end">NPR {{ "%.0f"|format(c.avg_order_value) }}</td>
+          <td class="text-muted small">{{ c.last_visit }}</td>
+          <td class="text-muted small" style="max-width:200px;">{{ c.discount_recommendation }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-5">No customer data yet. Customer records are created automatically when sales are made with customer names.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

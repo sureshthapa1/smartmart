@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}AI Insights — Smart Mart{% endblock %}
+{% block page_title %}AI Business Insights{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">AI Insights</li>{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- Insights Cards -->
+<div class="row g-3 mb-4">
+  {% for ins in insights %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm border-0 h-100"
+         style="border-left:4px solid var(--bs-{{ ins.type }})!important;">
+      <div class="card-body">
+        <div class="d-flex align-items-start gap-3">
+          <span style="font-size:1.8rem;line-height:1;">{{ ins.icon }}</span>
+          <div>
+            <div class="fw-bold mb-1" style="color:#0f172a;">{{ ins.title }}</div>
+            <div class="text-muted small">{{ ins.text }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-4 text-muted">
+        <i class="bi bi-robot fs-1 d-block mb-2"></i>
+        No insights yet. Add some sales data to get started.
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Sales Forecast Chart -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>🔮</span>Sales Forecast — Next 7 Days
+    <span class="badge bg-primary rounded-pill ms-auto">AI Prediction</span>
+  </div>
+  <div class="card-body">
+    <canvas id="forecastChart" height="80"></canvas>
+  </div>
+  <div class="card-footer bg-white">
+    <div class="row g-3 text-center">
+      {% for f in forecasts %}
+      <div class="col">
+        <div class="fw-semibold" style="color:#6366f1;">NPR {{ "%.0f"|format(f.predicted_sales) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">{{ f.day_name[:3] }}<br>{{ f.date[5:] }}</div>
+        <div class="text-muted" style="font-size:.7rem;">{{ "%.0f"|format(f.confidence_low) }}–{{ "%.0f"|format(f.confidence_high) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Restock Recommendations -->
+{% if restock_recs %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>🛒</span>Smart Restock Recommendations
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th class="text-end">Current Stock</th>
+          <th class="text-end">Avg Daily Demand</th>
+          <th class="text-end">Days Left</th>
+          <th class="text-end">Reorder Point</th>
+          <th class="text-end">Recommended Order</th>
+          <th class="text-center">Urgency</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in restock_recs %}
+        <tr>
+          <td class="fw-medium">{{ r.product.name }}</td>
+          <td class="text-end">
+            <span class="badge {% if r.current_stock == 0 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+              {{ r.current_stock }}
+            </span>
+          </td>
+          <td class="text-end text-muted">{{ r.avg_daily_demand }}</td>
+          <td class="text-end {% if r.days_of_stock_left <= 3 %}text-danger fw-bold{% endif %}">
+            {{ r.days_of_stock_left }}d
+          </td>
+          <td class="text-end text-muted">{{ r.reorder_point }}</td>
+          <td class="text-end fw-semibold text-primary">{{ r.recommended_qty }}</td>
+          <td class="text-center">
+            {% if r.urgency == 'critical' %}
+            <span class="badge bg-danger">🚨 Critical</span>
+            {% elif r.urgency == 'soon' %}
+            <span class="badge bg-warning text-dark">⚠️ Soon</span>
+            {% else %}
+            <span class="badge bg-success">✅ OK</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('inventory.adjust_stock', product_id=r.product.id) }}"
+               class="btn btn-sm btn-outline-primary">Restock</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Dead Stock -->
+{% if dead_stock %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <span>💤</span>Dead Stock Detection
+    <span class="badge bg-secondary rounded-pill ms-auto">No sales in 30 days</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Category</th>
+          <th class="text-end">Stock</th>
+          <th class="text-end">Stock Value (NPR)</th>
+          <th>Last Sale</th>
+          <th>Days Since Sale</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in dead_stock %}
+        <tr>
+          <td class="fw-medium">{{ d.product.name }}</td>
+          <td><span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;">{{ d.product.category or '—' }}</span></td>
+          <td class="text-end">{{ d.product.quantity }}</td>
+          <td class="text-end text-danger">{{ "%.2f"|format(d.stock_value) }}</td>
+          <td class="text-muted small">{{ d.last_sale.strftime('%Y-%m-%d') if d.last_sale else 'Never' }}</td>
+          <td class="text-center">
+            <span class="badge bg-secondary">{{ d.days_since_sale or '∞' }}d</span>
+          </td>
+          <td class="text-muted small">{{ d.recommendation }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+fetch("{{ url_for('ai.api_forecast') }}")
+  .then(r => r.json())
+  .then(data => {
+    new Chart(document.getElementById('forecastChart'), {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [
+          {
+            label: 'Predicted Sales (NPR)',
+            data: data.predicted,
+            backgroundColor: 'rgba(99,102,241,0.7)',
+            borderColor: '#6366f1',
+            borderWidth: 1,
+            borderRadius: 6,
+          },
+          {
+            label: 'High Estimate',
+            data: data.high,
+            type: 'line',
+            borderColor: '#22c55e',
+            borderDash: [4,4],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4,
+          },
+          {
+            label: 'Low Estimate',
+            data: data.low,
+            type: 'line',
+            borderColor: '#ef4444',
+            borderDash: [4,4],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4,
+          }
+        ]
+      },
+      options: {
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8' } },
+          x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}

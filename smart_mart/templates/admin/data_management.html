@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Data Management — Smart Mart{% endblock %}
+{% block page_title %}Data Management{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">Data Management</li>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-danger d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div>
+    <strong>Warning:</strong> Clearing data is <strong>permanent and irreversible</strong>.
+    Always export/backup your data before clearing. You must type <code>DELETE</code> to confirm each action.
+  </div>
+</div>
+
+<!-- Individual Section Cards -->
+<div class="row g-3 mb-4">
+
+  {% set sections = [
+    ("sales", "Sales & Transactions", "bi-cart3", "danger", counts.sales, "Clears all sales, sale items. Stock is NOT reversed."),
+    ("purchases", "Purchases", "bi-truck", "warning", counts.purchases, "Clears all purchase records and purchase items."),
+    ("expenses", "Expenses", "bi-cash-stack", "warning", counts.expenses, "Clears all manually recorded expenses."),
+    ("stock_movements", "Stock Movement History", "bi-arrow-left-right", "secondary", counts.stock_movements, "Clears the stock movement audit log only. Stock quantities are unchanged."),
+    ("products", "Products", "bi-box-seam", "danger", counts.products, "Clears all products AND all related sales, purchases, stock movements."),
+    ("suppliers", "Suppliers", "bi-building", "warning", counts.suppliers, "Clears all suppliers and their purchase records."),
+    ("categories", "Categories", "bi-tags", "secondary", counts.categories, "Clears all product categories."),
+  ] %}
+
+  {% for section_id, title, icon, color, count, note in sections %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="rounded-2 d-flex align-items-center justify-content-center"
+               style="width:42px;height:42px;background:var(--bs-{{ color }}-bg, #f8fafc);">
+            <i class="bi {{ icon }} text-{{ color }} fs-5"></i>
+          </div>
+          <div>
+            <div class="fw-semibold" style="color:#0f172a;">{{ title }}</div>
+            <div class="text-muted small">{{ count }} record{{ 's' if count != 1 else '' }}</div>
+          </div>
+        </div>
+        <p class="text-muted small mb-3">{{ note }}</p>
+        <button class="btn btn-outline-{{ color }} btn-sm w-100"
+                data-bs-toggle="modal"
+                data-bs-target="#clearModal"
+                data-section="{{ section_id }}"
+                data-title="{{ title }}"
+                data-count="{{ count }}">
+          <i class="bi bi-trash me-1"></i>Clear {{ title }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- Clear All Card -->
+<div class="card border-danger shadow-sm">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-3">
+      <div class="rounded-2 d-flex align-items-center justify-content-center"
+           style="width:48px;height:48px;background:#fef2f2;">
+        <i class="bi bi-nuclear fs-4 text-danger"></i>
+      </div>
+      <div class="flex-grow-1">
+        <div class="fw-bold text-danger fs-6">Clear ALL Data</div>
+        <div class="text-muted small">
+          Permanently removes all sales, purchases, expenses, stock movements, products, suppliers and categories.
+          Users are NOT deleted.
+        </div>
+      </div>
+      <button class="btn btn-danger"
+              data-bs-toggle="modal"
+              data-bs-target="#clearModal"
+              data-section="all"
+              data-title="ALL DATA"
+              data-count="{{ counts.sales + counts.purchases + counts.products + counts.expenses }}">
+        <i class="bi bi-trash3 me-1"></i>Clear Everything
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="clearModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title text-danger fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Clear
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1">You are about to permanently delete:</p>
+        <div class="alert alert-danger py-2 mb-3">
+          <strong id="modalTitle">—</strong>
+          <span class="text-muted ms-2">(<span id="modalCount">0</span> records)</span>
+        </div>
+        <p class="text-muted small mb-3">This action <strong>cannot be undone</strong>. Type <code>DELETE</code> below to confirm:</p>
+        <form method="post" action="{{ url_for('admin.clear_data') }}" id="clearForm">
+          <input type="hidden" name="section" id="modalSection" value="">
+          <input type="text" name="confirm" class="form-control mb-3"
+                 placeholder="Type DELETE here" id="confirmInput" autocomplete="off">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger flex-grow-1" id="confirmBtn" disabled>
+              <i class="bi bi-trash me-1"></i>Yes, Clear Permanently
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const clearModal = document.getElementById('clearModal');
+clearModal.addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  document.getElementById('modalTitle').textContent = btn.dataset.title;
+  document.getElementById('modalCount').textContent = btn.dataset.count;
+  document.getElementById('modalSection').value = btn.dataset.section;
+  document.getElementById('confirmInput').value = '';
+  document.getElementById('confirmBtn').disabled = true;
+});
+
+document.getElementById('confirmInput').addEventListener('input', function() {
+  document.getElementById('confirmBtn').disabled = this.value !== 'DELETE';
+});
+</script>
+{% endblock %}

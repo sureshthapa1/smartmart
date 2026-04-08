@@ -64,6 +64,9 @@ def create_sale():
                 customer_name=request.form.get("customer_name", "").strip() or None,
                 customer_address=request.form.get("customer_address", "").strip() or None,
                 customer_phone=request.form.get("customer_phone", "").strip() or None,
+                payment_mode=request.form.get("payment_mode", "cash"),
+                discount_amount=float(request.form.get("discount_amount", 0) or 0),
+                discount_note=request.form.get("discount_note", "").strip() or None,
             )
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))

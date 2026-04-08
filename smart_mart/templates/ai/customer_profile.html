@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}{{ customer_name }} — Customer Profile{% endblock %}
+{% block page_title %}Customer Profile{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ai.customer_intelligence') }}">Customer Intelligence</a></li>
+<li class="breadcrumb-item active">{{ customer_name }}</li>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+{% if behavior.error %}
+<div class="alert alert-warning">{{ behavior.error }}</div>
+{% else %}
+
+<!-- Header -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body d-flex align-items-center gap-4">
+    <div style="width:64px;height:64px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.5rem;flex-shrink:0;">
+      {{ customer_name[0].upper() }}
+    </div>
+    <div class="flex-grow-1">
+      <h4 class="fw-bold mb-0">{{ customer_name }}</h4>
+      <div class="text-muted small">{{ behavior.preferred_payment | capitalize }} preferred · Last visit: {{ behavior.last_purchase or '—' }}</div>
+    </div>
+    <div class="text-end">
+      <div class="fs-3 fw-bold text-success">NPR {{ "%.0f"|format(behavior.total_spent) }}</div>
+      <div class="text-muted small">{{ behavior.frequency }} purchases · Avg NPR {{ "%.0f"|format(behavior.avg_order_value) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- CLV -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header fw-semibold"><span class="me-2">💰</span>Lifetime Value</div>
+      <div class="card-body">
+        <div class="text-center mb-3">
+          <div class="fs-2 fw-bold text-primary">NPR {{ "%.0f"|format(clv.estimated_net_clv) }}</div>
+          <div class="text-muted small">Estimated Net CLV (3 years)</div>
+          <span class="badge bg-{% if clv.tier == 'High Value' %}success{% elif clv.tier == 'Medium Value' %}primary{% else %}secondary{% endif %} rounded-pill mt-1">
+            {{ clv.tier }}
+          </span>
+        </div>
+        <table class="table table-sm mb-0" style="font-size:.82rem;">
+          <tr><td class="text-muted border-0">Historical Revenue</td><td class="text-end border-0 fw-medium">NPR {{ "%.0f"|format(clv.historical_revenue) }}</td></tr>
+          <tr><td class="text-muted border-0">Avg Order Value</td><td class="text-end border-0">NPR {{ "%.0f"|format(clv.avg_order_value) }}</td></tr>
+          <tr><td class="text-muted border-0">Orders/Month</td><td class="text-end border-0">{{ clv.purchase_frequency_per_month }}</td></tr>
+          <tr><td class="text-muted border-0">Predicted Annual</td><td class="text-end border-0 text-success fw-medium">NPR {{ "%.0f"|format(clv.predicted_annual_revenue) }}</td></tr>
+          <tr><td class="text-muted border-0">Predicted 3-Year</td><td class="text-end border-0 text-primary fw-bold">NPR {{ "%.0f"|format(clv.predicted_3yr_revenue) }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Behavior -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header fw-semibold"><span class="me-2">🧠</span>Behavior Patterns</div>
+      <div class="card-body">
+        <table class="table table-sm mb-3" style="font-size:.82rem;">
+          <tr><td class="text-muted border-0">Peak Month</td><td class="text-end border-0 fw-medium">{{ behavior.peak_month or '—' }}</td></tr>
+          <tr><td class="text-muted border-0">Peak Day</td><td class="text-end border-0 fw-medium">{{ behavior.peak_day or '—' }}</td></tr>
+          <tr><td class="text-muted border-0">Avg Purchase Interval</td><td class="text-end border-0">{{ behavior.avg_purchase_interval_days or '—' }} days</td></tr>
+          <tr><td class="text-muted border-0">Preferred Payment</td><td class="text-end border-0">{{ behavior.preferred_payment | capitalize }}</td></tr>
+          <tr><td class="text-muted border-0">First Purchase</td><td class="text-end border-0 text-muted small">{{ behavior.first_purchase or '—' }}</td></tr>
+        </table>
+        <div class="fw-medium small mb-2">Top Products:</div>
+        {% for p in behavior.top_products %}
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="small">{{ p.name }}</span>
+          <span class="badge bg-success rounded-pill">{{ p.qty }}×</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Loyalty Offers -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header fw-semibold"><span class="me-2">🎁</span>Smart Offers</div>
+      <div class="card-body">
+        {% if offers.offers %}
+        {% for offer in offers.offers %}
+        <div class="border rounded-2 p-2 mb-2">
+          <div class="d-flex align-items-start gap-2">
+            <span>{% if offer.type == 'loyalty' %}🏆{% elif offer.type == 'retention' %}💌{% elif offer.type == 'festival' %}🎉{% elif offer.type == 'frequency' %}⭐{% else %}🎯{% endif %}</span>
+            <div>
+              <div class="fw-medium small">{{ offer.offer }}</div>
+              <div class="text-muted" style="font-size:.72rem;">{{ offer.reason }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-muted text-center py-3">No special offers at this time.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recommendations -->
+{% if not recs.error %}
+<div class="card shadow-sm border-0 mt-4">
+  <div class="card-header fw-semibold"><span class="me-2">🎯</span>Personalized Recommendations</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <!-- Cross-sell -->
+      <div class="col-md-4">
+        <h6 class="fw-semibold text-muted small text-uppercase mb-2">Cross-Sell</h6>
+        {% for p in recs.cross_sell %}
+        <div class="d-flex justify-content-between align-items-center border rounded-2 p-2 mb-1">
+          <span class="small fw-medium">{{ p.name }}</span>
+          <span class="text-muted small">NPR {{ "%.0f"|format(p.price) }}</span>
+        </div>
+        {% else %}
+        <div class="text-muted small">No cross-sell suggestions.</div>
+        {% endfor %}
+      </div>
+      <!-- Upsell -->
+      <div class="col-md-4">
+        <h6 class="fw-semibold text-muted small text-uppercase mb-2">Upsell</h6>
+        {% for u in recs.upsell %}
+        <div class="border rounded-2 p-2 mb-1">
+          <div class="small text-muted">{{ u.current }} →</div>
+          <div class="small fw-medium">{{ u.upgrade_to }}</div>
+          <div class="text-success small">+NPR {{ "%.0f"|format(u.price_diff) }}</div>
+        </div>
+        {% else %}
+        <div class="text-muted small">No upsell suggestions.</div>
+        {% endfor %}
+      </div>
+      <!-- Combos -->
+      <div class="col-md-4">
+        <h6 class="fw-semibold text-muted small text-uppercase mb-2">Combo Suggestions</h6>
+        {% for c in recs.combo_suggestions %}
+        <div class="border rounded-2 p-2 mb-1">
+          <div class="small fw-medium">{{ c.product_a }} + {{ c.product_b }}</div>
+          <div class="text-muted small">Bought together {{ c.co_purchase_count }}×</div>
+        </div>
+        {% else %}
+        <div class="text-muted small">No combo suggestions.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+<div class="mt-3">
+  <a href="{{ url_for('ai.customer_intelligence') }}" class="btn btn-outline-secondary btn-sm">← Back to Customer Intelligence</a>
+</div>
+{% endblock %}

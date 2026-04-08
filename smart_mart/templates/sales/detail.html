@@ -92,6 +92,17 @@
             <dt>Served by</dt>
             <dd>{{ sale.user.username if sale.user else '—' }}</dd>
           </div>
+          <div class="col-sm-4 mb-2">
+            <dt>Payment Mode</dt>
+            <dd>
+              {% set pm = sale.payment_mode or 'cash' %}
+              {% if pm == 'cash' %}💵 Cash
+              {% elif pm == 'qr' %}📱 QR / Digital
+              {% elif pm == 'card' %}💳 Card
+              {% elif pm == 'credit' %}📋 Credit / Udharo
+              {% else %}🔄 Other{% endif %}
+            </dd>
+          </div>
         </div>
       </div>
     </div>
@@ -125,6 +136,18 @@
             {% endfor %}
           </tbody>
           <tfoot>
+            <tr style="background:#f8fafc;">
+              <td colspan="4" class="text-end text-muted">Sub Total</td>
+              <td class="text-end fw-medium">NPR {{ "%.2f"|format(sale.items | sum(attribute='subtotal') | float) }}</td>
+            </tr>
+            {% if sale.discount_amount and sale.discount_amount > 0 %}
+            <tr style="background:#fef2f2;">
+              <td colspan="4" class="text-end text-danger">
+                Discount{% if sale.discount_note %} ({{ sale.discount_note }}){% endif %}
+              </td>
+              <td class="text-end text-danger fw-medium">- NPR {{ "%.2f"|format(sale.discount_amount | float) }}</td>
+            </tr>
+            {% endif %}
             <tr style="background:#f8fafc;">
               <td colspan="4" class="text-end fw-bold" style="color:#0f172a;">Total</td>
               <td class="text-end fw-bold fs-5" style="color:#6366f1;">NPR {{ "%.2f"|format(sale.total_amount) }}</td>

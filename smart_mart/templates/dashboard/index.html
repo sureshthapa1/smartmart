@@ -6,222 +6,318 @@
 
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  .metric-card { transition: transform .15s, box-shadow .15s; }
+  .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08)!important; }
+  .quick-btn { transition: all .15s; }
+  .quick-btn:hover { transform: translateY(-1px); }
+  .insight-badge { font-size:.8rem; }
+</style>
 {% endblock %}
 
 {% block content %}
-<!-- Metric Cards -->
-<div class="row g-3 mb-4">
-  <div class="col-sm-6 {% if current_user.role == 'admin' %}col-xl-3{% else %}col-xl-4{% endif %}">
-    <div class="card shadow-sm metric-card blue h-100">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="metric-icon" style="background:#eff6ff; color:#3b82f6;">
-          <i class="bi bi-box-seam fs-5"></i>
-        </div>
-        <div>
-          <div class="metric-label">Total Products</div>
-          <div class="metric-value">{{ total_products }}</div>
-        </div>
+
+<!-- Date Filter Bar -->
+<div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+  <span class="text-muted small fw-medium me-1">View:</span>
+  {% for f, label in [('today','Today'),('week','This Week'),('month','This Month')] %}
+  <a href="{{ url_for('dashboard.index', filter=f) }}"
+     class="btn btn-sm {% if active_filter == f %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+  <form method="get" class="d-flex gap-1 align-items-center ms-1">
+    <input type="hidden" name="filter" value="custom">
+    <input type="date" name="start" class="form-control form-control-sm" value="{{ filter_start }}" style="width:130px;">
+    <span class="text-muted small">–</span>
+    <input type="date" name="end" class="form-control form-control-sm" value="{{ filter_end }}" style="width:130px;">
+    <button type="submit" class="btn btn-sm btn-outline-primary">Go</button>
+  </form>
+  <span class="ms-auto badge rounded-pill" style="background:#f1f5f9;color:#475569;">{{ filter_label }}</span>
+</div>
+
+<!-- Quick Action Buttons -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary quick-btn">
+    <i class="bi bi-plus-circle me-1"></i>Add Product
+  </a>
+  <a href="{{ url_for('sales.create_sale') }}" class="btn btn-success quick-btn">
+    <i class="bi bi-cart-plus me-1"></i>New Sale
+  </a>
+  <a href="{{ url_for('purchases.create_purchase') }}" class="btn btn-warning quick-btn">
+    <i class="bi bi-truck me-1"></i>Add Purchase
+  </a>
+  <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary quick-btn">
+    <i class="bi bi-box-seam me-1"></i>Inventory
+  </a>
+</div>
+
+<!-- Smart Insights -->
+{% if insights %}
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  {% for ins in insights %}
+  <span class="badge rounded-pill insight-badge bg-{{ ins.type }} bg-opacity-10 text-{{ ins.type }} border border-{{ ins.type }} border-opacity-25 px-3 py-2">
+    <i class="bi {{ ins.icon }} me-1"></i>{{ ins.text }}
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Top Metric Cards Row 1 -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #22c55e!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-cart-check me-1"></i>Today's Sales</div>
+        <div class="fs-4 fw-bold text-success">NPR {{ "%.0f"|format(today_sales) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">{{ today_sales_count }} transaction{{ 's' if today_sales_count != 1 else '' }}</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 {% if current_user.role == 'admin' %}col-xl-3{% else %}col-xl-4{% endif %}">
-    <div class="card shadow-sm metric-card green h-100">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="metric-icon" style="background:#f0fdf4; color:#22c55e;">
-          <i class="bi bi-cart-check fs-5"></i>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #6366f1!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-graph-up me-1"></i>Today's Profit</div>
+        <div class="fs-4 fw-bold {% if today_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
+          NPR {{ "%.0f"|format(today_profit) }}
         </div>
-        <div>
-          <div class="metric-label">Today's Sales (NPR)</div>
-          <div class="metric-value text-success">{{ "%.2f"|format(today_sales) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">Sales minus cost</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #0ea5e9!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-wallet2 me-1"></i>Cash Balance</div>
+        <div class="fs-4 fw-bold {% if cash_balance >= 0 %}text-info{% else %}text-danger{% endif %}">
+          NPR {{ "%.0f"|format(cash_balance) }}
         </div>
+        <div class="text-muted" style="font-size:.75rem;">Revenue minus expenses</div>
       </div>
     </div>
   </div>
   {% if current_user.role == 'admin' %}
-  <div class="col-sm-6 col-xl-3">
-    <div class="card shadow-sm metric-card purple h-100">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="metric-icon" style="background:#faf5ff; color:#a855f7;">
-          <i class="bi bi-graph-up-arrow fs-5"></i>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #a855f7!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-graph-up-arrow me-1"></i>Monthly Profit</div>
+        <div class="fs-4 fw-bold {% if monthly_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+          NPR {{ "%.0f"|format(monthly_profit) }}
         </div>
-        <div>
-          <div class="metric-label">Monthly Profit (NPR)</div>
-          <div class="metric-value {% if monthly_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-            {{ "%.2f"|format(monthly_profit) }}
-          </div>
-        </div>
+        <div class="text-muted" style="font-size:.75rem;">This month</div>
       </div>
     </div>
   </div>
   {% endif %}
-  <div class="col-sm-6 {% if current_user.role == 'admin' %}col-xl-3{% else %}col-xl-4{% endif %}">
-    <div class="card shadow-sm metric-card orange h-100">
-      <div class="card-body d-flex align-items-center gap-3">
-        <div class="metric-icon" style="background:#fff7ed; color:#f97316;">
-          <i class="bi bi-currency-exchange fs-5"></i>
-        </div>
-        <div>
-          <div class="metric-label">Stock Value (NPR)</div>
-          <div class="metric-value">{{ "%.2f"|format(stock_value) }}</div>
-        </div>
+</div>
+
+<!-- Metric Cards Row 2 -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #f59e0b!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-receipt me-1"></i>Total Sales</div>
+        <div class="fs-4 fw-bold text-warning">{{ total_sales_count }}</div>
+        <div class="text-muted" style="font-size:.75rem;">All time transactions</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #f97316!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-currency-exchange me-1"></i>Stock Value</div>
+        <div class="fs-4 fw-bold" style="color:#f97316;">NPR {{ "%.0f"|format(stock_value) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">{{ total_products }} products</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #0ea5e9!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-calendar-week me-1"></i>This Week</div>
+        <div class="fs-4 fw-bold text-info">NPR {{ "%.0f"|format(weekly_sales) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">{{ weekly_sales_count }} sales</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #8b5cf6!important;">
+      <div class="card-body">
+        <div class="text-muted small mb-1"><i class="bi bi-calendar-month me-1"></i>This Month</div>
+        <div class="fs-4 fw-bold" style="color:#8b5cf6;">NPR {{ "%.0f"|format(monthly_sales) }}</div>
+        <div class="text-muted" style="font-size:.75rem;">{{ monthly_sales_count }} sales</div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Alert Counts -->
+<!-- Alert Cards (clickable) -->
 <div class="row g-3 mb-4">
   <div class="col-sm-4">
-    <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100" style="border-left: 4px solid #f59e0b !important;">
+    <a href="{{ url_for('inventory.list_products') }}?q=low" class="text-decoration-none">
+      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #f59e0b!important;">
         <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
-          </div>
+          <div style="width:42px;height:42px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">⚠️</div>
           <div>
-            <div class="text-muted small fw-500">Low Stock</div>
+            <div class="text-muted small">Low Stock</div>
             <div class="fs-3 fw-bold text-warning">{{ alert_counts.low_stock }}</div>
           </div>
-          {% if alert_counts.low_stock > 0 %}
-          <span class="badge rounded-pill bg-warning text-dark ms-auto">!</span>
-          {% endif %}
+          <i class="bi bi-arrow-right ms-auto text-muted"></i>
         </div>
       </div>
     </a>
   </div>
   <div class="col-sm-4">
     <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100" style="border-left: 4px solid #ef4444 !important;">
+      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #ef4444!important;">
         <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#fef2f2;border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i class="bi bi-calendar-x-fill text-danger fs-5"></i>
-          </div>
+          <div style="width:42px;height:42px;background:#fef2f2;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">📅</div>
           <div>
             <div class="text-muted small">Expiry Alerts</div>
             <div class="fs-3 fw-bold text-danger">{{ alert_counts.expiry }}</div>
           </div>
-          {% if alert_counts.expiry > 0 %}
-          <span class="badge rounded-pill bg-danger ms-auto">!</span>
-          {% endif %}
+          <i class="bi bi-arrow-right ms-auto text-muted"></i>
         </div>
       </div>
     </a>
   </div>
   <div class="col-sm-4">
     <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100" style="border-left: 4px solid #06b6d4 !important;">
+      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #06b6d4!important;">
         <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#ecfeff;border-radius:10px;display:flex;align-items:center;justify-content:center;">
-            <i class="bi bi-fire text-info fs-5"></i>
-          </div>
+          <div style="width:42px;height:42px;background:#ecfeff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🔥</div>
           <div>
             <div class="text-muted small">High Demand</div>
             <div class="fs-3 fw-bold text-info">{{ alert_counts.high_demand }}</div>
           </div>
+          <i class="bi bi-arrow-right ms-auto text-muted"></i>
         </div>
       </div>
     </a>
   </div>
 </div>
 
-<!-- Charts -->
+<!-- Charts Row -->
 <div class="row g-3 mb-4">
-  <div class="{% if current_user.role == 'admin' %}col-lg-6{% else %}col-12{% endif %}">
+  <div class="col-lg-8">
     <div class="card shadow-sm">
-      <div class="card-header d-flex align-items-center gap-2">
-        <i class="bi bi-graph-up text-primary"></i>
-        <span class="fw-semibold">Sales Trend (30 days)</span>
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-graph-up text-primary"></i>Sales Trend (30 days)
       </div>
-      <div class="card-body"><canvas id="salesChart" height="120"></canvas></div>
+      <div class="card-body"><canvas id="salesChart" height="100"></canvas></div>
     </div>
   </div>
-  {% if current_user.role == 'admin' %}
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-header d-flex align-items-center gap-2">
-        <i class="bi bi-graph-up-arrow text-success"></i>
-        <span class="fw-semibold">Profit Trend (30 days)</span>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-trophy-fill text-warning"></i>Top 5 Products (Month)
       </div>
-      <div class="card-body"><canvas id="profitChart" height="120"></canvas></div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+          <tbody>
+            {% for r in top5 %}
+            <tr>
+              <td class="ps-3">
+                <span class="badge rounded-pill me-1"
+                      style="background:{% if loop.index == 1 %}#fbbf24{% elif loop.index == 2 %}#94a3b8{% elif loop.index == 3 %}#cd7c2f{% else %}#f1f5f9{% endif %};color:{% if loop.index <= 3 %}#fff{% else %}#475569{% endif %};">
+                  {{ loop.index }}
+                </span>
+                {{ r.Product.name }}
+              </td>
+              <td class="text-end pe-3"><span class="badge bg-success">{{ r.qty_sold }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center text-muted py-4">No sales this month.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-  {% endif %}
+</div>
+
+<!-- Recent Sales + Dead Stock Row -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-clock-history me-2 text-primary"></i>Recent Sales</span>
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary btn-sm">View All</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Invoice</th><th>Customer</th><th>Staff</th><th class="text-end">Amount</th><th>Time</th></tr></thead>
+          <tbody>
+            {% for s in recent_sales %}
+            <tr>
+              <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="text-decoration-none fw-medium">
+                {{ s.invoice_number or '#' ~ s.id }}</a></td>
+              <td class="text-muted small">{{ s.customer_name or 'Walk-in' }}</td>
+              <td class="text-muted small">{{ s.user.username if s.user else '—' }}</td>
+              <td class="text-end fw-semibold text-success">NPR {{ "%.0f"|format(s.total_amount) }}</td>
+              <td class="text-muted small">{{ s.sale_date.strftime('%H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No sales today.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-hourglass-split me-2 text-danger"></i>Dead/Slow Stock</span>
+        <span class="badge bg-danger rounded-pill">No sales 30d</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Qty</th></tr></thead>
+          <tbody>
+            {% macro product_icon(name, category) %}
+              {%- set n = (name ~ ' ' ~ (category or ''))|lower -%}
+              {%- if 'rice' in n or 'flour' in n -%}🌾{%- elif 'milk' in n or 'dairy' in n -%}🥛
+              {%- elif 'oil' in n or 'ghee' in n -%}🫙{%- elif 'tea' in n -%}🍵
+              {%- elif 'soap' in n or 'shampoo' in n -%}🧴{%- elif 'medicine' in n or 'tablet' in n -%}💊
+              {%- elif 'phone' in n or 'mobile' in n -%}📱{%- else -%}📦{%- endif %}
+            {% endmacro %}
+            {% for p in dead_stock %}
+            <tr>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span style="font-size:1.1rem;">{{ product_icon(p.name, p.category) }}</span>
+                  <span class="fw-medium small">{{ p.name }}</span>
+                </div>
+              </td>
+              <td class="text-end"><span class="badge bg-secondary">{{ p.quantity }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center text-muted py-4">All products selling well! 🎉</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Low Stock Table -->
 {% if low_stock %}
-<div class="card shadow-sm">
-  <div class="card-header d-flex align-items-center gap-2">
-    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-    <span class="fw-semibold">Low Stock Items</span>
-    <span class="badge bg-warning text-dark ms-auto">{{ low_stock | length }}</span>
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Low Stock Items</span>
+    <span class="badge bg-warning text-dark">{{ low_stock | length }}</span>
   </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead>
-        <tr><th>Product</th><th>SKU</th><th>Qty</th><th>Action</th></tr>
-      </thead>
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Product</th><th>SKU</th><th class="text-end">Qty</th><th>Action</th></tr></thead>
       <tbody>
-        {% macro product_icon(name, category) %}
-          {%- set n = (name ~ ' ' ~ (category or ''))|lower -%}
-          {%- if 'rice' in n or 'flour' in n or 'grain' in n or 'wheat' in n -%}🌾
-          {%- elif 'milk' in n or 'dairy' in n -%}🥛
-          {%- elif 'butter' in n -%}🧈
-          {%- elif 'cheese' in n -%}🧀
-          {%- elif 'egg' in n -%}🥚
-          {%- elif 'chicken' in n -%}🍗
-          {%- elif 'meat' in n or 'mutton' in n -%}🥩
-          {%- elif 'fish' in n -%}🐟
-          {%- elif 'water' in n -%}💧
-          {%- elif 'juice' in n -%}🧃
-          {%- elif 'cola' in n or 'soda' in n or 'drink' in n or 'beverage' in n -%}🥤
-          {%- elif 'tea' in n -%}🍵
-          {%- elif 'coffee' in n -%}☕
-          {%- elif 'oil' in n or 'ghee' in n -%}🫙
-          {%- elif 'sugar' in n -%}🍬
-          {%- elif 'salt' in n -%}🧂
-          {%- elif 'spice' in n or 'masala' in n or 'chilli' in n -%}🌶️
-          {%- elif 'onion' in n -%}🧅
-          {%- elif 'potato' in n -%}🥔
-          {%- elif 'tomato' in n -%}🍅
-          {%- elif 'vegetable' in n -%}🥦
-          {%- elif 'fruit' in n -%}🍎
-          {%- elif 'bread' in n or 'roti' in n -%}🍞
-          {%- elif 'noodle' in n or 'pasta' in n -%}🍜
-          {%- elif 'biscuit' in n or 'cookie' in n -%}🍪
-          {%- elif 'cake' in n -%}🎂
-          {%- elif 'chocolate' in n -%}🍫
-          {%- elif 'candy' in n or 'toffee' in n -%}🍭
-          {%- elif 'chips' in n or 'snack' in n -%}🥨
-          {%- elif 'soap' in n -%}🧼
-          {%- elif 'shampoo' in n -%}🧴
-          {%- elif 'toothpaste' in n or 'toothbrush' in n -%}🪥
-          {%- elif 'detergent' in n or 'washing' in n -%}🧺
-          {%- elif 'tissue' in n or 'napkin' in n -%}🧻
-          {%- elif 'medicine' in n or 'tablet' in n or 'capsule' in n -%}💊
-          {%- elif 'phone' in n or 'mobile' in n -%}📱
-          {%- elif 'charger' in n or 'cable' in n -%}🔌
-          {%- elif 'battery' in n -%}🔋
-          {%- elif 'bulb' in n or 'light' in n -%}💡
-          {%- elif 'shirt' in n or 'tshirt' in n -%}👕
-          {%- elif 'pant' in n or 'jeans' in n -%}👖
-          {%- elif 'shoe' in n or 'sandal' in n -%}👟
-          {%- elif 'pen' in n or 'pencil' in n -%}✏️
-          {%- elif 'notebook' in n or 'copy' in n -%}📓
-          {%- elif 'toy' in n -%}🧸
-          {%- elif 'game' in n -%}🎮
-          {%- elif 'candle' in n -%}🕯️
-          {%- elif 'umbrella' in n -%}☂️
-          {%- elif 'cigarette' in n or 'tobacco' in n -%}🚬
-          {%- elif 'beer' in n or 'wine' in n or 'alcohol' in n -%}🍺
-          {%- else -%}📦
-          {%- endif %}
-        {% endmacro %}
         {% for p in low_stock %}
         <tr>
-          <td>{{ product_icon_cell(p.name, p.category, '#fffbeb') }}</td>
+          <td class="fw-medium">{{ p.name }}</td>
           <td><code class="text-muted">{{ p.sku }}</code></td>
-          <td><span class="badge bg-warning text-dark">{{ p.quantity }}</span></td>
+          <td class="text-end"><span class="badge bg-warning text-dark">{{ p.quantity }}</span></td>
           <td>
             <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}"
                class="btn btn-sm btn-outline-primary">
@@ -235,6 +331,7 @@
   </div>
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -266,7 +363,7 @@ async function loadChart(url, canvasId, label, color) {
 }
 loadChart("{{ url_for('api.sales_trend') }}", 'salesChart', 'Sales (NPR)', '#6366f1');
 {% if current_user.role == 'admin' %}
-loadChart("{{ url_for('api.profit_trend') }}", 'profitChart', 'Profit (NPR)', '#22c55e');
+// profit chart removed from dashboard — available in Reports
 {% endif %}
 </script>
 {% endblock %}

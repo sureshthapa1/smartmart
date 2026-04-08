@@ -9,10 +9,8 @@ from ..models.user import User
 
 
 def login(username: str, password: str) -> User | None:
-    """Verify credentials and create a session.
-
-    Returns the User on success, None on failure.
-    """
+    """Verify credentials and create a session."""
+    from flask import request as flask_request
     user: User | None = db.session.execute(
         db.select(User).filter_by(username=username)
     ).scalar_one_or_none()
@@ -24,11 +22,39 @@ def login(username: str, password: str) -> User | None:
         return None
 
     login_user(user)
+
+    # Track activity session
+    try:
+        from ..models.user_activity import UserActivity
+        session = UserActivity(
+            user_id=user.id,
+            ip_address=flask_request.remote_addr,
+        )
+        db.session.add(session)
+        db.session.commit()
+        # Store session ID in Flask session for logout tracking
+        from flask import session as flask_session
+        flask_session["activity_id"] = session.id
+    except Exception:
+        pass
+
     return user
 
 
 def logout() -> None:
     """Invalidate the current session."""
+    try:
+        from flask import session as flask_session
+        from ..models.user_activity import UserActivity
+        from datetime import datetime, timezone
+        activity_id = flask_session.get("activity_id")
+        if activity_id:
+            act = db.session.get(UserActivity, activity_id)
+            if act and act.logout_at is None:
+                act.logout_at = datetime.now(timezone.utc)
+                db.session.commit()
+    except Exception:
+        pass
     logout_user()
 
 

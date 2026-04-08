@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Online Orders Analytics — Smart Mart{% endblock %}
+{% block page_title %}Online Orders Analytics{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('online_orders.list_orders') }}">Online Orders</a></li>
+<li class="breadcrumb-item active">Analytics</li>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #22c55e!important;">
+      <div class="card-body"><div class="text-muted small">Today Orders</div><div class="fs-3 fw-bold text-success">{{ metrics.today_orders }}</div><div class="text-muted small">NPR {{ "%.0f"|format(metrics.today_revenue) }}</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #6366f1!important;">
+      <div class="card-body"><div class="text-muted small">This Week</div><div class="fs-3 fw-bold text-primary">{{ metrics.week_orders }}</div><div class="text-muted small">NPR {{ "%.0f"|format(metrics.week_revenue) }}</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #f59e0b!important;">
+      <div class="card-body"><div class="text-muted small">This Month</div><div class="fs-3 fw-bold text-warning">{{ metrics.month_orders }}</div><div class="text-muted small">NPR {{ "%.0f"|format(metrics.month_revenue) }}</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #ef4444!important;">
+      <div class="card-body"><div class="text-muted small">Pending</div><div class="fs-3 fw-bold text-danger">{{ metrics.pending }}</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #06b6d4!important;">
+      <div class="card-body"><div class="text-muted small">Out for Delivery</div><div class="fs-3 fw-bold text-info">{{ metrics.out_for_delivery }}</div></div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #22c55e!important;">
+      <div class="card-body"><div class="text-muted small">Delivered</div><div class="fs-3 fw-bold text-success">{{ metrics.delivered }}</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-graph-up me-2 text-primary"></i>Daily Order Trend (30 days)</div>
+      <div class="card-body"><canvas id="trendChart" height="100"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-2 text-success"></i>Revenue by Payment Mode</div>
+      <div class="card-body"><canvas id="pmChart" height="200"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Top Products -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy me-2 text-warning"></i>Top Ordered Products</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>#</th><th>Product</th><th class="text-end">Qty</th><th class="text-end">Revenue</th></tr></thead>
+          <tbody>
+            {% for p in top_products %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td class="fw-medium">{{ p.product_name }}</td>
+              <td class="text-end"><span class="badge bg-success">{{ p.qty }}</span></td>
+              <td class="text-end">NPR {{ "%.0f"|format(p.revenue) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-4">No data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Delivery Areas -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-geo-alt me-2 text-danger"></i>Top Delivery Areas</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Area</th><th class="text-end">Orders</th><th class="text-end">Revenue</th></tr></thead>
+          <tbody>
+            {% for a in top_areas %}
+            <tr>
+              <td class="fw-medium">{{ a.area }}</td>
+              <td class="text-end"><span class="badge bg-primary">{{ a.count }}</span></td>
+              <td class="text-end">NPR {{ "%.0f"|format(a.revenue) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No area data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Source Breakdown -->
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold"><i class="bi bi-globe me-2 text-info"></i>Orders by Source</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for s in source_breakdown %}
+      <div class="col-md-3 col-6">
+        <div class="border rounded-2 p-3 text-center">
+          <div style="font-size:1.5rem;">{% if s.source == 'website' %}🌐{% elif s.source == 'phone' %}📞{% elif s.source == 'whatsapp' %}💬{% elif s.source == 'app' %}📱{% else %}🚶{% endif %}</div>
+          <div class="fw-semibold">{{ s.source | capitalize }}</div>
+          <div class="fs-4 fw-bold text-primary">{{ s.count }}</div>
+          <div class="text-muted small">NPR {{ "%.0f"|format(s.revenue) }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7'];
+const trend = {{ daily_trend | tojson }};
+new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {
+    labels: trend.map(r => r.date.slice(5)),
+    datasets: [
+      { label: 'Orders', data: trend.map(r => r.count), backgroundColor: 'rgba(99,102,241,0.7)', borderRadius: 4, yAxisID: 'y' },
+      { label: 'Revenue', data: trend.map(r => r.revenue), type: 'line', borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.4, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8' } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#22c55e' } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+    }
+  }
+});
+
+const pm = {{ payment_breakdown | tojson }};
+new Chart(document.getElementById('pmChart'), {
+  type: 'doughnut',
+  data: {
+    labels: pm.map(r => r.mode.toUpperCase()),
+    datasets: [{ data: pm.map(r => r.revenue), backgroundColor: COLORS, borderWidth: 2, borderColor: '#fff' }]
+  },
+  options: { plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }, cutout: '60%' }
+});
+</script>
+{% endblock %}

@@ -14,6 +14,11 @@ class Sale(db.Model):
     customer_name = db.Column(db.String(120), nullable=True)
     customer_address = db.Column(db.String(255), nullable=True)
     customer_phone = db.Column(db.String(50), nullable=True)
+    payment_mode = db.Column(db.String(20), nullable=True, default="cash")  # cash|qr|card|other
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=True, default=0)
+    discount_note = db.Column(db.String(120), nullable=True)
+    credit_due_date = db.Column(db.Date, nullable=True)   # collection reminder for credit/udharo
+    credit_collected = db.Column(db.Boolean, nullable=False, default=False)
 
     # Relationships
     user = db.relationship("User", back_populates="sales")

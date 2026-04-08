@@ -162,6 +162,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.blueprint == 'online_orders' %}active{% endif %}"
+           href="{{ url_for('online_orders.list_orders') }}">
+          <i class="bi bi-globe"></i>Online Orders
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if request.blueprint == 'purchases' %}active{% endif %}"
            href="{{ url_for('purchases.list_purchases') }}">
           <i class="bi bi-truck"></i>Purchases
@@ -169,6 +175,32 @@
       </li>
 
       <div class="nav-section">Analytics</div>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'ai.chatbot' %}active{% endif %}"
+           href="{{ url_for('ai.chatbot') }}">
+          <i class="bi bi-chat-dots"></i>AI Assistant
+        </a>
+      </li>
+      {% if current_user.role == 'admin' %}
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'ai.insights' %}active{% endif %}"
+           href="{{ url_for('ai.insights') }}">
+          <i class="bi bi-robot"></i>AI Insights
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'ai.advanced_dashboard' %}active{% endif %}"
+           href="{{ url_for('ai.advanced_dashboard') }}">
+          <i class="bi bi-cpu"></i>Advanced AI
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'ai.customer_intelligence' or request.endpoint == 'ai.customer_profile' %}active{% endif %}"
+           href="{{ url_for('ai.customer_intelligence') }}">
+          <i class="bi bi-people-fill"></i>Customer Intel
+        </a>
+      </li>
+      {% endif %}
       {% if current_user.role == 'admin' %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint == 'reports' %}active{% else %}collapsed{% endif %}"
@@ -220,6 +252,18 @@
                 <i class="bi bi-bar-chart"></i>Stock Analysis
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.staff_efficiency' %}active{% endif %}"
+                 href="{{ url_for('reports.staff_efficiency') }}">
+                <i class="bi bi-person-check"></i>Staff Efficiency
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint and request.endpoint.startswith('reports.credit') %}active{% endif %}"
+                 href="{{ url_for('reports.credit_udharo') }}">
+                <i class="bi bi-credit-card-2-back"></i>Credit / Udharo
+              </a>
+            </li>
           </ul>
         </div>
       </li>
@@ -234,15 +278,33 @@
       {% if current_user.role == 'admin' %}
       <div class="nav-section">Admin</div>
       <li class="nav-item">
-        <a class="nav-link {% if request.blueprint == 'admin' %}active{% endif %}"
+        <a class="nav-link {% if request.endpoint == 'admin.users' %}active{% endif %}"
            href="{{ url_for('admin.users') }}">
           <i class="bi bi-people"></i>Users
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.staff_permissions' or request.endpoint == 'admin.edit_permissions' %}active{% endif %}"
+           href="{{ url_for('admin.staff_permissions') }}">
+          <i class="bi bi-shield-lock"></i>Staff Permissions
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.staff_activity' %}active{% endif %}"
+           href="{{ url_for('admin.staff_activity') }}">
+          <i class="bi bi-activity"></i>Staff Activity
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.blueprint == 'settings' %}active{% endif %}"
            href="{{ url_for('settings.index') }}">
           <i class="bi bi-gear"></i>Shop Settings
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'admin.data_management' %}active{% endif %}"
+           href="{{ url_for('admin.data_management') }}">
+          <i class="bi bi-trash3"></i>Data Management
         </a>
       </li>
       {% endif %}
@@ -281,6 +343,10 @@
         </div>
       </div>
       <div class="d-flex align-items-center gap-2">
+        <!-- Dark mode toggle -->
+        <button class="btn btn-sm btn-outline-secondary" id="darkToggle" title="Toggle dark mode">
+          <i class="bi bi-moon-stars" id="darkIcon"></i>
+        </button>
         <span class="badge rounded-pill" style="background:#f1f5f9; color:#64748b; font-weight:500;">
           <i class="bi bi-person me-1"></i>{{ current_user.role | capitalize }}
         </span>
@@ -308,6 +374,20 @@
   <script>
     document.getElementById('sidebarToggle')?.addEventListener('click', () => {
       document.getElementById('sidebar').classList.toggle('show');
+    });
+    // Dark mode
+    const darkToggle = document.getElementById('darkToggle');
+    const darkIcon = document.getElementById('darkIcon');
+    const html = document.documentElement;
+    if (localStorage.getItem('darkMode') === '1') {
+      html.setAttribute('data-bs-theme', 'dark');
+      darkIcon.className = 'bi bi-sun';
+    }
+    darkToggle?.addEventListener('click', () => {
+      const isDark = html.getAttribute('data-bs-theme') === 'dark';
+      html.setAttribute('data-bs-theme', isDark ? 'light' : 'dark');
+      darkIcon.className = isDark ? 'bi bi-moon-stars' : 'bi bi-sun';
+      localStorage.setItem('darkMode', isDark ? '0' : '1');
     });
   </script>
   {% block scripts %}{% endblock %}

@@ -23,6 +23,8 @@ def create_product(data: dict) -> Product:
         quantity=data.get("quantity", 0),
         supplier_id=data.get("supplier_id"),
         expiry_date=data.get("expiry_date"),
+        image_filename=data.get("image_filename"),
+        unit=data.get("unit", "pcs"),
     )
     db.session.add(product)
     try:
@@ -37,7 +39,7 @@ def update_product(product_id: int, data: dict) -> Product:
     """Update fields on an existing product."""
     product: Product = db.get_or_404(Product, product_id)
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
-                 "quantity", "supplier_id", "expiry_date")
+                 "quantity", "supplier_id", "expiry_date", "image_filename", "unit")
     for field in updatable:
         if field in data:
             setattr(product, field, data[field])

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Track Order — Smart Mart</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>body{background:#f8fafc;} .step-done{background:#6366f1!important;color:#fff!important;} .step-pending{background:#e2e8f0!important;}</style>
+</head>
+<body>
+  <nav class="navbar navbar-dark px-4 py-3" style="background:#0f172a;">
+    <span class="navbar-brand fw-bold"><i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart</span>
+    <span class="text-muted small">Order Tracking</span>
+  </nav>
+
+  <div class="container py-5" style="max-width:600px;">
+    {% if order %}
+    {% set slabel, scolor = order.status_label %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body text-center py-4">
+        <div class="fs-1 mb-2">{% if order.status == 'delivered' %}✅{% elif order.status == 'cancelled' %}❌{% elif order.status == 'out_for_delivery' %}🚴{% else %}📦{% endif %}</div>
+        <h4 class="fw-bold">{{ order.order_number }}</h4>
+        <span class="badge bg-{{ scolor }} rounded-pill fs-6 mb-2">{{ slabel }}</span>
+        <div class="text-muted small">{{ order.customer_name }} · {{ order.customer_phone }}</div>
+      </div>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        {% set steps = [('pending','⏳','Order Placed'),('confirmed','✅','Confirmed'),('preparing','🔧','Preparing'),('out_for_delivery','🚴','On the Way'),('delivered','📦','Delivered')] %}
+        {% set flow = ['pending','confirmed','preparing','out_for_delivery','delivered'] %}
+        {% set cur_idx = flow.index(order.status) if order.status in flow else -1 %}
+        <div class="d-flex align-items-center justify-content-between position-relative">
+          <div style="position:absolute;top:18px;left:8%;right:8%;height:3px;background:#e2e8f0;z-index:0;"></div>
+          {% for s, icon, label in steps %}
+          {% set si = loop.index0 %}
+          <div class="text-center flex-fill" style="z-index:1;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-1 {% if si <= cur_idx %}step-done{% else %}step-pending{% endif %}"
+                 style="width:38px;height:38px;font-size:1rem;">{{ icon }}</div>
+            <div style="font-size:.68rem;color:{% if si <= cur_idx %}#6366f1{% else %}#94a3b8{% endif %};">{{ label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Items -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header fw-semibold">Items</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for item in order.items %}
+            <tr><td>{{ item.product_name }}</td><td class="text-end">×{{ item.quantity }}</td><td class="text-end">NPR {{ "%.0f"|format(item.subtotal) }}</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="background:#f8fafc;"><td colspan="2" class="fw-bold">Total</td><td class="text-end fw-bold text-success">NPR {{ "%.0f"|format(order.grand_total) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Delivery Info -->
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="d-flex gap-2 mb-2"><i class="bi bi-geo-alt text-danger"></i><span class="small">{{ order.delivery_address }}</span></div>
+        {% if order.estimated_delivery %}
+        <div class="d-flex gap-2 mb-2"><i class="bi bi-clock text-primary"></i><span class="small">Est. delivery: {{ order.estimated_delivery.strftime('%d %b %Y %H:%M') }}</span></div>
+        {% endif %}
+        {% if order.delivered_at %}
+        <div class="d-flex gap-2"><i class="bi bi-check-circle text-success"></i><span class="small">Delivered: {{ order.delivered_at.strftime('%d %b %Y %H:%M') }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card shadow-sm border-0">
+      <div class="card-body text-center py-5">
+        <div class="fs-1 mb-3">🔍</div>
+        <h5>Order Not Found</h5>
+        <p class="text-muted">No order found for <strong>{{ order_number }}</strong></p>
+        <form method="get" action="">
+          <div class="input-group" style="max-width:300px;margin:0 auto;">
+            <input type="text" name="order_number" class="form-control" placeholder="Enter order number…">
+            <button type="submit" class="btn btn-primary">Track</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

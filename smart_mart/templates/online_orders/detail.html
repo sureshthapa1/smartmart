@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_number }} — Smart Mart{% endblock %}
+{% block page_title %}Order Detail{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('online_orders.list_orders') }}">Online Orders</a></li>
+<li class="breadcrumb-item active">{{ order.order_number }}</li>
+{% endblock %}
+
+{% block content %}
+{% set slabel, scolor = order.status_label %}
+
+<!-- Header -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body d-flex align-items-center gap-4 flex-wrap">
+    <div>
+      <div class="text-muted small">Order Number</div>
+      <div class="fw-bold fs-5" style="color:#6366f1;">{{ order.order_number }}</div>
+    </div>
+    <div>
+      <div class="text-muted small">Status</div>
+      <span class="badge bg-{{ scolor }} rounded-pill fs-6">{{ slabel }}</span>
+    </div>
+    <div>
+      <div class="text-muted small">Grand Total</div>
+      <div class="fw-bold fs-5 text-success">NPR {{ "%.2f"|format(order.grand_total) }}</div>
+    </div>
+    <div>
+      <div class="text-muted small">Payment</div>
+      <span class="badge {% if order.payment_status == 'paid' %}bg-success{% else %}bg-warning text-dark{% endif %} rounded-pill">
+        {{ order.payment_mode | upper }} · {{ order.payment_status | capitalize }}
+      </span>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{{ url_for('online_orders.track_order', order_number=order.order_number) }}"
+         class="btn btn-outline-secondary btn-sm" target="_blank">
+        <i class="bi bi-geo-alt me-1"></i>Track
+      </a>
+      <a href="{{ url_for('online_orders.list_orders') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left: Order Info + Items -->
+  <div class="col-lg-8">
+
+    <!-- Delivery Progress -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header fw-semibold"><i class="bi bi-truck me-2 text-primary"></i>Delivery Progress</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between position-relative mb-3">
+          <div style="position:absolute;top:16px;left:10%;right:10%;height:3px;background:#e2e8f0;z-index:0;"></div>
+          {% set steps = [('pending','⏳','Pending'),('confirmed','✅','Confirmed'),('preparing','🔧','Preparing'),('out_for_delivery','🚴','On Way'),('delivered','📦','Delivered')] %}
+          {% set current_idx = ['pending','confirmed','preparing','out_for_delivery','delivered'].index(order.status) if order.status in ['pending','confirmed','preparing','out_for_delivery','delivered'] else -1 %}
+          {% for s, icon, label in steps %}
+          {% set step_idx = loop.index0 %}
+          <div class="text-center" style="z-index:1;flex:1;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-1"
+                 style="width:36px;height:36px;background:{% if step_idx <= current_idx %}#6366f1{% else %}#e2e8f0{% endif %};font-size:1rem;">
+              {{ icon }}
+            </div>
+            <div style="font-size:.7rem;color:{% if step_idx <= current_idx %}#6366f1{% else %}#94a3b8{% endif %};">{{ label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Status Update Form -->
+        {% if order.status not in ['delivered', 'cancelled', 'returned'] %}
+        <form method="post" action="{{ url_for('online_orders.update_status', order_id=order.id) }}" class="mt-3">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label small fw-medium">Update Status</label>
+              <select name="status" class="form-select form-select-sm">
+                {% for s, (label, color) in order.STATUS_LABELS.items() %}
+                <option value="{{ s }}" {% if s == order.status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label small fw-medium">Note (optional)</label>
+              <input type="text" name="note" class="form-control form-control-sm" placeholder="Add a note…">
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-primary btn-sm">Update</button>
+            </div>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header fw-semibold"><i class="bi bi-list-ul me-2 text-primary"></i>Order Items</div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>
+            {% for item in order.items %}
+            <tr>
+              <td class="fw-medium">{{ item.product_name }}</td>
+              <td class="text-end">{{ item.quantity }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format(item.unit_price) }}</td>
+              <td class="text-end fw-semibold">NPR {{ "%.2f"|format(item.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3" class="text-end text-muted">Subtotal</td><td class="text-end">NPR {{ "%.2f"|format(order.total_amount) }}</td></tr>
+            {% if order.delivery_charge > 0 %}
+            <tr><td colspan="3" class="text-end text-muted">Delivery Charge</td><td class="text-end">NPR {{ "%.2f"|format(order.delivery_charge) }}</td></tr>
+            {% endif %}
+            {% if order.discount_amount > 0 %}
+            <tr><td colspan="3" class="text-end text-danger">Discount</td><td class="text-end text-danger">- NPR {{ "%.2f"|format(order.discount_amount) }}</td></tr>
+            {% endif %}
+            <tr style="background:#f8fafc;"><td colspan="3" class="text-end fw-bold">Grand Total</td><td class="text-end fw-bold fs-5 text-success">NPR {{ "%.2f"|format(order.grand_total) }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    {% if order.notes %}
+    <div class="card shadow-sm border-0">
+      <div class="card-header fw-semibold"><i class="bi bi-journal-text me-2"></i>Notes & History</div>
+      <div class="card-body">
+        <pre class="mb-0" style="font-size:.82rem;white-space:pre-wrap;">{{ order.notes }}</pre>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Customer + Payment -->
+  <div class="col-lg-4">
+    <!-- Customer Info -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-person me-2 text-primary"></i>Customer</div>
+      <div class="card-body">
+        <div class="fw-bold mb-1">{{ order.customer_name }}</div>
+        <div class="text-muted small mb-1"><i class="bi bi-telephone me-1"></i>{{ order.customer_phone }}</div>
+        {% if order.customer_email %}
+        <div class="text-muted small mb-1"><i class="bi bi-envelope me-1"></i>{{ order.customer_email }}</div>
+        {% endif %}
+        <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ order.delivery_address }}</div>
+        {% if order.delivery_area %}
+        <div class="text-muted small">Area: {{ order.delivery_area }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-2 text-success"></i>Payment</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted small">Mode</span>
+          <span class="fw-medium">{{ order.payment_mode | upper }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-3">
+          <span class="text-muted small">Status</span>
+          <span class="badge {% if order.payment_status == 'paid' %}bg-success{% elif order.payment_status == 'failed' %}bg-danger{% else %}bg-warning text-dark{% endif %} rounded-pill">
+            {{ order.payment_status | capitalize }}
+          </span>
+        </div>
+        <form method="post" action="{{ url_for('online_orders.update_payment', order_id=order.id) }}">
+          <div class="input-group input-group-sm">
+            <select name="payment_status" class="form-select form-select-sm">
+              {% for s in ['pending','paid','failed','refunded'] %}
+              <option value="{{ s }}" {% if s == order.payment_status %}selected{% endif %}>{{ s | capitalize }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-success btn-sm">Update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Order Meta -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header fw-semibold"><i class="bi bi-info-circle me-2"></i>Order Info</div>
+      <div class="card-body">
+        <table class="table table-sm mb-0" style="font-size:.82rem;">
+          <tr><td class="text-muted border-0">Source</td><td class="border-0 text-end">{{ order.order_source | capitalize }}</td></tr>
+          <tr><td class="text-muted border-0">Assigned To</td><td class="border-0 text-end">{{ order.assigned_to or '—' }}</td></tr>
+          <tr><td class="text-muted border-0">Est. Delivery</td><td class="border-0 text-end">{{ order.estimated_delivery.strftime('%d %b %H:%M') if order.estimated_delivery else '—' }}</td></tr>
+          <tr><td class="text-muted border-0">Delivered At</td><td class="border-0 text-end">{{ order.delivered_at.strftime('%d %b %H:%M') if order.delivered_at else '—' }}</td></tr>
+          <tr><td class="text-muted border-0">Created</td><td class="border-0 text-end">{{ order.created_at.strftime('%d %b %Y %H:%M') if order.created_at else '—' }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

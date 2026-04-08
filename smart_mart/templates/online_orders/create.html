@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}New Online Order — Smart Mart{% endblock %}
+{% block page_title %}New Online Order{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('online_orders.list_orders') }}">Online Orders</a></li>
+<li class="breadcrumb-item active">New Order</li>
+{% endblock %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('online_orders.create_order') }}" id="orderForm">
+  <div class="row g-4">
+
+    <!-- Customer Details -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header fw-semibold"><i class="bi bi-person me-2 text-primary"></i>Customer Details</div>
+        <div class="card-body">
+          <div class="mb-3 position-relative">
+            <label class="form-label fw-medium small">Customer Name <span class="text-danger">*</span></label>
+            <input type="text" name="customer_name" id="customerName" class="form-control"
+                   placeholder="Customer name" required autocomplete="off">
+            <div id="customerSuggestions" class="position-absolute w-100 bg-white border rounded-2 shadow-sm"
+                 style="z-index:1000;display:none;max-height:200px;overflow-y:auto;top:100%;left:0;"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Phone <span class="text-danger">*</span></label>
+            <input type="text" name="customer_phone" id="customerPhone" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Email</label>
+            <input type="email" name="customer_email" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Delivery Address <span class="text-danger">*</span></label>
+            <textarea name="delivery_address" id="customerAddress" class="form-control" rows="2" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium small">Delivery Area</label>
+            <input type="text" name="delivery_area" class="form-control" placeholder="e.g. Kathmandu, Lalitpur">
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Settings -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header fw-semibold"><i class="bi bi-gear me-2 text-primary"></i>Order Settings</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label fw-medium small">Payment Mode</label>
+              <select name="payment_mode" class="form-select">
+                <option value="cod">💵 Cash on Delivery</option>
+                <option value="online">💻 Online Transfer</option>
+                <option value="qr">📱 QR/eSewa/Khalti</option>
+                <option value="card">💳 Card</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-medium small">Order Source</label>
+              <select name="order_source" class="form-select">
+                <option value="website">🌐 Website</option>
+                <option value="phone">📞 Phone</option>
+                <option value="whatsapp">💬 WhatsApp</option>
+                <option value="app">📱 App</option>
+                <option value="walk_in">🚶 Walk-in</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-medium small">Delivery Charge (NPR)</label>
+              <input type="number" name="delivery_charge" class="form-control" value="0" min="0" step="0.01">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-medium small">Discount (NPR)</label>
+              <input type="number" name="discount_amount" class="form-control" value="0" min="0" step="0.01">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium small">Estimated Delivery</label>
+              <input type="datetime-local" name="estimated_delivery" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium small">Assigned To (Delivery Person)</label>
+              <input type="text" name="assigned_to" class="form-control" placeholder="Delivery person name">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-medium small">Notes</label>
+              <textarea name="notes" class="form-control" rows="2" placeholder="Special instructions…"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0">
+        <div class="card-header fw-semibold d-flex align-items-center gap-2">
+          <i class="bi bi-cart3 text-primary"></i>Order Items
+          <div class="ms-auto d-flex align-items-center gap-2">
+            <i class="bi bi-upc-scan text-muted"></i>
+            <input type="text" id="barcodeInput" class="form-control form-control-sm"
+                   style="width:160px;" placeholder="Scan SKU…" autocomplete="off">
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="table mb-0 align-middle">
+            <thead><tr><th>Product</th><th style="width:90px;">Qty</th><th style="width:130px;">Price (NPR)</th><th style="width:120px;">Subtotal</th><th style="width:40px;"></th></tr></thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer bg-white d-flex align-items-center justify-content-between">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addItemBtn">
+            <i class="bi bi-plus-lg me-1"></i>Add Item
+          </button>
+          <div class="fw-bold">Total: NPR <span id="grandTotal">0.00</span></div>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-check-lg me-1"></i>Create Order
+        </button>
+        <a href="{{ url_for('online_orders.list_orders') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+const PRODUCTS = [{% for p in products %}{ id: {{ p.id }}, name: {{ p.name | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}{% endfor %}];
+let rowIndex = 0;
+const tsInstances = {};
+
+function addRow(productId, qty, price) {
+  const idx = rowIndex++;
+  const tr = document.createElement('tr');
+  const selId = `prod_${idx}`;
+  const opts = PRODUCTS.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name} (${p.stock})</option>`).join('');
+  tr.innerHTML = `
+    <td><select id="${selId}" name="items[${idx}][product_id]" required>
+      <option value="">— Select —</option>${opts}</select></td>
+    <td><input type="number" class="form-control form-control-sm qty-input" name="items[${idx}][quantity]" min="1" value="${qty||1}" required></td>
+    <td><input type="number" class="form-control form-control-sm price-input" name="items[${idx}][unit_price]" min="0" step="0.01" value="${price||'0.00'}" required></td>
+    <td class="subtotal-cell text-end fw-medium">0.00</td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger remove-btn"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('itemsBody').appendChild(tr);
+
+  const ts = new TomSelect(`#${selId}`, {
+    placeholder: 'Search product…',
+    onChange(val) {
+      const p = PRODUCTS.find(x => x.id == val);
+      if (p) tr.querySelector('.price-input').value = p.price.toFixed(2);
+      updateRow(tr);
+    }
+  });
+  tsInstances[idx] = ts;
+  if (productId) ts.setValue(productId);
+
+  tr.querySelector('.qty-input').addEventListener('input', () => updateRow(tr));
+  tr.querySelector('.price-input').addEventListener('input', () => updateRow(tr));
+  tr.querySelector('.remove-btn').addEventListener('click', () => { tr.remove(); recalc(); });
+}
+
+function updateRow(tr) {
+  const qty = parseFloat(tr.querySelector('.qty-input').value) || 0;
+  const price = parseFloat(tr.querySelector('.price-input').value) || 0;
+  tr.querySelector('.subtotal-cell').textContent = (qty * price).toFixed(2);
+  recalc();
+}
+
+function recalc() {
+  let total = 0;
+  document.querySelectorAll('.subtotal-cell').forEach(c => total += parseFloat(c.textContent) || 0);
+  document.getElementById('grandTotal').textContent = total.toFixed(2);
+}
+
+document.getElementById('addItemBtn').addEventListener('click', () => addRow());
+addRow();
+
+// Barcode scanner
+document.getElementById('barcodeInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const sku = this.value.trim();
+    const p = PRODUCTS.find(x => x.name.toLowerCase() === sku.toLowerCase());
+    if (p) { addRow(p.id, 1, p.price); this.value = ''; }
+    else { this.style.borderColor = '#ef4444'; setTimeout(() => this.style.borderColor = '', 1500); }
+  }
+});
+
+// Customer autofill
+const customerName = document.getElementById('customerName');
+const customerPhone = document.getElementById('customerPhone');
+const customerAddress = document.getElementById('customerAddress');
+const suggestions = document.getElementById('customerSuggestions');
+let timer;
+
+customerName.addEventListener('input', function() {
+  clearTimeout(timer);
+  const q = this.value.trim();
+  if (q.length < 1) { suggestions.style.display = 'none'; return; }
+  timer = setTimeout(async () => {
+    const res = await fetch(`/api/customer-search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.length) { suggestions.style.display = 'none'; return; }
+    suggestions.innerHTML = data.map(c => `
+      <div class="px-3 py-2 customer-suggestion" style="cursor:pointer;font-size:.875rem;border-bottom:1px solid #f1f5f9;"
+           data-name="${c.name}" data-phone="${c.phone}" data-address="${c.address}">
+        <div class="fw-medium">${c.name}</div>
+        <div class="text-muted small">${c.phone} ${c.address ? '· ' + c.address : ''}</div>
+      </div>`).join('');
+    suggestions.style.display = 'block';
+    suggestions.querySelectorAll('.customer-suggestion').forEach(el => {
+      el.addEventListener('click', () => {
+        customerName.value = el.dataset.name;
+        customerPhone.value = el.dataset.phone;
+        customerAddress.value = el.dataset.address;
+        suggestions.style.display = 'none';
+      });
+    });
+  }, 250);
+});
+document.addEventListener('click', e => { if (!customerName.contains(e.target)) suggestions.style.display = 'none'; });
+</script>
+{% endblock %}

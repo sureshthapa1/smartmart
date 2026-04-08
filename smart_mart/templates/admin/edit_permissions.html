@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Edit Permissions — {{ user.username }}{% endblock %}
+{% block page_title %}Edit Permissions: {{ user.username }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.staff_permissions') }}">Permissions</a></li>
+<li class="breadcrumb-item active">{{ user.username }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div style="width:48px;height:48px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.2rem;flex-shrink:0;">
+          {{ user.username[0].upper() }}
+        </div>
+        <div>
+          <div class="fw-bold fs-6" style="color:#0f172a;">{{ user.username }}</div>
+          <div class="text-muted small">Staff — configure what this user can access</div>
+        </div>
+        <div class="ms-auto d-flex gap-2">
+          <button type="button" class="btn btn-outline-success btn-sm" id="enableAll">Enable All</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="disableAll">Disable All</button>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('admin.edit_permissions', user_id=user.id) }}">
+      {% for group_name, group_perms in permission_groups.items() %}
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white border-bottom py-3 px-4">
+          <h6 class="fw-bold mb-0">
+            {% if group_name == 'Inventory' %}<i class="bi bi-box-seam me-2 text-primary"></i>
+            {% elif group_name == 'Sales' %}<i class="bi bi-cart3 me-2 text-success"></i>
+            {% elif group_name == 'Purchases' %}<i class="bi bi-truck me-2 text-warning"></i>
+            {% else %}<i class="bi bi-grid me-2 text-info"></i>{% endif %}
+            {{ group_name }}
+          </h6>
+        </div>
+        <div class="card-body px-4 py-3">
+          <div class="row g-2">
+            {% for perm_key, perm_label in group_perms %}
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input perm-toggle" type="checkbox"
+                       name="{{ perm_key }}" id="{{ perm_key }}"
+                       {% if perms[perm_key] %}checked{% endif %}>
+                <label class="form-check-label" for="{{ perm_key }}">{{ perm_label }}</label>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-check-lg me-1"></i>Save Permissions
+        </button>
+        <a href="{{ url_for('admin.staff_permissions') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('enableAll').addEventListener('click', () => {
+  document.querySelectorAll('.perm-toggle').forEach(cb => cb.checked = true);
+});
+document.getElementById('disableAll').addEventListener('click', () => {
+  document.querySelectorAll('.perm-toggle').forEach(cb => cb.checked = false);
+});
+</script>
+{% endblock %}

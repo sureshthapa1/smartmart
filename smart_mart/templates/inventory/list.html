@@ -58,6 +58,7 @@
       <div class="d-flex gap-2">
         {% if current_user.role == 'admin' %}
         <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-outline-secondary"><i class="bi bi-tags me-1"></i>Categories</a>
+        <a href="{{ url_for('inventory.bulk_upload') }}" class="btn btn-outline-primary"><i class="bi bi-cloud-upload me-1"></i>Bulk Upload</a>
         {% endif %}
         <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add Product</a>
       </div>
@@ -86,7 +87,7 @@
               <th>SKU</th>
               {% if current_user.role == 'admin' %}<th>Cost (NPR)</th>{% endif %}
               <th>Selling (NPR)</th>
-              <th>Qty</th>
+              <th>Qty / Unit</th>
               <th>Supplier</th>
               <th>Expiry</th>
               <th>Actions</th>
@@ -95,14 +96,28 @@
           <tbody>
             {% for p in products %}
             <tr>
-              <td>{{ product_icon_cell(p.name, p.category) }}</td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  {% if p.image_filename %}
+                  <img src="{{ url_for('static', filename='uploads/products/' ~ p.image_filename) }}"
+                       alt="{{ p.name }}"
+                       style="width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #e2e8f0;">
+                  {% else %}
+                  <div class="rounded-2 d-flex align-items-center justify-content-center flex-shrink-0"
+                       style="width:36px;height:36px;background:#f1f5f9;font-size:1.2rem;line-height:1;">
+                    {% from 'macros/product_icon.html' import get_emoji %}{{ get_emoji(p.name, p.category) }}
+                  </div>
+                  {% endif %}
+                  <span class="fw-medium">{{ p.name }}</span>
+                </div>
+              </td>
               <td><span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;">{{ p.category or '—' }}</span></td>
               <td><code class="text-muted">{{ p.sku }}</code></td>
               {% if current_user.role == 'admin' %}<td>{{ "%.2f"|format(p.cost_price) }}</td>{% endif %}
               <td>{{ "%.2f"|format(p.selling_price) }}</td>
               <td>
                 <span class="badge rounded-pill {% if p.quantity == 0 %}bg-danger{% elif p.quantity <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
-                  {{ p.quantity }}
+                  {{ p.quantity }} {{ p.unit or 'pcs' }}
                 </span>
               </td>
               <td class="text-muted">{{ p.supplier.name if p.supplier else '—' }}</td>
@@ -112,6 +127,7 @@
                   <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
                   <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Adjust Stock"><i class="bi bi-arrow-left-right"></i></a>
                   {% if current_user.role == 'admin' %}
+                  <a href="{{ url_for('ai.product_analysis', product_id=p.id) }}" class="btn btn-sm btn-outline-info" title="AI Analysis"><i class="bi bi-robot"></i></a>
                   <form method="post" action="{{ url_for('inventory.delete_product', product_id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete product {{ p.name }}?')">
                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                   </form>

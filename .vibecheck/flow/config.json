@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "projectName": "Mart Project",
+  "userName": "developer",
+  "skillLevel": "intermediate",
+  "outputFolder": ".vibecheck/flow",
+  "planningArtifacts": ".vibecheck\\flow\\planning-artifacts",
+  "implementationArtifacts": ".vibecheck\\flow\\implementation-artifacts",
+  "installedAt": "2026-04-07T13:41:00.058Z",
+  "ide": [
+    "vscode"
+  ]
+}

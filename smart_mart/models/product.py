@@ -14,6 +14,8 @@ class Product(db.Model):
     quantity = db.Column(db.Integer, nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
+    image_filename = db.Column(db.String(255), nullable=True)
+    unit = db.Column(db.String(20), nullable=True, default="pcs")
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False,
                            default=lambda: datetime.now(timezone.utc),

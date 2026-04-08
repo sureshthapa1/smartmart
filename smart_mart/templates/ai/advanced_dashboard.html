@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}Advanced AI Dashboard — Smart Mart{% endblock %}
+{% block page_title %}Advanced AI Intelligence{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ai.insights') }}">AI</a></li>
+<li class="breadcrumb-item active">Advanced Dashboard</li>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  .ai-card { border: none !important; border-radius: 12px !important; transition: transform .15s; }
+  .ai-card:hover { transform: translateY(-2px); }
+  .module-badge { font-size: .7rem; letter-spacing: .05em; }
+  .result-box { background: #f8fafc; border-radius: 8px; padding: 1rem; font-size: .875rem; }
+  pre.json-output { background: #0f172a; color: #22c55e; border-radius: 8px; padding: 1rem; font-size: .78rem; max-height: 300px; overflow-y: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Module Navigation -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  <a href="#trend" class="btn btn-outline-primary btn-sm">📈 Trend Analyzer</a>
+  <a href="#profit" class="btn btn-outline-danger btn-sm">💸 Profit Leak</a>
+  <a href="#supplier" class="btn btn-outline-warning btn-sm">🏭 Supplier Score</a>
+  <a href="#simulation" class="btn btn-outline-success btn-sm">🔬 Simulation</a>
+  <a href="#invoice" class="btn btn-outline-secondary btn-sm">🧾 Invoice Validator</a>
+  <a href="{{ url_for('ai.insights') }}" class="btn btn-outline-info btn-sm ms-auto">← Basic Insights</a>
+</div>
+
+<!-- ── MODULE 1: TREND ANALYZER ─────────────────────────────────────────── -->
+<div id="trend" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>📈</span>Trend & Fast-Moving Product Analyzer
+    <span class="badge bg-primary rounded-pill module-badge ms-auto">MODULE 1</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <select id="trendPeriod" class="form-select form-select-sm">
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary btn-sm" onclick="loadTrend()">
+          <i class="bi bi-play-fill me-1"></i>Analyze
+        </button>
+      </div>
+    </div>
+    <div id="trendResult" class="result-box">Click Analyze to load trend data.</div>
+  </div>
+</div>
+
+<!-- ── MODULE 3: PROFIT LEAK ────────────────────────────────────────────── -->
+<div id="profit" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>💸</span>Profit Leak Detection AI
+    <span class="badge bg-danger rounded-pill module-badge ms-auto">MODULE 3</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <label class="form-label small">Margin Threshold (%)</label>
+        <input type="number" id="marginThreshold" class="form-control form-control-sm" value="15" min="0" max="100" style="width:100px;">
+      </div>
+      <div class="col-auto align-self-end">
+        <button class="btn btn-danger btn-sm" onclick="loadProfitLeak()">
+          <i class="bi bi-search me-1"></i>Detect Leaks
+        </button>
+      </div>
+    </div>
+    <div id="profitLeakResult" class="result-box">Click Detect Leaks to analyze.</div>
+  </div>
+</div>
+
+<!-- ── MODULE 4: SUPPLIER SCORECARD ─────────────────────────────────────── -->
+<div id="supplier" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>🏭</span>Supplier Performance Scorecard
+    <span class="badge bg-warning text-dark rounded-pill module-badge ms-auto">MODULE 4</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <select id="supplierSelect" class="form-select form-select-sm">
+          <option value="">— All Suppliers —</option>
+          {% for s in suppliers %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-warning btn-sm" onclick="loadSupplierScore()">
+          <i class="bi bi-star me-1"></i>Score
+        </button>
+      </div>
+    </div>
+    <div id="supplierResult" class="result-box">Select a supplier and click Score.</div>
+  </div>
+</div>
+
+<!-- ── MODULE 5: SIMULATION ──────────────────────────────────────────────── -->
+<div id="simulation" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>🔬</span>What-If Business Simulation
+    <span class="badge bg-success rounded-pill module-badge ms-auto">MODULE 5</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      <!-- Sales simulation -->
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3">
+          <h6 class="fw-semibold mb-3">📊 Sales Change</h6>
+          <label class="form-label small">Change % (e.g. +20 or -15)</label>
+          <input type="number" id="salesChangePct" class="form-control form-control-sm mb-2" value="20">
+          <button class="btn btn-success btn-sm w-100" onclick="simulateSales()">Simulate</button>
+          <div id="salesSimResult" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+      <!-- Price simulation -->
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3">
+          <h6 class="fw-semibold mb-3">💰 Price Change</h6>
+          <label class="form-label small">Product</label>
+          <select id="priceProduct" class="form-select form-select-sm mb-2">
+            {% for p in products %}
+            <option value="{{ p.id }}" data-price="{{ p.selling_price }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label small">New Price (NPR)</label>
+          <input type="number" id="newPrice" class="form-control form-control-sm mb-2" step="0.01">
+          <button class="btn btn-success btn-sm w-100" onclick="simulatePrice()">Simulate</button>
+          <div id="priceSimResult" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+      <!-- Expense simulation -->
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3">
+          <h6 class="fw-semibold mb-3">📉 Expense Change</h6>
+          <label class="form-label small">Change % (e.g. -10 to reduce)</label>
+          <input type="number" id="expenseChangePct" class="form-control form-control-sm mb-2" value="-10">
+          <button class="btn btn-success btn-sm w-100" onclick="simulateExpenses()">Simulate</button>
+          <div id="expenseSimResult" class="mt-2 small text-muted"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODULE 2: INVOICE VALIDATOR ──────────────────────────────────────── -->
+<div id="invoice" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>🧾</span>AI Invoice Error Detector
+    <span class="badge bg-secondary rounded-pill module-badge ms-auto">MODULE 2</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      This runs automatically when creating a sale. The API endpoint is:
+      <code>POST /ai/api/invoice/validate</code>
+    </p>
+    <div class="alert alert-info py-2 small">
+      <i class="bi bi-info-circle me-1"></i>
+      The invoice validator checks for: price anomalies, below-cost selling, duplicate products,
+      insufficient stock, unusual quantities, and excessive discounts — all before confirming a sale.
+    </div>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3 text-center">
+          <div class="fs-3">🔍</div>
+          <div class="fw-semibold small">Price Anomaly</div>
+          <div class="text-muted" style="font-size:.75rem;">Flags >30% deviation from standard price</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3 text-center">
+          <div class="fs-3">📦</div>
+          <div class="fw-semibold small">Stock Validation</div>
+          <div class="text-muted" style="font-size:.75rem;">Prevents overselling</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded-2 p-3 text-center">
+          <div class="fs-3">🔄</div>
+          <div class="fw-semibold small">Duplicate Detection</div>
+          <div class="text-muted" style="font-size:.75rem;">Warns on same product added twice</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- API Reference -->
+<div class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-code-slash me-2"></i>REST API Reference</div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" style="font-size:.82rem;">
+        <thead class="table-dark"><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/trends/fast-moving?period=weekly</code></td><td>Fast-moving products</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/trends/dead-stock?days=30</code></td><td>Dead stock analysis</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/trends/seasonal</code></td><td>Seasonal demand patterns</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/trends/dashboard</code></td><td>Full trend dashboard</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/invoice/validate</code></td><td>Validate sale items</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/profit-leak/dashboard</code></td><td>Profit leak analysis</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/profit-leak/low-margin</code></td><td>Low margin products</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/suppliers/scorecard</code></td><td>All supplier scores</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/suppliers/{id}/score</code></td><td>Single supplier score</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/sales</code></td><td>Sales change simulation</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/price</code></td><td>Price change simulation</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/expenses</code></td><td>Expense change simulation</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/simulate/stockout/{id}</code></td><td>Stock-out impact</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmt(data) {
+  return '<pre class="json-output">' + JSON.stringify(data, null, 2) + '</pre>';
+}
+
+function renderTrend(data) {
+  if (!data.products || !data.products.length) return '<p class="text-muted">No data.</p>';
+  let html = `<div class="mb-2 text-muted small">${data.label} — ${data.products.length} products</div>`;
+  html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>#</th><th>Product</th><th>Qty Sold</th><th>Revenue</th><th>Velocity/day</th><th>Days of Stock</th></tr></thead><tbody>';
+  data.products.forEach((p, i) => {
+    const daysClass = p.days_of_stock < 7 ? 'text-danger fw-bold' : p.days_of_stock < 14 ? 'text-warning' : '';
+    html += `<tr><td>${i+1}</td><td>${p.name}</td><td><span class="badge bg-success">${p.qty_sold}</span></td><td>NPR ${p.revenue.toLocaleString()}</td><td>${p.velocity_per_day}</td><td class="${daysClass}">${p.days_of_stock}d</td></tr>`;
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+async function loadTrend() {
+  const period = document.getElementById('trendPeriod').value;
+  document.getElementById('trendResult').innerHTML = '<div class="text-muted">Loading...</div>';
+  const res = await fetch(`/ai/api/trends/fast-moving?period=${period}&top=10`);
+  const data = await res.json();
+  document.getElementById('trendResult').innerHTML = renderTrend(data);
+}
+
+async function loadProfitLeak() {
+  const threshold = document.getElementById('marginThreshold').value;
+  document.getElementById('profitLeakResult').innerHTML = '<div class="text-muted">Analyzing...</div>';
+  const res = await fetch(`/ai/api/profit-leak/low-margin?threshold=${threshold}`);
+  const data = await res.json();
+  let html = `<div class="alert alert-${data.low_margin_products.length > 0 ? 'warning' : 'success'} py-2 small mb-3">${data.insight}</div>`;
+  if (data.low_margin_products.length) {
+    html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>Product</th><th>Cost</th><th>Price</th><th>Margin %</th><th>Revenue Lost</th><th>Recommendation</th></tr></thead><tbody>';
+    data.low_margin_products.forEach(p => {
+      html += `<tr><td>${p.name}</td><td>NPR ${p.cost_price}</td><td>NPR ${p.selling_price}</td><td class="text-danger fw-bold">${p.margin_pct}%</td><td class="text-danger">NPR ${p.estimated_revenue_lost.toLocaleString()}</td><td class="text-muted small">${p.recommendation}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('profitLeakResult').innerHTML = html;
+}
+
+async function loadSupplierScore() {
+  const sid = document.getElementById('supplierSelect').value;
+  const url = sid ? `/ai/api/suppliers/${sid}/score` : '/ai/api/suppliers/scorecard';
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (sid) {
+    const gradeColors = {A:'success', B:'info', C:'warning', D:'danger'};
+    const gc = gradeColors[data.grade] || 'secondary';
+    let html = `<div class="d-flex align-items-center gap-3 mb-3">
+      <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold fs-3" style="width:60px;height:60px;background:var(--bs-${gc});color:#fff;">${data.grade}</div>
+      <div><div class="fw-bold fs-5">${data.supplier_name}</div><div class="text-muted small">Score: ${data.total_score}/100</div></div>
+    </div>`;
+    html += '<div class="row g-2 mb-3">';
+    for (const [k, v] of Object.entries(data.breakdown)) {
+      const pct = (v.score / v.max * 100).toFixed(0);
+      html += `<div class="col-6"><div class="small text-muted mb-1">${v.label}</div><div class="progress" style="height:8px;"><div class="progress-bar bg-primary" style="width:${pct}%"></div></div><div class="small">${v.score}/${v.max}</div></div>`;
+    }
+    html += '</div>';
+    html += `<div class="alert alert-${gc} py-2 small">${data.recommendation}</div>`;
+    document.getElementById('supplierResult').innerHTML = html;
+  } else {
+    let html = '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>#</th><th>Supplier</th><th>Score</th><th>Grade</th><th>Orders</th><th>Value</th></tr></thead><tbody>';
+    (data.scorecards || []).forEach((s, i) => {
+      html += `<tr><td>${i+1}</td><td>${s.supplier_name}</td><td>${s.total_score}</td><td><span class="badge bg-${s.grade_color}">${s.grade}</span></td><td>${s.stats.total_purchases}</td><td>NPR ${s.stats.total_value.toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    document.getElementById('supplierResult').innerHTML = html;
+  }
+}
+
+async function simulateSales() {
+  const pct = parseFloat(document.getElementById('salesChangePct').value);
+  const res = await fetch('/ai/api/simulate/sales', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({change_pct: pct, days: 30})
+  });
+  const d = await res.json();
+  const color = d.impact.profit_change >= 0 ? 'success' : 'danger';
+  document.getElementById('salesSimResult').innerHTML =
+    `<div class="alert alert-${color} py-2 small mt-2">
+      Revenue: NPR ${d.simulated.revenue.toLocaleString()} (${d.impact.revenue_change >= 0 ? '+' : ''}${d.impact.revenue_change.toLocaleString()})<br>
+      Profit: NPR ${d.simulated.net_profit.toLocaleString()} (${d.impact.profit_change >= 0 ? '+' : ''}${d.impact.profit_change.toLocaleString()})<br>
+      ${d.recommendation}
+    </div>`;
+}
+
+async function simulatePrice() {
+  const pid = document.getElementById('priceProduct').value;
+  const price = parseFloat(document.getElementById('newPrice').value);
+  if (!price) return;
+  const res = await fetch('/ai/api/simulate/price', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({product_id: parseInt(pid), new_price: price, days: 30})
+  });
+  const d = await res.json();
+  const color = d.impact.profit_change >= 0 ? 'success' : 'danger';
+  document.getElementById('priceSimResult').innerHTML =
+    `<div class="alert alert-${color} py-2 small mt-2">
+      ${d.warning ? '<strong>⚠️ ' + d.warning + '</strong><br>' : ''}
+      Margin: ${d.simulated.margin_pct}% (${d.impact.margin_change >= 0 ? '+' : ''}${d.impact.margin_change}%)<br>
+      Profit change: NPR ${d.impact.profit_change.toLocaleString()}<br>
+      ${d.recommendation}
+    </div>`;
+}
+
+async function simulateExpenses() {
+  const pct = parseFloat(document.getElementById('expenseChangePct').value);
+  const res = await fetch('/ai/api/simulate/expenses', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({change_pct: pct, days: 30})
+  });
+  const d = await res.json();
+  const color = d.impact.profit_change >= 0 ? 'success' : 'danger';
+  document.getElementById('expenseSimResult').innerHTML =
+    `<div class="alert alert-${color} py-2 small mt-2">
+      Expenses: NPR ${d.simulated.expenses.toLocaleString()}<br>
+      Net Profit: NPR ${d.simulated.net_profit.toLocaleString()}<br>
+      ${d.recommendation}
+    </div>`;
+}
+
+// Auto-fill new price from selected product
+document.getElementById('priceProduct')?.addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  document.getElementById('newPrice').value = opt.dataset.price || '';
+});
+</script>
+{% endblock %}

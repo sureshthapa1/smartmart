@@ -156,3 +156,252 @@ def opening_closing_stock(start: date, end: date) -> list[dict]:
 def profitability_analysis(start: date, end: date) -> list[dict]:
     """Return profit, margin, and loss flag per product in [start, end]."""
     return profit_per_product(start, end)
+
+
+def sales_summary(start: date, end: date) -> dict:
+    """Return a high-level sales summary for the period."""
+    from ..models.user import User
+    total_revenue = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+    ).scalar() or 0
+
+    total_transactions = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+    ).scalar() or 0
+
+    total_items_sold = db.session.execute(
+        db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
+        .join(Sale, SaleItem.sale_id == Sale.id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+    ).scalar() or 0
+
+    avg_transaction = float(total_revenue) / total_transactions if total_transactions else 0
+
+    # Best single day
+    best_day_row = db.session.execute(
+        db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("total"))
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(func.date(Sale.sale_date))
+        .order_by(func.sum(Sale.total_amount).desc())
+        .limit(1)
+    ).first()
+
+    return {
+        "total_revenue": float(total_revenue),
+        "total_transactions": total_transactions,
+        "total_items_sold": int(total_items_sold),
+        "avg_transaction": round(avg_transaction, 2),
+        "best_day": str(best_day_row.day) if best_day_row else "—",
+        "best_day_revenue": float(best_day_row.total) if best_day_row else 0,
+    }
+
+
+def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]:
+    """Return sales grouped by day/week/month."""
+    if period == "weekly":
+        rows = db.session.execute(
+            db.select(
+                func.strftime('%Y-W%W', Sale.sale_date).label("period"),
+                func.sum(Sale.total_amount).label("total"),
+                func.count(Sale.id).label("transactions"),
+            )
+            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .group_by(func.strftime('%Y-W%W', Sale.sale_date))
+            .order_by(func.strftime('%Y-W%W', Sale.sale_date))
+        ).all()
+    elif period == "monthly":
+        rows = db.session.execute(
+            db.select(
+                func.strftime('%Y-%m', Sale.sale_date).label("period"),
+                func.sum(Sale.total_amount).label("total"),
+                func.count(Sale.id).label("transactions"),
+            )
+            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .group_by(func.strftime('%Y-%m', Sale.sale_date))
+            .order_by(func.strftime('%Y-%m', Sale.sale_date))
+        ).all()
+    else:  # daily
+        rows = db.session.execute(
+            db.select(
+                func.date(Sale.sale_date).label("period"),
+                func.sum(Sale.total_amount).label("total"),
+                func.count(Sale.id).label("transactions"),
+            )
+            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .group_by(func.date(Sale.sale_date))
+            .order_by(func.date(Sale.sale_date))
+        ).all()
+    return [{"period": str(r.period), "total": float(r.total), "transactions": r.transactions} for r in rows]
+
+
+def product_wise_sales(start: date, end: date) -> list[dict]:
+    """Return detailed sales breakdown per product."""
+    rows = db.session.execute(
+        db.select(
+            Product,
+            func.sum(SaleItem.quantity).label("qty_sold"),
+            func.sum(SaleItem.subtotal).label("revenue"),
+            func.count(SaleItem.id.distinct()).label("times_sold"),
+        )
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Product.id)
+        .order_by(func.sum(SaleItem.subtotal).desc())
+    ).all()
+    result = []
+    for r in rows:
+        p = r.Product
+        cost = float(p.cost_price) * r.qty_sold
+        profit = float(r.revenue) - cost
+        result.append({
+            "product": p,
+            "qty_sold": r.qty_sold,
+            "revenue": float(r.revenue),
+            "cost": cost,
+            "profit": profit,
+            "times_sold": r.times_sold,
+        })
+    return result
+
+
+def staff_sales_report(start: date, end: date) -> list[dict]:
+    """Return revenue and transaction count per staff member."""
+    from ..models.user import User
+    rows = db.session.execute(
+        db.select(
+            User.username,
+            User.role,
+            func.count(Sale.id).label("transactions"),
+            func.sum(Sale.total_amount).label("revenue"),
+            func.sum(SaleItem.quantity).label("items_sold"),
+        )
+        .join(Sale, Sale.user_id == User.id)
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(User.id)
+        .order_by(func.sum(Sale.total_amount).desc())
+    ).all()
+    return [{
+        "username": r.username,
+        "role": r.role,
+        "transactions": r.transactions,
+        "revenue": float(r.revenue),
+        "items_sold": r.items_sold,
+        "avg_sale": round(float(r.revenue) / r.transactions, 2) if r.transactions else 0,
+    } for r in rows]
+
+
+def hourly_sales(start: date, end: date) -> list[dict]:
+    """Return sales grouped by hour of day (peak hours analysis)."""
+    rows = db.session.execute(
+        db.select(
+            func.strftime('%H', Sale.sale_date).label("hour"),
+            func.sum(Sale.total_amount).label("total"),
+            func.count(Sale.id).label("transactions"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(func.strftime('%H', Sale.sale_date))
+        .order_by(func.strftime('%H', Sale.sale_date))
+    ).all()
+    return [{"hour": int(r.hour), "label": f"{int(r.hour):02d}:00",
+             "total": float(r.total), "transactions": r.transactions} for r in rows]
+
+
+def staff_efficiency_report(start: date, end: date) -> list[dict]:
+    """Comprehensive per-staff efficiency metrics."""
+    from ..models.user import User
+    from ..models.sale import Sale, SaleItem
+
+    users = db.session.execute(db.select(User).order_by(User.username)).scalars().all()
+    result = []
+
+    for user in users:
+        # Basic sales metrics
+        sales = db.session.execute(
+            db.select(Sale)
+            .where(and_(
+                Sale.user_id == user.id,
+                func.date(Sale.sale_date) >= start,
+                func.date(Sale.sale_date) <= end,
+            ))
+        ).scalars().all()
+
+        if not sales:
+            continue
+
+        sale_ids = [s.id for s in sales]
+        total_revenue = sum(float(s.total_amount) for s in sales)
+        total_discount = sum(float(s.discount_amount or 0) for s in sales)
+        total_transactions = len(sales)
+
+        # Items sold
+        items_sold = db.session.execute(
+            db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
+            .where(SaleItem.sale_id.in_(sale_ids))
+        ).scalar() or 0
+
+        # Avg sale value
+        avg_sale = total_revenue / total_transactions if total_transactions else 0
+
+        # Peak hour
+        peak_row = db.session.execute(
+            db.select(
+                func.strftime('%H', Sale.sale_date).label("hour"),
+                func.count(Sale.id).label("cnt")
+            )
+            .where(Sale.id.in_(sale_ids))
+            .group_by(func.strftime('%H', Sale.sale_date))
+            .order_by(func.count(Sale.id).desc())
+            .limit(1)
+        ).first()
+        peak_hour = f"{int(peak_row.hour):02d}:00" if peak_row else "—"
+
+        # Top product sold by this staff
+        top_prod_row = db.session.execute(
+            db.select(Product, func.sum(SaleItem.quantity).label("qty"))
+            .join(SaleItem, SaleItem.product_id == Product.id)
+            .where(SaleItem.sale_id.in_(sale_ids))
+            .group_by(Product.id)
+            .order_by(func.sum(SaleItem.quantity).desc())
+            .limit(1)
+        ).first()
+        top_product = top_prod_row.Product.name if top_prod_row else "—"
+        top_product_qty = top_prod_row.qty if top_prod_row else 0
+
+        # Active days
+        active_days = db.session.execute(
+            db.select(func.count(func.date(Sale.sale_date).distinct()))
+            .where(Sale.id.in_(sale_ids))
+        ).scalar() or 0
+
+        # Sales per active day
+        sales_per_day = round(total_transactions / active_days, 1) if active_days else 0
+
+        # Discount rate
+        gross = sum(
+            float(si.unit_price) * si.quantity
+            for s in sales for si in s.items
+        )
+        discount_rate = round((total_discount / gross * 100), 1) if gross else 0
+
+        result.append({
+            "user": user,
+            "total_transactions": total_transactions,
+            "total_revenue": total_revenue,
+            "total_discount": total_discount,
+            "discount_rate": discount_rate,
+            "items_sold": int(items_sold),
+            "avg_sale": round(avg_sale, 2),
+            "peak_hour": peak_hour,
+            "top_product": top_product,
+            "top_product_qty": top_product_qty,
+            "active_days": active_days,
+            "sales_per_day": sales_per_day,
+        })
+
+    # Sort by revenue descending
+    result.sort(key=lambda x: x["total_revenue"], reverse=True)
+    return result

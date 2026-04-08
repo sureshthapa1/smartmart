@@ -1,62 +1,353 @@
 {% extends "base.html" %}
-{% block title %}Sales Report — Smart Mart{% endblock %}
-{% block page_title %}Sales Report{% endblock %}
+{% block title %}Sales Analytics — Smart Mart{% endblock %}
+{% block page_title %}Sales Analytics{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item">Reports</li>
-<li class="breadcrumb-item active">Sales Report</li>
+<li class="breadcrumb-item active">Sales Analytics</li>
+{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 {% endblock %}
 
 {% block content %}
+
+<!-- Date Filter + Period Toggle -->
 <div class="card shadow-sm mb-4">
   <div class="card-body py-3">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-auto">
-          <label class="form-label small fw-medium mb-1">Start Date</label>
-          <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
-        </div>
-        <div class="col-auto">
-          <label class="form-label small fw-medium mb-1">End Date</label>
-          <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
-        </div>
-        <div class="col-auto">
-          <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-funnel me-1"></i>Filter
-          </button>
-        </div>
-      </form>
-      <a href="{{ url_for('reports.export_sales_csv') }}?start_date={{ start_date }}&end_date={{ end_date }}"
-         class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-download me-1"></i>Export CSV
-      </a>
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">Group By</label>
+        <select name="period" class="form-select form-select-sm">
+          <option value="daily" {% if period == 'daily' %}selected{% endif %}>Daily</option>
+          <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Weekly</option>
+          <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>Monthly</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Apply</button>
+        <a href="{{ url_for('reports.sales_report') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+      </div>
+      <div class="col-auto ms-auto">
+        <a href="{{ url_for('reports.export_sales_csv') }}?start_date={{ start_date }}&end_date={{ end_date }}"
+           class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #6366f1!important;">
+      <div class="card-body">
+        <div class="text-muted small">Total Revenue</div>
+        <div class="fs-5 fw-bold text-primary">NPR {{ "%.2f"|format(summary.total_revenue) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #22c55e!important;">
+      <div class="card-body">
+        <div class="text-muted small">Transactions</div>
+        <div class="fs-5 fw-bold text-success">{{ summary.total_transactions }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #f59e0b!important;">
+      <div class="card-body">
+        <div class="text-muted small">Items Sold</div>
+        <div class="fs-5 fw-bold text-warning">{{ summary.total_items_sold }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-2">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #06b6d4!important;">
+      <div class="card-body">
+        <div class="text-muted small">Avg Sale Value</div>
+        <div class="fs-5 fw-bold text-info">NPR {{ "%.2f"|format(summary.avg_transaction) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    <div class="card shadow-sm h-100" style="border-left:4px solid #a855f7!important;">
+      <div class="card-body">
+        <div class="text-muted small">Best Day</div>
+        <div class="fw-bold" style="color:#a855f7;">{{ summary.best_day }}</div>
+        <div class="text-muted small">NPR {{ "%.2f"|format(summary.best_day_revenue) }}</div>
+      </div>
     </div>
   </div>
 </div>
 
-<div class="card shadow-sm">
+<!-- Sales Trend Chart -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-graph-up text-primary"></i>
+    Sales Trend — {{ period | capitalize }}
+  </div>
+  <div class="card-body">
+    <canvas id="salesTrendChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- Top & Least Products -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-trophy-fill text-warning"></i>Top 10 Selling Products
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>#</th><th>Product</th><th class="text-end">Qty Sold</th></tr></thead>
+          <tbody>
+            {% for r in top %}
+            <tr>
+              <td><span class="badge rounded-pill" style="background:{% if loop.index == 1 %}#fbbf24{% elif loop.index == 2 %}#94a3b8{% elif loop.index == 3 %}#cd7c2f{% else %}#f1f5f9{% endif %};color:{% if loop.index <= 3 %}#fff{% else %}#475569{% endif %};">{{ loop.index }}</span></td>
+              <td class="fw-medium">{{ r.product.name }}</td>
+              <td class="text-end"><span class="badge bg-success">{{ r.qty_sold }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-down-circle-fill text-danger"></i>Least 10 Selling Products
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>#</th><th>Product</th><th class="text-end">Qty Sold</th></tr></thead>
+          <tbody>
+            {% for r in least %}
+            <tr>
+              <td class="text-muted small">{{ loop.index }}</td>
+              <td class="fw-medium">{{ r.product.name }}</td>
+              <td class="text-end"><span class="badge bg-danger">{{ r.qty_sold }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Product-wise Sales Report -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-box-seam text-primary"></i>Product-wise Sales Report
+  </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead>
         <tr>
-          <th>Date</th>
-          <th class="text-end">Total Sales (NPR)</th>
+          <th>Product</th>
+          <th>Category</th>
+          <th class="text-end">Qty Sold</th>
+          <th class="text-end">Times Sold</th>
+          <th class="text-end">Revenue (NPR)</th>
+          <th class="text-end">Cost (NPR)</th>
+          <th class="text-end">Profit (NPR)</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in rows %}
+        {% for r in product_wise %}
         <tr>
-          <td class="fw-medium">{{ row.date }}</td>
-          <td class="text-end fw-semibold">{{ "%.2f"|format(row.total) }}</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="2" class="text-center text-muted py-5">
-            <i class="bi bi-graph-up fs-2 d-block mb-2"></i>No results found.
+          <td class="fw-medium">{{ r.product.name }}</td>
+          <td><span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;">{{ r.product.category or '—' }}</span></td>
+          <td class="text-end">{{ r.qty_sold }}</td>
+          <td class="text-end">{{ r.times_sold }}</td>
+          <td class="text-end">{{ "%.2f"|format(r.revenue) }}</td>
+          <td class="text-end text-muted">{{ "%.2f"|format(r.cost) }}</td>
+          <td class="text-end {% if r.profit >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+            {{ "%.2f"|format(r.profit) }}
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No sales in this period.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- Staff Revenue Report -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-people-fill text-info"></i>Revenue by Staff
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Staff Member</th>
+          <th>Role</th>
+          <th class="text-end">Transactions</th>
+          <th class="text-end">Items Sold</th>
+          <th class="text-end">Revenue (NPR)</th>
+          <th class="text-end">Avg Sale (NPR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in staff %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:.85rem;flex-shrink:0;">
+                {{ r.username[0].upper() }}
+              </div>
+              <span class="fw-medium">{{ r.username }}</span>
+            </div>
+          </td>
+          <td><span class="badge {% if r.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">{{ r.role }}</span></td>
+          <td class="text-end">{{ r.transactions }}</td>
+          <td class="text-end">{{ r.items_sold }}</td>
+          <td class="text-end fw-semibold text-success">{{ "%.2f"|format(r.revenue) }}</td>
+          <td class="text-end text-muted">{{ "%.2f"|format(r.avg_sale) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No staff sales data.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Peak Hours Chart -->
+{% if hourly %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history text-warning"></i>Peak Sales Hours
+  </div>
+  <div class="card-body">
+    <canvas id="hourlyChart" height="80"></canvas>
+  </div>
+</div>
+{% endif %}
+
+<!-- Period Table -->
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-table text-primary"></i>{{ period | capitalize }} Sales Breakdown
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th class="text-end">Transactions</th>
+          <th class="text-end">Revenue (NPR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in by_period %}
+        <tr>
+          <td class="fw-medium">{{ r.period }}</td>
+          <td class="text-end">{{ r.transactions }}</td>
+          <td class="text-end fw-semibold">{{ "%.2f"|format(r.total) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="text-center text-muted py-4">No sales in this period.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if by_period %}
+      <tfoot>
+        <tr style="background:#f8fafc;">
+          <td class="fw-bold">Total</td>
+          <td class="text-end fw-bold">{{ summary.total_transactions }}</td>
+          <td class="text-end fw-bold text-success">NPR {{ "%.2f"|format(summary.total_revenue) }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Sales Trend Chart
+const trendData = {{ by_period | tojson }};
+new Chart(document.getElementById('salesTrendChart'), {
+  type: 'bar',
+  data: {
+    labels: trendData.map(r => r.period),
+    datasets: [
+      {
+        label: 'Revenue (NPR)',
+        data: trendData.map(r => r.total),
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderColor: '#6366f1',
+        borderWidth: 1,
+        borderRadius: 4,
+        yAxisID: 'y',
+      },
+      {
+        label: 'Transactions',
+        data: trendData.map(r => r.transactions),
+        type: 'line',
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8' } },
+      y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#22c55e' } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+    }
+  }
+});
+
+// Hourly Chart
+{% if hourly %}
+const hourlyData = {{ hourly | tojson }};
+new Chart(document.getElementById('hourlyChart'), {
+  type: 'bar',
+  data: {
+    labels: hourlyData.map(r => r.label),
+    datasets: [{
+      label: 'Revenue (NPR)',
+      data: hourlyData.map(r => r.total),
+      backgroundColor: hourlyData.map(r => r.total === Math.max(...hourlyData.map(x => x.total)) ? '#f59e0b' : 'rgba(99,102,241,0.5)'),
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8' } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+    }
+  }
+});
+{% endif %}
+</script>
 {% endblock %}

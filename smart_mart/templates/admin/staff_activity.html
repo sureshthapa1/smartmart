@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Staff Activity — Smart Mart{% endblock %}
+{% block page_title %}Staff Activity Monitor{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item">Admin</li><li class="breadcrumb-item active">Staff Activity</li>{% endblock %}
+
+{% block content %}
+<!-- Staff Status Cards -->
+<div class="row g-3 mb-4">
+  {% for d in activity_data %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm border-0 h-100"
+         style="border-left:4px solid {% if d.is_online %}#22c55e{% else %}#94a3b8{% endif %}!important;">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div style="width:44px;height:44px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.1rem;flex-shrink:0;position:relative;">
+            {{ d.user.username[0].upper() }}
+            <span style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:{% if d.is_online %}#22c55e{% else %}#94a3b8{% endif %};border:2px solid #fff;"></span>
+          </div>
+          <div>
+            <div class="fw-bold" style="color:#0f172a;">{{ d.user.username }}</div>
+            <span class="badge rounded-pill {% if d.is_online %}bg-success{% else %}bg-secondary{% endif %}">
+              {% if d.is_online %}🟢 Online{% else %}⚫ Offline{% endif %}
+            </span>
+          </div>
+        </div>
+
+        <table class="table table-sm mb-0" style="font-size:.82rem;">
+          <tr>
+            <td class="text-muted border-0 py-1">Last Login</td>
+            <td class="border-0 py-1 text-end fw-medium">
+              {% if d.last_login %}{{ d.last_login.strftime('%d %b %Y %H:%M') }}{% else %}Never{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td class="text-muted border-0 py-1">Last Logout</td>
+            <td class="border-0 py-1 text-end">
+              {% if d.is_online %}<span class="text-success">Active now</span>
+              {% elif d.last_logout %}{{ d.last_logout.strftime('%d %b %Y %H:%M') }}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td class="text-muted border-0 py-1">Sessions (30d)</td>
+            <td class="border-0 py-1 text-end fw-medium">{{ d.sessions_30d }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted border-0 py-1">Time Online (30d)</td>
+            <td class="border-0 py-1 text-end fw-medium">
+              {% set h = d.total_minutes_30d // 60 %}
+              {% set m = d.total_minutes_30d % 60 %}
+              {% if h > 0 %}{{ h }}h {{ m }}m{% else %}{{ m }}m{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td class="text-muted border-0 py-1">Page Views (30d)</td>
+            <td class="border-0 py-1 text-end fw-medium">{{ d.total_page_views_30d }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted border-0 py-1">Total Sessions</td>
+            <td class="border-0 py-1 text-end">{{ d.total_sessions }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-people fs-1 d-block mb-2"></i>No staff users found.
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Sessions Log -->
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history text-primary"></i>Recent Login Sessions (Staff)
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th>Login Time</th>
+          <th>Logout Time</th>
+          <th class="text-end">Duration</th>
+          <th class="text-end">Page Views</th>
+          <th>IP Address</th>
+          <th class="text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:28px;height:28px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.75rem;font-weight:700;flex-shrink:0;">
+                {{ s.user.username[0].upper() }}
+              </div>
+              <span class="fw-medium">{{ s.user.username }}</span>
+            </div>
+          </td>
+          <td class="text-muted small">{{ s.login_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td class="text-muted small">
+            {% if s.logout_at %}{{ s.logout_at.strftime('%d %b %Y %H:%M') }}{% else %}—{% endif %}
+          </td>
+          <td class="text-end">
+            {% set h = s.duration_minutes // 60 %}
+            {% set m = s.duration_minutes % 60 %}
+            {% if h > 0 %}{{ h }}h {{ m }}m{% else %}{{ m }}m{% endif %}
+          </td>
+          <td class="text-end">{{ s.page_views or 0 }}</td>
+          <td class="text-muted small">{{ s.ip_address or '—' }}</td>
+          <td class="text-center">
+            {% if s.is_active %}
+            <span class="badge bg-success rounded-pill">Online</span>
+            {% else %}
+            <span class="badge bg-secondary rounded-pill">Offline</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No sessions recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

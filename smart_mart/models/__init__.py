@@ -7,9 +7,18 @@ from .purchase import Purchase, PurchaseItem
 from .expense import Expense
 from .stock_movement import StockMovement
 from .shop_settings import ShopSettings
+from .user_permissions import UserPermissions
+from .user_activity import UserActivity
+from .customer import Customer
+from .product_icon_map import ProductIconMap
+from .ai_memory import AIModelVersion, AIRecommendation, AIAlert, AIRetrainingLog, AIFeedbackLog
+from .online_order import OnlineOrder, OnlineOrderItem
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
     "Sale", "SaleItem", "Purchase", "PurchaseItem",
     "Expense", "StockMovement", "ShopSettings",
+    "UserPermissions", "UserActivity", "Customer", "ProductIconMap",
+    "AIModelVersion", "AIRecommendation", "AIAlert", "AIRetrainingLog", "AIFeedbackLog",
+    "OnlineOrder", "OnlineOrderItem",
 ]

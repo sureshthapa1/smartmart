@@ -19,8 +19,9 @@ class InsufficientStockError(ValueError):
 
 def create_sale(items: list[dict], user_id: int,
                 customer_name: str = None, customer_address: str = None,
-                customer_phone: str = None) -> Sale:
-    """Create a confirmed sale. Raises InsufficientStockError before any DB write if stock is insufficient."""
+                customer_phone: str = None, payment_mode: str = "cash",
+                discount_amount: float = 0, discount_note: str = None) -> Sale:
+    """Create a confirmed sale."""
     products: dict[int, Product] = {}
     for item in items:
         pid = item["product_id"]
@@ -37,7 +38,6 @@ def create_sale(items: list[dict], user_id: int,
             )
 
     try:
-        # Auto-generate invoice number from shop settings
         invoice_number = None
         try:
             from ..models.shop_settings import ShopSettings
@@ -47,6 +47,7 @@ def create_sale(items: list[dict], user_id: int,
             pass
 
         total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
+        total_amount = max(0, total_amount - (discount_amount or 0))
         sale = Sale(
             user_id=user_id,
             total_amount=total_amount,
@@ -55,6 +56,9 @@ def create_sale(items: list[dict], user_id: int,
             customer_name=customer_name,
             customer_address=customer_address,
             customer_phone=customer_phone,
+            payment_mode=payment_mode or "cash",
+            discount_amount=discount_amount or 0,
+            discount_note=discount_note,
         )
         db.session.add(sale)
         db.session.flush()
@@ -70,13 +74,22 @@ def create_sale(items: list[dict], user_id: int,
             product.quantity -= qty
             db.session.add(StockMovement(
                 product_id=product.id, change_amount=-qty, change_type="sale",
-                reference_id=sale.id, created_by=user_id, timestamp=datetime.now(timezone.utc),
+                reference_id=sale.id, created_by=user_id,
+                timestamp=datetime.now(timezone.utc),
             ))
 
         try:
             from . import cash_flow_manager
             cash_flow_manager.record_income(sale)
         except ImportError:
+            pass
+
+        # Save customer for autofill on next visit
+        try:
+            from ..models.customer import Customer
+            if customer_name and customer_name.strip().lower() != "walk-in customer":
+                Customer.upsert(customer_name, customer_phone, customer_address)
+        except Exception:
             pass
 
         db.session.commit()
@@ -88,12 +101,10 @@ def create_sale(items: list[dict], user_id: int,
 
 
 def get_sale(sale_id: int) -> Sale:
-    """Return a Sale by ID or raise 404."""
     return db.get_or_404(Sale, sale_id)
 
 
 def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
-    """Return paginated sales, optionally filtered by start_date/end_date."""
     stmt = db.select(Sale).order_by(Sale.sale_date.desc())
     conditions = []
     if filters.get("start_date"):
@@ -107,7 +118,6 @@ def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
 
 
 def delete_sale(sale_id: int) -> None:
-    """Delete a sale and reverse all stock changes. Admin only."""
     sale = get_sale(sale_id)
     try:
         for item in sale.items:
@@ -131,25 +141,22 @@ def delete_sale(sale_id: int) -> None:
 
 
 def generate_invoice_pdf(sale_id: int) -> bytes:
-    """Generate a professional PDF invoice for a sale using ReportLab."""
+    """Generate a professional Tax Invoice PDF using ReportLab."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
     from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
                                      Paragraph, Spacer, HRFlowable)
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
     sale: Sale = get_sale(sale_id)
     buffer = BytesIO()
 
-    # Load shop settings
+    # ── Shop settings ─────────────────────────────────────────────────────
     shop_name = "Smart Mart"
-    shop_pan = ""
-    shop_address = ""
-    shop_phone = ""
-    shop_email = ""
-    footer_note = "Thank you for shopping with us!"
+    shop_pan = shop_address = shop_phone = shop_email = ""
+    footer_note = "Thank you for your business!"
     try:
         from ..models.shop_settings import ShopSettings
         s = ShopSettings.get()
@@ -166,166 +173,262 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     customer_name = sale.customer_name or "Walk-in Customer"
     customer_address = sale.customer_address or ""
     customer_phone = sale.customer_phone or ""
+    pm = (sale.payment_mode or "cash").upper()
+    pm_labels = {"CASH": "Cash", "QR": "QR / Digital Wallet",
+                 "CARD": "Card", "CREDIT": "Credit / Udharo", "OTHER": "Other"}
+    payment_label = pm_labels.get(pm, pm)
 
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            leftMargin=1.8*cm, rightMargin=1.8*cm,
-                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    # ── Document setup ────────────────────────────────────────────────────
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=1.8*cm, rightMargin=1.8*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm
+    )
+    W = A4[0] - 3.6*cm
 
-    accent = colors.HexColor("#6366f1")
-    dark = colors.HexColor("#0f172a")
-    light_gray = colors.HexColor("#f8fafc")
-    mid_gray = colors.HexColor("#64748b")
+    # Colors
+    navy = colors.HexColor("#1e3a5f")
+    blue = colors.HexColor("#2563eb")
+    light_blue = colors.HexColor("#eff6ff")
+    slate = colors.HexColor("#64748b")
+    border = colors.HexColor("#cbd5e1")
+    green = colors.HexColor("#16a34a")
+    light_green = colors.HexColor("#f0fdf4")
+    row_alt = colors.HexColor("#f8fafc")
 
-    def ps(name, **kw):
+    def S(name, **kw):
         return ParagraphStyle(name, **kw)
 
     story = []
 
-    # Header
-    header_data = [[
-        Paragraph(f"<b>{shop_name}</b>", ps("h1", fontSize=20, fontName="Helvetica-Bold", textColor=dark)),
-        Paragraph("<b>INVOICE</b>", ps("h2", fontSize=20, fontName="Helvetica-Bold", textColor=accent, alignment=TA_RIGHT)),
-    ]]
-    ht = Table(header_data, colWidths=[9*cm, 9*cm])
-    ht.setStyle(TableStyle([("VALIGN", (0,0), (-1,-1), "MIDDLE")]))
-    story.append(ht)
-
-    shop_sub_parts = []
+    # ── HEADER: two-column layout ─────────────────────────────────────────
+    # Left column: shop name + details stacked
+    # Right column: TAX INVOICE + invoice number + date
+    left_col = [
+        Paragraph(f"<b>{shop_name}</b>",
+                  S("sn", fontSize=16, fontName="Helvetica-Bold",
+                    textColor=navy, spaceAfter=4, leading=20)),
+    ]
+    contact_parts = []
     if shop_address:
-        shop_sub_parts.append(shop_address)
+        contact_parts.append(shop_address)
     if shop_phone:
-        shop_sub_parts.append(f"Tel: {shop_phone}")
+        contact_parts.append(f"Tel: {shop_phone}")
     if shop_email:
-        shop_sub_parts.append(shop_email)
+        contact_parts.append(shop_email)
     if shop_pan:
-        shop_sub_parts.append(f"PAN: {shop_pan}")
-    story.append(Paragraph("  |  ".join(shop_sub_parts) if shop_sub_parts else "Inventory & Sales Management System",
-                            ps("sub", fontSize=8, fontName="Helvetica", textColor=mid_gray)))
-    story.append(HRFlowable(width="100%", thickness=2, color=accent, spaceAfter=8))
+        contact_parts.append(f"PAN No: {shop_pan}")
+    for part in contact_parts:
+        left_col.append(Paragraph(part, S(f"sc_{part[:5]}", fontSize=8,
+                                          fontName="Helvetica", textColor=slate,
+                                          spaceAfter=2, leading=11)))
 
-    # Meta
-    sale_date_str = sale.sale_date.strftime("%B %d, %Y  %H:%M") if sale.sale_date else "N/A"
-    served_by = sale.user.username if sale.user else "—"
-    lbl = ps("lbl", fontSize=8, fontName="Helvetica-Bold", textColor=mid_gray)
-    val = ps("val", fontSize=9, fontName="Helvetica", textColor=dark)
+    right_col = [
+        Paragraph("TAX INVOICE",
+                  S("ti", fontSize=16, fontName="Helvetica-Bold",
+                    textColor=blue, alignment=TA_RIGHT, spaceAfter=5, leading=20)),
+        Paragraph(f"<b>No: {invoice_num}</b>",
+                  S("inv", fontSize=10, fontName="Helvetica-Bold",
+                    textColor=navy, alignment=TA_RIGHT, spaceAfter=3, leading=13)),
+        Paragraph(sale.sale_date.strftime("%d %B %Y  %I:%M %p") if sale.sale_date else "",
+                  S("dt", fontSize=8, fontName="Helvetica",
+                    textColor=slate, alignment=TA_RIGHT, leading=11)),
+    ]
 
-    bill_to_lines = [Paragraph("BILL TO", lbl), Paragraph(f"<b>{customer_name}</b>", val)]
-    if customer_address:
-        bill_to_lines.append(Paragraph(customer_address, val))
-    if customer_phone:
-        bill_to_lines.append(Paragraph(f"Tel: {customer_phone}", val))
-
-    meta_data = [[
-        [Paragraph("INVOICE DETAILS", lbl),
-         Paragraph(f"Invoice No: <b>{invoice_num}</b>", val),
-         Paragraph(f"Date: <b>{sale_date_str}</b>", val),
-         Paragraph(f"Served by: <b>{served_by}</b>", val)],
-        bill_to_lines,
-    ]]
-    mt = Table(meta_data, colWidths=[9*cm, 9*cm])
-    mt.setStyle(TableStyle([
-        ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ("BACKGROUND", (0,0), (-1,-1), light_gray),
-        ("BOX", (0,0), (0,0), 0.5, colors.HexColor("#e2e8f0")),
-        ("BOX", (1,0), (1,0), 0.5, colors.HexColor("#e2e8f0")),
-        ("LEFTPADDING", (0,0), (-1,-1), 10),
-        ("TOPPADDING", (0,0), (-1,-1), 8),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+    hdr = Table([[left_col, right_col]], colWidths=[W * 0.55, W * 0.45])
+    hdr.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BACKGROUND", (0, 0), (-1, -1), light_blue),
+        ("LEFTPADDING", (0, 0), (0, 0), 14),
+        ("RIGHTPADDING", (0, 0), (0, 0), 10),
+        ("LEFTPADDING", (1, 0), (1, 0), 10),
+        ("RIGHTPADDING", (1, 0), (1, 0), 14),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LINEBELOW", (0, 0), (-1, -1), 2.5, blue),
     ]))
-    story.append(mt)
-    story.append(Spacer(1, 0.5*cm))
+    story.append(hdr)
+    story.append(Spacer(1, 0.4 * cm))
 
-    # Items table
-    col_widths = [1*cm, 6.5*cm, 2*cm, 2.5*cm, 2.5*cm, 3.5*cm]
-    th = ps("th", fontSize=8, fontName="Helvetica-Bold", textColor=colors.white)
-    th_r = ps("thr", fontSize=8, fontName="Helvetica-Bold", textColor=colors.white, alignment=TA_RIGHT)
-    th_c = ps("thc", fontSize=8, fontName="Helvetica-Bold", textColor=colors.white, alignment=TA_CENTER)
+    # ── BILL TO + PAYMENT DETAILS ─────────────────────────────────────────
+    lbl_s = S("lbl", fontSize=7, fontName="Helvetica-Bold", textColor=slate,
+               spaceAfter=3, leading=10)
+    val_s = S("val", fontSize=9, fontName="Helvetica", textColor=navy,
+               spaceAfter=2, leading=12)
+    val_b = S("valb", fontSize=9, fontName="Helvetica-Bold", textColor=navy,
+               spaceAfter=2, leading=12)
 
-    table_data = [[
-        Paragraph("#", th_c),
-        Paragraph("PRODUCT", th),
-        Paragraph("QTY", th_c),
-        Paragraph("UNIT PRICE", th_r),
-        Paragraph("DISCOUNT", th_r),
-        Paragraph("SUBTOTAL", th_r),
+    bill_items = [Paragraph("BILL TO", lbl_s),
+                  Paragraph(customer_name, val_b)]
+    if customer_phone:
+        bill_items.append(Paragraph(f"Tel: {customer_phone}", val_s))
+    if customer_address:
+        bill_items.append(Paragraph(customer_address, val_s))
+
+    pay_items = [
+        Paragraph("PAYMENT DETAILS", lbl_s),
+        Paragraph(f"Mode:  <b>{payment_label}</b>", val_s),
+        Paragraph("Status:  <b>Paid</b>", val_s),
+        Paragraph(f"Served by:  <b>{sale.user.username if sale.user else '—'}</b>", val_s),
+    ]
+
+    meta = Table([[bill_items, pay_items]], colWidths=[W * 0.52, W * 0.48])
+    meta.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOX", (0, 0), (0, 0), 0.5, border),
+        ("BOX", (1, 0), (1, 0), 0.5, border),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(meta)
+    story.append(Spacer(1, 0.4 * cm))
+
+    # ── ITEMS TABLE ───────────────────────────────────────────────────────
+    col_w = [0.7*cm, 5.8*cm, 1.4*cm, 1.4*cm, 2.4*cm, 1.8*cm, 2.5*cm]
+    th = S("th", fontSize=8, fontName="Helvetica-Bold",
+            textColor=colors.white, alignment=TA_CENTER)
+    th_r = S("thr", fontSize=8, fontName="Helvetica-Bold",
+              textColor=colors.white, alignment=TA_RIGHT)
+
+    rows = [[
+        Paragraph("#", th),
+        Paragraph("DESCRIPTION", th),
+        Paragraph("UNIT", th),
+        Paragraph("QTY", th),
+        Paragraph("RATE (NPR)", th_r),
+        Paragraph("DISC", th_r),
+        Paragraph("AMOUNT (NPR)", th_r),
     ]]
 
     for i, si in enumerate(sale.items, 1):
         name = si.product.name if si.product else f"Product #{si.product_id}"
         sku = si.product.sku if si.product else ""
-        cat = si.product.category if si.product else ""
-        product_cell = [
-            Paragraph(f"<b>{name}</b>", ps("pn", fontSize=9, fontName="Helvetica-Bold", textColor=dark)),
-            Paragraph(f"SKU: {sku}  |  {cat}", ps("ps", fontSize=7, fontName="Helvetica", textColor=mid_gray)),
+        unit = (si.product.unit if si.product else "pcs") or "pcs"
+        desc = [
+            Paragraph(f"<b>{name}</b>",
+                      S(f"pn{i}", fontSize=9, fontName="Helvetica-Bold",
+                        textColor=navy, leading=12)),
+            Paragraph(f"SKU: {sku}",
+                      S(f"sk{i}", fontSize=7, fontName="Helvetica",
+                        textColor=slate, leading=10)),
         ]
-        table_data.append([
-            Paragraph(str(i), ps("n", fontSize=9, fontName="Helvetica", textColor=mid_gray, alignment=TA_CENTER)),
-            product_cell,
-            Paragraph(str(si.quantity), ps("q", fontSize=9, fontName="Helvetica", textColor=dark, alignment=TA_CENTER)),
-            Paragraph(f"NPR {float(si.unit_price):,.2f}", ps("up", fontSize=9, fontName="Helvetica", textColor=dark, alignment=TA_RIGHT)),
-            Paragraph("—", ps("d", fontSize=9, fontName="Helvetica", textColor=mid_gray, alignment=TA_RIGHT)),
-            Paragraph(f"NPR {float(si.subtotal):,.2f}", ps("st", fontSize=9, fontName="Helvetica-Bold", textColor=dark, alignment=TA_RIGHT)),
+        rows.append([
+            Paragraph(str(i), S(f"n{i}", fontSize=9, fontName="Helvetica",
+                                 textColor=slate, alignment=TA_CENTER)),
+            desc,
+            Paragraph(unit, S(f"u{i}", fontSize=9, fontName="Helvetica",
+                               textColor=slate, alignment=TA_CENTER)),
+            Paragraph(str(si.quantity), S(f"q{i}", fontSize=9, fontName="Helvetica",
+                                           textColor=navy, alignment=TA_CENTER)),
+            Paragraph(f"{float(si.unit_price):,.2f}",
+                      S(f"up{i}", fontSize=9, fontName="Helvetica",
+                        textColor=navy, alignment=TA_RIGHT)),
+            Paragraph("—", S(f"d{i}", fontSize=9, fontName="Helvetica",
+                              textColor=slate, alignment=TA_RIGHT)),
+            Paragraph(f"{float(si.subtotal):,.2f}",
+                      S(f"st{i}", fontSize=9, fontName="Helvetica-Bold",
+                        textColor=navy, alignment=TA_RIGHT)),
         ])
 
-    it = Table(table_data, colWidths=col_widths, repeatRows=1)
+    row_bgs = [("BACKGROUND", (0, i), (-1, i),
+                colors.white if i % 2 == 1 else row_alt)
+               for i in range(1, len(rows))]
+
+    it = Table(rows, colWidths=col_w, repeatRows=1)
     it.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), dark),
-        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ("FONTSIZE", (0,0), (-1,0), 8),
-        ("TOPPADDING", (0,0), (-1,0), 8),
-        ("BOTTOMPADDING", (0,0), (-1,0), 8),
-        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f8fafc")]),
-        ("FONTSIZE", (0,1), (-1,-1), 9),
-        ("TOPPADDING", (0,1), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,1), (-1,-1), 6),
-        ("LEFTPADDING", (0,0), (-1,-1), 6),
-        ("RIGHTPADDING", (0,0), (-1,-1), 6),
-        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-        ("LINEBELOW", (0,0), (-1,0), 1.5, accent),
-    ]))
+        ("BACKGROUND", (0, 0), (-1, 0), navy),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.5, blue),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("TOPPADDING", (0, 1), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.3, border),
+    ] + row_bgs))
     story.append(it)
-    story.append(Spacer(1, 0.4*cm))
+    story.append(Spacer(1, 0.3 * cm))
 
-    # Totals
-    subtotal = float(sale.total_amount)
-    totals_data = [
-        ["", "Subtotal:", f"NPR {subtotal:,.2f}"],
-        ["", "Discount:", "NPR 0.00"],
-        ["", "Tax (0%):", "NPR 0.00"],
+    # ── TOTALS ────────────────────────────────────────────────────────────
+    gross_total = sum(float(si.subtotal) for si in sale.items)
+    discount = float(sale.discount_amount or 0)
+    final_total = float(sale.total_amount)
+    tot_s = S("ts", fontSize=9, fontName="Helvetica", textColor=slate)
+    tot_v = S("tv", fontSize=9, fontName="Helvetica", textColor=navy, alignment=TA_RIGHT)
+    tot_red = S("tr", fontSize=9, fontName="Helvetica", textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT)
+
+    totals_rows = [
+        [Paragraph("Sub Total:", tot_s), Paragraph(f"NPR {gross_total:,.2f}", tot_v)],
     ]
-    tt = Table(totals_data, colWidths=[10*cm, 4*cm, 4*cm])
-    tt.setStyle(TableStyle([
-        ("ALIGN", (1,0), (-1,-1), "RIGHT"),
-        ("FONTNAME", (0,0), (-1,-1), "Helvetica"),
-        ("FONTSIZE", (0,0), (-1,-1), 9),
-        ("TEXTCOLOR", (1,0), (-1,-1), mid_gray),
-        ("TOPPADDING", (0,0), (-1,-1), 3),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
-    ]))
-    story.append(tt)
+    if discount > 0:
+        disc_label = f"Discount ({sale.discount_note}):" if sale.discount_note else "Discount:"
+        totals_rows.append([Paragraph(disc_label, tot_s), Paragraph(f"- NPR {discount:,.2f}", tot_red)])
+    totals_rows.append([Paragraph("Tax (0%):", tot_s), Paragraph("NPR 0.00", tot_v)])
 
-    grand_data = [["", "TOTAL AMOUNT:", f"NPR {subtotal:,.2f}"]]
-    gt = Table(grand_data, colWidths=[10*cm, 4*cm, 4*cm])
-    gt.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), dark),
-        ("TEXTCOLOR", (0,0), (-1,-1), colors.white),
-        ("FONTNAME", (0,0), (-1,-1), "Helvetica-Bold"),
-        ("FONTSIZE", (0,0), (-1,-1), 11),
-        ("ALIGN", (1,0), (-1,-1), "RIGHT"),
-        ("TOPPADDING", (0,0), (-1,-1), 8),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
-        ("LEFTPADDING", (0,0), (-1,-1), 8),
-        ("RIGHTPADDING", (0,0), (-1,-1), 8),
+    totals = Table(totals_rows, colWidths=[W * 0.8, W * 0.2])
+    totals.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
     ]))
-    story.append(gt)
-    story.append(Spacer(1, 0.6*cm))
+    story.append(totals)
 
-    # Footer
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#e2e8f0"), spaceAfter=6))
-    footer = ps("footer", fontSize=8, fontName="Helvetica", textColor=mid_gray, alignment=TA_CENTER)
-    story.append(Paragraph(footer_note, footer))
-    story.append(Paragraph("This is a computer-generated invoice and does not require a signature.", footer))
+    grand = Table([[
+        Paragraph("TOTAL AMOUNT",
+                  S("gt", fontSize=11, fontName="Helvetica-Bold",
+                    textColor=colors.white, alignment=TA_RIGHT)),
+        Paragraph(f"NPR {final_total:,.2f}",
+                  S("gv", fontSize=12, fontName="Helvetica-Bold",
+                    textColor=colors.white, alignment=TA_RIGHT)),
+    ]], colWidths=[W * 0.75, W * 0.25])
+    grand.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), navy),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(grand)
+    story.append(Spacer(1, 0.4 * cm))
+
+    # ── PAYMENT CONFIRMATION ──────────────────────────────────────────────
+    pay_conf = Table([[
+        Paragraph(f"Payment Received  —  <b>{payment_label}</b>",
+                  S("pc", fontSize=9, fontName="Helvetica-Bold", textColor=green)),
+        Paragraph(f"NPR {final_total:,.2f}",
+                  S("pv", fontSize=11, fontName="Helvetica-Bold",
+                    textColor=green, alignment=TA_RIGHT)),
+    ]], colWidths=[W * 0.72, W * 0.28])
+    pay_conf.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), light_green),
+        ("BOX", (0, 0), (-1, -1), 1, green),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    story.append(pay_conf)
+    story.append(Spacer(1, 0.5 * cm))
+
+    # ── FOOTER ────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width="100%", thickness=0.5, color=border, spaceAfter=5))
+    story.append(Paragraph(footer_note,
+                            S("fn", fontSize=8, fontName="Helvetica",
+                              textColor=slate, alignment=TA_CENTER)))
+    story.append(Paragraph(
+        "This is a computer-generated Tax Invoice. No signature required.",
+        S("fn2", fontSize=7, fontName="Helvetica",
+          textColor=colors.HexColor("#94a3b8"), alignment=TA_CENTER)
+    ))
 
     doc.build(story)
     return buffer.getvalue()

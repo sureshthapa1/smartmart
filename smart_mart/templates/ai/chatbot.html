@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}AI Assistant — Smart Mart{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">AI Assistant</li>{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0" style="height:70vh;display:flex;flex-direction:column;">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+        <div style="width:36px;height:36px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">🤖</div>
+        <div>
+          <div class="fw-bold">Smart Mart AI Assistant</div>
+          <div class="text-muted" style="font-size:.75rem;">Ask about sales, stock, profit, forecasts…</div>
+        </div>
+        <span class="badge bg-success rounded-pill ms-auto">Online</span>
+      </div>
+
+      <!-- Chat messages -->
+      <div id="chatMessages" class="flex-grow-1 p-3 overflow-auto" style="background:#f8fafc;">
+        <!-- Welcome message -->
+        <div class="d-flex gap-2 mb-3">
+          <div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
+          <div class="rounded-3 p-3 shadow-sm" style="background:#fff;max-width:80%;font-size:.875rem;">
+            👋 Hello! I'm your Smart Mart AI assistant.<br><br>
+            I can help you with:<br>
+            • Today's / weekly / monthly sales<br>
+            • Top products & best sellers<br>
+            • Low stock & restock alerts<br>
+            • Sales forecasts<br>
+            • Profit & cash balance<br>
+            • Dead stock detection<br><br>
+            Type <strong>help</strong> to see all commands.
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick suggestions -->
+      <div class="px-3 py-2 border-top" style="background:#fff;">
+        <div class="d-flex gap-1 flex-wrap mb-2">
+          {% for q in ["Today's sales", "Top product", "Low stock", "Sales forecast", "Profit", "Dead stock"] %}
+          <button class="btn btn-outline-secondary btn-sm quick-q" data-q="{{ q }}">{{ q }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="p-3 border-top" style="background:#fff;">
+        <div class="input-group">
+          <input type="text" id="chatInput" class="form-control"
+                 placeholder="Ask anything about your business…"
+                 autocomplete="off">
+          <button class="btn btn-primary" id="sendBtn">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const messages = document.getElementById('chatMessages');
+const input = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function addMessage(text, isUser) {
+  const div = document.createElement('div');
+  div.className = 'd-flex gap-2 mb-3' + (isUser ? ' flex-row-reverse' : '');
+  const avatar = isUser
+    ? `<div style="width:32px;height:32px;background:#22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">👤</div>`
+    : `<div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>`;
+  const bubble = `<div class="rounded-3 p-3 shadow-sm" style="background:${isUser ? '#6366f1' : '#fff'};color:${isUser ? '#fff' : '#0f172a'};max-width:80%;font-size:.875rem;white-space:pre-line;">${text}</div>`;
+  div.innerHTML = isUser ? bubble + avatar : avatar + bubble;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.id = 'typing';
+  div.className = 'd-flex gap-2 mb-3';
+  div.innerHTML = `<div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
+    <div class="rounded-3 p-3 shadow-sm" style="background:#fff;font-size:.875rem;">
+      <span class="text-muted">Thinking</span>
+      <span class="dots">...</span>
+    </div>`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+async function sendMessage(text) {
+  if (!text.trim()) return;
+  addMessage(text, true);
+  input.value = '';
+  addTyping();
+  try {
+    const res = await fetch("{{ url_for('ai.chatbot_query') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await res.json();
+    document.getElementById('typing')?.remove();
+    addMessage(data.reply, false);
+  } catch {
+    document.getElementById('typing')?.remove();
+    addMessage('Sorry, something went wrong. Please try again.', false);
+  }
+}
+
+sendBtn.addEventListener('click', () => sendMessage(input.value));
+input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(input.value); });
+
+document.querySelectorAll('.quick-q').forEach(btn => {
+  btn.addEventListener('click', () => sendMessage(btn.dataset.q));
+});
+</script>
+{% endblock %}
