@@ -61,17 +61,38 @@ def product_analysis(product_id):
 @ai_bp.route("/chatbot", methods=["GET"])
 @login_required
 def chatbot():
-    return render_template("ai/chatbot.html")
+    from flask import session as flask_session
+    history = flask_session.get("chatbot_history", [])
+    return render_template("ai/chatbot.html", history=history)
 
 
 @ai_bp.route("/chatbot/query", methods=["POST"])
 @login_required
 def chatbot_query():
+    from flask import session as flask_session
     data = request.get_json() or {}
     message = data.get("message", "").strip()
     if not message:
         return jsonify({"reply": "Please type a message."})
-    reply = ai_engine.chatbot_query(message)
+
+    history = flask_session.get("chatbot_history", [])
+
+    # Build context-aware message: if message is a follow-up (short/pronoun-heavy),
+    # prepend the last bot reply topic as context
+    context_msg = message
+    if history and len(message.split()) <= 4:
+        last_bot = next((h["text"] for h in reversed(history) if h["role"] == "bot"), "")
+        if last_bot:
+            context_msg = f"{last_bot[:80]} {message}"
+
+    reply = ai_engine.chatbot_query(context_msg)
+
+    # Store in session (keep last 10 exchanges = 20 messages)
+    history.append({"role": "user", "text": message})
+    history.append({"role": "bot", "text": reply})
+    flask_session["chatbot_history"] = history[-20:]
+    flask_session.modified = True
+
     return jsonify({"reply": reply})
 
 
@@ -344,6 +365,7 @@ def api_nlg_summary():
 def api_image_recognize():
     """POST with multipart/form-data file OR JSON {"filename": "..."}"""
     from ...services.ai_image_recognition import recognize_from_filename, recognize_from_text
+    from flask import current_app
     import os
 
     # File upload
@@ -355,7 +377,7 @@ def api_image_recognize():
             import uuid
             ext = os.path.splitext(f.filename)[1].lower()
             filename = f"{uuid.uuid4().hex}{ext}"
-            upload_dir = os.path.join(db.get_app().static_folder, "uploads", "products")
+            upload_dir = os.path.join(current_app.static_folder, "uploads", "products")
             os.makedirs(upload_dir, exist_ok=True)
             f.save(os.path.join(upload_dir, filename))
             result["saved_filename"] = filename

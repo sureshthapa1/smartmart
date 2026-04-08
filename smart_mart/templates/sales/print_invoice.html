@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice {{ sale.invoice_number or sale.id }} — {{ shop.shop_name if shop else 'Smart Mart' }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1e293b; background: #fff; }
+    .page { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e3a5f; padding-bottom: 16px; margin-bottom: 16px; }
+    .shop-name { font-size: 20px; font-weight: 700; color: #1e3a5f; }
+    .shop-meta { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.6; }
+    .invoice-title { text-align: right; }
+    .invoice-title h2 { font-size: 18px; color: #2563eb; font-weight: 700; }
+    .invoice-title .inv-num { font-size: 13px; font-weight: 600; color: #1e3a5f; margin-top: 4px; }
+    .invoice-title .inv-date { font-size: 11px; color: #64748b; }
+    .meta-row { display: flex; gap: 24px; margin-bottom: 16px; }
+    .meta-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; }
+    .meta-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 600; margin-bottom: 4px; }
+    .meta-box .value { font-size: 13px; font-weight: 600; color: #0f172a; }
+    .meta-box .sub { font-size: 11px; color: #64748b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    thead th { background: #1e3a5f; color: #fff; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .totals { margin-left: auto; width: 280px; }
+    .totals table td { padding: 4px 8px; font-size: 12px; }
+    .totals .grand { background: #1e3a5f; color: #fff; font-weight: 700; font-size: 14px; }
+    .payment-confirm { background: #f0fdf4; border: 1px solid #16a34a; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .payment-confirm .label { color: #16a34a; font-weight: 600; font-size: 12px; }
+    .payment-confirm .amount { color: #16a34a; font-weight: 700; font-size: 15px; }
+    .footer { text-align: center; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; }
+    .print-btn { position: fixed; top: 16px; right: 16px; background: #6366f1; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    @media print {
+      .print-btn { display: none; }
+      body { font-size: 12px; }
+      .page { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ Print</button>
+  <div class="page">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+        <div class="shop-meta">
+          {% if shop and shop.address %}{{ shop.address }}<br>{% endif %}
+          {% if shop and shop.phone %}Tel: {{ shop.phone }}<br>{% endif %}
+          {% if shop and shop.pan_number %}PAN: {{ shop.pan_number }}{% endif %}
+        </div>
+      </div>
+      <div class="invoice-title">
+        <h2>TAX INVOICE</h2>
+        <div class="inv-num">No: {{ sale.invoice_number or ('INV-%05d' % sale.id) }}</div>
+        <div class="inv-date">{{ sale.sale_date.strftime('%d %B %Y  %I:%M %p') if sale.sale_date else '' }}</div>
+      </div>
+    </div>
+
+    <!-- Bill To + Payment -->
+    <div class="meta-row">
+      <div class="meta-box">
+        <div class="label">Bill To</div>
+        <div class="value">{{ sale.customer_name or 'Walk-in Customer' }}</div>
+        {% if sale.customer_phone %}<div class="sub">Tel: {{ sale.customer_phone }}</div>{% endif %}
+        {% if sale.customer_address %}<div class="sub">{{ sale.customer_address }}</div>{% endif %}
+      </div>
+      <div class="meta-box">
+        <div class="label">Payment</div>
+        <div class="value">
+          {% set pm = sale.payment_mode or 'cash' %}
+          {% if pm == 'cash' %}Cash
+          {% elif pm == 'qr' %}QR / Digital
+          {% elif pm == 'card' %}Card
+          {% elif pm == 'credit' %}Credit / Udharo
+          {% else %}Other{% endif %}
+        </div>
+        <div class="sub">Served by: {{ sale.user.username if sale.user else '—' }}</div>
+      </div>
+    </div>
+
+    <!-- Items -->
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Description</th>
+          <th>SKU</th>
+          <th class="text-center">Qty</th>
+          <th class="text-right">Rate (NPR)</th>
+          <th class="text-right">Amount (NPR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in sale.items %}
+        <tr>
+          <td class="text-center">{{ loop.index }}</td>
+          <td><strong>{{ item.product.name if item.product else 'Product #' ~ item.product_id }}</strong></td>
+          <td style="color:#94a3b8;font-size:11px;">{{ item.product.sku if item.product else '—' }}</td>
+          <td class="text-center">{{ item.quantity }}</td>
+          <td class="text-right">{{ "%.2f"|format(item.unit_price | float) }}</td>
+          <td class="text-right"><strong>{{ "%.2f"|format(item.subtotal | float) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="totals">
+      <table>
+        <tr><td>Sub Total</td><td class="text-right">NPR {{ "%.2f"|format(sale.items | sum(attribute='subtotal') | float) }}</td></tr>
+        {% if sale.discount_amount and sale.discount_amount > 0 %}
+        <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note }}){% endif %}</td>
+            <td class="text-right" style="color:#dc2626;">- NPR {{ "%.2f"|format(sale.discount_amount | float) }}</td></tr>
+        {% endif %}
+        <tr><td>Tax (0%)</td><td class="text-right">NPR 0.00</td></tr>
+        <tr class="grand"><td>TOTAL</td><td class="text-right">NPR {{ "%.2f"|format(sale.total_amount | float) }}</td></tr>
+      </table>
+    </div>
+
+    <!-- Payment Confirmation -->
+    <div class="payment-confirm">
+      <span class="label">✅ Payment Received</span>
+      <span class="amount">NPR {{ "%.2f"|format(sale.total_amount | float) }}</span>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      {{ shop.footer_note if shop and shop.footer_note else 'Thank you for your business!' }}<br>
+      This is a computer-generated Tax Invoice. No signature required.
+    </div>
+  </div>
+</body>
+</html>

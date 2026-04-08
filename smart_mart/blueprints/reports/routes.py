@@ -224,17 +224,105 @@ def staff_efficiency():
 @reports_bp.route("/sales/export-csv")
 @login_required
 def export_sales_csv():
+    from ...extensions import db
+    from ...models.sale import Sale, SaleItem
+    from sqlalchemy import and_, func
+    import csv, io
     start, end, _, _ = _get_date_range()
-    rows = report_engine.sales_report(start, end)
-    csv_str = exporter.export_report_csv(rows, ["date", "total"])
-    return Response(csv_str, mimetype="text/csv",
+    sales = db.session.execute(
+        db.select(Sale)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .order_by(Sale.sale_date.desc())
+    ).scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Invoice No", "Customer", "Payment Mode", "Items", "Subtotal", "Discount", "Total"])
+    for s in sales:
+        subtotal = sum(float(i.subtotal) for i in s.items)
+        writer.writerow([
+            s.sale_date.strftime("%Y-%m-%d %H:%M") if s.sale_date else "",
+            s.invoice_number or f"INV-{s.id:05d}",
+            s.customer_name or "Walk-in",
+            s.payment_mode or "cash",
+            len(s.items),
+            round(subtotal, 2),
+            float(s.discount_amount or 0),
+            float(s.total_amount),
+        ])
+    return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=sales_report.csv"})
+
+
+@reports_bp.route("/top-products/export-csv")
+@admin_required
+def export_top_products_csv():
+    start, end, _, _ = _get_date_range()
+    rows = report_engine.top_products(start, end)
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Rank", "Product", "SKU", "Category", "Qty Sold"])
+    for i, r in enumerate(rows, 1):
+        writer.writerow([i, r["product"].name, r["product"].sku,
+                         r["product"].category or "", r["qty_sold"]])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=top_products.csv"})
+
+
+@reports_bp.route("/category-performance/export-csv")
+@admin_required
+def export_category_csv():
+    start, end, _, _ = _get_date_range()
+    rows = report_engine.category_performance(start, end)
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Category", "Revenue", "Qty Sold", "Transactions", "Avg Order"])
+    for r in rows:
+        writer.writerow([r.get("category", ""), r.get("revenue", 0),
+                         r.get("qty_sold", 0), r.get("txn_count", 0), r.get("avg_order", 0)])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=category_performance.csv"})
+
+
+@reports_bp.route("/inventory-valuation/export-csv")
+@admin_required
+def export_inventory_csv():
+    data = report_engine.inventory_valuation()
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Product", "SKU", "Category", "Qty", "Cost Price", "Selling Price", "Stock Value"])
+    for r in data.get("products", []):
+        p = r.get("product")
+        if p:
+            writer.writerow([p.name, p.sku, p.category or "", p.quantity,
+                             float(p.cost_price), float(p.selling_price),
+                             float(p.cost_price) * p.quantity])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=inventory_valuation.csv"})
+
+
+@reports_bp.route("/staff-efficiency/export-csv")
+@admin_required
+def export_staff_csv():
+    start, end, _, _ = _get_date_range()
+    data = report_engine.staff_efficiency_report(start, end)
+    import csv, io
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Staff", "Role", "Transactions", "Items Sold", "Revenue", "Avg Sale"])
+    for r in data.get("staff", []):
+        writer.writerow([r.get("username", ""), r.get("role", ""),
+                         r.get("transactions", 0), r.get("items_sold", 0),
+                         r.get("revenue", 0), r.get("avg_sale", 0)])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=staff_efficiency.csv"})
 
 
 @reports_bp.route("/credit-udharo")
 @admin_required
 def credit_udharo():
-    from sqlalchemy import func, and_
     from ...extensions import db
     from ...models.sale import Sale
 

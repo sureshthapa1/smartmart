@@ -14,11 +14,11 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
     # Relationships
-    sales = db.relationship("Sale", back_populates="user", lazy="dynamic")
-    purchases = db.relationship("Purchase", back_populates="creator", lazy="dynamic",
+    sales = db.relationship("Sale", back_populates="user")
+    purchases = db.relationship("Purchase", back_populates="creator",
                                 foreign_keys="Purchase.created_by")
-    expenses = db.relationship("Expense", back_populates="creator", lazy="dynamic")
-    stock_movements = db.relationship("StockMovement", back_populates="creator", lazy="dynamic")
+    expenses = db.relationship("Expense", back_populates="creator")
+    stock_movements = db.relationship("StockMovement", back_populates="creator")
 
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"

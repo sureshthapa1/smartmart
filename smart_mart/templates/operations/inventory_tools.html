@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Inventory Tools - Smart Mart{% endblock %}
+{% block page_title %}Inventory Tools{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Inventory Tools</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">Barcode and Reorder Profiles</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Product</th><th>Barcode</th><th>Reorder Level</th><th>Shelf</th><th></th></tr></thead>
+      <tbody>
+        {% for product in products %}
+        {% set profile = profiles[product.id] %}
+        <tr>
+          <form method="post">
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+            <td>{{ product.name }}</td>
+            <td><input name="barcode" class="form-control form-control-sm" value="{{ profile.barcode or '' }}"></td>
+            <td><input name="reorder_level" type="number" min="0" class="form-control form-control-sm" value="{{ profile.reorder_level }}"></td>
+            <td><input name="shelf_location" class="form-control form-control-sm" value="{{ profile.shelf_location or '' }}"></td>
+            <td class="text-end"><button class="btn btn-sm btn-primary" type="submit">Save</button></td>
+          </form>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Purchase Batches</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Batch</th><th>Product</th><th>Purchase</th><th class="text-end">Received</th><th class="text-end">Remaining</th><th>Expiry</th></tr></thead>
+      <tbody>
+      {% for batch in batches %}
+        <tr>
+          <td><code>{{ batch.batch_code }}</code></td>
+          <td>{{ batch.product.name if batch.product else 'Unknown' }}</td>
+          <td>{% if batch.purchase_id %}#{{ batch.purchase_id }}{% else %}-{% endif %}</td>
+          <td class="text-end">{{ batch.quantity_received }}</td>
+          <td class="text-end">{{ batch.quantity_remaining }}</td>
+          <td>{{ batch.expiry_date or '-' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No batches recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -103,6 +103,10 @@
               {% else %}🔄 Other{% endif %}
             </dd>
           </div>
+          <div class="col-sm-4 mb-2">
+            <dt>Total Returns</dt>
+            <dd>{{ sale.returns | length }}</dd>
+          </div>
         </div>
       </div>
     </div>
@@ -159,14 +163,57 @@
 
     <!-- Actions -->
     <div class="d-flex gap-2">
+      <a href="{{ url_for('returns.create_return', sale_id=sale.id) }}"
+         class="btn btn-warning">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Create Return
+      </a>
       <a href="{{ url_for('sales.download_invoice', sale_id=sale.id) }}"
          class="btn btn-primary">
         <i class="bi bi-download me-1"></i>Download Invoice
+      </a>
+      <a href="{{ url_for('sales.print_invoice', sale_id=sale.id) }}" target="_blank"
+         class="btn btn-outline-secondary">
+        <i class="bi bi-printer me-1"></i>Print Invoice
       </a>
       <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back to Sales
       </a>
     </div>
+
+    {% if sale.returns %}
+    <div class="card shadow-sm mt-4">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-counterclockwise text-warning"></i>
+        <span>Return History</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Return</th>
+              <th>Date</th>
+              <th>Refund Mode</th>
+              <th class="text-end">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in sale.returns %}
+            <tr>
+              <td class="fw-medium">#{{ r.id }}</td>
+              <td class="text-muted small">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="text-capitalize">{{ r.refund_mode.replace('_', ' ') }}</td>
+              <td class="text-end fw-semibold">NPR {{ "%.2f"|format(r.refund_amount|float) }}</td>
+              <td class="text-end">
+                <a href="{{ url_for('returns.return_detail', return_id=r.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

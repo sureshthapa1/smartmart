@@ -4,6 +4,11 @@ from ..extensions import db
 
 class Sale(db.Model):
     __tablename__ = "sales"
+    __table_args__ = (
+        db.Index("ix_sale_date", "sale_date"),
+        db.Index("ix_sale_payment_mode", "payment_mode"),
+        db.Index("ix_sale_customer_name", "customer_name"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     invoice_number = db.Column(db.String(30), nullable=True)
@@ -23,6 +28,7 @@ class Sale(db.Model):
     # Relationships
     user = db.relationship("User", back_populates="sales")
     items = db.relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
+    returns = db.relationship("SaleReturn", back_populates="sale", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Sale #{self.id} total={self.total_amount}>"
@@ -30,6 +36,10 @@ class Sale(db.Model):
 
 class SaleItem(db.Model):
     __tablename__ = "sale_items"
+    __table_args__ = (
+        db.Index("ix_sale_item_sale_id", "sale_id"),
+        db.Index("ix_sale_item_product_id", "product_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey("sales.id"), nullable=False)
@@ -41,6 +51,9 @@ class SaleItem(db.Model):
     # Relationships
     sale = db.relationship("Sale", back_populates="items")
     product = db.relationship("Product", back_populates="sale_items")
+    return_items = db.relationship(
+        "SaleReturnItem", back_populates="sale_item", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<SaleItem sale={self.sale_id} product={self.product_id} qty={self.quantity}>"

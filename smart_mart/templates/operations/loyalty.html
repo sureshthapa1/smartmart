@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Loyalty - Smart Mart{% endblock %}
+{% block page_title %}Loyalty{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Loyalty</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Customer Loyalty Points</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Customer</th><th class="text-end">Points</th><th class="text-end">Entries</th></tr></thead>
+      <tbody>
+      {% for row in loyalty %}
+        <tr>
+          <td>{{ row.customer_name }}</td>
+          <td class="text-end fw-semibold">{{ row.points }}</td>
+          <td class="text-end">{{ row.entries }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="text-center text-muted py-4">No loyalty activity yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

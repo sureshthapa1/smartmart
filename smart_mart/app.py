@@ -1,12 +1,13 @@
 import os
-from flask import Flask, redirect, url_for, render_template
+import logging
+from logging.handlers import RotatingFileHandler
+from flask import Flask, redirect, url_for, render_template, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
 from .extensions import db, login_manager, bcrypt
 
 
 def create_app(config_name="development"):
-    # Resolve template and static folders relative to this package directory
     pkg_dir = os.path.dirname(__file__)
     app = Flask(
         __name__,
@@ -15,18 +16,39 @@ def create_app(config_name="development"):
     )
     app.config.from_object(config[config_name])
 
+    # ── Logging ───────────────────────────────────────────────────────────
+    if not app.debug:
+        logs_dir = os.path.join(os.path.dirname(pkg_dir), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            os.path.join(logs_dir, "smart_mart.log"),
+            maxBytes=1_000_000, backupCount=5
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        ))
+        app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
     bcrypt.init_app(app)
 
-    # Import models so SQLAlchemy registers them with the metadata
     from . import models  # noqa: F401
 
-    # Register blueprints
     _register_blueprints(app)
 
-    # Auto-create any missing DB tables on first request (safe, idempotent)
+    # ── HTTP Security Headers ─────────────────────────────────────────────
+    @app.after_request
+    def set_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+    # ── Auto-create DB tables on first request ────────────────────────────
     @app.before_request
     def create_tables():
         try:
@@ -35,7 +57,12 @@ def create_app(config_name="development"):
             app.logger.warning("db.create_all() failed: %s", exc)
         app.before_request_funcs[None].remove(create_tables)
 
-    # Track page views per active session
+    # ── Session permanent (8hr timeout from config) ───────────────────────
+    @app.before_request
+    def make_session_permanent():
+        session.permanent = True
+
+    # ── Track page views per active session ───────────────────────────────
     @app.before_request
     def track_page_view():
         from flask import session as flask_session, request
@@ -51,12 +78,25 @@ def create_app(config_name="development"):
             except Exception:
                 pass
 
-    # Root redirect
+    # ── Alert count context processor (sidebar badge) ────────────────────
+    @app.context_processor
+    def inject_alert_count():
+        try:
+            from flask_login import current_user
+            if current_user.is_authenticated:
+                from .services.alert_engine import get_low_stock_alerts, get_expiry_alerts
+                count = len(get_low_stock_alerts()) + len(get_expiry_alerts())
+                return {"global_alert_count": count}
+        except Exception:
+            pass
+        return {"global_alert_count": 0}
+
+    # ── Root redirect ─────────────────────────────────────────────────────
     @app.route("/")
     def index():
         return redirect(url_for("auth.login"))
 
-    # Global error handlers
+    # ── Global error handlers ─────────────────────────────────────────────
     @app.errorhandler(403)
     def forbidden(e):
         return render_template("errors/403.html"), 403
@@ -65,94 +105,51 @@ def create_app(config_name="development"):
     def not_found(e):
         return render_template("errors/404.html"), 404
 
-    if not app.debug:
-        @app.errorhandler(500)
-        def server_error(e):
-            return render_template("errors/500.html"), 500
+    @app.errorhandler(500)
+    def server_error(e):
+        app.logger.exception("Unhandled server error: %s", e)
+        return render_template("errors/500.html"), 500
 
-        @app.errorhandler(SQLAlchemyError)
-        def db_error(e):
-            app.logger.exception("Database error: %s", e)
-            return render_template("errors/500.html"), 500
-
-    # Create DB tables on first run — use a CLI command or seed.py instead
-    # db.create_all() removed from here to avoid nested app context issues
+    @app.errorhandler(SQLAlchemyError)
+    def db_error(e):
+        app.logger.exception("Database error: %s", e)
+        db.session.rollback()
+        return render_template("errors/500.html"), 500
 
     return app
 
 
 def _register_blueprints(app):
-    # Blueprints will be registered here as they are implemented in subsequent tasks.
-    # Each import is guarded so the app factory works even before the blueprint
-    # modules exist.
-    try:
-        from .blueprints.auth import auth_bp
-        app.register_blueprint(auth_bp)
-    except ImportError:
-        pass
+    import traceback
 
-    try:
-        from .blueprints.dashboard import dashboard_bp
-        app.register_blueprint(dashboard_bp)
-    except ImportError:
-        pass
+    blueprints = [
+        (".blueprints.auth", "auth_bp"),
+        (".blueprints.dashboard", "dashboard_bp"),
+        (".blueprints.inventory", "inventory_bp"),
+        (".blueprints.sales", "sales_bp"),
+        (".blueprints.returns", "returns_bp"),
+        (".blueprints.purchases", "purchases_bp"),
+        (".blueprints.reports", "reports_bp"),
+        (".blueprints.alerts", "alerts_bp"),
+        (".blueprints.admin", "admin_bp"),
+        (".blueprints.ai", "ai_bp"),
+        (".blueprints.online_orders", "online_orders_bp"),
+        (".blueprints.settings", "settings_bp"),
+        (".blueprints.operations", "operations_bp"),
+        (".blueprints.api", "api_bp"),
+        (".blueprints.expenses", "expenses_bp"),
+    ]
 
-    try:
-        from .blueprints.inventory import inventory_bp
-        app.register_blueprint(inventory_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.sales import sales_bp
-        app.register_blueprint(sales_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.purchases import purchases_bp
-        app.register_blueprint(purchases_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.reports import reports_bp
-        app.register_blueprint(reports_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.alerts import alerts_bp
-        app.register_blueprint(alerts_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.admin import admin_bp
-        app.register_blueprint(admin_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.ai import ai_bp
-        app.register_blueprint(ai_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.online_orders import online_orders_bp
-        app.register_blueprint(online_orders_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.settings import settings_bp
-        app.register_blueprint(settings_bp)
-    except ImportError:
-        pass
-
-    try:
-        from .blueprints.api import api_bp
-        app.register_blueprint(api_bp)
-    except ImportError:
-        pass
+    for module_path, bp_name in blueprints:
+        try:
+            import importlib
+            module = importlib.import_module(module_path, package="smart_mart")
+            bp = getattr(module, bp_name)
+            app.register_blueprint(bp)
+        except ImportError:
+            pass  # Blueprint not yet implemented
+        except Exception as exc:
+            app.logger.error(
+                "Failed to register blueprint %s: %s\n%s",
+                bp_name, exc, traceback.format_exc()
+            )

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Notifications - Smart Mart{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Notifications</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">System Notifications</div>
+  <div class="list-group list-group-flush">
+    {% for n in notifications %}
+    <div class="list-group-item d-flex align-items-start gap-3">
+      <div class="mt-1"><span class="badge bg-{{ n.category }}">{{ 'Unread' if not n.is_read else 'Read' }}</span></div>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">{{ n.title }}</div>
+        <div class="text-muted small">{{ n.body }}</div>
+      </div>
+      {% if not n.is_read %}
+      <form method="post">
+        <input type="hidden" name="notification_id" value="{{ n.id }}">
+        <button class="btn btn-sm btn-outline-secondary" type="submit">Mark Read</button>
+      </form>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="list-group-item text-center text-muted py-4">No notifications.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

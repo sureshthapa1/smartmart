@@ -15,7 +15,7 @@ class UserActivity(db.Model):
     # page_views tracked separately
     page_views = db.Column(db.Integer, default=0)
 
-    user = db.relationship("User", backref=db.backref("activity_sessions", lazy="dynamic"))
+    user = db.relationship("User", backref=db.backref("activity_sessions", lazy="select"))
 
     @property
     def duration_minutes(self) -> int:

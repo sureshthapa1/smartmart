@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
 from ...extensions import db
@@ -19,6 +19,11 @@ sales_bp = Blueprint("sales", __name__, url_prefix="/sales")
 @sales_bp.route("/")
 @login_required
 def list_sales():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_view_sales:
+            abort(403)
     start_date = request.args.get("start_date", "").strip() or None
     end_date = request.args.get("end_date", "").strip() or None
 
@@ -39,6 +44,7 @@ def list_sales():
     return render_template(
         "sales/list.html",
         sales=sales,
+        page=page,
         start_date=start_date or "",
         end_date=end_date or "",
     )
@@ -47,6 +53,11 @@ def list_sales():
 @sales_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_sale():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_create_sale:
+            abort(403)
     products = db.session.execute(
         db.select(Product).order_by(Product.name)
     ).scalars().all()
@@ -67,6 +78,7 @@ def create_sale():
                 payment_mode=request.form.get("payment_mode", "cash"),
                 discount_amount=float(request.form.get("discount_amount", 0) or 0),
                 discount_note=request.form.get("discount_note", "").strip() or None,
+                wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
             )
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
@@ -94,6 +106,19 @@ def download_invoice(sale_id):
         mimetype="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=invoice_{sale_id}.pdf"},
     )
+
+
+@sales_bp.route("/<int:sale_id>/invoice/print")
+@login_required
+def print_invoice(sale_id):
+    """Print-friendly HTML invoice — no sidebar, no topbar."""
+    sale = sales_manager.get_sale(sale_id)
+    from ...models.shop_settings import ShopSettings
+    try:
+        shop = ShopSettings.get()
+    except Exception:
+        shop = None
+    return render_template("sales/print_invoice.html", sale=sale, shop=shop)
 
 
 @sales_bp.route("/<int:sale_id>/delete", methods=["POST"])

@@ -154,6 +154,9 @@ def create_order():
                 unit_price=item["unit_price"],
                 subtotal=item["unit_price"] * item["quantity"],
             ))
+            # Deduct stock when order is created
+            if product and product.quantity >= item["quantity"]:
+                product.quantity -= item["quantity"]
 
         db.session.commit()
         flash(f"Online order {order.order_number} created successfully.", "success")
@@ -192,6 +195,11 @@ def update_status(order_id):
     elif new_status == "cancelled":
         order.cancelled_at = datetime.now(timezone.utc)
         order.cancel_reason = note or "Cancelled by staff"
+        # Restore stock on cancellation
+        for item in order.items:
+            product = db.session.get(Product, item.product_id)
+            if product:
+                product.quantity += item.quantity
 
     if note:
         order.notes = (order.notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {note}"

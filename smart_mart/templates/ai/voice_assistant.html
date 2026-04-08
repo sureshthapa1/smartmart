@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Voice Assistant — Smart Mart{% endblock %}
+{% block page_title %}Voice Assistant{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('ai.chatbot') }}">AI</a></li>
+<li class="breadcrumb-item active">Voice Assistant</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <!-- Browser not supported -->
+    <div id="notSupported" class="alert alert-warning d-flex gap-2 align-items-center" style="display:none!important;">
+      <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+      <div>
+        <strong>Voice input is not supported in this browser.</strong><br>
+        Please use <strong>Chrome</strong> or <strong>Edge</strong> for voice features.
+        You can still use the <a href="{{ url_for('ai.chatbot') }}">text chatbot</a>.
+      </div>
+    </div>
+
+    <div id="voiceApp">
+      <div class="card shadow-sm mb-3">
+        <div class="card-body text-center py-5">
+          <button id="micBtn" class="btn btn-primary rounded-circle"
+                  style="width:80px;height:80px;font-size:2rem;" title="Hold to speak">
+            <i class="bi bi-mic-fill"></i>
+          </button>
+          <p class="text-muted small mt-3 mb-0" id="micStatus">Click the mic and speak</p>
+        </div>
+      </div>
+
+      <div id="transcript" class="card shadow-sm mb-3" style="display:none;">
+        <div class="card-body">
+          <div class="text-muted small mb-1">You said:</div>
+          <div id="transcriptText" class="fw-medium"></div>
+        </div>
+      </div>
+
+      <div id="replyCard" class="card shadow-sm" style="display:none;">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-robot text-primary"></i>
+            <span class="fw-semibold small">AI Response</span>
+            <button id="speakBtn" class="btn btn-sm btn-outline-secondary ms-auto">
+              <i class="bi bi-volume-up me-1"></i>Speak
+            </button>
+          </div>
+          <div id="replyText"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const notSupported = document.getElementById('notSupported');
+  const voiceApp = document.getElementById('voiceApp');
+  const micBtn = document.getElementById('micBtn');
+  const micStatus = document.getElementById('micStatus');
+  const transcriptCard = document.getElementById('transcript');
+  const transcriptText = document.getElementById('transcriptText');
+  const replyCard = document.getElementById('replyCard');
+  const replyText = document.getElementById('replyText');
+  const speakBtn = document.getElementById('speakBtn');
+
+  // Check browser support
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    notSupported.style.display = 'flex';
+    voiceApp.style.display = 'none';
+  } else {
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    let lastReply = '';
+
+    micBtn.addEventListener('click', () => {
+      micStatus.textContent = 'Listening…';
+      micBtn.classList.add('btn-danger');
+      micBtn.classList.remove('btn-primary');
+      recognition.start();
+    });
+
+    recognition.onresult = async (event) => {
+      const text = event.results[0][0].transcript;
+      transcriptText.textContent = text;
+      transcriptCard.style.display = '';
+      micStatus.textContent = 'Processing…';
+
+      try {
+        const res = await fetch('/ai/api/voice/query', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({transcript: text}),
+        });
+        const data = await res.json();
+        lastReply = data.tts_text || data.reply || '';
+        replyText.innerHTML = data.reply || '';
+        replyCard.style.display = '';
+        micStatus.textContent = 'Click the mic and speak';
+      } catch(e) {
+        micStatus.textContent = 'Error — please try again';
+      }
+      micBtn.classList.remove('btn-danger');
+      micBtn.classList.add('btn-primary');
+    };
+
+    recognition.onerror = (e) => {
+      micStatus.textContent = `Error: ${e.error}. Try again.`;
+      micBtn.classList.remove('btn-danger');
+      micBtn.classList.add('btn-primary');
+    };
+
+    recognition.onend = () => {
+      micBtn.classList.remove('btn-danger');
+      micBtn.classList.add('btn-primary');
+    };
+
+    speakBtn.addEventListener('click', () => {
+      if (!lastReply) return;
+      const utt = new SpeechSynthesisUtterance(lastReply);
+      utt.lang = 'en-US';
+      window.speechSynthesis.speak(utt);
+    });
+  }
+</script>
+{% endblock %}

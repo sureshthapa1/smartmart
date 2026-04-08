@@ -292,3 +292,18 @@ def generate_monthly_report() -> dict:
             "vs_last_month_pct": round(pct, 1),
         },
     }
+
+
+def generate_smart_summary() -> dict:
+    """Generate a concise smart summary combining daily + weekly highlights."""
+    daily = generate_daily_report()
+    weekly = generate_weekly_report()
+    combined = daily["paragraphs"][:2] + weekly["paragraphs"][:1]
+    return {
+        "type": "smart_summary",
+        "title": "Smart Business Summary",
+        "narrative": "\n\n".join(combined),
+        "paragraphs": combined,
+        "daily": daily["data"],
+        "weekly": weekly["data"],
+    }

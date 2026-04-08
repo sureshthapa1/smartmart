@@ -106,10 +106,14 @@ def index():
     # ── Total products ────────────────────────────────────────────────────
     total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
 
-    # ── Recent sales (last 8) ─────────────────────────────────────────────
+    # ── Recent sales (last 8) with eager loading ─────────────────────────
+    from sqlalchemy.orm import joinedload
     recent_sales = db.session.execute(
-        db.select(Sale).order_by(Sale.sale_date.desc()).limit(8)
-    ).scalars().all()
+        db.select(Sale)
+        .options(joinedload(Sale.user), joinedload(Sale.items))
+        .order_by(Sale.sale_date.desc())
+        .limit(8)
+    ).unique().scalars().all()
 
     # ── Top 5 selling products (this month) ──────────────────────────────
     top5 = db.session.execute(
@@ -165,6 +169,25 @@ def index():
         insights.append({"type": "info", "icon": "bi-trophy",
                           "text": f"Top seller this month: {top5[0].Product.name}"})
 
+    # ── NLG daily summary (shown once per day per admin) ─────────────────
+    nlg_summary = None
+    from flask_login import current_user as cu
+    from flask import session as flask_session
+    if cu.role == "admin":
+        today_str = str(today)
+        if flask_session.get("nlg_summary_date") != today_str:
+            try:
+                from ...services.ai_nlg import generate_daily_report
+                nlg_data = generate_daily_report()
+                nlg_summary = nlg_data.get("narrative", "")
+                flask_session["nlg_summary_date"] = today_str
+                flask_session["nlg_summary_text"] = nlg_summary
+                flask_session.modified = True
+            except Exception:
+                pass
+        else:
+            nlg_summary = flask_session.get("nlg_summary_text")
+
     return render_template("dashboard/index.html",
                            # Sales
                            total_sales_count=total_sales_count,
@@ -197,4 +220,5 @@ def index():
                            filter_label=filter_label,
                            filter_start=str(filter_start),
                            filter_end=str(filter_end),
+                           nlg_summary=nlg_summary,
                            )

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Operations - Smart Mart{% endblock %}
+{% block page_title %}Operations{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Operations</li>{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Outstanding Credit</div><div class="fs-4 fw-bold text-warning">{{ credit_records|sum(attribute='outstanding_amount')|round(2) }}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Supplier Dues</div><div class="fs-4 fw-bold text-info">{{ supplier_rows|sum(attribute='outstanding')|round(2) }}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Reorder Items</div><div class="fs-4 fw-bold text-danger">{{ reorders|length }}</div></div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card shadow-sm"><div class="card-body"><div class="text-muted small">Branches</div><div class="fs-4 fw-bold text-primary">{{ branches|length }}</div></div></div></div>
+</div>
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.credits') }}">Credit Ledger</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.suppliers') }}">Supplier Payments</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.closing') }}">Daily Closing</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.inventory_tools') }}">Inventory Tools</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.reorders') }}">Reorder Suggestions</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.notifications') }}">Notifications</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.loyalty') }}">Loyalty</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.branches') }}">Branches</a>
+  <a class="btn btn-outline-primary" href="{{ url_for('operations.backup_export') }}">Backup Export</a>
+</div>
+{% endblock %}

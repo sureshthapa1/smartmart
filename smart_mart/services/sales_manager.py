@@ -20,7 +20,8 @@ class InsufficientStockError(ValueError):
 def create_sale(items: list[dict], user_id: int,
                 customer_name: str = None, customer_address: str = None,
                 customer_phone: str = None, payment_mode: str = "cash",
-                discount_amount: float = 0, discount_note: str = None) -> Sale:
+                discount_amount: float = 0, discount_note: str = None,
+                wallet_redeem_points: int = 0) -> Sale:
     """Create a confirmed sale."""
     products: dict[int, Product] = {}
     for item in items:
@@ -46,8 +47,22 @@ def create_sale(items: list[dict], user_id: int,
         except Exception:
             pass
 
-        total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
-        total_amount = max(0, total_amount - (discount_amount or 0))
+        gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
+        total_amount = max(0, gross_total_amount - (discount_amount or 0))
+
+        redeemed_points = 0
+        try:
+            from . import loyalty_wallet_service
+            wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
+            redeem_preview = loyalty_wallet_service.preview_redeem(
+                wallet, int(wallet_redeem_points or 0), total_amount
+            )
+            redeemed_points = int(redeem_preview["redeemed_points"])
+            total_amount = redeem_preview["payable_total"]
+            if redeemed_points > 0 and not discount_note:
+                discount_note = "Loyalty points redeemed"
+        except Exception:
+            wallet = None
         sale = Sale(
             user_id=user_id,
             total_amount=total_amount,
@@ -89,6 +104,17 @@ def create_sale(items: list[dict], user_id: int,
             from ..models.customer import Customer
             if customer_name and customer_name.strip().lower() != "walk-in customer":
                 Customer.upsert(customer_name, customer_phone, customer_address)
+        except Exception:
+            pass
+
+        try:
+            from . import loyalty_wallet_service
+            loyalty_wallet_service.apply_sale_points(
+                wallet=wallet,
+                sale_id=sale.id,
+                final_amount_paid=total_amount,
+                redeemed_points=redeemed_points,
+            )
         except Exception:
             pass
 

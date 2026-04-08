@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Daily Closing - Smart Mart{% endblock %}
+{% block page_title %}Daily Closing{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Daily Closing</li>{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">{{ 'Close Active Session' if session else 'Open Cash Session' }}</div>
+      <div class="card-body">
+        <form method="post" class="row g-3">
+          {% if session %}
+          <input type="hidden" name="action" value="close">
+          <input type="hidden" name="session_id" value="{{ session.id }}">
+          <div class="col-12"><div class="text-muted small">Opened at {{ session.opened_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+          <div class="col-12"><input type="number" step="0.01" min="0" name="closing_cash" class="form-control" placeholder="Closing cash counted" required></div>
+          {% else %}
+          <input type="hidden" name="action" value="open">
+          <div class="col-12"><input type="number" step="0.01" min="0" name="opening_cash" class="form-control" placeholder="Opening cash" required></div>
+          {% endif %}
+          <div class="col-12"><textarea name="notes" rows="3" class="form-control" placeholder="Notes"></textarea></div>
+          <div class="col-12"><button class="btn btn-primary" type="submit">{{ 'Close Session' if session else 'Open Session' }}</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Recent Sessions</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Status</th><th>Opened</th><th class="text-end">Opening</th><th class="text-end">Expected</th><th class="text-end">Closing</th><th class="text-end">Variance</th></tr></thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td><span class="badge {% if s.status == 'open' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ s.status }}</span></td>
+              <td>{{ s.opened_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format(s.opening_cash|float) }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format((s.expected_cash or 0)|float) }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format((s.closing_cash or 0)|float) }}</td>
+              <td class="text-end {% if s.variance and s.variance != 0 %}text-warning fw-semibold{% endif %}">NPR {{ "%.2f"|format((s.variance or 0)|float) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No cash sessions yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -103,6 +103,8 @@
             <tr>
               <th>#</th>
               <th>Date</th>
+              <th>Customer</th>
+              <th>Payment</th>
               <th>Items</th>
               <th>Total (NPR)</th>
               <th>Actions</th>
@@ -111,9 +113,22 @@
           <tbody>
             {% for sale in sales %}
             <tr>
-              <td><span class="badge" style="background:#f1f5f9;color:#475569;">#{{ sale.id }}</span></td>
+              <td><a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="text-decoration-none fw-medium text-primary">
+                {{ sale.invoice_number or '#' ~ sale.id }}</a></td>
               <td class="text-muted small">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
-              <td><span class="badge rounded-pill bg-light text-dark border">{{ sale.items | length }} items</span></td>
+              <td class="small">{{ sale.customer_name or '<span class="text-muted">Walk-in</span>' | safe }}</td>
+              <td>
+                {% set pm = sale.payment_mode or 'cash' %}
+                <span class="badge rounded-pill
+                  {% if pm == 'cash' %}bg-success
+                  {% elif pm == 'credit' %}bg-warning text-dark
+                  {% elif pm == 'qr' %}bg-info text-dark
+                  {% else %}bg-secondary{% endif %}">
+                  {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
+                  {{ pm | capitalize }}
+                </span>
+              </td>
+              <td><span class="badge rounded-pill bg-light text-dark border">{{ sale.items | length }}</span></td>
               <td class="fw-semibold">{{ "%.2f"|format(sale.total_amount) }}</td>
               <td>
                 <div class="d-flex gap-1">
@@ -138,7 +153,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="5" class="text-center text-muted py-5">
+              <td colspan="7" class="text-center text-muted py-5">
                 <i class="bi bi-cart-x fs-2 d-block mb-2"></i>No sales found.
               </td>
             </tr>
@@ -148,6 +163,23 @@
       </div>
     </div>
   </div>
+
+  <!-- Pagination -->
+  {% if sales | length == 20 or page > 1 %}
+  <div class="d-flex justify-content-between align-items-center mt-3 px-1">
+    <span class="text-muted small">Page {{ page }}</span>
+    <div class="d-flex gap-2">
+      {% if page > 1 %}
+      <a href="?page={{ page - 1 }}&start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-sm btn-outline-secondary">← Previous</a>
+      {% endif %}
+      {% if sales | length == 20 %}
+      <a href="?page={{ page + 1 }}&start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-sm btn-outline-secondary">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

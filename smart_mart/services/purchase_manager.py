@@ -51,6 +51,13 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
         except (ImportError, AttributeError):
             pass
 
+        try:
+            from . import operations_manager
+            operations_manager.create_batches_for_purchase(purchase)
+        except Exception:
+            db.session.rollback()
+            raise
+
         db.session.commit()
     except Exception:
         db.session.rollback()

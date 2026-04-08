@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Return #{{ sale_return.id }} - Smart Mart{% endblock %}
+{% block page_title %}Return #{{ sale_return.id }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('returns.list_returns') }}" class="text-decoration-none">Returns</a></li>
+<li class="breadcrumb-item active">Return #{{ sale_return.id }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-receipt-cutoff me-2 text-warning"></i>Returned Items</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="text-end">Qty</th>
+              <th class="text-end">Unit Price</th>
+              <th class="text-end">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in sale_return.items %}
+            <tr>
+              <td>{{ item.product.name if item.product else 'Unknown Product' }}</td>
+              <td class="text-end">{{ item.quantity }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format(item.unit_price|float) }}</td>
+              <td class="text-end fw-semibold">NPR {{ "%.2f"|format(item.subtotal|float) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="background:#f8fafc;">
+              <td colspan="3" class="text-end fw-bold">Refund Total</td>
+              <td class="text-end fw-bold text-primary">NPR {{ "%.2f"|format(sale_return.refund_amount|float) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Return Details</div>
+      <div class="card-body">
+        <div class="small text-muted mb-1">Original Sale</div>
+        <div class="fw-medium mb-3">
+          <a href="{{ url_for('sales.sale_detail', sale_id=sale_return.sale_id) }}" class="text-decoration-none">
+            Sale #{{ sale_return.sale_id }}
+          </a>
+        </div>
+        <div class="small text-muted mb-1">Created</div>
+        <div class="fw-medium mb-3">{{ sale_return.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="small text-muted mb-1">Refund Mode</div>
+        <div class="fw-medium text-capitalize mb-3">{{ sale_return.refund_mode.replace('_', ' ') }}</div>
+        <div class="small text-muted mb-1">Reason</div>
+        <div class="fw-medium mb-3">{{ sale_return.reason or 'Not provided' }}</div>
+        <div class="small text-muted mb-1">Notes</div>
+        <div class="fw-medium">{{ sale_return.notes or 'No notes' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

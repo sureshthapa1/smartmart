@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Credit Ledger - Smart Mart{% endblock %}
+{% block page_title %}Credit Ledger{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Credit Ledger</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Outstanding Credit Sales</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Sale</th><th>Customer</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th><th>Receive Payment</th></tr></thead>
+      <tbody>
+        {% for row in records %}
+        <tr>
+          <td><a href="{{ url_for('sales.sale_detail', sale_id=row.sale.id) }}" class="text-decoration-none">#{{ row.sale.id }}</a></td>
+          <td>{{ row.sale.customer_name or 'Walk-in' }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.sale.total_amount|float) }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.paid_amount) }}</td>
+          <td class="text-end fw-semibold {% if row.outstanding_amount > 0 %}text-warning{% else %}text-success{% endif %}">NPR {{ "%.2f"|format(row.outstanding_amount) }}</td>
+          <td>
+            {% if row.outstanding_amount > 0 %}
+            <form method="post" class="d-flex gap-2">
+              <input type="hidden" name="sale_id" value="{{ row.sale.id }}">
+              <input type="number" name="amount" step="0.01" min="0.01" max="{{ row.outstanding_amount }}" class="form-control form-control-sm" placeholder="Amount">
+              <select name="payment_mode" class="form-select form-select-sm">
+                <option value="cash">Cash</option>
+                <option value="qr">QR</option>
+                <option value="card">Card</option>
+              </select>
+              <button class="btn btn-sm btn-primary" type="submit">Save</button>
+            </form>
+            {% else %}
+            <span class="badge bg-success">Collected</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No credit sales yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

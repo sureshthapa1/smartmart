@@ -17,6 +17,15 @@
 
 {% block content %}
 
+{% if nlg_summary %}
+<div class="alert alert-info alert-dismissible fade show d-flex gap-2 mb-3" role="alert" id="nlgBanner">
+  <i class="bi bi-stars flex-shrink-0 mt-1"></i>
+  <div class="small" style="white-space:pre-line;">{{ nlg_summary }}</div>
+  <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"
+          onclick="fetch('/api/nlg/dismiss', {method:'POST'})"></button>
+</div>
+{% endif %}
+
 <!-- Date Filter Bar -->
 <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
   <span class="text-muted small fw-medium me-1">View:</span>

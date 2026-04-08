@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Create Return - Smart Mart{% endblock %}
+{% block page_title %}Create Return{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="text-decoration-none">Sale #{{ sale.id }}</a></li>
+<li class="breadcrumb-item active">Create Return</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <form method="post" class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Return Items for Sale #{{ sale.id }}
+      </div>
+      <div class="card-body">
+        <div class="table-responsive mb-3">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th class="text-end">Sold</th>
+                <th class="text-end">Returned</th>
+                <th class="text-end">Available</th>
+                <th style="width:140px;">Return Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in returnable_items %}
+              <tr>
+                <td>
+                  <div class="fw-medium">{{ row.sale_item.product.name if row.sale_item.product else 'Unknown Product' }}</div>
+                  <div class="text-muted small">{{ row.sale_item.product.sku if row.sale_item.product else 'No SKU' }}</div>
+                </td>
+                <td class="text-end">{{ row.sale_item.quantity }}</td>
+                <td class="text-end text-muted">{{ row.already_returned }}</td>
+                <td class="text-end fw-semibold">{{ row.remaining_quantity }}</td>
+                <td>
+                  <input
+                    type="number"
+                    min="0"
+                    max="{{ row.remaining_quantity }}"
+                    name="return_qty_{{ row.sale_item.id }}"
+                    value="0"
+                    class="form-control"
+                    {% if row.remaining_quantity == 0 %}disabled{% endif %}>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Refund Mode</label>
+            <select name="refund_mode" class="form-select">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="qr">QR / Digital</option>
+              <option value="store_credit">Store Credit</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reason</label>
+            <input type="text" name="reason" class="form-control" maxlength="255" placeholder="Damaged, wrong item, customer changed mind">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" rows="3" class="form-control" placeholder="Optional notes for this return"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer bg-white d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check2-circle me-1"></i>Create Return
+        </button>
+        <a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Sale Summary</div>
+      <div class="card-body">
+        <div class="small text-muted mb-1">Customer</div>
+        <div class="fw-medium mb-3">{{ sale.customer_name or 'Walk-in Customer' }}</div>
+        <div class="small text-muted mb-1">Sale Date</div>
+        <div class="fw-medium mb-3">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="small text-muted mb-1">Original Total</div>
+        <div class="fw-bold text-primary">NPR {{ "%.2f"|format(sale.total_amount|float) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

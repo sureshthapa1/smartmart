@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Reorder Suggestions - Smart Mart{% endblock %}
+{% block page_title %}Reorder Suggestions{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Reorder Suggestions</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Suggested Reorders</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Product</th><th class="text-end">In Stock</th><th class="text-end">Reorder Level</th><th class="text-end">Sold 30d</th><th class="text-end">Suggested Qty</th></tr></thead>
+      <tbody>
+      {% for row in suggestions %}
+        <tr>
+          <td>{{ row.product.name }}</td>
+          <td class="text-end">{{ row.product.quantity }}</td>
+          <td class="text-end">{{ row.profile.reorder_level }}</td>
+          <td class="text-end">{{ row.sold_recently }}</td>
+          <td class="text-end fw-semibold {% if row.suggested_qty > 0 %}text-danger{% endif %}">{{ row.suggested_qty }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No reorder suggestions right now.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

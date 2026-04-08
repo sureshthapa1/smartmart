@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Expenses — Smart Mart{% endblock %}
+{% block page_title %}Expense Management{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Expenses</li>{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 class="fw-bold mb-1">Expenses</h5>
+    <p class="text-muted small mb-0">Track rent, salaries, utilities, and other costs</p>
+  </div>
+  <a href="{{ url_for('expenses.create_expense') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add Expense
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-medium mb-1">Type</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for t in expense_types %}
+          <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t | capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+        <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="alert alert-info d-flex align-items-center gap-2 mb-3">
+  <i class="bi bi-info-circle-fill"></i>
+  <span><strong>Total Expenses:</strong> NPR {{ "%.2f"|format(total_amount) }} ({{ total }} records)</span>
+</div>
+
+<!-- Table -->
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th class="text-end">Amount (NPR)</th>
+          <th>Note</th>
+          <th>Created By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td class="text-muted small">{{ e.expense_date.strftime('%Y-%m-%d') }}</td>
+          <td><span class="badge bg-secondary">{{ e.expense_type | capitalize }}</span></td>
+          <td class="text-end fw-semibold text-danger">{{ "%.2f"|format(e.amount | float) }}</td>
+          <td class="text-muted small">{{ e.note or '—' }}</td>
+          <td class="text-muted small">{{ e.creator.username if e.creator else '—' }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('expenses.edit_expense', expense_id=e.id) }}"
+                 class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+              <form method="post" action="{{ url_for('expenses.delete_expense', expense_id=e.id) }}"
+                    onsubmit="return confirm('Delete this expense?')" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-5">No expenses recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if total > per_page %}
+<div class="d-flex justify-content-center mt-3">
+  <nav>
+    <ul class="pagination pagination-sm">
+      {% if page > 1 %}
+      <li class="page-item"><a class="page-link" href="?page={{ page - 1 }}">Previous</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page }}</span></li>
+      {% if page * per_page < total %}
+      <li class="page-item"><a class="page-link" href="?page={{ page + 1 }}">Next</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+{% endif %}
+{% endblock %}

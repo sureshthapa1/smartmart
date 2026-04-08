@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 
 class Config:
@@ -8,6 +9,7 @@ class Config:
     LOW_STOCK_THRESHOLD = 10
     EXPIRY_WARNING_DAYS = 30
     HIGH_DEMAND_THRESHOLD = 50
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
 
 
 class DevelopmentConfig(Config):
@@ -23,6 +25,12 @@ class ProductionConfig(Config):
         "DATABASE_URL", "sqlite:///smart_mart.db"
     )
     WTF_CSRF_ENABLED = True
+
+    @classmethod
+    def init_app(cls, app):
+        secret = os.environ.get("SECRET_KEY")
+        if not secret:
+            raise RuntimeError("SECRET_KEY must be set in production environment.")
 
 
 class TestingConfig(Config):

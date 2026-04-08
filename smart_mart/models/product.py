@@ -4,6 +4,11 @@ from ..extensions import db
 
 class Product(db.Model):
     __tablename__ = "products"
+    __table_args__ = (
+        db.Index("ix_product_sku", "sku"),
+        db.Index("ix_product_quantity", "quantity"),
+        db.Index("ix_product_category", "category"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
@@ -23,9 +28,9 @@ class Product(db.Model):
 
     # Relationships
     supplier = db.relationship("Supplier", back_populates="products")
-    sale_items = db.relationship("SaleItem", back_populates="product", lazy="dynamic")
-    purchase_items = db.relationship("PurchaseItem", back_populates="product", lazy="dynamic")
-    stock_movements = db.relationship("StockMovement", back_populates="product", lazy="dynamic")
+    sale_items = db.relationship("SaleItem", back_populates="product")
+    purchase_items = db.relationship("PurchaseItem", back_populates="product")
+    stock_movements = db.relationship("StockMovement", back_populates="product")
 
     def __repr__(self):
         return f"<Product {self.sku} - {self.name}>"

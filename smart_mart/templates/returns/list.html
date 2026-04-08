@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Returns - Smart Mart{% endblock %}
+{% block page_title %}Returns{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Returns</li>{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span class="fw-semibold"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Recent Returns</span>
+    <span class="badge bg-warning text-dark">{{ returns|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Return</th>
+          <th>Sale</th>
+          <th>Date</th>
+          <th>Refund Mode</th>
+          <th class="text-end">Refund</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in returns %}
+        <tr>
+          <td class="fw-semibold">#{{ r.id }}</td>
+          <td>
+            <a href="{{ url_for('sales.sale_detail', sale_id=r.sale_id) }}" class="text-decoration-none">
+              Sale #{{ r.sale_id }}
+            </a>
+          </td>
+          <td class="text-muted small">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="text-capitalize">{{ r.refund_mode }}</td>
+          <td class="text-end fw-semibold">NPR {{ "%.2f"|format(r.refund_amount|float) }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('returns.return_detail', return_id=r.id) }}" class="btn btn-sm btn-outline-primary">
+              View
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">No returns have been created yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

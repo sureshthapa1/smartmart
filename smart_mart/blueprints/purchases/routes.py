@@ -302,22 +302,7 @@ def bulk_upload():
 
     return render_template("purchases/bulk_upload.html", suppliers=suppliers,
                            today=date.today().isoformat())
-    items: list[dict] = []
-    index = 0
-    while True:
-        product_id = form.get(f"items[{index}][product_id]")
-        if product_id is None:
-            break
-        try:
-            pid = int(product_id)
-            qty = int(form.get(f"items[{index}][quantity]", "0"))
-            cost = float(form.get(f"items[{index}][unit_cost]", "0"))
-            if pid > 0 and qty > 0 and cost >= 0:
-                items.append({"product_id": pid, "quantity": qty, "unit_cost": cost})
-        except (ValueError, TypeError):
-            pass
-        index += 1
-    return items
+
 
 def _parse_items(form) -> list[dict]:
     items: list[dict] = []

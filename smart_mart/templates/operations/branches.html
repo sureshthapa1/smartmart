@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Branches - Smart Mart{% endblock %}
+{% block page_title %}Branches{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Branches</li>{% endblock %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">Create Branch</div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <div class="col-md-4"><input name="name" class="form-control" placeholder="Branch name" required></div>
+      <div class="col-md-3"><input name="code" class="form-control" placeholder="Code" required></div>
+      <div class="col-md-3"><input name="address" class="form-control" placeholder="Address"></div>
+      <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Create</button></div>
+    </form>
+  </div>
+</div>
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Registered Branches</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Name</th><th>Code</th><th>Address</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for branch in branches %}
+        <tr>
+          <td>{{ branch.name }}</td>
+          <td><code>{{ branch.code }}</code></td>
+          <td>{{ branch.address or '-' }}</td>
+          <td><span class="badge {% if branch.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if branch.is_active else 'Inactive' }}</span></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">No branches yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

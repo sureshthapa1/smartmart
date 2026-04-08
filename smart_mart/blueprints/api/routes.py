@@ -3,12 +3,12 @@
 from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, request
+from flask_login import current_user
 from sqlalchemy import func
 
 from ...extensions import db
 from ...models.sale import Sale
-from ...services import cash_flow_manager
-from ...services.decorators import login_required
+from ...services.decorators import login_required, admin_required
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -33,16 +33,61 @@ def sales_trend():
 @api_bp.route("/profit-trend")
 @login_required
 def profit_trend():
-    """Daily profit for the past 30 days."""
+    """Daily profit for the past 30 days — single aggregated query."""
+    from ...models.sale import SaleItem
+    from ...models.product import Product
+    from ...models.expense import Expense
+    from sqlalchemy import and_, cast, Numeric
+
     end = date.today()
     start = end - timedelta(days=29)
+
+    # Revenue per day
+    rev_rows = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.sum(Sale.total_amount).label("revenue"),
+        )
+        .where(func.date(Sale.sale_date) >= start)
+        .group_by(func.date(Sale.sale_date))
+    ).all()
+    revenue_by_day = {str(r.day): float(r.revenue) for r in rev_rows}
+
+    # COGS per day
+    cogs_rows = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.sum(Product.cost_price * SaleItem.quantity).label("cogs"),
+        )
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .join(Product, Product.id == SaleItem.product_id)
+        .where(func.date(Sale.sale_date) >= start)
+        .group_by(func.date(Sale.sale_date))
+    ).all()
+    cogs_by_day = {str(r.day): float(r.cogs) for r in cogs_rows}
+
+    # Expenses per day
+    exp_rows = db.session.execute(
+        db.select(
+            Expense.expense_date.label("day"),
+            func.sum(Expense.amount).label("expenses"),
+        )
+        .where(and_(Expense.expense_date >= start, Expense.expense_date <= end))
+        .group_by(Expense.expense_date)
+    ).all()
+    exp_by_day = {str(r.day): float(r.expenses) for r in exp_rows}
+
     labels, data = [], []
     current = start
     while current <= end:
-        pl = cash_flow_manager.profit_loss(current, current)
-        labels.append(str(current))
-        data.append(float(pl["profit"]))
+        day_str = str(current)
+        rev = revenue_by_day.get(day_str, 0)
+        cogs = cogs_by_day.get(day_str, 0)
+        exp = exp_by_day.get(day_str, 0)
+        labels.append(day_str)
+        data.append(round(rev - cogs - exp, 2))
         current += timedelta(days=1)
+
     return jsonify({"labels": labels, "data": data})
 
 
@@ -90,52 +135,88 @@ def customer_detail(customer_id):
 @api_bp.route("/customers/<int:customer_id>/intelligence")
 @login_required
 def customer_intelligence(customer_id):
-    """Customer rank, CLV, churn risk, visit stats for pre-billing panel."""
+    """Customer rank, CLV, churn risk, visit stats for pre-billing panel.
+    Uses direct queries instead of loading all customers for speed.
+    """
     from ...models.customer import Customer
-    from ...services.ai_customer_intelligence import (
-        tier_customers, churn_prediction, customer_lifetime_value
-    )
+    from ...models.sale import Sale, SaleItem
+    from ...models.product import Product
     from datetime import date as dt
+    from sqlalchemy import and_
+
     c = db.get_or_404(Customer, customer_id)
+    today = dt.today()
 
-    # Tier info
-    tiers = tier_customers()
-    tier_info = next((t for t in tiers["customers"] if t["id"] == customer_id), None)
+    # Get this customer's sales directly
+    sales = db.session.execute(
+        db.select(Sale)
+        .where(func.lower(Sale.customer_name) == c.name.lower())
+        .order_by(Sale.sale_date.desc())
+    ).scalars().all()
 
-    # CLV
-    clv = customer_lifetime_value(c.name)
+    frequency = len(sales)
+    total_spent = sum(float(s.total_amount) for s in sales)
+    avg_order = round(total_spent / frequency, 2) if frequency else 0
+    last_sale_date = sales[0].sale_date.date() if sales else None
+    recency_days = (today - last_sale_date).days if last_sale_date else None
 
-    # Churn risk
-    churn = churn_prediction()
+    # Compute tier score
+    monetary_score = min(50, total_spent / 1000 * 10)
+    frequency_score = min(30, frequency * 3)
+    recency_score = max(0, 20 - (recency_days or 999) * 0.2)
+    total_score = monetary_score + frequency_score + recency_score
+
+    if total_score >= 70:
+        tier, tier_color, tier_icon = "Platinum", "primary", "💎"
+    elif total_score >= 50:
+        tier, tier_color, tier_icon = "Gold", "warning", "🥇"
+    elif total_score >= 30:
+        tier, tier_color, tier_icon = "Silver", "secondary", "🥈"
+    elif frequency > 0:
+        tier, tier_color, tier_icon = "Bronze", "danger", "🥉"
+    else:
+        tier, tier_color, tier_icon = "New", "secondary", "🆕"
+
+    # CLV (simple calculation inline)
+    dates = sorted([s.sale_date.date() for s in sales if s.sale_date])
+    if len(dates) >= 2:
+        lifespan_days = (dates[-1] - dates[0]).days
+        purchase_rate = frequency / max(lifespan_days / 30, 1)
+    else:
+        purchase_rate = frequency
+    predicted_3yr = avg_order * purchase_rate * 12 * 3
+    clv = round(predicted_3yr * 0.25, 2)
+
+    # Churn check
     churn_status = None
-    for entry in churn.get("churned", []):
-        if entry["name"].lower() == c.name.lower():
-            churn_status = {"risk": "churned", "days_inactive": entry["days_inactive"],
-                            "action": entry["action"]}
-            break
-    if not churn_status:
-        for entry in churn.get("at_risk", []):
-            if entry["name"].lower() == c.name.lower():
-                churn_status = {"risk": "at_risk", "days_inactive": entry["days_inactive"],
-                                "action": entry["action"]}
-                break
-
-    last_visit_str = c.last_visit.strftime("%Y-%m-%d") if c.last_visit else None
+    if recency_days is not None:
+        three_months_ago = today - __import__('datetime').timedelta(days=90)
+        six_months_ago = today - __import__('datetime').timedelta(days=180)
+        recent_count = sum(1 for s in sales if s.sale_date and s.sale_date.date() >= three_months_ago)
+        prev_count = sum(1 for s in sales if s.sale_date and
+                         six_months_ago <= s.sale_date.date() < three_months_ago)
+        declining = prev_count > 0 and recent_count < prev_count * 0.5
+        if recency_days > 90:
+            churn_status = {"risk": "churned", "days_inactive": recency_days,
+                            "action": "Win-back campaign with 20% discount"}
+        elif recency_days > 45 or declining:
+            churn_status = {"risk": "at_risk", "days_inactive": recency_days,
+                            "action": "Send retention offer: 10% discount"}
 
     return jsonify({
         "id": c.id,
         "name": c.name,
-        "tier": tier_info["tier"] if tier_info else "New",
-        "tier_color": tier_info["tier_color"] if tier_info else "secondary",
-        "tier_icon": tier_info["tier_icon"] if tier_info else "🆕",
-        "total_spent": tier_info["total_spent"] if tier_info else 0,
-        "frequency": tier_info["frequency"] if tier_info else 0,
-        "avg_order": tier_info["avg_order"] if tier_info else 0,
-        "last_visit": last_visit_str,
-        "recency_days": tier_info["recency_days"] if tier_info else None,
-        "score": tier_info["score"] if tier_info else 0,
-        "clv": clv.get("estimated_net_clv", 0),
-        "clv_tier": clv.get("tier", "—"),
+        "tier": tier,
+        "tier_color": tier_color,
+        "tier_icon": tier_icon,
+        "total_spent": round(total_spent, 2),
+        "frequency": frequency,
+        "avg_order": avg_order,
+        "last_visit": str(last_sale_date) if last_sale_date else None,
+        "recency_days": recency_days,
+        "score": round(total_score, 1),
+        "clv": clv,
+        "clv_tier": "High Value" if clv > 5000 else "Medium Value" if clv > 1000 else "Low Value",
         "churn": churn_status,
     })
 
@@ -183,6 +264,45 @@ def offer_feedback(customer_id):
     return jsonify({"ok": True})
 
 
+@api_bp.route("/alerts/top5")
+@login_required
+def alerts_top5():
+    """Top 5 most critical alerts for the notification bell dropdown."""
+    from ...services.alert_engine import get_low_stock_alerts, get_expiry_alerts
+    from datetime import date
+    alerts = []
+
+    # Out-of-stock first
+    for p in get_low_stock_alerts():
+        if p.quantity == 0:
+            alerts.append({"icon": "🔴", "title": f"{p.name} — OUT OF STOCK",
+                           "detail": "Restock immediately", "priority": 0})
+        else:
+            alerts.append({"icon": "🟡", "title": f"{p.name} — Low Stock",
+                           "detail": f"Only {p.quantity} units left", "priority": 1})
+
+    # Expiry alerts
+    today = date.today()
+    for p in get_expiry_alerts():
+        days = (p.expiry_date - today).days
+        alerts.append({"icon": "⏰", "title": f"{p.name} — Expiring Soon",
+                       "detail": f"Expires in {days} day{'s' if days != 1 else ''}",
+                       "priority": 2})
+
+    alerts.sort(key=lambda x: x["priority"])
+    return jsonify(alerts[:5])
+
+
+@api_bp.route("/nlg/dismiss", methods=["POST"])
+@login_required
+def nlg_dismiss():
+    """Dismiss the NLG daily summary banner."""
+    from flask import session as flask_session
+    flask_session.pop("nlg_summary_text", None)
+    flask_session.modified = True
+    return jsonify({"ok": True})
+
+
 @api_bp.route("/product-icon", methods=["GET", "POST"])
 @login_required
 def product_icon():
@@ -203,3 +323,172 @@ def product_icon():
     from ...models.product_icon_map import ProductIconMap
     emoji = ProductIconMap.get(name)
     return jsonify({"emoji": emoji})
+
+
+# ---------------------------------------------------------------------------
+# Loyalty Wallet
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/loyalty/wallet", methods=["GET"])
+@login_required
+def loyalty_wallet():
+    from ...services import loyalty_wallet_service
+    customer_name = request.args.get("customer_name", "").strip()
+    customer_phone = request.args.get("customer_phone", "").strip() or None
+    wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
+    db.session.commit()
+    return jsonify(loyalty_wallet_service.wallet_snapshot(wallet))
+
+
+@api_bp.route("/loyalty/redeem-preview", methods=["POST"])
+@login_required
+def loyalty_redeem_preview():
+    from ...services import loyalty_wallet_service
+    data = request.get_json() or {}
+    customer_name = (data.get("customer_name") or "").strip()
+    customer_phone = (data.get("customer_phone") or "").strip() or None
+    requested_points = int(data.get("requested_points", 0) or 0)
+    gross_total = float(data.get("gross_total", 0) or 0)
+    wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
+    preview = loyalty_wallet_service.preview_redeem(wallet, requested_points, gross_total)
+    db.session.commit()
+    return jsonify({
+        "wallet": loyalty_wallet_service.wallet_snapshot(wallet),
+        "preview": preview,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Duplicate / Fake Customer Detection
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/customers/duplicates/detect", methods=["POST"])
+@admin_required
+def detect_customer_duplicates():
+    from ...services import customer_quality_service
+    flags = customer_quality_service.detect_duplicates(trigger_user_id=current_user.id)
+    return jsonify({"created_flags": len(flags)})
+
+
+@api_bp.route("/customers/duplicates", methods=["GET"])
+@admin_required
+def list_customer_duplicates():
+    from ...services import customer_quality_service
+    status = request.args.get("status", "pending")
+    flags = customer_quality_service.list_duplicate_flags(status=status)
+    return jsonify([
+        {
+            "id": f.id,
+            "primary_customer_id": f.primary_customer_id,
+            "primary_customer_name": f.primary_customer.name if f.primary_customer else None,
+            "duplicate_customer_id": f.duplicate_customer_id,
+            "duplicate_customer_name": f.duplicate_customer.name if f.duplicate_customer else None,
+            "confidence": float(f.confidence),
+            "reason": f.reason,
+            "suspicious": bool(f.suspicious),
+            "status": f.status,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        }
+        for f in flags
+    ])
+
+
+@api_bp.route("/customers/duplicates/<int:flag_id>/approve", methods=["POST"])
+@admin_required
+def approve_customer_duplicate(flag_id):
+    from ...services import customer_quality_service
+    flag = customer_quality_service.approve_merge(flag_id, admin_user_id=current_user.id)
+    return jsonify({"id": flag.id, "status": flag.status})
+
+
+@api_bp.route("/customers/duplicates/<int:flag_id>/reject", methods=["POST"])
+@admin_required
+def reject_customer_duplicate(flag_id):
+    from ...services import customer_quality_service
+    flag = customer_quality_service.reject_merge(flag_id, admin_user_id=current_user.id)
+    return jsonify({"id": flag.id, "status": flag.status})
+
+
+# ---------------------------------------------------------------------------
+# Offline -> Online Sync
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/sync/push", methods=["POST"])
+@login_required
+def sync_push():
+    from ...services import sync_service
+    data = request.get_json() or {}
+    device_id = (data.get("device_id") or "").strip()
+    events = data.get("events") or []
+    if not device_id:
+        return jsonify({"error": "device_id is required"}), 400
+    if not isinstance(events, list):
+        return jsonify({"error": "events must be a list"}), 400
+    result = sync_service.push_events(device_id=device_id, events=events)
+    return jsonify(result)
+
+
+@api_bp.route("/sync/pull", methods=["GET"])
+@login_required
+def sync_pull():
+    from ...services import sync_service
+    device_id = request.args.get("device_id", "").strip()
+    since_event_id = int(request.args.get("since_event_id", 0) or 0)
+    if not device_id:
+        return jsonify({"error": "device_id is required"}), 400
+    result = sync_service.pull_events(device_id=device_id, since_event_id=since_event_id)
+    return jsonify(result)
+
+
+@api_bp.route("/sync/conflicts/<int:sync_event_id>/resolve", methods=["POST"])
+@admin_required
+def resolve_sync_conflict(sync_event_id):
+    from ...services import sync_service
+    data = request.get_json() or {}
+    strategy = data.get("strategy", "server_wins")
+    try:
+        result = sync_service.resolve_conflict(sync_event_id, strategy)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+# ---------------------------------------------------------------------------
+# Competitor Price Tracking
+# ---------------------------------------------------------------------------
+
+@api_bp.route("/pricing/competitor", methods=["POST"])
+@admin_required
+def add_competitor_price():
+    from ...services import competitor_pricing_service
+    data = request.get_json() or {}
+    try:
+        entry = competitor_pricing_service.add_competitor_price(
+            product_id=int(data.get("product_id")),
+            competitor_name=(data.get("competitor_name") or "").strip(),
+            competitor_price=float(data.get("competitor_price")),
+            captured_by_user_id=current_user.id,
+            notes=data.get("notes"),
+        )
+        return jsonify({"entry_id": entry.id}), 201
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@api_bp.route("/pricing/competitor/<int:product_id>", methods=["GET"])
+@login_required
+def compare_competitor_price(product_id):
+    from ...services import competitor_pricing_service
+    result = competitor_pricing_service.compare_product_price(product_id)
+    return jsonify(result)
+
+
+@api_bp.route("/pricing/suggestions/<int:product_id>", methods=["POST"])
+@admin_required
+def pricing_suggestion(product_id):
+    from ...services import competitor_pricing_service
+    try:
+        result = competitor_pricing_service.generate_pricing_suggestion(product_id)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400

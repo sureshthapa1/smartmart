@@ -13,8 +13,8 @@
     <div style="width:48px;height:48px;background:#f0fdf4;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">📊</div>
     <div>
       <div class="text-muted small fw-semibold text-uppercase" style="letter-spacing:.05em;">Total Inventory Value</div>
-      <div class="fs-2 fw-bold text-success">NPR {{ "%.2f"|format(data.total | float) }}</div>
-      <div class="text-muted small">{{ data.items | length }} products</div>
+      <div class="fs-2 fw-bold text-success">NPR {{ "%.2f"|format(data["total"] | float) }}</div>
+      <div class="text-muted small">{{ data["items"] | length }} products</div>
     </div>
   </div>
 </div>
@@ -37,7 +37,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for item in data.items %}
+        {% for item in data["items"] %}
         <tr>
           <td>
             <div class="d-flex align-items-center gap-2">
@@ -74,11 +74,11 @@
         </tr>
         {% endfor %}
       </tbody>
-      {% if data.items %}
+      {% if data["items"] %}
       <tfoot>
         <tr style="background:#f8fafc;">
           <td colspan="6" class="text-end fw-bold" style="color:#0f172a;">Grand Total</td>
-          <td class="text-end fw-bold fs-5" style="color:#22c55e;">NPR {{ "%.2f"|format(data.total | float) }}</td>
+          <td class="text-end fw-bold fs-5" style="color:#22c55e;">NPR {{ "%.2f"|format(data["total"] | float) }}</td>
         </tr>
       </tfoot>
       {% endif %}

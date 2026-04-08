@@ -17,6 +17,11 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
+        from ...services.authenticator import is_rate_limited, _get_client_ip
+        if is_rate_limited(_get_client_ip()):
+            flash("Too many failed login attempts. Please wait 10 minutes and try again.", "danger")
+            return render_template("auth/login.html")
+
         user = authenticator.login(username, password)
         if user is not None:
             return redirect(url_for("dashboard.index"))

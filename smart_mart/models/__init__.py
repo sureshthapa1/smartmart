@@ -3,6 +3,7 @@ from .supplier import Supplier
 from .category import Category
 from .product import Product
 from .sale import Sale, SaleItem
+from .sale_return import SaleReturn, SaleReturnItem
 from .purchase import Purchase, PurchaseItem
 from .expense import Expense
 from .stock_movement import StockMovement
@@ -13,12 +14,38 @@ from .customer import Customer
 from .product_icon_map import ProductIconMap
 from .ai_memory import AIModelVersion, AIRecommendation, AIAlert, AIRetrainingLog, AIFeedbackLog
 from .online_order import OnlineOrder, OnlineOrderItem
+from .ai_enhancements import (
+    LoyaltyWallet,
+    LoyaltyWalletTransaction,
+    CustomerDuplicateFlag,
+    SyncEvent,
+    DeviceSyncState,
+    CompetitorPriceEntry,
+    CompetitorPriceSuggestion,
+    AIDecisionLog,
+)
+from .operations import (
+    CustomerCreditPayment,
+    SupplierPayment,
+    CashSession,
+    ProductInventoryProfile,
+    ProductBatch,
+    AppNotification,
+    CustomerLoyaltyTransaction,
+    Branch,
+)
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
-    "Sale", "SaleItem", "Purchase", "PurchaseItem",
+    "Sale", "SaleItem", "SaleReturn", "SaleReturnItem", "Purchase", "PurchaseItem",
     "Expense", "StockMovement", "ShopSettings",
     "UserPermissions", "UserActivity", "Customer", "ProductIconMap",
     "AIModelVersion", "AIRecommendation", "AIAlert", "AIRetrainingLog", "AIFeedbackLog",
     "OnlineOrder", "OnlineOrderItem",
+    "LoyaltyWallet", "LoyaltyWalletTransaction", "CustomerDuplicateFlag",
+    "SyncEvent", "DeviceSyncState",
+    "CompetitorPriceEntry", "CompetitorPriceSuggestion", "AIDecisionLog",
+    "CustomerCreditPayment", "SupplierPayment", "CashSession",
+    "ProductInventoryProfile", "ProductBatch", "AppNotification",
+    "CustomerLoyaltyTransaction", "Branch",
 ]

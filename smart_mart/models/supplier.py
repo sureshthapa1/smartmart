@@ -13,8 +13,8 @@ class Supplier(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    products = db.relationship("Product", back_populates="supplier", lazy="dynamic")
-    purchases = db.relationship("Purchase", back_populates="supplier", lazy="dynamic")
+    products = db.relationship("Product", back_populates="supplier")
+    purchases = db.relationship("Purchase", back_populates="supplier")
 
     def __repr__(self):
         return f"<Supplier {self.name}>"
