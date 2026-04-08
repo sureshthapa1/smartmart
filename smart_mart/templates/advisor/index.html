@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}AI Business Advisor — Smart Mart{% endblock %}
+{% block page_title %}AI Business Advisor{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Business Advisor</li>{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+{% set s = report.summary %}
+{% set recs = report.recommendations %}
+{% set opps = report.opportunities %}
+{% set fc = report.forecast %}
+{% set kpis = report.kpis %}
+
+<!-- Header -->
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <div style="font-size:1.3rem;font-weight:800;color:#0f172a">AI Business Advisor</div>
+    <div class="text-muted small">Powered by Smart Mart Intelligence Engine &bull; Updated {{ report.generated_at[:16].replace('T',' ') }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('advisor.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
+  </div>
+</div>
+
+<!-- Executive KPI Row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label">Monthly Revenue</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(s.revenue.month) }}</div>
+        <div class="stat-sub">
+          {% if s.revenue.change_pct >= 0 %}<i class="bi bi-arrow-up-short"></i>{% else %}<i class="bi bi-arrow-down-short"></i>{% endif %}
+          {{ s.revenue.change_pct|abs|round(1) }}% vs last month
+        </div>
+        <div class="stat-bg">💰</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:{% if s.profit.month >= 0 %}linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6{% else %}linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b{% endif %}">
+      <div class="card-body p-4">
+        <div class="stat-label">Net Profit</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(s.profit.month) }}</div>
+        <div class="stat-sub">{{ s.margins.net }}% net margin</div>
+        <div class="stat-bg">📈</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
+      <div class="card-body p-4">
+        <div class="stat-label">Gross Margin</div>
+        <div class="stat-value">{{ s.margins.gross }}%</div>
+        <div class="stat-sub">{{ s.transactions.month }} transactions</div>
+        <div class="stat-bg">📊</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#7e22ce">
+      <div class="card-body p-4">
+        <div class="stat-label">Avg Order Value</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(s.transactions.avg_order) }}</div>
+        <div class="stat-sub">{{ s.customers.new_month }} new customers</div>
+        <div class="stat-bg">🛒</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Recommendations -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-lightbulb-fill text-warning"></i>
+        <span>Strategic Recommendations</span>
+        {% if recs %}<span class="badge bg-danger ms-auto">{{ recs|selectattr('priority','equalto','critical')|list|length }} critical</span>{% endif %}
+      </div>
+      <div class="list-group list-group-flush">
+        {% for r in recs %}
+        <div class="list-group-item py-3">
+          <div class="d-flex align-items-start gap-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:{% if r.color=='danger' %}#fee2e2{% elif r.color=='warning' %}#fffbeb{% elif r.color=='success' %}#dcfce7{% else %}#eff6ff{% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="bi {{ r.icon }}" style="color:{% if r.color=='danger' %}#ef4444{% elif r.color=='warning' %}#f59e0b{% elif r.color=='success' %}#22c55e{% else %}#3b82f6{% endif %}"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span style="font-weight:600;font-size:.875rem">{{ r.title }}</span>
+                <span class="badge bg-{{ r.color }} bg-opacity-10 text-{{ r.color }}" style="font-size:.65rem">{{ r.priority }}</span>
+              </div>
+              <div class="text-muted small mb-1">{{ r.insight }}</div>
+              <div style="font-size:.8rem;color:#6366f1"><i class="bi bi-arrow-right-circle me-1"></i>{{ r.action }}</div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="list-group-item text-center text-muted py-4"><i class="bi bi-check-circle text-success me-1"></i>No critical issues found.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Scorecard -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-speedometer2 me-2 text-primary"></i>KPI Scorecard</div>
+      <div class="card-body p-3">
+        {% for kpi in kpis %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span style="font-size:.8rem;font-weight:600;color:#475569">{{ kpi.kpi }}</span>
+            <div class="d-flex align-items-center gap-2">
+              <span style="font-size:.8rem;font-weight:700;color:#0f172a">{{ kpi.value }}</span>
+              <i class="bi bi-arrow-{{ kpi.trend }}-short" style="color:{% if kpi.trend=='up' %}#22c55e{% else %}#ef4444{% endif %}"></i>
+            </div>
+          </div>
+          <div class="progress" style="height:6px;border-radius:4px">
+            <div class="progress-bar" style="width:{{ kpi.score }}%;background:{% if kpi.score >= 70 %}#22c55e{% elif kpi.score >= 40 %}#f59e0b{% else %}#ef4444{% endif %};border-radius:4px"></div>
+          </div>
+          <div class="text-muted" style="font-size:.7rem;margin-top:2px">Target: {{ kpi.target }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Revenue Forecast -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-graph-up text-primary me-2"></i>30-Day Revenue Forecast</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge {% if fc.trend == 'up' %}bg-success{% elif fc.trend == 'down' %}bg-danger{% else %}bg-secondary{% endif %}">
+            Trend: {{ fc.trend }} {% if fc.trend_pct %}({{ fc.trend_pct|abs }}%/day){% endif %}
+          </span>
+          <span class="text-muted small">Projected: NPR {{ "%.0f"|format(fc.projected_monthly) }}</span>
+        </div>
+      </div>
+      <div class="card-body"><canvas id="forecastChart" height="80"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Growth Opportunities -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-rocket-takeoff-fill text-success me-2"></i>Growth Opportunities</div>
+      <div class="list-group list-group-flush">
+        {% for opp in opps %}
+        <div class="list-group-item py-3">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi {{ opp.icon }} mt-1" style="color:{{ opp.color }};font-size:1rem;flex-shrink:0"></i>
+            <div>
+              <div style="font-weight:600;font-size:.845rem">{{ opp.title }}</div>
+              <div class="text-muted" style="font-size:.75rem">{{ opp.detail }}</div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="list-group-item text-center text-muted py-4">No opportunities identified yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stock & Customer Health -->
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body text-center p-4">
+        <div style="font-size:2.5rem;font-weight:800;color:{% if s.stock.out > 0 %}#ef4444{% else %}#22c55e{% endif %}">{{ s.stock.out }}</div>
+        <div class="text-muted small">Out of Stock</div>
+        <div class="mt-2"><a href="{{ url_for('alerts.index') }}" class="btn btn-sm btn-outline-danger">View Alerts</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body text-center p-4">
+        <div style="font-size:2.5rem;font-weight:800;color:#f59e0b">{{ s.stock.low }}</div>
+        <div class="text-muted small">Low Stock Items</div>
+        <div class="mt-2"><a href="{{ url_for('operations.reorders') }}" class="btn btn-sm btn-outline-warning">Reorder</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body text-center p-4">
+        <div style="font-size:2.5rem;font-weight:800;color:#6366f1">{{ s.customers.total }}</div>
+        <div class="text-muted small">Total Customers</div>
+        <div class="mt-2"><a href="{{ url_for('ai.customer_intelligence') }}" class="btn btn-sm btn-outline-primary">Analyse</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fc = {{ report.forecast | tojson }};
+new Chart(document.getElementById('forecastChart'), {
+  type: 'line',
+  data: {
+    labels: fc.labels,
+    datasets: [{
+      label: 'Projected Revenue (NPR)',
+      data: fc.forecast,
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,.1)',
+      fill: true, tension: 0.4,
+      pointRadius: 2, borderWidth: 2,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: false, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 10 } }
+    }
+  }
+});
+</script>
+{% endblock %}

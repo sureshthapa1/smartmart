@@ -175,6 +175,10 @@
          class="btn btn-outline-secondary">
         <i class="bi bi-printer me-1"></i>Print Invoice
       </a>
+      <a href="{{ url_for('sales.thermal_receipt', sale_id=sale.id) }}" target="_blank"
+         class="btn btn-outline-secondary">
+        <i class="bi bi-receipt me-1"></i>Thermal Receipt
+      </a>
       <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back to Sales
       </a>

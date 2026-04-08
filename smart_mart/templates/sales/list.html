@@ -1,186 +1,111 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sales — Smart Mart</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <style>
-    :root { --accent: #6366f1; }
-    body { background: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .top-navbar { background: #0f172a; }
-    .top-navbar .navbar-brand { color: #fff; font-weight: 700; }
-    .table thead th { background: #f8fafc; color: #475569; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
-    .table td { font-size: .875rem; color: #334155; border-color: #f1f5f9; vertical-align: middle; }
-    .table-hover tbody tr:hover { background: #f8fafc; }
-    .card { border: none !important; border-radius: 12px !important; }
-    .btn-primary { background: var(--accent); border-color: var(--accent); }
-    .btn-primary:hover { background: #4f46e5; border-color: #4f46e5; }
-    .btn-outline-primary { color: var(--accent); border-color: var(--accent); }
-    .btn-outline-primary:hover { background: var(--accent); border-color: var(--accent); }
-    .alert { border: none; border-radius: 10px; }
-    .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(99,102,241,.15); }
-  </style>
-</head>
-<body>
-  <nav class="navbar top-navbar px-3 py-2">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm me-3" style="background:#1e293b;color:#94a3b8;border:none;">
-      <i class="bi bi-house-door me-1"></i>Dashboard
-    </a>
-    <a class="navbar-brand" href="#">
-      <i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart
-    </a>
-    <div class="d-flex gap-2 ms-auto">
-      <a href="{{ url_for('inventory.list_products') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-box-seam me-1"></i>Inventory
-      </a>
-      <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:none;">
-        <i class="bi bi-cart3 me-1"></i>Sales
-      </a>
-      <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-truck me-1"></i>Purchases
-      </a>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-box-arrow-right me-1"></i>Logout
-      </a>
-    </div>
-  </nav>
+{% extends "base.html" %}
+{% block title %}Sales — Smart Mart{% endblock %}
+{% block page_title %}Sales{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Sales</li>{% endblock %}
+{% block content %}
 
-  <div class="container-fluid px-4 py-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
-          {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>
-          {% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>
-          {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
-          <span>{{ message }}</span>
-          <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
-        </div>
-      {% endfor %}
-    {% endwith %}
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <div>
-        <h4 class="fw-bold mb-0" style="color:#0f172a;">Sales</h4>
-        <p class="text-muted small mb-0">View and manage all sales transactions</p>
-      </div>
-      <a href="{{ url_for('sales.create_sale') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg me-1"></i>New Sale
-      </a>
-    </div>
-
-    <!-- Date Filter -->
-    <div class="card shadow-sm mb-4">
-      <div class="card-body py-3">
-        <form method="get" action="{{ url_for('sales.list_sales') }}" class="row g-2 align-items-end">
-          <div class="col-auto">
-            <label class="form-label small fw-medium mb-1">Start Date</label>
-            <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date }}">
-          </div>
-          <div class="col-auto">
-            <label class="form-label small fw-medium mb-1">End Date</label>
-            <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date }}">
-          </div>
-          <div class="col-auto">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-funnel me-1"></i>Filter
-            </button>
-            {% if start_date or end_date %}
-              <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-x me-1"></i>Clear
-              </a>
-            {% endif %}
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div class="card shadow-sm">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Payment</th>
-              <th>Items</th>
-              <th>Total (NPR)</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for sale in sales %}
-            <tr>
-              <td><a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="text-decoration-none fw-medium text-primary">
-                {{ sale.invoice_number or '#' ~ sale.id }}</a></td>
-              <td class="text-muted small">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
-              <td class="small">{{ sale.customer_name or '<span class="text-muted">Walk-in</span>' | safe }}</td>
-              <td>
-                {% set pm = sale.payment_mode or 'cash' %}
-                <span class="badge rounded-pill
-                  {% if pm == 'cash' %}bg-success
-                  {% elif pm == 'credit' %}bg-warning text-dark
-                  {% elif pm == 'qr' %}bg-info text-dark
-                  {% else %}bg-secondary{% endif %}">
-                  {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
-                  {{ pm | capitalize }}
-                </span>
-              </td>
-              <td><span class="badge rounded-pill bg-light text-dark border">{{ sale.items | length }}</span></td>
-              <td class="fw-semibold">{{ "%.2f"|format(sale.total_amount) }}</td>
-              <td>
-                <div class="d-flex gap-1">
-                  <a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}"
-                     class="btn btn-sm btn-outline-primary" title="View">
-                    <i class="bi bi-eye"></i>
-                  </a>
-                  <a href="{{ url_for('sales.download_invoice', sale_id=sale.id) }}"
-                     class="btn btn-sm btn-outline-secondary" title="Download Invoice">
-                    <i class="bi bi-download"></i>
-                  </a>
-                  {% if current_user.role == 'admin' %}
-                  <form method="post" action="{{ url_for('sales.delete_sale', sale_id=sale.id) }}"
-                        class="d-inline" onsubmit="return confirm('Delete Sale #{{ sale.id }}? This will reverse all stock changes.')">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete & Reverse">
-                      <i class="bi bi-arrow-counterclockwise"></i>
-                    </button>
-                  </form>
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="7" class="text-center text-muted py-5">
-                <i class="bi bi-cart-x fs-2 d-block mb-2"></i>No sales found.
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Sales</div>
+    <div class="page-header-sub">All transactions</div>
   </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('sales.customer_statement') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person-lines-fill me-1"></i>Customer Statement</a>
+    <a href="{{ url_for('reports.export_sales_csv') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
+    <a href="{{ url_for('sales.create_sale') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Sale</a>
+  </div>
+</div>
 
-  <!-- Pagination -->
-  {% if sales | length == 20 or page > 1 %}
-  <div class="d-flex justify-content-between align-items-center mt-3 px-1">
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <label class="form-label small fw-semibold mb-1">From</label>
+        <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date }}">
+      </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">To</label>
+        <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date }}">
+      </div>
+      <div class="d-flex gap-2 align-self-end">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+        {% if start_date or end_date %}<a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Date &amp; Time</th>
+          <th>Customer</th>
+          <th>Staff</th>
+          <th>Payment</th>
+          <th class="text-center">Items</th>
+          <th class="text-end">Total (NPR)</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales %}
+        <tr>
+          <td>
+            <a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="fw-semibold text-decoration-none" style="color:var(--accent)">
+              {{ sale.invoice_number or '#' ~ sale.id }}
+            </a>
+          </td>
+          <td class="text-muted small">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="small">{{ sale.customer_name or '<span class="text-muted">Walk-in</span>'|safe }}</td>
+          <td class="text-muted small">{{ sale.user.username if sale.user else '—' }}</td>
+          <td>
+            {% set pm = sale.payment_mode or 'cash' %}
+            <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+              {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
+              {{ pm | capitalize }}
+            </span>
+          </td>
+          <td class="text-center"><span class="badge bg-light text-dark border">{{ sale.items|length }}</span></td>
+          <td class="text-end fw-semibold">{{ "%.2f"|format(sale.total_amount|float) }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="btn btn-sm btn-outline-primary" title="View"><i class="bi bi-eye"></i></a>
+              <a href="{{ url_for('sales.download_invoice', sale_id=sale.id) }}" class="btn btn-sm btn-outline-secondary" title="Invoice"><i class="bi bi-download"></i></a>
+              <a href="{{ url_for('sales.thermal_receipt', sale_id=sale.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Receipt"><i class="bi bi-receipt"></i></a>
+              {% if current_user.role == 'admin' %}
+              <form method="post" action="{{ url_for('sales.delete_sale', sale_id=sale.id) }}" class="d-inline" onsubmit="return confirm('Delete Sale #{{ sale.id }}? Stock will be reversed.')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-arrow-counterclockwise"></i></button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-5">
+            <i class="bi bi-cart-x fs-1 d-block mb-2 opacity-25"></i>
+            No sales found. <a href="{{ url_for('sales.create_sale') }}">Create one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if sales|length == 20 or page > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
     <span class="text-muted small">Page {{ page }}</span>
     <div class="d-flex gap-2">
       {% if page > 1 %}
-      <a href="?page={{ page - 1 }}&start_date={{ start_date }}&end_date={{ end_date }}"
-         class="btn btn-sm btn-outline-secondary">← Previous</a>
+      <a href="?page={{ page-1 }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
       {% endif %}
-      {% if sales | length == 20 %}
-      <a href="?page={{ page + 1 }}&start_date={{ start_date }}&end_date={{ end_date }}"
-         class="btn btn-sm btn-outline-secondary">Next →</a>
+      {% if sales|length == 20 %}
+      <a href="?page={{ page+1 }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-sm btn-outline-secondary">Next →</a>
       {% endif %}
     </div>
   </div>
   {% endif %}
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+</div>
+{% endblock %}

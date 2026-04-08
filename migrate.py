@@ -49,5 +49,21 @@ with app.app_context():
         print("\n--- expenses ---")
         # expenses table is created by db.create_all() above
 
+        print("\n--- dismissed_alerts ---")
+        # dismissed_alerts table is created by db.create_all() above
+
+        print("\n--- user_permissions (new columns) ---")
+        safe_add("user_permissions", "can_view_returns", "BOOLEAN NOT NULL DEFAULT 1")
+        safe_add("user_permissions", "can_create_return", "BOOLEAN NOT NULL DEFAULT 0")
+        safe_add("user_permissions", "can_view_online_orders", "BOOLEAN NOT NULL DEFAULT 1")
+        safe_add("user_permissions", "can_manage_online_orders", "BOOLEAN NOT NULL DEFAULT 0")
+
+        print("\n--- shop_settings (new columns) ---")
+        safe_add("shop_settings", "vat_enabled", "BOOLEAN NOT NULL DEFAULT 0")
+        safe_add("shop_settings", "vat_rate", "NUMERIC(5,2) DEFAULT 13.00")
+        safe_add("shop_settings", "vat_number", "VARCHAR(50)")
+        safe_add("shop_settings", "currency_symbol", "VARCHAR(10) DEFAULT 'NPR'")
+        safe_add("shop_settings", "low_stock_threshold", "INTEGER DEFAULT 10")
+
     print("\nMigration complete.")
 

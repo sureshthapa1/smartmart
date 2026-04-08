@@ -3,21 +3,41 @@
 {% block page_title %}Notifications{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Notifications</li>{% endblock %}
 {% block content %}
+{% set unread = notifications | selectattr('is_read', 'equalto', false) | list %}
 <div class="card shadow-sm">
-  <div class="card-header fw-semibold">System Notifications</div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">
+      System Notifications
+      {% if unread %}
+      <span class="badge bg-danger ms-1">{{ unread | length }}</span>
+      {% endif %}
+    </span>
+    {% if unread %}
+    <form method="post">
+      <input type="hidden" name="action" value="mark_all">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Mark All as Read</button>
+    </form>
+    {% endif %}
+  </div>
   <div class="list-group list-group-flush">
     {% for n in notifications %}
-    <div class="list-group-item d-flex align-items-start gap-3">
-      <div class="mt-1"><span class="badge bg-{{ n.category }}">{{ 'Unread' if not n.is_read else 'Read' }}</span></div>
+    <div class="list-group-item d-flex align-items-start gap-3 {% if not n.is_read %}bg-light{% endif %}">
+      <div class="mt-1">
+        <span class="badge bg-{{ n.category }}">{{ n.category | capitalize }}</span>
+      </div>
       <div class="flex-grow-1">
-        <div class="fw-semibold">{{ n.title }}</div>
+        <div class="fw-semibold {% if not n.is_read %}text-dark{% else %}text-muted{% endif %}">{{ n.title }}</div>
         <div class="text-muted small">{{ n.body }}</div>
+        <div class="text-muted" style="font-size:0.75rem">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
       </div>
       {% if not n.is_read %}
-      <form method="post">
+      <form method="post" class="flex-shrink-0">
+        <input type="hidden" name="action" value="mark_one">
         <input type="hidden" name="notification_id" value="{{ n.id }}">
         <button class="btn btn-sm btn-outline-secondary" type="submit">Mark Read</button>
       </form>
+      {% else %}
+      <span class="text-muted small flex-shrink-0 mt-1">Read</span>
       {% endif %}
     </div>
     {% else %}

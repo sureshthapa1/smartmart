@@ -29,6 +29,14 @@ class UserPermissions(db.Model):
     can_bulk_upload_purchases = db.Column(db.Boolean, default=False)
     can_manage_suppliers = db.Column(db.Boolean, default=False)
 
+    # Returns
+    can_view_returns = db.Column(db.Boolean, default=True)
+    can_create_return = db.Column(db.Boolean, default=False)
+
+    # Online Orders
+    can_view_online_orders = db.Column(db.Boolean, default=True)
+    can_manage_online_orders = db.Column(db.Boolean, default=False)
+
     # Alerts
     can_view_alerts = db.Column(db.Boolean, default=True)
 

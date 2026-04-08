@@ -21,6 +21,11 @@ def index():
         s.website = request.form.get("website", "").strip() or None
         s.invoice_prefix = request.form.get("invoice_prefix", "INV").strip() or "INV"
         s.footer_note = request.form.get("footer_note", "").strip() or "Thank you for shopping with us!"
+        s.vat_enabled = request.form.get("vat_enabled") == "on"
+        s.vat_rate = float(request.form.get("vat_rate", "13") or 13)
+        s.vat_number = request.form.get("vat_number", "").strip() or None
+        s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
+        s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
         db.session.commit()
         flash("Settings saved successfully.", "success")
         return redirect(url_for("settings.index"))

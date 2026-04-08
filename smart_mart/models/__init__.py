@@ -34,6 +34,12 @@ from .operations import (
     CustomerLoyaltyTransaction,
     Branch,
 )
+from .dismissed_alert import DismissedAlert
+from .product_variant import ProductVariant
+from .purchase_order import PurchaseOrder, PurchaseOrderItem
+from .stock_transfer import StockTransfer, StockTransferItem
+from .shift import Shift
+from .notification_log import NotificationLog
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
@@ -48,4 +54,10 @@ __all__ = [
     "CustomerCreditPayment", "SupplierPayment", "CashSession",
     "ProductInventoryProfile", "ProductBatch", "AppNotification",
     "CustomerLoyaltyTransaction", "Branch",
+    "DismissedAlert",
+    "ProductVariant",
+    "PurchaseOrder", "PurchaseOrderItem",
+    "StockTransfer", "StockTransferItem",
+    "Shift",
+    "NotificationLog",
 ]

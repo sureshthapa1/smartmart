@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Cash Flow Prediction — Smart Mart{% endblock %}
+{% block page_title %}Cash Flow Prediction{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item">AI</li><li class="breadcrumb-item active">Cash Flow</li>{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label">Projected Revenue (30d)</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(data.total_predicted_revenue or 0) }}</div>
+        <div class="stat-sub">Avg NPR {{ "%.0f"|format(data.avg_daily_revenue or 0) }}/day</div>
+        <div class="stat-bg">💰</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b">
+      <div class="card-body p-4">
+        <div class="stat-label">Projected Expenses (30d)</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(data.total_predicted_expense or 0) }}</div>
+        <div class="stat-sub">Avg NPR {{ "%.0f"|format(data.avg_daily_expense or 0) }}/day</div>
+        <div class="stat-bg">📉</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:{% if (data.total_net_cashflow or 0) >= 0 %}linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6{% else %}linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b{% endif %}">
+      <div class="card-body p-4">
+        <div class="stat-label">Net Cash Flow (30d)</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(data.total_net_cashflow or 0) }}</div>
+        <div class="stat-sub">{{ data.outlook | capitalize if data.outlook else '—' }}</div>
+        <div class="stat-bg">📊</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
+      <div class="card-body p-4">
+        <div class="stat-label">Outlook</div>
+        <div class="stat-value" style="font-size:1.4rem">{% if data.outlook == 'positive' %}✅{% else %}⚠️{% endif %}</div>
+        <div class="stat-sub">{{ data.outlook | capitalize if data.outlook else '—' }}</div>
+        <div class="stat-bg">🎯</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if data.insight %}
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-stars fs-5"></i>
+  <span>{{ data.insight }}</span>
+</div>
+{% endif %}
+
+{% if data.forecasts %}
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-graph-up me-2 text-primary"></i>30-Day Cash Flow Forecast</div>
+  <div class="card-body"><canvas id="cfChart" height="80"></canvas></div>
+</div>
+{% else %}
+<div class="card"><div class="card-body text-center text-muted py-5"><i class="bi bi-graph-up fs-1 d-block mb-2 opacity-25"></i>Not enough historical data to generate a forecast yet.</div></div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if data.forecasts %}
+<script>
+const fc = {{ data.forecasts | tojson }};
+new Chart(document.getElementById('cfChart'), {
+  type: 'line',
+  data: {
+    labels: fc.map(d => d.day),
+    datasets: [
+      { label: 'Revenue', data: fc.map(d => d.predicted_revenue), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+      { label: 'Expenses', data: fc.map(d => d.predicted_expense), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.08)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+      { label: 'Net', data: fc.map(d => d.net_cashflow), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.08)', fill: false, tension: 0.4, borderWidth: 2, pointRadius: 2 },
+    ]
+  },
+  options: {
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { beginAtZero: false, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 10 } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

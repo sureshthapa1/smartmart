@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Transfer #{{ transfer.id }} — Smart Mart{% endblock %}
+{% block page_title %}Stock Transfer #{{ transfer.id }}{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('transfers.list_transfers') }}" class="text-decoration-none">Transfers</a></li><li class="breadcrumb-item active">#{{ transfer.id }}</li>{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Transfer Details</span>
+        <span class="badge {% if transfer.status == 'completed' %}bg-success{% elif transfer.status == 'cancelled' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ transfer.status }}</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><div class="text-muted small">From</div><div class="fw-semibold">{{ transfer.from_branch.name }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">To</div><div class="fw-semibold">{{ transfer.to_branch.name }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">Created by</div><div class="fw-semibold">{{ transfer.creator.username }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">Created</div><div>{{ transfer.created_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+          {% if transfer.completed_at %}<div class="col-md-4"><div class="text-muted small">Completed</div><div>{{ transfer.completed_at.strftime('%Y-%m-%d %H:%M') }}</div></div>{% endif %}
+          {% if transfer.notes %}<div class="col-12"><div class="text-muted small">Notes</div><div>{{ transfer.notes }}</div></div>{% endif %}
+        </div>
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th>Product</th><th>SKU</th><th class="text-end">Quantity</th></tr></thead>
+            <tbody>
+              {% for item in transfer.items %}
+              <tr>
+                <td>{{ item.product.name if item.product else '—' }}</td>
+                <td><code class="text-muted">{{ item.product.sku if item.product else '—' }}</code></td>
+                <td class="text-end fw-semibold">{{ item.quantity }}</td>
+              </tr>
+              {% endfor %}
+              <tr style="border-top:2px solid #e2e8f0">
+                <td colspan="2" class="text-end fw-bold">Total Units</td>
+                <td class="text-end fw-bold">{{ transfer.total_items }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Actions</div>
+      <div class="card-body d-flex flex-column gap-2">
+        {% if transfer.status == 'pending' %}
+        <form method="post" action="{{ url_for('transfers.complete_transfer', transfer_id=transfer.id) }}" onsubmit="return confirm('Complete this transfer? Stock will be deducted.')">
+          <button class="btn btn-success w-100" type="submit"><i class="bi bi-check-circle me-1"></i>Complete Transfer</button>
+        </form>
+        <form method="post" action="{{ url_for('transfers.cancel_transfer', transfer_id=transfer.id) }}" onsubmit="return confirm('Cancel this transfer?')">
+          <button class="btn btn-outline-danger w-100" type="submit"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+        </form>
+        {% else %}
+        <div class="text-muted small text-center py-2">No actions available for {{ transfer.status }} transfers.</div>
+        {% endif %}
+        <a href="{{ url_for('transfers.list_transfers') }}" class="btn btn-outline-secondary w-100">Back to List</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

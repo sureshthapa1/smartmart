@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, abort
 from flask_login import current_user
 
 from ...extensions import db
@@ -18,6 +18,11 @@ purchases_bp = Blueprint("purchases", __name__, url_prefix="/purchases")
 @purchases_bp.route("/")
 @login_required
 def list_purchases():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_view_purchases:
+            abort(403)
     start_date_raw = request.args.get("start_date", "").strip() or None
     end_date_raw = request.args.get("end_date", "").strip() or None
     filters: dict = {}
@@ -40,6 +45,11 @@ def list_purchases():
 @purchases_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_purchase():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_create_purchase:
+            abort(403)
     suppliers = purchase_manager.list_suppliers()
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
     if request.method == "POST":
@@ -82,6 +92,11 @@ def create_purchase():
 @purchases_bp.route("/suppliers")
 @login_required
 def list_suppliers():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_suppliers:
+            abort(403)
     suppliers = purchase_manager.list_suppliers()
     return render_template("purchases/suppliers.html", suppliers=suppliers)
 
@@ -163,6 +178,11 @@ def download_sample():
 @purchases_bp.route("/bulk-upload", methods=["GET", "POST"])
 @login_required
 def bulk_upload():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_bulk_upload_purchases:
+            abort(403)
     """Bulk purchase upload via CSV or Excel file."""
     import io, csv
     suppliers = purchase_manager.list_suppliers()

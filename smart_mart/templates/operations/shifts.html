@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Shift Management — Smart Mart{% endblock %}
+{% block page_title %}Shift Management{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Shifts</li>{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">{{ 'Close Current Shift' if open_shift else 'Open New Shift' }}</div>
+      <div class="card-body">
+        <form method="post" class="row g-3">
+          {% if open_shift %}
+          <input type="hidden" name="action" value="close">
+          <input type="hidden" name="shift_id" value="{{ open_shift.id }}">
+          <div class="col-12">
+            <div class="p-3 rounded-3" style="background:#f0fdf4;border:1px solid #bbf7d0">
+              <div class="text-muted small">Shift started</div>
+              <div class="fw-semibold">{{ open_shift.started_at.strftime('%H:%M') }}</div>
+              <div class="text-muted small mt-1">Opening cash: NPR {{ "%.2f"|format(open_shift.opening_cash|float) }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Closing Cash (NPR)</label>
+            <input type="number" step="0.01" min="0" name="closing_cash" class="form-control" placeholder="Count and enter cash" required>
+          </div>
+          {% else %}
+          <input type="hidden" name="action" value="open">
+          <div class="col-12">
+            <label class="form-label">Opening Cash (NPR)</label>
+            <input type="number" step="0.01" min="0" name="opening_cash" class="form-control" placeholder="Starting float" required>
+          </div>
+          {% endif %}
+          <div class="col-12">
+            <label class="form-label">Notes (optional)</label>
+            <textarea name="notes" rows="2" class="form-control" placeholder="Handover notes..."></textarea>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit">
+              {{ 'Close Shift' if open_shift else 'Open Shift' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold">Recent Shifts</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Staff</th><th>Started</th><th>Ended</th><th>Duration</th><th class="text-end">Sales</th><th class="text-end">Txns</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for s in shifts %}
+            <tr>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff;font-weight:700">{{ s.user.username[0].upper() }}</div>
+                  {{ s.user.username }}
+                </div>
+              </td>
+              <td>{{ s.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>{{ s.ended_at.strftime('%H:%M') if s.ended_at else '—' }}</td>
+              <td>{{ s.duration_minutes ~ ' min' if s.duration_minutes else '—' }}</td>
+              <td class="text-end">{% if s.total_sales %}NPR {{ "%.0f"|format(s.total_sales|float) }}{% else %}—{% endif %}</td>
+              <td class="text-end">{{ s.total_transactions or '—' }}</td>
+              <td><span class="badge {% if s.status == 'open' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ s.status }}</span></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No shifts recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

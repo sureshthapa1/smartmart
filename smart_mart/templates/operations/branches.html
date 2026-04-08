@@ -7,18 +7,20 @@
   <div class="card-header fw-semibold">Create Branch</div>
   <div class="card-body">
     <form method="post" class="row g-3">
+      <input type="hidden" name="action" value="create">
       <div class="col-md-4"><input name="name" class="form-control" placeholder="Branch name" required></div>
-      <div class="col-md-3"><input name="code" class="form-control" placeholder="Code" required></div>
+      <div class="col-md-3"><input name="code" class="form-control" placeholder="Code (e.g. KTM-01)" required></div>
       <div class="col-md-3"><input name="address" class="form-control" placeholder="Address"></div>
       <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Create</button></div>
     </form>
   </div>
 </div>
+
 <div class="card shadow-sm">
   <div class="card-header fw-semibold">Registered Branches</div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead><tr><th>Name</th><th>Code</th><th>Address</th><th>Status</th></tr></thead>
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Name</th><th>Code</th><th>Address</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
       {% for branch in branches %}
         <tr>
@@ -26,12 +28,64 @@
           <td><code>{{ branch.code }}</code></td>
           <td>{{ branch.address or '-' }}</td>
           <td><span class="badge {% if branch.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if branch.is_active else 'Inactive' }}</span></td>
+          <td class="d-flex gap-2">
+            <!-- Toggle active -->
+            <form method="post">
+              <input type="hidden" name="action" value="toggle">
+              <input type="hidden" name="branch_id" value="{{ branch.id }}">
+              <button class="btn btn-sm {% if branch.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" type="submit">
+                {{ 'Deactivate' if branch.is_active else 'Activate' }}
+              </button>
+            </form>
+            <!-- Edit trigger -->
+            <button class="btn btn-sm btn-outline-secondary"
+              data-bs-toggle="modal" data-bs-target="#editModal"
+              data-id="{{ branch.id }}" data-name="{{ branch.name }}"
+              data-code="{{ branch.code }}" data-address="{{ branch.address or '' }}">
+              Edit
+            </button>
+          </td>
         </tr>
       {% else %}
-        <tr><td colspan="4" class="text-center text-muted py-4">No branches yet.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted py-4">No branches yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      <input type="hidden" name="action" value="edit">
+      <input type="hidden" name="branch_id" id="editBranchId">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editModalLabel">Edit Branch</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body row g-3">
+        <div class="col-12"><input name="name" id="editName" class="form-control" placeholder="Branch name" required></div>
+        <div class="col-12"><input name="code" id="editCode" class="form-control" placeholder="Code" required></div>
+        <div class="col-12"><input name="address" id="editAddress" class="form-control" placeholder="Address"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('editModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  document.getElementById('editBranchId').value = btn.dataset.id;
+  document.getElementById('editName').value = btn.dataset.name;
+  document.getElementById('editCode').value = btn.dataset.code;
+  document.getElementById('editAddress').value = btn.dataset.address;
+});
+</script>
 {% endblock %}

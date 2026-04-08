@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}End-of-Day Summary — Smart Mart{% endblock %}
+{% block page_title %}End-of-Day Summary{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">EOD Summary</li>{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <div style="font-size:1.1rem;font-weight:700;color:#0f172a">{{ summary.date_display }}</div>
+    <div class="text-muted small">Daily closing report</div>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <input type="date" name="date" class="form-control form-control-sm" value="{{ summary.date }}" max="{{ today.isoformat() }}">
+      <button class="btn btn-sm btn-outline-primary" type="submit">Load</button>
+    </form>
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label">Total Sales</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(summary.total_sales) }}</div>
+        <div class="stat-sub">{{ summary.total_transactions }} transactions</div>
+        <div class="stat-bg">💰</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6">
+      <div class="card-body p-4">
+        <div class="stat-label">Gross Profit</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(summary.gross_profit) }}</div>
+        <div class="stat-sub">{{ summary.gross_margin }}% margin</div>
+        <div class="stat-bg">📈</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:{% if summary.net_profit >= 0 %}linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af{% else %}linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b{% endif %}">
+      <div class="card-body p-4">
+        <div class="stat-label">Net Profit</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(summary.net_profit) }}</div>
+        <div class="stat-sub">After NPR {{ "%.0f"|format(summary.total_expenses) }} expenses</div>
+        <div class="stat-bg">🎯</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#92400e">
+      <div class="card-body p-4">
+        <div class="stat-label">Avg Order Value</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(summary.avg_order_value) }}</div>
+        <div class="stat-sub">NPR {{ "%.0f"|format(summary.total_discounts) }} discounts given</div>
+        <div class="stat-bg">🧾</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-2 text-primary"></i>Payment Breakdown</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Mode</th><th class="text-end">Transactions</th><th class="text-end">Amount</th></tr></thead>
+          <tbody>
+            {% for row in summary.payment_breakdown %}
+            <tr>
+              <td>
+                {% if row.mode == 'cash' %}💵{% elif row.mode == 'qr' %}📱{% elif row.mode == 'card' %}💳{% elif row.mode == 'credit' %}📋{% else %}🔄{% endif %}
+                {{ row.mode | capitalize }}
+              </td>
+              <td class="text-end">{{ row.count }}</td>
+              <td class="text-end fw-semibold">NPR {{ "%.2f"|format(row.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No sales today.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-receipt me-2 text-warning"></i>Expense Breakdown</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Type</th><th class="text-end">Amount</th></tr></thead>
+          <tbody>
+            {% for row in summary.expense_breakdown %}
+            <tr>
+              <td>{{ row.type | capitalize }}</td>
+              <td class="text-end text-danger">NPR {{ "%.2f"|format(row.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2" class="text-center text-muted py-3">No expenses today.</td></tr>
+            {% endfor %}
+            {% if summary.expense_breakdown %}
+            <tr style="border-top:2px solid #e2e8f0">
+              <td class="fw-semibold">Total</td>
+              <td class="text-end fw-semibold text-danger">NPR {{ "%.2f"|format(summary.total_expenses) }}</td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy-fill text-warning me-2"></i>Top Products</div>
+      <div class="list-group list-group-flush">
+        {% for p in summary.top_products %}
+        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+          <div>
+            <div style="font-size:.845rem;font-weight:500">{{ p.name[:22] }}</div>
+            <div class="text-muted" style="font-size:.72rem">{{ p.qty }} units sold</div>
+          </div>
+          <span class="badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff">NPR {{ "%.0f"|format(p.rev) }}</span>
+        </div>
+        {% else %}
+        <div class="list-group-item text-center text-muted py-3">No sales today.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if summary.cash_sessions %}
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-safe2 me-2 text-success"></i>Cash Sessions</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Status</th><th>Opened</th><th>Closed</th><th class="text-end">Opening</th><th class="text-end">Expected</th><th class="text-end">Actual</th><th class="text-end">Variance</th></tr></thead>
+      <tbody>
+        {% for s in summary.cash_sessions %}
+        <tr>
+          <td><span class="badge {% if s.status == 'open' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ s.status }}</span></td>
+          <td>{{ s.opened_at.strftime('%H:%M') }}</td>
+          <td>{{ s.closed_at.strftime('%H:%M') if s.closed_at else '—' }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(s.opening_cash|float) }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format((s.expected_cash or 0)|float) }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format((s.closing_cash or 0)|float) }}</td>
+          <td class="text-end {% if s.variance and s.variance|float != 0 %}{% if s.variance|float < 0 %}text-danger{% else %}text-success{% endif %} fw-semibold{% endif %}">
+            NPR {{ "%.2f"|format((s.variance or 0)|float) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

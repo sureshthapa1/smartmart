@@ -7,117 +7,92 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root { --accent: #6366f1; }
-    body { background: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .top-navbar { background: #0f172a; }
-    .top-navbar .navbar-brand { color: #fff; font-weight: 700; }
-    .card { border: none !important; border-radius: 12px !important; }
-    .card-header { background: #fff; border-bottom: 1px solid #f1f5f9; border-radius: 12px 12px 0 0 !important; }
-    .table thead th { background: #f8fafc; color: #475569; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
-    .table td { font-size: .875rem; border-color: #f1f5f9; vertical-align: middle; }
-    .btn-primary { background: var(--accent); border-color: var(--accent); }
-    .btn-primary:hover { background: #4f46e5; border-color: #4f46e5; }
-    .btn-outline-primary { color: var(--accent); border-color: var(--accent); }
-    .btn-outline-primary:hover { background: var(--accent); border-color: var(--accent); }
-    .form-control:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 .2rem rgba(99,102,241,.15); }
-    .alert { border: none; border-radius: 10px; }
-    .total-bar { background: #0f172a; border-radius: 12px; padding: 1rem 1.5rem; }
+    :root{--accent:#6366f1;--accent2:#8b5cf6}
+    body{background:#f1f5f9;font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:.9rem;color:#1e293b}
+    .top-bar{background:#0f172a;padding:.6rem 1.25rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:200}
+    .top-bar .brand{color:#fff;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:.5rem}
+    .top-bar .brand-dot{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#fff}
+    .card{border:1px solid rgba(226,232,240,.7)!important;border-radius:14px!important;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05)}
+    .card-header{background:#fff;border-bottom:1px solid #f1f5f9;border-radius:14px 14px 0 0!important;padding:.9rem 1.25rem;font-weight:600}
+    .table thead th{background:#f8fafc;color:#64748b;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;border-bottom:2px solid #e2e8f0;padding:.7rem 1rem}
+    .table td{font-size:.865rem;border-color:#f1f5f9;vertical-align:middle;padding:.65rem 1rem}
+    .form-control,.form-select{border-radius:9px;border-color:#e2e8f0;font-size:.865rem;padding:.5rem .85rem;transition:all .18s}
+    .form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+    .form-label{font-size:.8rem;font-weight:600;color:#475569;margin-bottom:.3rem}
+    .btn{border-radius:9px;font-weight:500;font-size:.845rem;transition:all .18s}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;box-shadow:0 2px 8px rgba(99,102,241,.35)}
+    .btn-primary:hover{background:linear-gradient(135deg,#4f46e5,#7c3aed);transform:translateY(-1px)}
+    .btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);border:none;box-shadow:0 2px 8px rgba(34,197,94,.3)}
+    .btn-success:hover{background:linear-gradient(135deg,#16a34a,#15803d);transform:translateY(-1px)}
+    .btn-outline-secondary{border-color:#e2e8f0;color:#64748b}
+    .btn-outline-secondary:hover{background:#f8fafc;border-color:#cbd5e1;color:#334155}
+    .btn-sm{border-radius:7px;font-size:.78rem}
+    .alert{border-radius:11px;border:none}
+    .total-bar{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:14px;padding:1.1rem 1.5rem;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+    .ts-wrapper.single .ts-control{border-radius:9px}
+    .ts-dropdown{border-radius:9px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:9999}
+    .ts-dropdown .option{padding:.45rem .75rem;font-size:.865rem}
+    .ts-dropdown .option:hover,.ts-dropdown .option.active{background:var(--accent);color:#fff}
+    .ts-control input{font-size:.865rem!important}
   </style>
 </head>
 <body>
-  <nav class="navbar top-navbar px-3 py-2">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm me-3" style="background:#1e293b;color:#94a3b8;border:none;">
-      <i class="bi bi-house-door me-1"></i>Dashboard
-    </a>
-    <a class="navbar-brand" href="#">
-      <i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart
-    </a>
-    <div class="d-flex gap-2 ms-auto">
-      <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-arrow-left me-1"></i>Purchases
-      </a>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-box-arrow-right me-1"></i>Logout
-      </a>
-    </div>
-  </nav>
+  <div class="top-bar">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+    <div class="brand"><div class="brand-dot"><i class="bi bi-shop"></i></div>Smart Mart</div>
+    <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-sm ms-auto" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px"><i class="bi bi-truck me-1"></i>Purchases</a>
+  </div>
 
-  <div class="container py-4" style="max-width: 940px;">
+  <div class="container py-4" style="max-width:960px">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2" role="alert">
-          {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>
-          {% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>
-          {% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
-          <span>{{ message }}</span>
-          <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2">
+          {% if category == 'success' %}<i class="bi bi-check-circle-fill"></i>{% elif category == 'danger' %}<i class="bi bi-x-circle-fill"></i>{% else %}<i class="bi bi-info-circle-fill"></i>{% endif %}
+          <span>{{ message }}</span><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
       {% endfor %}
     {% endwith %}
 
     <div class="mb-4">
-      <h4 class="fw-bold mb-0" style="color:#0f172a;">New Purchase</h4>
-      <p class="text-muted small mb-0">Record a new stock purchase</p>
+      <h4 class="fw-bold mb-0" style="color:#0f172a">New Purchase</h4>
+      <p class="text-muted small mb-0">Record a new stock purchase from a supplier</p>
     </div>
 
     <form method="post" action="{{ url_for('purchases.create_purchase') }}">
-      <!-- Purchase Details -->
-      <div class="card shadow-sm mb-3">
-        <div class="card-header d-flex align-items-center gap-2 py-3">
-          <i class="bi bi-info-circle text-primary"></i>
-          <span class="fw-semibold">Purchase Details</span>
-        </div>
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-info-circle me-2 text-primary"></i>Purchase Details</div>
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-6">
-              <label class="form-label fw-medium">Supplier <span class="text-danger">*</span></label>
+              <label class="form-label">Supplier <span class="text-danger">*</span></label>
               <div class="input-group">
                 <select name="supplier_id" class="form-select" required>
                   <option value="">— Select supplier —</option>
-                  {% for s in suppliers %}
-                  <option value="{{ s.id }}">{{ s.name }}</option>
-                  {% endfor %}
+                  {% for s in suppliers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
                 </select>
-                <a href="{{ url_for('purchases.create_supplier') }}" class="btn btn-outline-secondary" title="Add Supplier">
-                  <i class="bi bi-plus-lg"></i>
-                </a>
+                <a href="{{ url_for('purchases.create_supplier') }}" class="btn btn-outline-secondary" title="Add Supplier"><i class="bi bi-plus-lg"></i></a>
               </div>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-medium">Purchase Date <span class="text-danger">*</span></label>
+              <label class="form-label">Purchase Date <span class="text-danger">*</span></label>
               <input type="date" name="purchase_date" class="form-control" value="{{ today }}" required>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Items -->
-      <div class="card shadow-sm mb-3">
-        <div class="card-header d-flex align-items-center gap-2 py-3">
-          <i class="bi bi-box-seam text-primary"></i>
-          <span class="fw-semibold">Items</span>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th style="width:110px;">Qty</th>
-                  <th style="width:170px;">Unit Cost (NPR)</th>
-                  <th style="width:150px;">Subtotal (NPR)</th>
-                  <th style="width:50px;"></th>
-                </tr>
-              </thead>
-              <tbody id="itemsBody"></tbody>
-            </table>
-          </div>
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-box-seam me-2 text-primary"></i>Items</div>
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle">
+            <thead><tr><th>Product</th><th style="width:110px">Qty</th><th style="width:170px">Unit Cost (NPR)</th><th style="width:150px">Subtotal</th><th style="width:50px"></th></tr></thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
         </div>
         <div class="card-footer bg-white">
-          <button type="button" class="btn btn-outline-primary btn-sm" id="addItemBtn">
-            <i class="bi bi-plus-lg me-1"></i>Add Item
-          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addItemBtn"><i class="bi bi-plus-lg me-1"></i>Add Item</button>
         </div>
       </div>
 
@@ -125,65 +100,37 @@
         <span class="text-white-50">Total Cost</span>
         <div class="d-flex align-items-center gap-3">
           <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
-          <button type="submit" class="btn btn-success px-4 fw-semibold">
-            <i class="bi bi-check-circle me-1"></i>Confirm Purchase
-          </button>
+          <button type="submit" class="btn btn-success px-4 fw-semibold"><i class="bi bi-check-circle me-1"></i>Confirm Purchase</button>
         </div>
       </div>
     </form>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script>
-    const PRODUCTS = [{% for p in products %}{ id: {{ p.id }}, name: {{ p.name | tojson }}, cost: {{ p.cost_price | float }} }{% if not loop.last %},{% endif %}{% endfor %}];
-    let rowIndex = 0;
-    const tsInstances = {};
-
-    function addRow() {
-      const idx = rowIndex++;
-      const tr = document.createElement('tr');
-      const selectId = `prod_sel_${idx}`;
-      const opts = PRODUCTS.map(p => `<option value="${p.id}" data-cost="${p.cost}">${p.name}</option>`).join('');
-      tr.innerHTML = `
-        <td><select id="${selectId}" class="form-select form-select-sm" name="items[${idx}][product_id]" required>
-          <option value="">— Select product —</option>${opts}</select></td>
-        <td><input type="number" class="form-control form-control-sm qty-input" name="items[${idx}][quantity]" min="1" value="1" required></td>
-        <td><input type="number" class="form-control form-control-sm cost-input" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required></td>
-        <td class="subtotal-cell text-end fw-medium">0.00</td>
-        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger remove-btn"><i class="bi bi-trash"></i></button></td>`;
+    const PRODUCTS=[{% for p in products %}{id:{{p.id}},name:{{p.name|tojson}},cost:{{p.cost_price|float}}}{% if not loop.last %},{% endif %}{% endfor %}];
+    let rowIndex=0;
+    function addRow(){
+      const idx=rowIndex++;
+      const tr=document.createElement('tr');
+      const sid=`ps_${idx}`;
+      const opts=PRODUCTS.map(p=>`<option value="${p.id}" data-cost="${p.cost}">${p.name}</option>`).join('');
+      tr.innerHTML=`<td><select id="${sid}" name="items[${idx}][product_id]" required><option value="">— Select —</option>${opts}</select></td>
+        <td><input type="number" class="form-control form-control-sm qty-in" name="items[${idx}][quantity]" min="1" value="1" required></td>
+        <td><input type="number" class="form-control form-control-sm cost-in" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required></td>
+        <td class="sub-cell text-end fw-medium">0.00</td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger del-btn"><i class="bi bi-trash"></i></button></td>`;
       document.getElementById('itemsBody').appendChild(tr);
-
-      // Tom Select on product dropdown
-      const ts = new TomSelect(`#${selectId}`, {
-        placeholder: 'Search product…',
-        maxOptions: 50,
-        onChange(val) {
-          const p = PRODUCTS.find(x => x.id == val);
-          if (p) tr.querySelector('.cost-input').value = p.cost.toFixed(2);
-          updateRow(tr);
-        }
-      });
-      tsInstances[idx] = ts;
-
-      tr.querySelector('.qty-input').addEventListener('input', () => updateRow(tr));
-      tr.querySelector('.cost-input').addEventListener('input', () => updateRow(tr));
-      tr.querySelector('.remove-btn').addEventListener('click', () => { tr.remove(); recalc(); });
+      new TomSelect(`#${sid}`,{placeholder:'Search product…',maxOptions:50,onChange(v){const p=PRODUCTS.find(x=>x.id==v);if(p)tr.querySelector('.cost-in').value=p.cost.toFixed(2);recalcRow(tr);}});
+      tr.querySelector('.qty-in').addEventListener('input',()=>recalcRow(tr));
+      tr.querySelector('.cost-in').addEventListener('input',()=>recalcRow(tr));
+      tr.querySelector('.del-btn').addEventListener('click',()=>{tr.remove();recalcTotal();});
     }
-
-    function updateRow(tr) {
-      const qty = parseFloat(tr.querySelector('.qty-input').value) || 0;
-      const cost = parseFloat(tr.querySelector('.cost-input').value) || 0;
-      tr.querySelector('.subtotal-cell').textContent = (qty * cost).toFixed(2);
-      recalc();
-    }
-    function recalc() {
-      let total = 0;
-      document.querySelectorAll('.subtotal-cell').forEach(c => total += parseFloat(c.textContent) || 0);
-      document.getElementById('grandTotal').textContent = total.toFixed(2);
-    }
-    document.getElementById('addItemBtn').addEventListener('click', addRow);
+    function recalcRow(tr){const q=parseFloat(tr.querySelector('.qty-in').value)||0,c=parseFloat(tr.querySelector('.cost-in').value)||0;tr.querySelector('.sub-cell').textContent=(q*c).toFixed(2);recalcTotal();}
+    function recalcTotal(){let t=0;document.querySelectorAll('.sub-cell').forEach(c=>t+=parseFloat(c.textContent)||0);document.getElementById('grandTotal').textContent=t.toFixed(2);}
+    document.getElementById('addItemBtn').addEventListener('click',addRow);
     addRow();
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

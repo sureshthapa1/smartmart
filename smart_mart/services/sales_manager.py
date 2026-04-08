@@ -244,8 +244,14 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         contact_parts.append(shop_email)
     if shop_pan:
         contact_parts.append(f"PAN No: {shop_pan}")
-    for part in contact_parts:
-        left_col.append(Paragraph(part, S(f"sc_{part[:5]}", fontSize=8,
+    try:
+        from ..models.shop_settings import ShopSettings as _SS
+        _sv = _SS.get()
+        if _sv.vat_enabled and _sv.vat_number:
+            contact_parts.append(f"VAT No: {_sv.vat_number}")
+    except Exception:
+        pass
+    for part in contact_parts:        left_col.append(Paragraph(part, S(f"sc_{part[:5]}", fontSize=8,
                                           fontName="Helvetica", textColor=slate,
                                           spaceAfter=2, leading=11)))
 
@@ -385,6 +391,27 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     gross_total = sum(float(si.subtotal) for si in sale.items)
     discount = float(sale.discount_amount or 0)
     final_total = float(sale.total_amount)
+
+    # VAT calculation
+    vat_enabled = False
+    vat_rate = 0.0
+    vat_number = ""
+    try:
+        from ..models.shop_settings import ShopSettings
+        _s = ShopSettings.get()
+        vat_enabled = bool(_s.vat_enabled)
+        vat_rate = float(_s.vat_rate or 0)
+        vat_number = _s.vat_number or ""
+    except Exception:
+        pass
+
+    taxable_amount = final_total
+    vat_amount = 0.0
+    if vat_enabled and vat_rate > 0:
+        # VAT is inclusive in the total (extract it)
+        vat_amount = round(taxable_amount * vat_rate / (100 + vat_rate), 2)
+        taxable_amount = round(final_total - vat_amount, 2)
+
     tot_s = S("ts", fontSize=9, fontName="Helvetica", textColor=slate)
     tot_v = S("tv", fontSize=9, fontName="Helvetica", textColor=navy, alignment=TA_RIGHT)
     tot_red = S("tr", fontSize=9, fontName="Helvetica", textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT)
@@ -395,7 +422,11 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     if discount > 0:
         disc_label = f"Discount ({sale.discount_note}):" if sale.discount_note else "Discount:"
         totals_rows.append([Paragraph(disc_label, tot_s), Paragraph(f"- NPR {discount:,.2f}", tot_red)])
-    totals_rows.append([Paragraph("Tax (0%):", tot_s), Paragraph("NPR 0.00", tot_v)])
+    if vat_enabled and vat_rate > 0:
+        totals_rows.append([Paragraph(f"Taxable Amount:", tot_s), Paragraph(f"NPR {taxable_amount:,.2f}", tot_v)])
+        totals_rows.append([Paragraph(f"VAT ({vat_rate:.0f}%):", tot_s), Paragraph(f"NPR {vat_amount:,.2f}", tot_v)])
+    else:
+        totals_rows.append([Paragraph("Tax (0%):", tot_s), Paragraph("NPR 0.00", tot_v)])
 
     totals = Table(totals_rows, colWidths=[W * 0.8, W * 0.2])
     totals.setStyle(TableStyle([

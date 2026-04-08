@@ -82,31 +82,65 @@ def create_batches_for_purchase(purchase: Purchase) -> None:
         )
 
 
-def get_credit_records() -> list[dict]:
-    sales = db.session.execute(
-        db.select(Sale).where(Sale.payment_mode == "credit").order_by(Sale.sale_date.desc())
-    ).scalars().all()
-    records = []
-    for sale in sales:
-        paid = db.session.execute(
-            db.select(func.coalesce(func.sum(CustomerCreditPayment.amount), 0)).where(
-                CustomerCreditPayment.sale_id == sale.id
-            )
-        ).scalar() or 0
-        outstanding = max(Decimal("0.00"), _money(sale.total_amount) - _money(paid))
-        records.append(
-            {
-                "sale": sale,
-                "paid_amount": float(_money(paid)),
-                "outstanding_amount": float(outstanding),
-                "payments": db.session.execute(
-                    db.select(CustomerCreditPayment)
-                    .where(CustomerCreditPayment.sale_id == sale.id)
-                    .order_by(CustomerCreditPayment.paid_at.desc())
-                ).scalars().all(),
-            }
+# ---------------------------------------------------------------------------
+# Credit records — single aggregated query (fix #2: N+1)
+# ---------------------------------------------------------------------------
+
+def get_credit_records(page: int = 1, per_page: int = 50) -> dict:
+    """Return paginated credit records with aggregated payment totals in 2 queries."""
+    # Aggregate paid amounts per sale in one query
+    paid_subq = (
+        db.select(
+            CustomerCreditPayment.sale_id,
+            func.coalesce(func.sum(CustomerCreditPayment.amount), 0).label("paid"),
         )
-    return records
+        .group_by(CustomerCreditPayment.sale_id)
+        .subquery()
+    )
+
+    total_count = db.session.execute(
+        db.select(func.count(Sale.id)).where(Sale.payment_mode == "credit")
+    ).scalar() or 0
+
+    sales = db.session.execute(
+        db.select(Sale, func.coalesce(paid_subq.c.paid, 0).label("paid"))
+        .outerjoin(paid_subq, paid_subq.c.sale_id == Sale.id)
+        .where(Sale.payment_mode == "credit")
+        .order_by(Sale.sale_date.desc())
+        .limit(per_page)
+        .offset((page - 1) * per_page)
+    ).all()
+
+    # Fetch payments for visible sales only
+    sale_ids = [row.Sale.id for row in sales]
+    payments_by_sale: dict[int, list] = defaultdict(list)
+    if sale_ids:
+        for payment in db.session.execute(
+            db.select(CustomerCreditPayment)
+            .where(CustomerCreditPayment.sale_id.in_(sale_ids))
+            .order_by(CustomerCreditPayment.paid_at.desc())
+        ).scalars().all():
+            payments_by_sale[payment.sale_id].append(payment)
+
+    records = []
+    for row in sales:
+        sale = row.Sale
+        paid = _money(row.paid)
+        outstanding = max(Decimal("0.00"), _money(sale.total_amount) - paid)
+        records.append({
+            "sale": sale,
+            "paid_amount": float(paid),
+            "outstanding_amount": float(outstanding),
+            "payments": payments_by_sale[sale.id],
+        })
+
+    return {
+        "records": records,
+        "total": total_count,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total_count + per_page - 1) // per_page),
+    }
 
 
 def record_credit_payment(sale_id: int, user_id: int, amount: float, payment_mode: str, note: str | None = None):
@@ -115,8 +149,13 @@ def record_credit_payment(sale_id: int, user_id: int, amount: float, payment_mod
     if amount_decimal <= 0:
         raise ValueError("Payment amount must be greater than zero.")
 
-    outstanding = next(r for r in get_credit_records() if r["sale"].id == sale_id)["outstanding_amount"]
-    if amount_decimal > _money(outstanding):
+    paid = db.session.execute(
+        db.select(func.coalesce(func.sum(CustomerCreditPayment.amount), 0))
+        .where(CustomerCreditPayment.sale_id == sale_id)
+    ).scalar() or 0
+    outstanding = max(Decimal("0.00"), _money(sale.total_amount) - _money(paid))
+
+    if amount_decimal > outstanding:
         raise ValueError("Payment amount cannot exceed the outstanding balance.")
 
     db.session.add(
@@ -128,39 +167,91 @@ def record_credit_payment(sale_id: int, user_id: int, amount: float, payment_mod
             note=(note or "").strip() or None,
         )
     )
-    new_balance = _money(outstanding) - amount_decimal
+    new_balance = outstanding - amount_decimal
     sale.credit_collected = new_balance <= Decimal("0.00")
     db.session.commit()
 
+    # Dismiss stale notification for this sale
+    _dismiss_notification("sale", sale_id)
 
-def get_supplier_balances() -> list[dict]:
-    suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
-    rows = []
-    for supplier in suppliers:
-        purchases = db.session.execute(
-            db.select(Purchase).where(Purchase.supplier_id == supplier.id).order_by(Purchase.purchase_date.desc())
-        ).scalars().all()
-        total_purchases = sum(_money(p.total_cost) for p in purchases)
-        total_paid = db.session.execute(
-            db.select(func.coalesce(func.sum(SupplierPayment.amount), 0)).where(
-                SupplierPayment.supplier_id == supplier.id
-            )
-        ).scalar() or 0
-        rows.append(
-            {
-                "supplier": supplier,
-                "purchases": purchases,
-                "total_purchases": float(total_purchases),
-                "total_paid": float(_money(total_paid)),
-                "outstanding": float(max(Decimal("0.00"), total_purchases - _money(total_paid))),
-                "payments": db.session.execute(
-                    db.select(SupplierPayment)
-                    .where(SupplierPayment.supplier_id == supplier.id)
-                    .order_by(SupplierPayment.paid_at.desc())
-                ).scalars().all(),
-            }
+
+# ---------------------------------------------------------------------------
+# Supplier balances — single aggregated query (fix #2: N+1)
+# ---------------------------------------------------------------------------
+
+def get_supplier_balances(page: int = 1, per_page: int = 50) -> dict:
+    """Return paginated supplier balances with aggregated totals in 2 queries."""
+    paid_subq = (
+        db.select(
+            SupplierPayment.supplier_id,
+            func.coalesce(func.sum(SupplierPayment.amount), 0).label("paid"),
         )
-    return rows
+        .group_by(SupplierPayment.supplier_id)
+        .subquery()
+    )
+    purchase_subq = (
+        db.select(
+            Purchase.supplier_id,
+            func.coalesce(func.sum(Purchase.total_cost), 0).label("total_purchases"),
+        )
+        .group_by(Purchase.supplier_id)
+        .subquery()
+    )
+
+    total_count = db.session.execute(db.select(func.count(Supplier.id))).scalar() or 0
+
+    rows = db.session.execute(
+        db.select(
+            Supplier,
+            func.coalesce(purchase_subq.c.total_purchases, 0).label("total_purchases"),
+            func.coalesce(paid_subq.c.paid, 0).label("total_paid"),
+        )
+        .outerjoin(purchase_subq, purchase_subq.c.supplier_id == Supplier.id)
+        .outerjoin(paid_subq, paid_subq.c.supplier_id == Supplier.id)
+        .order_by(Supplier.name)
+        .limit(per_page)
+        .offset((page - 1) * per_page)
+    ).all()
+
+    supplier_ids = [r.Supplier.id for r in rows]
+    purchases_by_supplier: dict[int, list] = defaultdict(list)
+    payments_by_supplier: dict[int, list] = defaultdict(list)
+    if supplier_ids:
+        for p in db.session.execute(
+            db.select(Purchase)
+            .where(Purchase.supplier_id.in_(supplier_ids))
+            .order_by(Purchase.purchase_date.desc())
+        ).scalars().all():
+            purchases_by_supplier[p.supplier_id].append(p)
+        for sp in db.session.execute(
+            db.select(SupplierPayment)
+            .where(SupplierPayment.supplier_id.in_(supplier_ids))
+            .order_by(SupplierPayment.paid_at.desc())
+        ).scalars().all():
+            payments_by_supplier[sp.supplier_id].append(sp)
+
+    result = []
+    for row in rows:
+        supplier = row.Supplier
+        total_purchases = _money(row.total_purchases)
+        total_paid = _money(row.total_paid)
+        outstanding = max(Decimal("0.00"), total_purchases - total_paid)
+        result.append({
+            "supplier": supplier,
+            "purchases": purchases_by_supplier[supplier.id],
+            "total_purchases": float(total_purchases),
+            "total_paid": float(total_paid),
+            "outstanding": float(outstanding),
+            "payments": payments_by_supplier[supplier.id],
+        })
+
+    return {
+        "rows": result,
+        "total": total_count,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total_count + per_page - 1) // per_page),
+    }
 
 
 def record_supplier_payment(
@@ -174,9 +265,20 @@ def record_supplier_payment(
     amount_decimal = _money(amount)
     if amount_decimal <= 0:
         raise ValueError("Payment amount must be greater than zero.")
-    row = next(r for r in get_supplier_balances() if r["supplier"].id == supplier_id)
-    if amount_decimal > _money(row["outstanding"]):
+
+    paid = db.session.execute(
+        db.select(func.coalesce(func.sum(SupplierPayment.amount), 0))
+        .where(SupplierPayment.supplier_id == supplier_id)
+    ).scalar() or 0
+    total_purchases = db.session.execute(
+        db.select(func.coalesce(func.sum(Purchase.total_cost), 0))
+        .where(Purchase.supplier_id == supplier_id)
+    ).scalar() or 0
+    outstanding = max(Decimal("0.00"), _money(total_purchases) - _money(paid))
+
+    if amount_decimal > outstanding:
         raise ValueError("Payment amount cannot exceed the supplier outstanding balance.")
+
     db.session.add(
         SupplierPayment(
             supplier_id=supplier_id,
@@ -189,6 +291,13 @@ def record_supplier_payment(
     )
     db.session.commit()
 
+    # Dismiss stale notification for this supplier
+    _dismiss_notification("supplier", supplier_id)
+
+
+# ---------------------------------------------------------------------------
+# Cash sessions (fix #3: expense scoped to session window)
+# ---------------------------------------------------------------------------
 
 def get_open_cash_session(user_id: int) -> CashSession | None:
     return db.session.execute(
@@ -214,16 +323,24 @@ def close_cash_session(session_id: int, closing_cash: float, notes: str | None =
     if session.status != "open":
         raise ValueError("This cash session is already closed.")
 
+    closed_at = datetime.now(timezone.utc)
+
+    # Cash sales within the session window only (fix #3)
     cash_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
             Sale.user_id == session.user_id,
             Sale.payment_mode == "cash",
             Sale.sale_date >= session.opened_at,
+            Sale.sale_date <= closed_at,
         )
     ).scalar() or 0
-    session_day = session.opened_at.date()
+
+    # Expenses within the session window only (fix #3)
     expenses = db.session.execute(
-        db.select(func.coalesce(func.sum(Expense.amount), 0)).where(Expense.expense_date == session_day)
+        db.select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.expense_date >= session.opened_at.date(),
+            Expense.expense_date <= closed_at.date(),
+        )
     ).scalar() or 0
 
     expected_cash = _money(session.opening_cash) + _money(cash_sales) - _money(expenses)
@@ -231,7 +348,7 @@ def close_cash_session(session_id: int, closing_cash: float, notes: str | None =
     session.expected_cash = expected_cash
     session.closing_cash = actual_cash
     session.variance = actual_cash - expected_cash
-    session.closed_at = datetime.now(timezone.utc)
+    session.closed_at = closed_at
     session.status = "closed"
     if notes:
         session.notes = (session.notes or "") + ("\n" if session.notes else "") + notes.strip()
@@ -239,53 +356,86 @@ def close_cash_session(session_id: int, closing_cash: float, notes: str | None =
     return session
 
 
+# ---------------------------------------------------------------------------
+# Reorder suggestions — bulk profile load (fix #4: N+1 per product)
+# ---------------------------------------------------------------------------
+
 def get_reorder_suggestions(days: int = 30) -> list[dict]:
     cutoff = date.today() - timedelta(days=days)
     sales_by_product = defaultdict(int)
-    sale_rows = db.session.execute(
+    for product_id, qty in db.session.execute(
         db.select(SaleItem.product_id, func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(func.date(Sale.sale_date) >= cutoff)
         .group_by(SaleItem.product_id)
-    ).all()
-    for product_id, qty in sale_rows:
+    ).all():
         sales_by_product[product_id] = int(qty or 0)
 
-    suggestions = []
+    # Load all profiles in one query (fix #4)
+    profiles_map: dict[int, ProductInventoryProfile] = {
+        p.product_id: p
+        for p in db.session.execute(db.select(ProductInventoryProfile)).scalars().all()
+    }
+
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+
+    # Create missing profiles in bulk
+    new_profiles = []
     for product in products:
-        profile = _profile_for(product.id)
+        if product.id not in profiles_map:
+            profile = ProductInventoryProfile(product_id=product.id)
+            db.session.add(profile)
+            new_profiles.append(profile)
+    if new_profiles:
+        db.session.flush()
+        for p in new_profiles:
+            profiles_map[p.product_id] = p
+
+    suggestions = []
+    for product in products:
+        profile = profiles_map[product.id]
         sold_recently = sales_by_product[product.id]
         daily_avg = sold_recently / days if days else 0
         suggested_qty = max(0, int((daily_avg * 14) + profile.reorder_level - product.quantity))
         if product.quantity <= profile.reorder_level or suggested_qty > 0:
-            suggestions.append(
-                {
-                    "product": product,
-                    "profile": profile,
-                    "sold_recently": sold_recently,
-                    "suggested_qty": suggested_qty,
-                }
-            )
+            suggestions.append({
+                "product": product,
+                "profile": profile,
+                "sold_recently": sold_recently,
+                "suggested_qty": suggested_qty,
+            })
     suggestions.sort(key=lambda row: (row["product"].quantity - row["profile"].reorder_level, row["product"].name))
     return suggestions
 
 
-def award_loyalty_points(customer_name: str | None, sale_id: int, total_amount: float) -> None:
-    customer_name = (customer_name or "").strip()
-    if not customer_name or customer_name.lower() == "walk-in customer":
-        return
-    points = int(_money(total_amount) // Decimal("100"))
+# ---------------------------------------------------------------------------
+# Loyalty — redeem via operations page
+# ---------------------------------------------------------------------------def redeem_loyalty_points(customer_name: str, points: int, note: str | None = None) -> int:
+    """Deduct points for a customer. Returns new balance. Raises ValueError if insufficient."""
+    customer_name = customer_name.strip()
     if points <= 0:
-        return
+        raise ValueError("Redemption points must be greater than zero.")
+    current_balance = _get_loyalty_balance(customer_name)
+    if points > current_balance:
+        raise ValueError(f"Insufficient points. Available: {current_balance}.")
     db.session.add(
         CustomerLoyaltyTransaction(
             customer_name=customer_name,
-            sale_id=sale_id,
-            points_change=points,
-            reason="sale_reward",
+            sale_id=None,
+            points_change=-points,
+            reason=f"redemption{': ' + note.strip() if note else ''}",
         )
     )
+    db.session.commit()
+    return current_balance - points
+
+
+def _get_loyalty_balance(customer_name: str) -> int:
+    result = db.session.execute(
+        db.select(func.coalesce(func.sum(CustomerLoyaltyTransaction.points_change), 0))
+        .where(CustomerLoyaltyTransaction.customer_name == customer_name)
+    ).scalar()
+    return max(0, int(result or 0))
 
 
 def get_loyalty_summary() -> list[dict]:
@@ -301,63 +451,88 @@ def get_loyalty_summary() -> list[dict]:
     return [{"customer_name": r.customer_name, "points": int(r.points), "entries": r.entries} for r in rows]
 
 
+# ---------------------------------------------------------------------------
+# Notifications — stale cleanup (fix #1)
+# ---------------------------------------------------------------------------
+
+def _dismiss_notification(source_type: str, source_id: int) -> None:
+    """Remove resolved notifications so they don't linger."""
+    db.session.execute(
+        db.delete(AppNotification).where(
+            AppNotification.source_type == source_type,
+            AppNotification.source_id == source_id,
+        )
+    )
+    db.session.commit()
+
+
 def ensure_notifications() -> list[AppNotification]:
-    notifications: list[tuple[str, str, str, str, int]] = []
-    for record in get_credit_records():
+    """Rebuild live notifications, removing stale ones first."""
+    # Collect what should exist right now
+    live: list[tuple[str, str, str, str, int]] = []
+
+    # Credits
+    credit_data = get_credit_records(per_page=1000)
+    for record in credit_data["records"]:
         if record["outstanding_amount"] > 0:
-            notifications.append(
-                (
-                    "Overdue credit" if record["sale"].credit_due_date and record["sale"].credit_due_date < date.today() else "Pending credit",
-                    f"Sale #{record['sale'].id} has NPR {record['outstanding_amount']:.2f} pending.",
-                    "warning",
-                    "sale",
-                    record["sale"].id,
-                )
-            )
-    for supplier_row in get_supplier_balances():
-        if supplier_row["outstanding"] > 0:
-            notifications.append(
-                (
-                    "Supplier balance due",
-                    f"{supplier_row['supplier'].name} is owed NPR {supplier_row['outstanding']:.2f}.",
-                    "info",
-                    "supplier",
-                    supplier_row["supplier"].id,
-                )
-            )
+            overdue = record["sale"].credit_due_date and record["sale"].credit_due_date < date.today()
+            live.append((
+                "Overdue credit" if overdue else "Pending credit",
+                f"Sale #{record['sale'].id} has NPR {record['outstanding_amount']:.2f} pending.",
+                "warning",
+                "sale",
+                record["sale"].id,
+            ))
+
+    # Suppliers
+    supplier_data = get_supplier_balances(per_page=1000)
+    for row in supplier_data["rows"]:
+        if row["outstanding"] > 0:
+            live.append((
+                "Supplier balance due",
+                f"{row['supplier'].name} is owed NPR {row['outstanding']:.2f}.",
+                "info",
+                "supplier",
+                row["supplier"].id,
+            ))
+
+    # Reorders
     for suggestion in get_reorder_suggestions():
         if suggestion["suggested_qty"] > 0:
-            notifications.append(
-                (
-                    "Reorder recommended",
-                    f"{suggestion['product'].name}: reorder about {suggestion['suggested_qty']} units.",
-                    "danger" if suggestion["product"].quantity <= suggestion["profile"].reorder_level else "warning",
-                    "product",
-                    suggestion["product"].id,
-                )
-            )
+            live.append((
+                "Reorder recommended",
+                f"{suggestion['product'].name}: reorder about {suggestion['suggested_qty']} units.",
+                "danger" if suggestion["product"].quantity <= suggestion["profile"].reorder_level else "warning",
+                "product",
+                suggestion["product"].id,
+            ))
 
-    existing = {
-        (n.title, n.body, n.source_type, n.source_id)
-        for n in db.session.execute(db.select(AppNotification)).scalars().all()
-    }
-    created = False
-    for title, body, category, source_type, source_id in notifications:
-        key = (title, body, source_type, source_id)
-        if key not in existing:
-            db.session.add(
-                AppNotification(
-                    title=title,
-                    body=body,
-                    category=category,
-                    source_type=source_type,
-                    source_id=source_id,
-                )
-            )
-            created = True
-    if created:
-        db.session.commit()
-    return db.session.execute(db.select(AppNotification).order_by(AppNotification.created_at.desc())).scalars().all()
+    # Build lookup of what should exist: (source_type, source_id) -> (title, body, category)
+    live_keys = {(st, sid): (title, body, cat) for title, body, cat, st, sid in live}
+
+    # Remove notifications whose source is no longer active
+    existing = db.session.execute(db.select(AppNotification)).scalars().all()
+    for n in existing:
+        key = (n.source_type, n.source_id)
+        if key not in live_keys:
+            db.session.delete(n)
+
+    # Add new ones that don't exist yet
+    existing_keys = {(n.source_type, n.source_id) for n in existing}
+    for title, body, category, source_type, source_id in live:
+        if (source_type, source_id) not in existing_keys:
+            db.session.add(AppNotification(
+                title=title,
+                body=body,
+                category=category,
+                source_type=source_type,
+                source_id=source_id,
+            ))
+
+    db.session.commit()
+    return db.session.execute(
+        db.select(AppNotification).order_by(AppNotification.created_at.desc())
+    ).scalars().all()
 
 
 def mark_notification_read(notification_id: int) -> None:
@@ -365,6 +540,17 @@ def mark_notification_read(notification_id: int) -> None:
     notification.is_read = True
     db.session.commit()
 
+
+def mark_all_notifications_read() -> None:
+    db.session.execute(
+        db.update(AppNotification).where(AppNotification.is_read == False).values(is_read=True)
+    )
+    db.session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Branches — toggle active + edit (fix #5)
+# ---------------------------------------------------------------------------
 
 def list_branches() -> list[Branch]:
     return db.session.execute(db.select(Branch).order_by(Branch.name)).scalars().all()
@@ -377,48 +563,98 @@ def create_branch(name: str, code: str, address: str | None = None) -> Branch:
     return branch
 
 
+def update_branch(branch_id: int, name: str, code: str, address: str | None = None) -> Branch:
+    branch = db.get_or_404(Branch, branch_id)
+    branch.name = name.strip()
+    branch.code = code.strip().upper()
+    branch.address = (address or "").strip() or None
+    db.session.commit()
+    return branch
+
+
+def toggle_branch_active(branch_id: int) -> Branch:
+    branch = db.get_or_404(Branch, branch_id)
+    branch.is_active = not branch.is_active
+    db.session.commit()
+    return branch
+
+
+# ---------------------------------------------------------------------------
+# Backup export — extended (fix #7)
+# ---------------------------------------------------------------------------
+
 def export_backup_snapshot() -> bytes:
     snapshot = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "sales": [
             {
-                "id": sale.id,
-                "invoice_number": sale.invoice_number,
-                "total_amount": float(sale.total_amount),
-                "sale_date": sale.sale_date.isoformat() if sale.sale_date else None,
-                "payment_mode": sale.payment_mode,
-                "customer_name": sale.customer_name,
+                "id": s.id,
+                "invoice_number": s.invoice_number,
+                "total_amount": float(s.total_amount),
+                "sale_date": s.sale_date.isoformat() if s.sale_date else None,
+                "payment_mode": s.payment_mode,
+                "customer_name": s.customer_name,
             }
-            for sale in db.session.execute(db.select(Sale).order_by(Sale.id)).scalars().all()
+            for s in db.session.execute(db.select(Sale).order_by(Sale.id)).scalars().all()
         ],
         "purchases": [
             {
-                "id": purchase.id,
-                "supplier_id": purchase.supplier_id,
-                "purchase_date": purchase.purchase_date.isoformat() if purchase.purchase_date else None,
-                "total_cost": float(purchase.total_cost),
+                "id": p.id,
+                "supplier_id": p.supplier_id,
+                "purchase_date": p.purchase_date.isoformat() if p.purchase_date else None,
+                "total_cost": float(p.total_cost),
             }
-            for purchase in db.session.execute(db.select(Purchase).order_by(Purchase.id)).scalars().all()
+            for p in db.session.execute(db.select(Purchase).order_by(Purchase.id)).scalars().all()
         ],
         "products": [
             {
-                "id": product.id,
-                "name": product.name,
-                "sku": product.sku,
-                "quantity": product.quantity,
-                "cost_price": float(product.cost_price),
-                "selling_price": float(product.selling_price),
+                "id": p.id,
+                "name": p.name,
+                "sku": p.sku,
+                "quantity": p.quantity,
+                "cost_price": float(p.cost_price),
+                "selling_price": float(p.selling_price),
             }
-            for product in db.session.execute(db.select(Product).order_by(Product.id)).scalars().all()
+            for p in db.session.execute(db.select(Product).order_by(Product.id)).scalars().all()
         ],
         "customers": [
             {
-                "id": customer.id,
-                "name": customer.name,
-                "phone": customer.phone,
-                "address": customer.address,
+                "id": c.id,
+                "name": c.name,
+                "phone": c.phone,
+                "address": c.address,
             }
-            for customer in db.session.execute(db.select(Customer).order_by(Customer.id)).scalars().all()
+            for c in db.session.execute(db.select(Customer).order_by(Customer.id)).scalars().all()
+        ],
+        "suppliers": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "phone": getattr(s, "phone", None),
+                "address": getattr(s, "address", None),
+            }
+            for s in db.session.execute(db.select(Supplier).order_by(Supplier.id)).scalars().all()
+        ],
+        "expenses": [
+            {
+                "id": e.id,
+                "amount": float(e.amount),
+                "category": getattr(e, "category", None),
+                "note": getattr(e, "note", None),
+                "expense_date": e.expense_date.isoformat() if e.expense_date else None,
+            }
+            for e in db.session.execute(db.select(Expense).order_by(Expense.id)).scalars().all()
+        ],
+        "loyalty_transactions": [
+            {
+                "id": lt.id,
+                "customer_name": lt.customer_name,
+                "sale_id": lt.sale_id,
+                "points_change": lt.points_change,
+                "reason": lt.reason,
+                "created_at": lt.created_at.isoformat(),
+            }
+            for lt in db.session.execute(db.select(CustomerLoyaltyTransaction).order_by(CustomerLoyaltyTransaction.id)).scalars().all()
         ],
     }
     return json.dumps(snapshot, indent=2).encode("utf-8")

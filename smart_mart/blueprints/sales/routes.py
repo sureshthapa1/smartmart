@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -121,8 +121,64 @@ def print_invoice(sale_id):
     return render_template("sales/print_invoice.html", sale=sale, shop=shop)
 
 
-@sales_bp.route("/<int:sale_id>/delete", methods=["POST"])
-@admin_required
+@sales_bp.route("/<int:sale_id>/receipt")
+@login_required
+def thermal_receipt(sale_id):
+    """58mm thermal receipt — compact print layout."""
+    sale = sales_manager.get_sale(sale_id)
+    from ...models.shop_settings import ShopSettings
+    try:
+        shop = ShopSettings.get()
+    except Exception:
+        shop = None
+    return render_template("sales/thermal_receipt.html", sale=sale, shop=shop)
+
+
+@sales_bp.route("/customer-statement")
+@login_required
+def customer_statement():
+    """Per-customer purchase history, credit, and loyalty statement."""
+    from ...models.customer import Customer
+    from ...models.operations import CustomerLoyaltyTransaction, CustomerCreditPayment
+    from sqlalchemy import func
+
+    customer_name = request.args.get("name", "").strip()
+    customers = db.session.execute(
+        db.select(Customer).order_by(Customer.name)
+    ).scalars().all()
+
+    statement = None
+    if customer_name:
+        sales = db.session.execute(
+            db.select(Sale)
+            .where(func.lower(Sale.customer_name) == customer_name.lower())
+            .order_by(Sale.sale_date.desc())
+        ).scalars().all()
+
+        total_spent = sum(float(s.total_amount) for s in sales)
+        total_discounts = sum(float(s.discount_amount or 0) for s in sales)
+        credit_sales = [s for s in sales if s.payment_mode == "credit"]
+        outstanding = sum(float(s.total_amount) for s in credit_sales if not s.credit_collected)
+
+        loyalty_points = db.session.execute(
+            db.select(func.coalesce(func.sum(CustomerLoyaltyTransaction.points_change), 0))
+            .where(CustomerLoyaltyTransaction.customer_name == customer_name)
+        ).scalar() or 0
+
+        statement = {
+            "customer_name": customer_name,
+            "sales": sales,
+            "total_spent": total_spent,
+            "total_discounts": total_discounts,
+            "total_transactions": len(sales),
+            "outstanding_credit": outstanding,
+            "loyalty_points": int(loyalty_points),
+        }
+
+    return render_template("sales/customer_statement.html",
+                           customers=customers, statement=statement,
+                           customer_name=customer_name,
+                           today=date.today())
 def delete_sale(sale_id):
     try:
         sales_manager.delete_sale(sale_id)

@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for, abort
 from flask_login import current_user
 
 from ...services.decorators import login_required
@@ -10,6 +10,11 @@ returns_bp = Blueprint("returns", __name__, url_prefix="/returns")
 @returns_bp.route("/")
 @login_required
 def list_returns():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_view_returns:
+            abort(403)
     returns = returns_manager.list_returns()
     return render_template("returns/list.html", returns=returns)
 
@@ -17,6 +22,11 @@ def list_returns():
 @returns_bp.route("/sale/<int:sale_id>/create", methods=["GET", "POST"])
 @login_required
 def create_return(sale_id):
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_create_return:
+            abort(403)
     sale = returns_manager.get_sale(sale_id)
     returnable_items = returns_manager.returnable_items_for_sale(sale_id)
 

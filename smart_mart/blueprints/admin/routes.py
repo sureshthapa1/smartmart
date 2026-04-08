@@ -216,7 +216,15 @@ PERMISSION_GROUPS = {
         ("can_view_purchases", "View Purchases"),
         ("can_create_purchase", "Create Purchases"),
         ("can_bulk_upload_purchases", "Bulk Upload Purchases"),
-        ("can_manage_suppliers", "Manage Suppliers"),
+        ("can_manage_suppliers", "View & Manage Suppliers"),
+    ],
+    "Returns": [
+        ("can_view_returns", "View Returns"),
+        ("can_create_return", "Process Returns"),
+    ],
+    "Online Orders": [
+        ("can_view_online_orders", "View Online Orders"),
+        ("can_manage_online_orders", "Create / Update Orders & Payment"),
     ],
     "Other": [
         ("can_view_alerts", "View Alerts"),

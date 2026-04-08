@@ -14,6 +14,11 @@ class ShopSettings(db.Model):
     invoice_prefix = db.Column(db.String(10), default="INV")
     invoice_counter = db.Column(db.Integer, default=1)
     footer_note = db.Column(db.String(255), default="Thank you for shopping with us!")
+    vat_enabled = db.Column(db.Boolean, default=False)
+    vat_rate = db.Column(db.Numeric(5, 2), default=13.00)  # Nepal standard 13%
+    vat_number = db.Column(db.String(50), nullable=True)
+    currency_symbol = db.Column(db.String(10), default="NPR")
+    low_stock_threshold = db.Column(db.Integer, default=10)
 
     @classmethod
     def get(cls):

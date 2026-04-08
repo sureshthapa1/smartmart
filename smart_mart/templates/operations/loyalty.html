@@ -3,23 +3,55 @@
 {% block page_title %}Loyalty{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Loyalty</li>{% endblock %}
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-header fw-semibold">Customer Loyalty Points</div>
-  <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead><tr><th>Customer</th><th class="text-end">Points</th><th class="text-end">Entries</th></tr></thead>
-      <tbody>
-      {% for row in loyalty %}
-        <tr>
-          <td>{{ row.customer_name }}</td>
-          <td class="text-end fw-semibold">{{ row.points }}</td>
-          <td class="text-end">{{ row.entries }}</td>
-        </tr>
-      {% else %}
-        <tr><td colspan="3" class="text-center text-muted py-4">No loyalty activity yet.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Redeem Points</div>
+      <div class="card-body">
+        <form method="post" class="row g-3">
+          <div class="col-12">
+            <label class="form-label small text-muted">Customer Name</label>
+            <input name="customer_name" class="form-control" placeholder="Enter customer name" required list="customerList">
+            <datalist id="customerList">
+              {% for row in loyalty %}<option value="{{ row.customer_name }}">{% endfor %}
+            </datalist>
+          </div>
+          <div class="col-12">
+            <label class="form-label small text-muted">Points to Redeem</label>
+            <input type="number" name="points" min="1" class="form-control" placeholder="e.g. 50" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label small text-muted">Note (optional)</label>
+            <input name="note" class="form-control" placeholder="Reason for redemption">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-warning w-100" type="submit">Redeem Points</button>
+          </div>
+        </form>
+        <div class="mt-3 text-muted small">1 point = NPR 1 discount &bull; Earned at 1 pt per NPR 100 spent</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Customer Loyalty Points</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Customer</th><th class="text-end">Points Balance</th><th class="text-end">Transactions</th></tr></thead>
+          <tbody>
+          {% for row in loyalty %}
+            <tr>
+              <td>{{ row.customer_name }}</td>
+              <td class="text-end fw-semibold {% if row.points > 0 %}text-success{% elif row.points < 0 %}text-danger{% endif %}">{{ row.points }}</td>
+              <td class="text-end">{{ row.entries }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No loyalty activity yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone, date, timedelta
 
-from flask import Blueprint, Response, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, jsonify, redirect, render_template, request, url_for, abort
 from flask_login import current_user
 from sqlalchemy import and_, func
 
@@ -32,6 +32,11 @@ def _gen_order_number() -> str:
 @online_orders_bp.route("/")
 @login_required
 def list_orders():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_view_online_orders:
+            abort(403)
     status_filter = request.args.get("status", "")
     search = request.args.get("q", "").strip()
     start_raw = request.args.get("start_date", "")
@@ -81,6 +86,11 @@ def list_orders():
 @online_orders_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_order():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_online_orders:
+            abort(403)
     products = db.session.execute(
         db.select(Product).where(Product.quantity > 0).order_by(Product.name)
     ).scalars().all()
@@ -179,6 +189,11 @@ def order_detail(order_id):
 @online_orders_bp.route("/<int:order_id>/status", methods=["POST"])
 @login_required
 def update_status(order_id):
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_online_orders:
+            abort(403)
     order = db.get_or_404(OnlineOrder, order_id)
     new_status = request.form.get("status", "")
     note = request.form.get("note", "").strip()
@@ -214,6 +229,11 @@ def update_status(order_id):
 @online_orders_bp.route("/<int:order_id>/payment", methods=["POST"])
 @login_required
 def update_payment(order_id):
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_online_orders:
+            abort(403)
     order = db.get_or_404(OnlineOrder, order_id)
     order.payment_status = request.form.get("payment_status", order.payment_status)
     db.session.commit()

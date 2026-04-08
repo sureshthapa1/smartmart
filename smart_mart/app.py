@@ -46,6 +46,17 @@ def create_app(config_name="development"):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        # Allow CDN resources used by the app
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; "
+            "font-src 'self' fonts.gstatic.com cdn.jsdelivr.net; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self';"
+        )
         return response
 
     # ── Auto-create DB tables on first request ────────────────────────────
@@ -85,7 +96,16 @@ def create_app(config_name="development"):
             from flask_login import current_user
             if current_user.is_authenticated:
                 from .services.alert_engine import get_low_stock_alerts, get_expiry_alerts
-                count = len(get_low_stock_alerts()) + len(get_expiry_alerts())
+                from .models.dismissed_alert import DismissedAlert
+                dismissed = set(
+                    db.session.execute(
+                        db.select(DismissedAlert.alert_key)
+                        .where(DismissedAlert.user_id == current_user.id)
+                    ).scalars().all()
+                )
+                low_stock = [p for p in get_low_stock_alerts() if f"low_stock:{p.id}" not in dismissed]
+                expiry = [p for p in get_expiry_alerts() if f"expiry:{p.id}" not in dismissed]
+                count = len(low_stock) + len(expiry)
                 return {"global_alert_count": count}
         except Exception:
             pass
@@ -138,6 +158,9 @@ def _register_blueprints(app):
         (".blueprints.operations", "operations_bp"),
         (".blueprints.api", "api_bp"),
         (".blueprints.expenses", "expenses_bp"),
+        (".blueprints.advisor", "advisor_bp"),
+        (".blueprints.purchase_orders", "po_bp"),
+        (".blueprints.transfers", "transfers_bp"),
     ]
 
     for module_path, bp_name in blueprints:

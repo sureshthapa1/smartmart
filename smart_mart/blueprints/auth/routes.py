@@ -1,5 +1,6 @@
 """Auth blueprint — login and logout routes."""
 
+from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
@@ -20,7 +21,7 @@ def login():
         from ...services.authenticator import is_rate_limited, _get_client_ip
         if is_rate_limited(_get_client_ip()):
             flash("Too many failed login attempts. Please wait 10 minutes and try again.", "danger")
-            return render_template("auth/login.html")
+            return render_template("auth/login.html", now=datetime.now())
 
         user = authenticator.login(username, password)
         if user is not None:
@@ -28,7 +29,7 @@ def login():
 
         flash("Invalid username or password.", "danger")
 
-    return render_template("auth/login.html")
+    return render_template("auth/login.html", now=datetime.now())
 
 
 @auth_bp.route("/logout")

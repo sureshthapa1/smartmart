@@ -4,15 +4,26 @@
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Credit Ledger</li>{% endblock %}
 {% block content %}
 <div class="card shadow-sm">
-  <div class="card-header fw-semibold">Outstanding Credit Sales</div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Outstanding Credit Sales</span>
+    <small class="text-muted">{{ data.total }} record{{ 's' if data.total != 1 }}</small>
+  </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Sale</th><th>Customer</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th><th>Receive Payment</th></tr></thead>
+      <thead><tr><th>Sale</th><th>Customer</th><th>Due Date</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th><th>Receive Payment</th></tr></thead>
       <tbody>
-        {% for row in records %}
+        {% for row in data.records %}
         <tr>
           <td><a href="{{ url_for('sales.sale_detail', sale_id=row.sale.id) }}" class="text-decoration-none">#{{ row.sale.id }}</a></td>
           <td>{{ row.sale.customer_name or 'Walk-in' }}</td>
+          <td>
+            {% if row.sale.credit_due_date %}
+              {% set overdue = row.outstanding_amount > 0 and row.sale.credit_due_date < today %}
+              <span class="{{ 'text-danger fw-semibold' if overdue else '' }}">
+                {{ row.sale.credit_due_date.strftime('%Y-%m-%d') }}{% if overdue %} ⚠{% endif %}
+              </span>
+            {% else %}-{% endif %}
+          </td>
           <td class="text-end">NPR {{ "%.2f"|format(row.sale.total_amount|float) }}</td>
           <td class="text-end">NPR {{ "%.2f"|format(row.paid_amount) }}</td>
           <td class="text-end fw-semibold {% if row.outstanding_amount > 0 %}text-warning{% else %}text-success{% endif %}">NPR {{ "%.2f"|format(row.outstanding_amount) }}</td>
@@ -20,8 +31,8 @@
             {% if row.outstanding_amount > 0 %}
             <form method="post" class="d-flex gap-2">
               <input type="hidden" name="sale_id" value="{{ row.sale.id }}">
-              <input type="number" name="amount" step="0.01" min="0.01" max="{{ row.outstanding_amount }}" class="form-control form-control-sm" placeholder="Amount">
-              <select name="payment_mode" class="form-select form-select-sm">
+              <input type="number" name="amount" step="0.01" min="0.01" max="{{ row.outstanding_amount }}" class="form-control form-control-sm" placeholder="Amount" style="width:110px">
+              <select name="payment_mode" class="form-select form-select-sm" style="width:90px">
                 <option value="cash">Cash</option>
                 <option value="qr">QR</option>
                 <option value="card">Card</option>
@@ -34,10 +45,21 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No credit sales yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No credit sales yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if data.pages > 1 %}
+  <div class="card-footer d-flex justify-content-center">
+    <nav><ul class="pagination pagination-sm mb-0">
+      {% for p in range(1, data.pages + 1) %}
+      <li class="page-item {% if p == data.page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('operations.credits', page=p) }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+    </ul></nav>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

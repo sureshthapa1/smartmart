@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Anomaly Detection — Smart Mart{% endblock %}
+{% block page_title %}Anomaly Detection{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item">AI</li><li class="breadcrumb-item active">Anomalies</li>{% endblock %}
+{% block content %}
+<div class="row g-3">
+  {% set sections = [
+    ('price_anomalies',    'Price Anomalies',          'bi-tag-fill',              'warning', 'Products sold at unusual prices'),
+    ('sales_spikes',       'Sales Spikes',             'bi-graph-up-arrow',        'success', 'Unusually high sales volume'),
+    ('suspicious_discounts','Suspicious Discounts',    'bi-percent',               'danger',  'Discounts that look abnormal'),
+    ('off_hours_transactions','Off-Hours Transactions','bi-clock-history',         'info',    'Sales outside normal business hours'),
+  ] %}
+  {% for key, title, icon, color, desc in sections %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <div style="width:32px;height:32px;border-radius:8px;background:rgba(var(--bs-{{ color }}-rgb),.1);display:flex;align-items:center;justify-content:center">
+          <i class="bi {{ icon }} text-{{ color }}"></i>
+        </div>
+        <div>
+          <span class="fw-semibold">{{ title }}</span>
+          <span class="text-muted small ms-2">{{ desc }}</span>
+        </div>
+        <span class="badge bg-{{ color }} ms-auto">{{ report[key]|length if report[key] else 0 }}</span>
+      </div>
+      {% if report[key] %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              {% for col in report[key][0].keys() %}
+              <th>{{ col | replace('_',' ') | title }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report[key] %}
+            <tr>
+              {% for val in row.values() %}
+              <td class="small">{{ val }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center text-muted py-4">
+        <i class="bi bi-check-circle text-success me-1"></i>No {{ title | lower }} detected.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

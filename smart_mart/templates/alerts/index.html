@@ -5,6 +5,22 @@
 
 {% block content %}
 {% from 'macros/product_icon.html' import product_icon_cell %}
+
+{% set total_active = (alerts.low_stock | selectattr('id') | list | length)
+   + (alerts.expiry | selectattr('id') | list | length) %}
+
+<div class="d-flex justify-content-end mb-3">
+  {% if total_active > 0 %}
+  <form method="post" action="{{ url_for('alerts.dismiss') }}">
+    <button class="btn btn-outline-secondary btn-sm" type="submit">
+      <i class="bi bi-check2-all me-1"></i>Mark All as Read
+    </button>
+  </form>
+  {% else %}
+  <span class="text-muted small"><i class="bi bi-check-circle text-success me-1"></i>All alerts cleared</span>
+  {% endif %}
+</div>
+
 <div class="row g-4">
 
   <!-- Low Stock -->

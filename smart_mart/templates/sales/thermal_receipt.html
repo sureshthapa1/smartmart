@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt #{{ sale.invoice_number or sale.id }}</title>
+  <style>
+    @page { size: 80mm auto; margin: 0 }
+    * { box-sizing: border-box; margin: 0; padding: 0 }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: 80mm; padding: 4mm; color: #000; background: #fff }
+    .center { text-align: center }
+    .right { text-align: right }
+    .bold { font-weight: bold }
+    .shop-name { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .divider { border-top: 1px dashed #000; margin: 4px 0 }
+    .divider-solid { border-top: 1px solid #000; margin: 4px 0 }
+    table { width: 100%; border-collapse: collapse }
+    td { padding: 1px 0; vertical-align: top }
+    .item-name { width: 55% }
+    .item-qty { width: 10%; text-align: center }
+    .item-price { width: 15%; text-align: right }
+    .item-total { width: 20%; text-align: right }
+    .total-row td { font-weight: bold; font-size: 13px; padding-top: 3px }
+    .footer { text-align: center; font-size: 10px; margin-top: 6px }
+    @media print {
+      body { width: 80mm }
+      .no-print { display: none }
+    }
+  </style>
+</head>
+<body>
+  <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+  {% if shop and shop.address %}<div class="center" style="font-size:10px">{{ shop.address }}</div>{% endif %}
+  {% if shop and shop.phone %}<div class="center" style="font-size:10px">Tel: {{ shop.phone }}</div>{% endif %}
+  {% if shop and shop.pan_number %}<div class="center" style="font-size:10px">PAN: {{ shop.pan_number }}</div>{% endif %}
+  {% if shop and shop.vat_enabled and shop.vat_number %}<div class="center" style="font-size:10px">VAT No: {{ shop.vat_number }}</div>{% endif %}
+
+  <div class="divider-solid"></div>
+  <div class="center bold">RECEIPT</div>
+  <div class="divider"></div>
+
+  <table>
+    <tr><td>Invoice:</td><td class="right">{{ sale.invoice_number or '#' ~ sale.id }}</td></tr>
+    <tr><td>Date:</td><td class="right">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    {% if sale.customer_name %}<tr><td>Customer:</td><td class="right">{{ sale.customer_name }}</td></tr>{% endif %}
+    <tr><td>Payment:</td><td class="right">{{ sale.payment_mode | upper }}</td></tr>
+  </table>
+
+  <div class="divider"></div>
+  <table>
+    <tr>
+      <td class="item-name bold">Item</td>
+      <td class="item-qty bold">Qty</td>
+      <td class="item-price bold">Price</td>
+      <td class="item-total bold">Total</td>
+    </tr>
+  </table>
+  <div class="divider"></div>
+  <table>
+    {% set subtotal = namespace(val=0) %}
+    {% for item in sale.items %}
+    {% set subtotal.val = subtotal.val + item.subtotal|float %}
+    <tr>
+      <td class="item-name">{{ item.product.name[:20] if item.product else 'Item' }}</td>
+      <td class="item-qty">{{ item.quantity }}</td>
+      <td class="item-price">{{ "%.0f"|format(item.unit_price|float) }}</td>
+      <td class="item-total">{{ "%.0f"|format(item.subtotal|float) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="divider"></div>
+  <table>
+    <tr><td>Subtotal</td><td class="right">NPR {{ "%.2f"|format(subtotal.val) }}</td></tr>
+    {% if sale.discount_amount and sale.discount_amount|float > 0 %}
+    <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note[:15] }}){% endif %}</td><td class="right">- NPR {{ "%.2f"|format(sale.discount_amount|float) }}</td></tr>
+    {% endif %}
+    {% if shop and shop.vat_enabled %}
+    {% set vat_rate = shop.vat_rate|float %}
+    {% set vat_amount = sale.total_amount|float * vat_rate / (100 + vat_rate) %}
+    <tr><td>VAT ({{ vat_rate|int }}%)</td><td class="right">NPR {{ "%.2f"|format(vat_amount) }}</td></tr>
+    {% endif %}
+    <tr class="total-row"><td>TOTAL</td><td class="right">NPR {{ "%.2f"|format(sale.total_amount|float) }}</td></tr>
+  </table>
+
+  <div class="divider-solid"></div>
+  <div class="footer">
+    {{ shop.footer_note if shop and shop.footer_note else 'Thank you for shopping with us!' }}<br>
+    <span style="font-size:9px">Printed: {{ now.strftime('%Y-%m-%d %H:%M') if now else '' }}</span>
+  </div>
+
+  <div class="no-print" style="margin-top:12px;text-align:center">
+    <button onclick="window.print()" style="padding:8px 20px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">
+      🖨️ Print Receipt
+    </button>
+    <button onclick="window.close()" style="padding:8px 16px;background:#f1f5f9;color:#475569;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px">
+      Close
+    </button>
+  </div>
+  <script>
+    const now = new Date();
+    document.querySelectorAll('[data-now]').forEach(el => el.textContent = now.toLocaleString());
+  </script>
+</body>
+</html>

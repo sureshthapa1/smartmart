@@ -59,6 +59,11 @@
   <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary quick-btn">
     <i class="bi bi-box-seam me-1"></i>Inventory
   </a>
+  {% if current_user.role == 'admin' %}
+  <a href="{{ url_for('advisor.index') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#6366f1;color:#6366f1">
+    <i class="bi bi-stars me-1"></i>Business Advisor
+  </a>
+  {% endif %}
 </div>
 
 <!-- Smart Insights -->
@@ -75,45 +80,43 @@
 <!-- Top Metric Cards Row 1 -->
 <div class="row g-3 mb-3">
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #22c55e!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-cart-check me-1"></i>Today's Sales</div>
-        <div class="fs-4 fw-bold text-success">NPR {{ "%.0f"|format(today_sales) }}</div>
-        <div class="text-muted" style="font-size:.75rem;">{{ today_sales_count }} transaction{{ 's' if today_sales_count != 1 else '' }}</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-cart-check me-1"></i>Today's Sales</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(today_sales) }}</div>
+        <div class="stat-sub">{{ today_sales_count }} transaction{{ 's' if today_sales_count != 1 else '' }}</div>
+        <div class="stat-bg">💰</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #6366f1!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-graph-up me-1"></i>Today's Profit</div>
-        <div class="fs-4 fw-bold {% if today_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
-          NPR {{ "%.0f"|format(today_profit) }}
-        </div>
-        <div class="text-muted" style="font-size:.75rem;">Sales minus cost</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-graph-up me-1"></i>Today's Profit</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(today_profit) }}</div>
+        <div class="stat-sub">Sales minus cost</div>
+        <div class="stat-bg">📈</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #0ea5e9!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-wallet2 me-1"></i>Cash Balance</div>
-        <div class="fs-4 fw-bold {% if cash_balance >= 0 %}text-info{% else %}text-danger{% endif %}">
-          NPR {{ "%.0f"|format(cash_balance) }}
-        </div>
-        <div class="text-muted" style="font-size:.75rem;">Revenue minus expenses</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-wallet2 me-1"></i>Cash Balance</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(cash_balance) }}</div>
+        <div class="stat-sub">Revenue minus expenses</div>
+        <div class="stat-bg">🏦</div>
       </div>
     </div>
   </div>
   {% if current_user.role == 'admin' %}
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #a855f7!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-graph-up-arrow me-1"></i>Monthly Profit</div>
-        <div class="fs-4 fw-bold {% if monthly_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-          NPR {{ "%.0f"|format(monthly_profit) }}
-        </div>
-        <div class="text-muted" style="font-size:.75rem;">This month</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#7e22ce">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-graph-up-arrow me-1"></i>Monthly Profit</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(monthly_profit) }}</div>
+        <div class="stat-sub">This month</div>
+        <div class="stat-bg">🎯</div>
       </div>
     </div>
   </div>
@@ -123,38 +126,42 @@
 <!-- Metric Cards Row 2 -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #f59e0b!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-receipt me-1"></i>Total Sales</div>
-        <div class="fs-4 fw-bold text-warning">{{ total_sales_count }}</div>
-        <div class="text-muted" style="font-size:.75rem;">All time transactions</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#92400e">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-receipt me-1"></i>Total Sales</div>
+        <div class="stat-value">{{ total_sales_count }}</div>
+        <div class="stat-sub">All time transactions</div>
+        <div class="stat-bg">🧾</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #f97316!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-currency-exchange me-1"></i>Stock Value</div>
-        <div class="fs-4 fw-bold" style="color:#f97316;">NPR {{ "%.0f"|format(stock_value) }}</div>
-        <div class="text-muted" style="font-size:.75rem;">{{ total_products }} products</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#9a3412">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-currency-exchange me-1"></i>Stock Value</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(stock_value) }}</div>
+        <div class="stat-sub">{{ total_products }} products</div>
+        <div class="stat-bg">📦</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #0ea5e9!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-calendar-week me-1"></i>This Week</div>
-        <div class="fs-4 fw-bold text-info">NPR {{ "%.0f"|format(weekly_sales) }}</div>
-        <div class="text-muted" style="font-size:.75rem;">{{ weekly_sales_count }} sales</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe);color:#155e75">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-calendar-week me-1"></i>This Week</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(weekly_sales) }}</div>
+        <div class="stat-sub">{{ weekly_sales_count }} sales</div>
+        <div class="stat-bg">📅</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-xl-3">
-    <div class="card shadow-sm metric-card h-100" style="border-left:4px solid #8b5cf6!important;">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-calendar-month me-1"></i>This Month</div>
-        <div class="fs-4 fw-bold" style="color:#8b5cf6;">NPR {{ "%.0f"|format(monthly_sales) }}</div>
-        <div class="text-muted" style="font-size:.75rem;">{{ monthly_sales_count }} sales</div>
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#6b21a8">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-calendar-month me-1"></i>This Month</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(monthly_sales) }}</div>
+        <div class="stat-sub">{{ monthly_sales_count }} sales</div>
+        <div class="stat-bg">🗓️</div>
       </div>
     </div>
   </div>

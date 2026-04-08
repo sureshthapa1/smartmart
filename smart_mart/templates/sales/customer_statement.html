@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Customer Statement — Smart Mart{% endblock %}
+{% block page_title %}Customer Statement{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">Sales</a></li><li class="breadcrumb-item active">Customer Statement</li>{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Select Customer</div>
+      <div class="card-body">
+        <form method="get" class="row g-2">
+          <div class="col-12">
+            <input type="text" name="name" class="form-control" placeholder="Customer name..." value="{{ customer_name }}" list="custList" autocomplete="off">
+            <datalist id="custList">{% for c in customers %}<option value="{{ c.name }}">{% endfor %}</datalist>
+          </div>
+          <div class="col-12"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-1"></i>Load Statement</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% if statement %}
+  <div class="col-lg-8">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <div class="card text-center p-3">
+          <div style="font-size:1.6rem;font-weight:800;color:#6366f1">{{ statement.total_transactions }}</div>
+          <div class="text-muted small">Visits</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center p-3">
+          <div style="font-size:1.4rem;font-weight:800;color:#22c55e">NPR {{ "%.0f"|format(statement.total_spent) }}</div>
+          <div class="text-muted small">Total Spent</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center p-3">
+          <div style="font-size:1.4rem;font-weight:800;color:{% if statement.outstanding_credit > 0 %}#ef4444{% else %}#22c55e{% endif %}">NPR {{ "%.0f"|format(statement.outstanding_credit) }}</div>
+          <div class="text-muted small">Outstanding Credit</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card text-center p-3">
+          <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">{{ statement.loyalty_points }}</div>
+          <div class="text-muted small">Loyalty Points</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if statement %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div style="font-size:1rem;font-weight:700">{{ statement.customer_name }}</div>
+  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print</button>
+</div>
+<div class="card">
+  <div class="card-header fw-semibold">Purchase History</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th class="text-end">Amount</th><th class="text-end">Discount</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for s in statement.sales %}
+        <tr>
+          <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="text-decoration-none fw-semibold">{{ s.invoice_number or '#' ~ s.id }}</a></td>
+          <td class="text-muted small">{{ s.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>
+            <span class="badge bg-light text-dark border">
+              {% if s.payment_mode == 'cash' %}💵{% elif s.payment_mode == 'qr' %}📱{% elif s.payment_mode == 'card' %}💳{% elif s.payment_mode == 'credit' %}📋{% else %}🔄{% endif %}
+              {{ s.payment_mode | capitalize }}
+            </span>
+          </td>
+          <td class="text-end fw-semibold">NPR {{ "%.2f"|format(s.total_amount|float) }}</td>
+          <td class="text-end text-muted">{% if s.discount_amount and s.discount_amount|float > 0 %}NPR {{ "%.2f"|format(s.discount_amount|float) }}{% else %}—{% endif %}</td>
+          <td>
+            {% if s.payment_mode == 'credit' %}
+              {% if s.credit_collected %}<span class="badge bg-success">Collected</span>
+              {% elif s.credit_due_date and s.credit_due_date < today %}<span class="badge bg-danger">Overdue</span>
+              {% else %}<span class="badge bg-warning text-dark">Pending</span>{% endif %}
+            {% else %}<span class="badge bg-success">Paid</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No purchases found.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if statement.sales %}
+      <tfoot style="border-top:2px solid #e2e8f0">
+        <tr>
+          <td colspan="3" class="fw-bold text-end">Total</td>
+          <td class="text-end fw-bold">NPR {{ "%.2f"|format(statement.total_spent) }}</td>
+          <td class="text-end fw-bold text-muted">NPR {{ "%.2f"|format(statement.total_discounts) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% elif customer_name %}
+<div class="card"><div class="card-body text-center text-muted py-5">No records found for "{{ customer_name }}".</div></div>
+{% else %}
+<div class="card"><div class="card-body text-center text-muted py-5"><i class="bi bi-person-lines-fill fs-1 d-block mb-2 text-muted"></i>Select a customer to view their statement.</div></div>
+{% endif %}
+{% endblock %}

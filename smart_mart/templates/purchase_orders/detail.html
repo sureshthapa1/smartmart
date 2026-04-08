@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ po.po_number }} — Smart Mart{% endblock %}
+{% block page_title %}{{ po.po_number }}{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('purchase_orders.list_pos') }}" class="text-decoration-none">Purchase Orders</a></li><li class="breadcrumb-item active">{{ po.po_number }}</li>{% endblock %}
+{% block content %}
+{% set label, color = po.status_label %}
+<div class="row g-3 mb-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">{{ po.po_number }}</span>
+        <span class="badge bg-{{ color }} fs-6">{{ label }}</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><div class="text-muted small">Supplier</div><div class="fw-semibold">{{ po.supplier.name }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">Created by</div><div class="fw-semibold">{{ po.creator.username }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">Expected Date</div><div class="fw-semibold">{{ po.expected_date.strftime('%Y-%m-%d') if po.expected_date else '—' }}</div></div>
+          {% if po.sent_at %}<div class="col-md-4"><div class="text-muted small">Sent At</div><div class="fw-semibold">{{ po.sent_at.strftime('%Y-%m-%d %H:%M') }}</div></div>{% endif %}
+          {% if po.received_at %}<div class="col-md-4"><div class="text-muted small">Received At</div><div class="fw-semibold">{{ po.received_at.strftime('%Y-%m-%d %H:%M') }}</div></div>{% endif %}
+          {% if po.notes %}<div class="col-12"><div class="text-muted small">Notes</div><div>{{ po.notes }}</div></div>{% endif %}
+        </div>
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead><tr><th>Product</th><th class="text-end">Ordered</th><th class="text-end">Received</th><th class="text-end">Unit Cost</th><th class="text-end">Subtotal</th></tr></thead>
+            <tbody>
+              {% for item in po.items %}
+              <tr>
+                <td>{{ item.product.name if item.product else '—' }}</td>
+                <td class="text-end">{{ item.quantity_ordered }}</td>
+                <td class="text-end">
+                  <span class="{% if item.quantity_received >= item.quantity_ordered %}text-success{% elif item.quantity_received > 0 %}text-warning{% endif %}">{{ item.quantity_received }}</span>
+                </td>
+                <td class="text-end">NPR {{ "%.2f"|format(item.unit_cost|float) }}</td>
+                <td class="text-end">NPR {{ "%.2f"|format(item.unit_cost|float * item.quantity_ordered) }}</td>
+              </tr>
+              {% endfor %}
+              <tr style="border-top:2px solid #e2e8f0">
+                <td colspan="4" class="text-end fw-bold">Total</td>
+                <td class="text-end fw-bold">NPR {{ "%.2f"|format(po.total_cost) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Actions</div>
+      <div class="card-body d-flex flex-column gap-2">
+        {% if po.status == 'draft' %}
+        <form method="post" action="{{ url_for('purchase_orders.send_po', po_id=po.id) }}">
+          <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send me-1"></i>Mark as Sent</button>
+        </form>
+        {% endif %}
+        {% if po.status in ('sent', 'partial') %}
+        <button class="btn btn-success w-100" data-bs-toggle="collapse" data-bs-target="#receiveForm">
+          <i class="bi bi-box-arrow-in-down me-1"></i>Receive Goods
+        </button>
+        <div class="collapse" id="receiveForm">
+          <form method="post" action="{{ url_for('purchase_orders.receive_po', po_id=po.id) }}" class="mt-2">
+            {% for item in po.items %}
+            <div class="mb-2">
+              <label class="form-label small">{{ item.product.name if item.product else '—' }} (ordered: {{ item.quantity_ordered }}, received: {{ item.quantity_received }})</label>
+              <input type="number" name="qty_{{ item.id }}" class="form-control form-control-sm" min="0" max="{{ item.quantity_ordered - item.quantity_received }}" value="0">
+            </div>
+            {% endfor %}
+            <button class="btn btn-success w-100 mt-2" type="submit">Confirm Receipt</button>
+          </form>
+        </div>
+        {% endif %}
+        {% if po.status not in ('received', 'cancelled') %}
+        <form method="post" action="{{ url_for('purchase_orders.cancel_po', po_id=po.id) }}" onsubmit="return confirm('Cancel this PO?')">
+          <button class="btn btn-outline-danger w-100" type="submit"><i class="bi bi-x-circle me-1"></i>Cancel PO</button>
+        </form>
+        {% endif %}
+        {% if po.purchase_id %}
+        <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-outline-secondary w-100"><i class="bi bi-truck me-1"></i>View Purchase Record</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

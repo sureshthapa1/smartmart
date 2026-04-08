@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}New Purchase Order — Smart Mart{% endblock %}
+{% block page_title %}New Purchase Order{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('purchase_orders.list_pos') }}" class="text-decoration-none">Purchase Orders</a></li><li class="breadcrumb-item active">Create</li>{% endblock %}
+{% block content %}
+<form method="post" id="poForm">
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <label class="form-label">Supplier <span class="text-danger">*</span></label>
+      <select name="supplier_id" class="form-select" required>
+        <option value="">— Select supplier —</option>
+        {% for s in suppliers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Expected Delivery Date</label>
+      <input type="date" name="expected_date" class="form-control">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Notes</label>
+      <input type="text" name="notes" class="form-control" placeholder="Optional notes to supplier">
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+      <span>Order Items</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="addRow"><i class="bi bi-plus-lg me-1"></i>Add Item</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle" id="itemsTable">
+        <thead><tr><th>Product</th><th style="width:120px">Qty</th><th style="width:150px">Unit Cost (NPR)</th><th style="width:140px">Subtotal</th><th style="width:40px"></th></tr></thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center">
+    <div class="fw-semibold" style="font-size:1.1rem">Total: NPR <span id="grandTotal">0.00</span></div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('purchase_orders.list_pos') }}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create PO</button>
+    </div>
+  </div>
+</form>
+
+{% block scripts %}
+<script>
+const PRODUCTS = [{% for p in products %}{"id":{{p.id}},"name":{{p.name|tojson}},"cost":{{p.cost_price|float}}}{% if not loop.last %},{% endif %}{% endfor %}];
+let idx = 0;
+function addRow(pid, qty, cost) {
+  const i = idx++;
+  const opts = '<option value="">— Select —</option>' + PRODUCTS.map(p => `<option value="${p.id}" data-cost="${p.cost}" ${p.id==pid?'selected':''}>${p.name}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><select class="form-select form-select-sm prod-sel" name="items[${i}][product_id]">${opts}</select></td>
+    <td><input type="number" class="form-control form-control-sm qty-in" name="items[${i}][quantity]" min="1" value="${qty||1}"></td>
+    <td><input type="number" class="form-control form-control-sm cost-in" name="items[${i}][unit_cost]" min="0" step="0.01" value="${cost||'0.00'}"></td>
+    <td class="sub-cell text-end fw-medium">0.00</td>
+    <td><button type="button" class="btn btn-sm btn-outline-danger del-btn"><i class="bi bi-trash"></i></button></td>`;
+  document.getElementById('itemsBody').appendChild(tr);
+  tr.querySelector('.prod-sel').addEventListener('change', e => {
+    const opt = e.target.options[e.target.selectedIndex];
+    if (opt.dataset.cost) tr.querySelector('.cost-in').value = parseFloat(opt.dataset.cost).toFixed(2);
+    recalc(tr);
+  });
+  tr.querySelector('.qty-in').addEventListener('input', () => recalc(tr));
+  tr.querySelector('.cost-in').addEventListener('input', () => recalc(tr));
+  tr.querySelector('.del-btn').addEventListener('click', () => { tr.remove(); recalcTotal(); });
+  recalc(tr);
+}
+function recalc(tr) {
+  const qty = parseFloat(tr.querySelector('.qty-in').value)||0;
+  const cost = parseFloat(tr.querySelector('.cost-in').value)||0;
+  tr.querySelector('.sub-cell').textContent = (qty*cost).toFixed(2);
+  recalcTotal();
+}
+function recalcTotal() {
+  let t = 0;
+  document.querySelectorAll('.sub-cell').forEach(c => t += parseFloat(c.textContent)||0);
+  document.getElementById('grandTotal').textContent = t.toFixed(2);
+}
+document.getElementById('addRow').addEventListener('click', () => addRow());
+addRow();
+</script>
+{% endblock %}
+{% endblock %}

@@ -3,7 +3,7 @@
 import os
 import uuid
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app
+from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app, abort
 from flask_login import current_user
 
 from ...extensions import db
@@ -58,6 +58,11 @@ def list_products():
 @inventory_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_product():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_add_product:
+            abort(403)
     suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
     try:
         categories = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
@@ -92,6 +97,11 @@ def create_product():
 @inventory_bp.route("/<int:product_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_product(product_id):
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_edit_product:
+            abort(403)
     product = db.get_or_404(Product, product_id)
     suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
     try:
@@ -142,6 +152,11 @@ def delete_product(product_id):
 @inventory_bp.route("/<int:product_id>/adjust-stock", methods=["GET", "POST"])
 @login_required
 def adjust_stock(product_id):
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_adjust_stock:
+            abort(403)
     product = db.get_or_404(Product, product_id)
     if request.method == "POST":
         direction = request.form.get("direction", "in")
@@ -368,6 +383,17 @@ def bulk_upload():
         return redirect(url_for("inventory.list_products"))
 
     return render_template("inventory/bulk_upload.html")
+
+
+@inventory_bp.route("/labels", methods=["GET", "POST"])
+@login_required
+def print_labels():
+    """Generate printable barcode/price labels for products."""
+    products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+    selected_ids = []
+    if request.method == "POST":
+        selected_ids = [int(x) for x in request.form.getlist("product_ids") if x.isdigit()]
+    return render_template("inventory/labels.html", products=products, selected_ids=selected_ids)
 
 
 @inventory_bp.route("/bulk-upload/sample")
