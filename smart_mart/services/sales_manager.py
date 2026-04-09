@@ -251,7 +251,8 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
             contact_parts.append(f"VAT No: {_sv.vat_number}")
     except Exception:
         pass
-    for part in contact_parts:        left_col.append(Paragraph(part, S(f"sc_{part[:5]}", fontSize=8,
+    for part in contact_parts:
+        left_col.append(Paragraph(part, S(f"sc_{part[:5]}", fontSize=8,
                                           fontName="Helvetica", textColor=slate,
                                           spaceAfter=2, leading=11)))
 
