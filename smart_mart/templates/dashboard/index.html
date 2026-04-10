@@ -309,7 +309,7 @@
               <td class="text-muted small">{{ s.customer_name or 'Walk-in' }}</td>
               <td class="text-muted small">{{ s.user.username if s.user else '—' }}</td>
               <td class="text-end fw-semibold text-success">NPR {{ "%.0f"|format(s.total_amount) }}</td>
-              <td class="text-muted small">{{ s.sale_date.strftime('%H:%M') }}</td>
+              <td class="text-muted small">{{ s.sale_date | nst('%H:%M') }}</td>
             </tr>
             {% else %}
             <tr><td colspan="5" class="text-center text-muted py-4">No sales today.</td></tr>

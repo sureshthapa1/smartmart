@@ -307,7 +307,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         Paragraph(f"<b>No: {invoice_num}</b>",
                   S("inv", fontSize=10, fontName="Helvetica-Bold",
                     textColor=navy, alignment=TA_RIGHT, spaceAfter=3, leading=13)),
-        Paragraph(sale.sale_date.strftime("%d %B %Y  %I:%M %p") if sale.sale_date else "",
+        Paragraph((sale.sale_date + __import__('datetime').timedelta(hours=5, minutes=45)).strftime("%d %B %Y  %I:%M %p") if sale.sale_date else "",
                   S("dt", fontSize=8, fontName="Helvetica",
                     textColor=slate, alignment=TA_RIGHT, leading=11)),
     ]

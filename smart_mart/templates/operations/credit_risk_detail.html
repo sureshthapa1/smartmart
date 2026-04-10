@@ -99,7 +99,7 @@
         {% set outstanding = [0, sale.total_amount|float - paid]|max %}
         <tr>
           <td><a href="{{ url_for('sales.sale_detail', sale_id=sale.id) }}" class="fw-semibold text-decoration-none" style="color:var(--accent)">{{ sale.invoice_number or '#' ~ sale.id }}</a></td>
-          <td class="text-muted small">{{ sale.sale_date.strftime('%Y-%m-%d') }}</td>
+          <td class="text-muted small">{{ sale.sale_date | nst('%Y-%m-%d') }}</td>
           <td class="text-end">NPR {{ "%.2f"|format(sale.total_amount|float) }}</td>
           <td class="text-end text-success">NPR {{ "%.2f"|format(paid) }}</td>
           <td class="text-end fw-semibold {% if outstanding > 0 %}text-danger{% else %}text-success{% endif %}">NPR {{ "%.2f"|format(outstanding) }}</td>

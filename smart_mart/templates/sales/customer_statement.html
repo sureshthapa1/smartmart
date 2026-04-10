@@ -64,7 +64,7 @@
         {% for s in statement.sales %}
         <tr>
           <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="text-decoration-none fw-semibold">{{ s.invoice_number or '#' ~ s.id }}</a></td>
-          <td class="text-muted small">{{ s.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="text-muted small">{{ s.sale_date | nst('%Y-%m-%d %H:%M') }}</td>
           <td>
             <span class="badge bg-light text-dark border">
               {% if s.payment_mode == 'cash' %}💵{% elif s.payment_mode == 'qr' %}📱{% elif s.payment_mode == 'card' %}💳{% elif s.payment_mode == 'credit' %}📋{% else %}🔄{% endif %}

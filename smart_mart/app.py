@@ -91,6 +91,20 @@ def create_app(config_name="development"):
 
     # ── Jinja2 custom filters ─────────────────────────────────────────────
     import json as _json
+    from datetime import timedelta as _td
+
+    # Nepal Standard Time = UTC + 5:45
+    _NST_OFFSET = _td(hours=5, minutes=45)
+
+    @app.template_filter("nst")
+    def nst_filter(dt, fmt="%Y-%m-%d %H:%M"):
+        """Convert a naive UTC datetime to Nepal Standard Time (UTC+5:45)."""
+        if dt is None:
+            return ""
+        try:
+            return (dt + _NST_OFFSET).strftime(fmt)
+        except Exception:
+            return str(dt)
 
     @app.template_filter("from_json")
     def from_json_filter(value):

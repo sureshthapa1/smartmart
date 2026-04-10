@@ -63,7 +63,7 @@
       <div class="invoice-title">
         <h2>TAX INVOICE</h2>
         <div class="inv-num">No: {{ sale.invoice_number or ('INV-%05d' % sale.id) }}</div>
-        <div class="inv-date">{{ sale.sale_date.strftime('%d %B %Y  %I:%M %p') if sale.sale_date else '' }}</div>
+        <div class="inv-date">{{ sale.sale_date | nst('%d %B %Y  %I:%M %p') if sale.sale_date else '' }}</div>
       </div>
     </div>
 

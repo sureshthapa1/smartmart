@@ -87,7 +87,7 @@
         <div class="small text-muted mb-1">Customer</div>
         <div class="fw-medium mb-3">{{ sale.customer_name or 'Walk-in Customer' }}</div>
         <div class="small text-muted mb-1">Sale Date</div>
-        <div class="fw-medium mb-3">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="fw-medium mb-3">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</div>
         <div class="small text-muted mb-1">Original Total</div>
         <div class="fw-bold text-primary">NPR {{ "%.2f"|format(sale.total_amount|float) }}</div>
       </div>

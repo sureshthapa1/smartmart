@@ -71,7 +71,7 @@
         </div>
         <div class="text-end">
           <div class="fs-4 fw-bold">Sale #{{ sale.id }}</div>
-          <div class="text-white-50 small">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</div>
+          <div class="text-white-50 small">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</div>
         </div>
       </div>
     </div>
@@ -86,7 +86,7 @@
           </div>
           <div class="col-sm-4 mb-2">
             <dt>Date &amp; Time</dt>
-            <dd>{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</dd>
+            <dd>{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</dd>
           </div>
           <div class="col-sm-4 mb-2">
             <dt>Served by</dt>

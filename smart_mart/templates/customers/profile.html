@@ -96,7 +96,7 @@
                     {{ s.invoice_number or '#' ~ s.id }}
                   </a>
                 </td>
-                <td class="text-muted small">{{ s.sale_date.strftime('%d %b %Y') }}</td>
+                <td class="text-muted small">{{ s.sale_date | nst('%d %b %Y') }}</td>
                 <td>
                   {% set pm = s.payment_mode or 'cash' %}
                   <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">

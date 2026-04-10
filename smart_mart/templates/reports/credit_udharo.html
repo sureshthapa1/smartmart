@@ -118,7 +118,7 @@
             {% endif %}
           </td>
           <td class="text-muted small">{{ s.customer_phone or '—' }}</td>
-          <td class="text-muted small">{{ s.sale_date.strftime('%Y-%m-%d') if s.sale_date else '—' }}</td>
+          <td class="text-muted small">{{ s.sale_date | nst('%Y-%m-%d') if s.sale_date else '—' }}</td>
           <td class="text-end fw-semibold">NPR {{ "%.2f"|format(s.total_amount|float) }}</td>
           <td>
             {% if r.status == 'collected' %}

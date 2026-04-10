@@ -47,7 +47,7 @@
 
   <table>
     <tr><td>Invoice:</td><td class="right">{{ sale.invoice_number or '#' ~ sale.id }}</td></tr>
-    <tr><td>Date:</td><td class="right">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    <tr><td>Date:</td><td class="right">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td></tr>
     {% if sale.customer_name %}<tr><td>Customer:</td><td class="right">{{ sale.customer_name }}</td></tr>{% endif %}
     <tr><td>Payment:</td><td class="right">{{ sale.payment_mode | upper }}</td></tr>
   </table>
