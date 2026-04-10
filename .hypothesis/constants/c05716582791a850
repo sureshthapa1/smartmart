@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\purchase_orders\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/<int:po_id>', '/<int:po_id>/cancel', '/<int:po_id>/receive', '/<int:po_id>/send', '/create', '/purchase-orders', '0', 'GET', 'POST', 'danger', 'expected_date', 'notes', 'product_id', 'purchase_orders', 'quantity', 'status', 'success', 'supplier_id', 'unit_cost']

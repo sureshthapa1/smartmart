@@ -143,7 +143,8 @@
                 </div>
               </div>
             </div>
-            <!-- Discount -->
+            <!-- Credit Risk Warning (shown when Credit payment mode + named customer) -->
+            <div id="creditRiskWarning" class="col-12" style="display:none;"></div>
             <div class="col-md-4">
               <label class="form-label fw-medium small">Discount (NPR)</label>
               <input type="number" name="discount_amount" class="form-control form-control-sm"
@@ -324,7 +325,11 @@
     function recalcTotal() {
       let total = 0;
       document.querySelectorAll('.subtotal-cell').forEach(cell => total += parseFloat(cell.textContent) || 0);
-      document.getElementById('grandTotal').textContent = total.toFixed(2);
+      const discount = parseFloat(document.getElementById('discountInput')?.value || 0) || 0;
+      const net = Math.max(0, total - discount);
+      document.getElementById('grandTotal').textContent = net.toFixed(2);
+      // Check active promotions
+      checkPromotions(total);
     }
 
     document.getElementById('addItemBtn').addEventListener('click', () => addRow());
@@ -333,6 +338,52 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+  // ── Promotions check ─────────────────────────────────────────────────
+  let promoTimer;
+  async function checkPromotions(subtotal) {
+    clearTimeout(promoTimer);
+    promoTimer = setTimeout(async () => {
+      if (subtotal <= 0) { removePromoBar(); return; }
+      try {
+        const res = await fetch('/promotions/api/check', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({subtotal, items: []}),
+        });
+        const data = await res.json();
+        if (data.promotions && data.promotions.length > 0) {
+          showPromoBar(data.promotions);
+        } else {
+          removePromoBar();
+        }
+      } catch(e) { removePromoBar(); }
+    }, 400);
+  }
+
+  function showPromoBar(promos) {
+    let bar = document.getElementById('promoBar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'promoBar';
+      bar.className = 'alert alert-success d-flex align-items-center gap-2 mt-2';
+      document.getElementById('saleForm').insertBefore(bar, document.getElementById('saleForm').firstChild);
+    }
+    bar.innerHTML = '<i class="bi bi-tag-fill"></i><div><strong>Active Promotions:</strong> ' +
+      promos.map(p => `<span class="badge bg-success ms-1">${p.name} — NPR ${p.discount.toFixed(2)} off</span>`).join('') +
+      ' <button type="button" class="btn btn-sm btn-success ms-2" onclick="applyBestPromo(' + JSON.stringify(promos) + ')">Apply Best</button></div>';
+  }
+
+  function removePromoBar() {
+    document.getElementById('promoBar')?.remove();
+  }
+
+  function applyBestPromo(promos) {
+    const best = promos.reduce((a, b) => a.discount > b.discount ? a : b);
+    document.getElementById('discountInput').value = best.discount.toFixed(2);
+    document.getElementById('discountNote').value = best.name;
+    recalcTotal();
+  }
+
   // ── AI Invoice Validation before submit ──────────────────────────────
   document.getElementById('saleForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -552,6 +603,55 @@
       return iconCache[productName];
     } catch { return null; }
   }
+
+  // ── Credit Risk Warning ───────────────────────────────────────────────
+  const creditRiskDiv = document.getElementById('creditRiskWarning');
+  let riskCheckTimer = null;
+
+  function checkCreditRisk() {
+    const name = document.getElementById('customerName').value.trim();
+    const isCreditMode = document.querySelector('input[name="payment_mode"]:checked')?.value === 'credit';
+    if (!isCreditMode || !name || name.toLowerCase() === 'walk-in customer') {
+      creditRiskDiv.style.display = 'none';
+      creditRiskDiv.innerHTML = '';
+      return;
+    }
+    fetch(`/api/customer-risk/${encodeURIComponent(name)}`)
+      .then(r => r.json())
+      .then(data => {
+        let html = '';
+        if (data.risk_tier === 'risky') {
+          html = `<div class="alert alert-danger py-2 mb-0 mt-2">
+            <strong>🔴 High-Risk Customer</strong> — ${data.risk_label}
+            ${data.total_outstanding > 0 ? `<br><small>Outstanding balance: NPR ${data.total_outstanding.toLocaleString()}</small>` : ''}
+          </div>`;
+        } else if (data.risk_tier === 'moderate') {
+          html = `<div class="alert alert-warning py-2 mb-0 mt-2">
+            <strong>🟡 Moderate Risk</strong> — ${data.risk_label}
+            ${data.total_outstanding > 0 ? `<br><small>Outstanding balance: NPR ${data.total_outstanding.toLocaleString()}</small>` : ''}
+          </div>`;
+        } else {
+          html = `<div class="alert alert-success py-2 mb-0 mt-2">
+            <strong>🟢 Safe Customer</strong> — Good credit history.
+          </div>`;
+        }
+        creditRiskDiv.innerHTML = html;
+        creditRiskDiv.style.display = '';
+      })
+      .catch(() => { creditRiskDiv.style.display = 'none'; });
+  }
+
+  document.querySelectorAll('input[name="payment_mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      clearTimeout(riskCheckTimer);
+      riskCheckTimer = setTimeout(checkCreditRisk, 300);
+    });
+  });
+
+  document.getElementById('customerName').addEventListener('change', () => {
+    clearTimeout(riskCheckTimer);
+    riskCheckTimer = setTimeout(checkCreditRisk, 500);
+  });
   </script>
 </body>
 </html>

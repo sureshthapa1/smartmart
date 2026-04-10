@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Variant — {{ product.name }}{% endblock %}
+{% block page_title %}{{ action }} Variant{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.product_variants', product_id=product.id) }}" class="text-decoration-none">{{ product.name }}</a></li>
+<li class="breadcrumb-item active">{{ action }}</li>
+{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-collection me-2 text-primary"></i>{{ action }} Variant for <strong>{{ product.name }}</strong></div>
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Variant Name <span class="text-danger">*</span></label>
+            <input type="text" name="variant_name" class="form-control" required
+                   value="{{ variant.variant_name if variant else '' }}"
+                   placeholder="e.g. 1kg, Red, Large, 500ml">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">SKU <span class="text-danger">*</span></label>
+              <input type="text" name="sku" class="form-control" required
+                     value="{{ variant.sku if variant else '' }}"
+                     placeholder="e.g. RICE-001-1KG">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Barcode</label>
+              <input type="text" name="barcode" class="form-control"
+                     value="{{ variant.barcode if variant else '' }}"
+                     placeholder="Optional barcode">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Cost Price (NPR)</label>
+              <input type="number" name="cost_price" class="form-control" min="0" step="0.01"
+                     value="{{ variant.cost_price|float if variant else product.cost_price|float }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Selling Price (NPR)</label>
+              <input type="number" name="selling_price" class="form-control" min="0" step="0.01"
+                     value="{{ variant.selling_price|float if variant else product.selling_price|float }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Stock Qty</label>
+              <input type="number" name="quantity" class="form-control" min="0"
+                     value="{{ variant.quantity if variant else 0 }}">
+            </div>
+          </div>
+          {% if variant %}
+          <div class="mb-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
+                     {{ 'checked' if variant.is_active }}>
+              <label class="form-check-label" for="isActive">Active</label>
+            </div>
+          </div>
+          {% endif %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg me-1"></i>{{ action }}
+            </button>
+            <a href="{{ url_for('inventory.product_variants', product_id=product.id) }}"
+               class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

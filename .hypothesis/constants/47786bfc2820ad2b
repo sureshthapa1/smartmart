@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\transfer_manager.py
+# hypothesis_version: 6.151.11
+
+['cancelled', 'completed', 'pending', 'product_id', 'quantity']

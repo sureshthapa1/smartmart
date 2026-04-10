@@ -13,6 +13,24 @@ from ...services.decorators import login_required, admin_required
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 
+def _get_risk_map() -> dict:
+    """Return {customer_name_lower: risk_data} for credit ledger badges."""
+    try:
+        from ...models.customer_risk_score import CustomerRiskScore
+        from ...extensions import db
+        from ...services.credit_risk_service import TIER_LABELS
+        rows = db.session.execute(db.select(CustomerRiskScore)).scalars().all()
+        result = {}
+        for row in rows:
+            label, color = TIER_LABELS[row.effective_tier]
+            result[row.customer_name.lower()] = {
+                "risk_label": label,
+                "risk_color": color,
+                "has_override": row.has_override,
+            }
+        return result
+    except Exception:
+        return {}
 def _get_date_range():
     start_raw = request.args.get("start_date", "")
     end_raw = request.args.get("end_date", "")
@@ -378,7 +396,8 @@ def credit_udharo():
                            records=records,
                            summary=summary,
                            status_filter=status_filter,
-                           today=today)
+                           today=today,
+                           risk_scores=_get_risk_map())
 
 
 @reports_bp.route("/credit-udharo/<int:sale_id>/mark-collected", methods=["POST"])

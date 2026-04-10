@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\customer.py
+# hypothesis_version: 6.151.11
+
+[120, 255, 'customers', 'ix_customer_name', 'ix_customer_phone', 'name', 'phone', 'walk-in customer']

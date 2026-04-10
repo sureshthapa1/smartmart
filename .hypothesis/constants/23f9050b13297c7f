@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\expenses\routes.py
+# hypothesis_version: 6.151.11
+
+['%Y-%m', '/', '/create', '/expenses', 'Expense deleted.', 'Expense updated.', 'GET', 'POST', 'amount', 'danger', 'end_date', 'expense_date', 'expense_type', 'expenses', 'expenses/form.html', 'expenses/list.html', 'miscellaneous', 'month', 'note', 'other', 'page', 'purchase', 'rent', 'salary', 'start_date', 'success', 'total', 'type', 'utilities']

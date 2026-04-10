@@ -10,22 +10,22 @@ class UserPermissions(db.Model):
 
     # Inventory
     can_view_inventory = db.Column(db.Boolean, default=True)
-    can_add_product = db.Column(db.Boolean, default=True)
-    can_edit_product = db.Column(db.Boolean, default=True)
+    can_add_product = db.Column(db.Boolean, default=False)
+    can_edit_product = db.Column(db.Boolean, default=False)
     can_delete_product = db.Column(db.Boolean, default=False)
-    can_adjust_stock = db.Column(db.Boolean, default=True)
+    can_adjust_stock = db.Column(db.Boolean, default=False)
     can_bulk_upload_products = db.Column(db.Boolean, default=False)
 
     # Sales
     can_view_sales = db.Column(db.Boolean, default=True)
     can_create_sale = db.Column(db.Boolean, default=True)
     can_delete_sale = db.Column(db.Boolean, default=False)
-    can_give_discount = db.Column(db.Boolean, default=True)
+    can_give_discount = db.Column(db.Boolean, default=False)
     can_download_invoice = db.Column(db.Boolean, default=True)
 
     # Purchases
-    can_view_purchases = db.Column(db.Boolean, default=True)
-    can_create_purchase = db.Column(db.Boolean, default=True)
+    can_view_purchases = db.Column(db.Boolean, default=False)
+    can_create_purchase = db.Column(db.Boolean, default=False)
     can_bulk_upload_purchases = db.Column(db.Boolean, default=False)
     can_manage_suppliers = db.Column(db.Boolean, default=False)
 
@@ -34,7 +34,7 @@ class UserPermissions(db.Model):
     can_create_return = db.Column(db.Boolean, default=False)
 
     # Online Orders
-    can_view_online_orders = db.Column(db.Boolean, default=True)
+    can_view_online_orders = db.Column(db.Boolean, default=False)
     can_manage_online_orders = db.Column(db.Boolean, default=False)
 
     # Alerts

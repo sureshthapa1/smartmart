@@ -1,19 +1,18 @@
 """Customer Credit Risk Scoring Service.
 
-Calculates a risk score for each customer based on their Udhar (credit) history:
-- How many credit sales they've taken
-- How quickly they pay back
-- Outstanding balance
-- Overdue credits
+Calculates a risk score (0-100) for each customer based on their Udhar (credit) history
+and persists results in the customer_risk_scores table.
 
-Risk Levels:
-  🟢 SAFE    — score 70-100  (pays on time, low outstanding)
-  🟡 WATCH   — score 40-69   (sometimes late, moderate outstanding)
-  🔴 RISKY   — score 0-39    (frequently late/overdue, high outstanding)
+Risk Tiers (spec-aligned):
+  🟢 Safe     — score 0-39   (low risk)
+  🟡 Moderate — score 40-69  (moderate risk)
+  🔴 Risky    — score 70-100 (high risk)
+
+Score is inverted from the old implementation: higher score = MORE risk.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import func
@@ -21,10 +20,30 @@ from sqlalchemy import func
 from ..extensions import db
 from ..models.sale import Sale
 from ..models.operations import CustomerCreditPayment
+from ..models.customer_risk_score import CustomerRiskScore
+
+
+# ── Tier helpers ──────────────────────────────────────────────────────────────
+
+TIER_LABELS = {
+    "safe": ("🟢 Safe", "success"),
+    "moderate": ("🟡 Moderate", "warning"),
+    "risky": ("🔴 Risky", "danger"),
+}
+
+TIER_ORDER = {"risky": 0, "moderate": 1, "safe": 2}
+
+
+def _score_to_tier(score: int) -> str:
+    if score <= 39:
+        return "safe"
+    if score <= 69:
+        return "moderate"
+    return "risky"
 
 
 def _days_to_pay(sale: Sale) -> int | None:
-    """How many days it took to fully collect a credit sale. None if still unpaid."""
+    """Days from sale_date to last payment. None if still unpaid."""
     if not sale.credit_collected:
         return None
     last_payment = db.session.execute(
@@ -36,16 +55,17 @@ def _days_to_pay(sale: Sale) -> int | None:
     return None
 
 
-def calculate_risk_score(customer_name: str) -> dict:
-    """Calculate credit risk score for a customer. Returns score 0-100 and risk level."""
+# ── Core computation ──────────────────────────────────────────────────────────
+
+def _compute_raw(customer_name: str) -> dict:
+    """Compute risk score from DB data. Returns a dict with all metrics."""
     today = date.today()
 
-    # All credit sales for this customer
     credit_sales = db.session.execute(
         db.select(Sale)
         .where(
             func.lower(Sale.customer_name) == customer_name.strip().lower(),
-            Sale.payment_mode == "credit"
+            Sale.payment_mode == "credit",
         )
         .order_by(Sale.sale_date.desc())
     ).scalars().all()
@@ -53,24 +73,22 @@ def calculate_risk_score(customer_name: str) -> dict:
     if not credit_sales:
         return {
             "customer_name": customer_name,
-            "score": 100,
-            "risk_level": "safe",
-            "risk_label": "🟢 Safe",
-            "risk_color": "success",
+            "score": 0,
+            "risk_tier": "safe",
             "total_credit_sales": 0,
             "total_borrowed": 0.0,
             "total_outstanding": 0.0,
             "overdue_count": 0,
             "avg_days_to_pay": None,
+            "on_time_rate": 1.0,
             "paid_on_time_pct": 100,
-            "summary": "No credit history. New customer.",
+            "summary": "No credit history.",
         }
 
     total_borrowed = sum(float(s.total_amount) for s in credit_sales)
-    total_count = len(credit_sales)
 
-    # Outstanding balance
-    paid_amounts = {}
+    # Outstanding per sale
+    paid_amounts: dict[int, float] = {}
     for s in credit_sales:
         paid = db.session.execute(
             db.select(func.coalesce(func.sum(CustomerCreditPayment.amount), 0))
@@ -79,91 +97,74 @@ def calculate_risk_score(customer_name: str) -> dict:
         paid_amounts[s.id] = float(paid)
 
     total_outstanding = sum(
-        max(0, float(s.total_amount) - paid_amounts[s.id])
-        for s in credit_sales
+        max(0.0, float(s.total_amount) - paid_amounts[s.id]) for s in credit_sales
     )
 
-    # Overdue count
+    # Active overdue (unpaid + past due date)
     overdue_count = sum(
         1 for s in credit_sales
-        if not s.credit_collected
-        and s.credit_due_date
-        and s.credit_due_date < today
+        if not s.credit_collected and s.credit_due_date and s.credit_due_date < today
     )
 
-    # Unpaid with no due date set (open-ended Udhar)
-    open_udhar = sum(
-        1 for s in credit_sales
-        if not s.credit_collected and not s.credit_due_date
-    )
+    # Average days overdue for overdue sales
+    overdue_days = []
+    for s in credit_sales:
+        if not s.credit_collected and s.credit_due_date and s.credit_due_date < today:
+            overdue_days.append((today - s.credit_due_date).days)
+    avg_days_overdue = sum(overdue_days) / len(overdue_days) if overdue_days else 0.0
 
-    # Payment speed for collected sales
-    days_list = [_days_to_pay(s) for s in credit_sales if s.credit_collected]
+    # On-time rate: settled sales paid on or before due date
+    settled = [s for s in credit_sales if s.credit_collected]
+    on_time = 0
+    for s in settled:
+        d = _days_to_pay(s)
+        if d is not None:
+            if s.credit_due_date:
+                # paid before or on due date
+                last_pay = db.session.execute(
+                    db.select(func.max(CustomerCreditPayment.paid_at))
+                    .where(CustomerCreditPayment.sale_id == s.id)
+                ).scalar()
+                if last_pay and last_pay.date() <= s.credit_due_date:
+                    on_time += 1
+            else:
+                # no due date — treat as on-time if paid within 30 days
+                if d <= 30:
+                    on_time += 1
+
+    on_time_rate = on_time / len(settled) if settled else 1.0
+    on_time_pct = round(on_time_rate * 100)
+
+    days_list = [_days_to_pay(s) for s in settled]
     days_list = [d for d in days_list if d is not None]
-    avg_days = round(sum(days_list) / len(days_list), 1) if days_list else None
+    avg_days_to_pay = round(sum(days_list) / len(days_list), 1) if days_list else None
 
-    # On-time payment percentage (paid within 30 days)
-    collected = [s for s in credit_sales if s.credit_collected]
-    on_time = sum(1 for d in days_list if d <= 30)
-    on_time_pct = round(on_time / len(days_list) * 100) if days_list else 100
+    # ── Weighted score (0-100, higher = MORE risk) ────────────────────────
+    # Factor 1: On-time rate (weight 40%) — lower rate → higher risk
+    f1 = (1.0 - on_time_rate) * 100  # 0 = perfect, 100 = never on time
 
-    # ── Score calculation (0-100, higher = safer) ─────────────────────────
-    score = 100
+    # Factor 2: Overdue count (weight 25%) — normalised to 0-100 (cap at 5)
+    f2 = min(overdue_count / 5.0, 1.0) * 100
 
-    # Deduct for outstanding balance ratio
-    if total_borrowed > 0:
-        outstanding_ratio = total_outstanding / total_borrowed
-        score -= int(outstanding_ratio * 40)  # up to -40 for 100% outstanding
+    # Factor 3: Outstanding ratio (weight 20%) — outstanding / borrowed
+    f3 = (total_outstanding / total_borrowed * 100) if total_borrowed > 0 else 0.0
 
-    # Deduct for overdue credits
-    score -= overdue_count * 15  # -15 per overdue
+    # Factor 4: Average days overdue (weight 15%) — normalised (cap at 90 days)
+    f4 = min(avg_days_overdue / 90.0, 1.0) * 100
 
-    # Deduct for open-ended Udhar (no due date)
-    score -= open_udhar * 5  # -5 per open Udhar
-
-    # Deduct for slow payment
-    if avg_days is not None:
-        if avg_days > 60:
-            score -= 20
-        elif avg_days > 30:
-            score -= 10
-        elif avg_days > 14:
-            score -= 5
-
-    # Deduct for low on-time payment rate
-    if on_time_pct < 50:
-        score -= 15
-    elif on_time_pct < 75:
-        score -= 7
-
-    # Bonus for good payment history
-    if len(collected) >= 3 and on_time_pct >= 90 and total_outstanding == 0:
-        score = min(100, score + 10)
-
+    score = round(f1 * 0.40 + f2 * 0.25 + f3 * 0.20 + f4 * 0.15)
     score = max(0, min(100, score))
 
-    # ── Risk level ────────────────────────────────────────────────────────
-    if score >= 70:
-        risk_level = "safe"
-        risk_label = "🟢 Safe"
-        risk_color = "success"
-    elif score >= 40:
-        risk_level = "watch"
-        risk_label = "🟡 Watch"
-        risk_color = "warning"
-    else:
-        risk_level = "risky"
-        risk_label = "🔴 Risky"
-        risk_color = "danger"
+    risk_tier = _score_to_tier(score)
 
-    # ── Human-readable summary ────────────────────────────────────────────
+    # Summary
     parts = []
     if total_outstanding > 0:
         parts.append(f"NPR {total_outstanding:,.0f} outstanding")
     if overdue_count > 0:
         parts.append(f"{overdue_count} overdue")
-    if avg_days is not None:
-        parts.append(f"avg {avg_days:.0f} days to pay")
+    if avg_days_to_pay is not None:
+        parts.append(f"avg {avg_days_to_pay:.0f} days to pay")
     if on_time_pct < 100 and days_list:
         parts.append(f"{on_time_pct}% on time")
     summary = " · ".join(parts) if parts else "All credits cleared on time."
@@ -171,25 +172,82 @@ def calculate_risk_score(customer_name: str) -> dict:
     return {
         "customer_name": customer_name,
         "score": score,
-        "risk_level": risk_level,
-        "risk_label": risk_label,
-        "risk_color": risk_color,
-        "total_credit_sales": total_count,
+        "risk_tier": risk_tier,
+        "total_credit_sales": len(credit_sales),
         "total_borrowed": round(total_borrowed, 2),
         "total_outstanding": round(total_outstanding, 2),
         "overdue_count": overdue_count,
-        "open_udhar_count": open_udhar,
-        "avg_days_to_pay": avg_days,
+        "avg_days_to_pay": avg_days_to_pay,
+        "on_time_rate": on_time_rate,
         "paid_on_time_pct": on_time_pct,
-        "collected_count": len(collected),
         "summary": summary,
         "credit_sales": credit_sales,
         "paid_amounts": paid_amounts,
     }
 
 
+def _persist(raw: dict) -> CustomerRiskScore:
+    """Upsert the CustomerRiskScore row for this customer."""
+    row = db.session.execute(
+        db.select(CustomerRiskScore)
+        .where(CustomerRiskScore.customer_name == raw["customer_name"])
+    ).scalar_one_or_none()
+
+    if row is None:
+        row = CustomerRiskScore(customer_name=raw["customer_name"])
+        db.session.add(row)
+
+    row.risk_score = raw["score"]
+    row.risk_tier = raw["risk_tier"]
+    row.last_computed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return row
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def calculate_risk_score(customer_name: str) -> dict:
+    """Compute, persist, and return full risk data for a customer."""
+    raw = _compute_raw(customer_name)
+    row = _persist(raw)
+
+    label, color = TIER_LABELS[row.effective_tier]
+    raw.update({
+        "risk_level": row.effective_tier,   # backward-compat alias
+        "risk_label": label,
+        "risk_color": color,
+        "has_override": row.has_override,
+        "override_tier": row.override_tier,
+    })
+    return raw
+
+
+def get_risk_for_customer(customer_name: str) -> dict:
+    """Return stored risk data (fast path). Falls back to on-demand computation."""
+    row = db.session.execute(
+        db.select(CustomerRiskScore)
+        .where(CustomerRiskScore.customer_name == customer_name)
+    ).scalar_one_or_none()
+
+    if row is None:
+        return calculate_risk_score(customer_name)
+
+    label, color = TIER_LABELS[row.effective_tier]
+    return {
+        "customer_name": customer_name,
+        "score": row.risk_score,
+        "risk_tier": row.risk_tier,
+        "risk_level": row.effective_tier,
+        "risk_label": label,
+        "risk_color": color,
+        "has_override": row.has_override,
+        "override_tier": row.override_tier,
+        "total_outstanding": 0.0,  # lightweight — no full recompute
+    }
+
+
 def get_all_customer_risk_scores() -> list[dict]:
-    """Get risk scores for all customers who have ever taken credit."""
+    """Compute and return risk scores for all credit customers."""
     customer_names = db.session.execute(
         db.select(Sale.customer_name.distinct())
         .where(Sale.payment_mode == "credit", Sale.customer_name.isnot(None))
@@ -201,10 +259,49 @@ def get_all_customer_risk_scores() -> list[dict]:
         if name and name.strip():
             scores.append(calculate_risk_score(name))
 
-    # Sort: risky first, then watch, then safe; within each group by outstanding desc
-    order = {"risky": 0, "watch": 1, "safe": 2}
-    scores.sort(key=lambda x: (order.get(x["risk_level"], 9), -x["total_outstanding"]))
+    scores.sort(key=lambda x: (TIER_ORDER.get(x["risk_level"], 9), -x["total_outstanding"]))
     return scores
+
+
+def recalculate_all() -> int:
+    """Recompute risk scores for all credit customers. Preserves overrides. Returns count updated."""
+    customer_names = db.session.execute(
+        db.select(Sale.customer_name.distinct())
+        .where(Sale.payment_mode == "credit", Sale.customer_name.isnot(None))
+    ).scalars().all()
+
+    count = 0
+    for name in customer_names:
+        if name and name.strip():
+            raw = _compute_raw(name)
+            _persist(raw)
+            count += 1
+    return count
+
+
+def set_override(customer_name: str, override_tier: str | None, admin_user_id: int) -> CustomerRiskScore:
+    """Set or clear an admin override for a customer's risk tier."""
+    if override_tier and override_tier not in ("safe", "moderate", "risky"):
+        raise ValueError(f"Invalid override tier: {override_tier!r}")
+
+    row = db.session.execute(
+        db.select(CustomerRiskScore)
+        .where(CustomerRiskScore.customer_name == customer_name)
+    ).scalar_one_or_none()
+
+    if row is None:
+        # Compute first so we have a row to override
+        calculate_risk_score(customer_name)
+        row = db.session.execute(
+            db.select(CustomerRiskScore)
+            .where(CustomerRiskScore.customer_name == customer_name)
+        ).scalar_one()
+
+    row.override_tier = override_tier
+    row.override_by = admin_user_id if override_tier else None
+    row.override_at = datetime.now(timezone.utc) if override_tier else None
+    db.session.commit()
+    return row
 
 
 def get_risk_summary() -> dict:
@@ -213,7 +310,8 @@ def get_risk_summary() -> dict:
     return {
         "total": len(scores),
         "safe": sum(1 for s in scores if s["risk_level"] == "safe"),
-        "watch": sum(1 for s in scores if s["risk_level"] == "watch"),
+        "watch": sum(1 for s in scores if s["risk_level"] == "moderate"),   # backward compat
+        "moderate": sum(1 for s in scores if s["risk_level"] == "moderate"),
         "risky": sum(1 for s in scores if s["risk_level"] == "risky"),
         "total_outstanding": sum(s["total_outstanding"] for s in scores),
     }

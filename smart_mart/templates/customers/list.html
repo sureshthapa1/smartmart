@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Customers</li>{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Customers</div>
+    <div class="page-header-sub">{{ total }} customer{{ 's' if total != 1 }} registered</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('customers.export_csv') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+  </div>
+</div>
+
+<!-- Search & Sort bar -->
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div class="input-group" style="max-width:340px">
+        <span class="input-group-text bg-transparent border-end-0">
+          <i class="bi bi-search text-muted"></i>
+        </span>
+        <input type="text" class="form-control border-start-0 ps-0"
+               name="q" value="{{ q }}" placeholder="Search name or phone…">
+      </div>
+      <div>
+        <select name="sort" class="form-select form-select-sm" style="width:auto">
+          <option value="visits"  {{ 'selected' if sort == 'visits'  }}>Most Visits</option>
+          <option value="recent"  {{ 'selected' if sort == 'recent'  }}>Recently Active</option>
+          <option value="name"    {{ 'selected' if sort == 'name'    }}>Name A–Z</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Search</button>
+      {% if q %}<a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Total Customers</div>
+        <div class="fs-4 fw-bold text-primary">{{ total }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Repeat Customers</div>
+        <div class="fs-4 fw-bold text-success">
+          {{ customers | selectattr('visit_count', 'gt', 1) | list | length }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Showing</div>
+        <div class="fs-4 fw-bold">{{ customers | length }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Address</th>
+            <th class="text-center">Visits</th>
+            <th>Last Visit</th>
+            <th>Since</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in customers %}
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0">
+                  {{ c.name[0].upper() }}
+                </div>
+                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}"
+                   class="fw-semibold text-decoration-none" style="color:var(--accent)">
+                  {{ c.name }}
+                </a>
+              </div>
+            </td>
+            <td class="text-muted small">{{ c.phone or '—' }}</td>
+            <td class="text-muted small">{{ c.address or '—' }}</td>
+            <td class="text-center">
+              <span class="badge {% if c.visit_count >= 10 %}bg-success{% elif c.visit_count >= 3 %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ c.visit_count }}
+              </span>
+            </td>
+            <td class="text-muted small">
+              {{ c.last_visit.strftime('%d %b %Y') if c.last_visit else '—' }}
+            </td>
+            <td class="text-muted small">
+              {{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="View Profile">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="{{ url_for('customers.delete_customer', customer_id=c.id) }}"
+                      class="d-inline" onsubmit="return confirm('Delete {{ c.name }}?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">
+              <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
+              {% if q %}No customers matching "<strong>{{ q }}</strong>".
+              {% else %}No customers yet — they appear automatically after first sale.{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if total > per_page %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">Page {{ page }} of {{ ((total - 1) // per_page) + 1 }}</span>
+    <div class="d-flex gap-2">
+      {% if page > 1 %}
+      <a href="?page={{ page-1 }}&q={{ q }}&sort={{ sort }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
+      {% endif %}
+      {% if page * per_page < total %}
+      <a href="?page={{ page+1 }}&q={{ q }}&sort={{ sort }}" class="btn btn-sm btn-outline-secondary">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

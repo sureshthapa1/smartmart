@@ -12,8 +12,33 @@
         <p class="text-muted small mb-0 mt-1">These details appear on all invoices and reports.</p>
       </div>
       <div class="card-body p-4">
-        <form method="post" action="{{ url_for('settings.index') }}">
+        <form method="post" action="{{ url_for('settings.index') }}" enctype="multipart/form-data">
 
+          <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
+            <i class="bi bi-image me-1"></i>Shop Logo
+          </h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              {% if s.logo_filename %}
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <img src="{{ url_for('static', filename='uploads/shop/' ~ s.logo_filename) }}"
+                     alt="Shop Logo" style="max-height:60px;max-width:180px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;padding:4px;background:#fff">
+                <div>
+                  <div class="small fw-semibold">Current Logo</div>
+                  <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" name="remove_logo" value="1" id="removeLogo">
+                    <label class="form-check-label text-danger small" for="removeLogo">Remove logo</label>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+              <label class="form-label fw-medium">{{ 'Replace Logo' if s.logo_filename else 'Upload Logo' }}</label>
+              <input type="file" name="logo" class="form-control" accept=".jpg,.jpeg,.png,.gif,.webp">
+              <div class="form-text">Appears on invoices. PNG/JPG recommended. Max ~500KB.</div>
+            </div>
+          </div>
+
+          <hr class="my-3">
           <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
             <i class="bi bi-shop me-1"></i>Business Information
           </h6>
@@ -114,11 +139,17 @@
       <div class="card-body p-4">
         <div class="border rounded-2 p-3" style="background:#f8fafc;">
           <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <div class="fw-bold fs-5" style="color:#0f172a;">{{ s.shop_name or 'Smart Mart' }}</div>
-              {% if s.address %}<div class="text-muted small">{{ s.address }}</div>{% endif %}
-              {% if s.phone %}<div class="text-muted small">Tel: {{ s.phone }}</div>{% endif %}
-              {% if s.pan_number %}<div class="text-muted small">PAN: {{ s.pan_number }}</div>{% endif %}
+            <div class="d-flex align-items-center gap-3">
+              {% if s.logo_filename %}
+              <img src="{{ url_for('static', filename='uploads/shop/' ~ s.logo_filename) }}"
+                   alt="Logo" style="max-height:50px;max-width:120px;object-fit:contain">
+              {% endif %}
+              <div>
+                <div class="fw-bold fs-5" style="color:#0f172a;">{{ s.shop_name or 'Smart Mart' }}</div>
+                {% if s.address %}<div class="text-muted small">{{ s.address }}</div>{% endif %}
+                {% if s.phone %}<div class="text-muted small">Tel: {{ s.phone }}</div>{% endif %}
+                {% if s.pan_number %}<div class="text-muted small">PAN: {{ s.pan_number }}</div>{% endif %}
+              </div>
             </div>
             <div class="text-end">
               <div class="fw-bold fs-5" style="color:#6366f1;">INVOICE</div>

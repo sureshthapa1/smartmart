@@ -15,8 +15,47 @@ def list_returns():
         p = UserPermissions.get_or_create(current_user.id)
         if not p.can_view_returns:
             abort(403)
-    returns = returns_manager.list_returns()
-    return render_template("returns/list.html", returns=returns)
+    from ...extensions import db
+    from ...models.sale_return import SaleReturn
+    from ...models.sale import Sale
+    from sqlalchemy import func, and_
+    from datetime import date
+
+    q = request.args.get("q", "").strip() or None
+    start_raw = request.args.get("start_date", "").strip() or None
+    end_raw = request.args.get("end_date", "").strip() or None
+    page = request.args.get("page", 1, type=int)
+    per_page = 25
+
+    stmt = (db.select(SaleReturn)
+            .join(Sale, Sale.id == SaleReturn.sale_id)
+            .order_by(SaleReturn.created_at.desc()))
+
+    if q:
+        stmt = stmt.where(
+            func.lower(Sale.customer_name).like(f"%{q.lower()}%") |
+            func.lower(Sale.invoice_number).like(f"%{q.lower()}%")
+        )
+    if start_raw:
+        try:
+            stmt = stmt.where(func.date(SaleReturn.created_at) >= date.fromisoformat(start_raw))
+        except ValueError:
+            pass
+    if end_raw:
+        try:
+            stmt = stmt.where(func.date(SaleReturn.created_at) <= date.fromisoformat(end_raw))
+        except ValueError:
+            pass
+
+    all_returns = db.session.execute(stmt).scalars().all()
+    total = len(all_returns)
+    total_refund = sum(float(r.refund_amount) for r in all_returns)
+    returns = all_returns[(page - 1) * per_page: page * per_page]
+
+    return render_template("returns/list.html", returns=returns,
+                           total=total, total_refund=total_refund,
+                           q=q or "", start_date=start_raw or "",
+                           end_date=end_raw or "", page=page, per_page=per_page)
 
 
 @returns_bp.route("/sale/<int:sale_id>/create", methods=["GET", "POST"])

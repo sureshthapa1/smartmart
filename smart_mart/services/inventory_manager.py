@@ -32,6 +32,14 @@ def create_product(data: dict) -> Product:
     except IntegrityError:
         db.session.rollback()
         raise ValueError(f"A product with SKU '{data['sku']}' already exists.")
+    # Audit log
+    try:
+        from . import audit_service
+        audit_service.log("create", "Product", product.id, product.name,
+                          changes={"name": [None, product.name], "sku": [None, product.sku]})
+        db.session.commit()
+    except Exception:
+        pass
     return product
 
 
@@ -49,6 +57,13 @@ def update_product(product_id: int, data: dict) -> Product:
     except IntegrityError:
         db.session.rollback()
         raise ValueError(f"A product with SKU '{data.get('sku')}' already exists.")
+    # Audit log
+    try:
+        from . import audit_service
+        audit_service.log("update", "Product", product.id, product.name)
+        db.session.commit()
+    except Exception:
+        pass
     return product
 
 
@@ -80,10 +95,20 @@ def get_products(search: str | None = None, page: int = 1, per_page: int = 20) -
     return db.session.execute(stmt).scalars().all()
 
 
-def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: int) -> StockMovement:
-    """Manually adjust stock in or out. Raises ValueError on invalid direction or insufficient stock."""
+def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: int,
+                 adjustment_type: str = None) -> StockMovement:
+    """Manually adjust stock in or out. Raises ValueError on invalid direction or insufficient stock.
+    
+    adjustment_type options for 'out': 'damage', 'loss', 'theft', 'expiry', 'adjustment_out'
+    """
     if direction not in ("in", "out"):
         raise ValueError("direction must be 'in' or 'out'.")
+    # Determine change_type
+    if direction == "out":
+        valid_out_types = ("damage", "loss", "theft", "expiry", "adjustment_out")
+        change_type = adjustment_type if adjustment_type in valid_out_types else "adjustment_out"
+    else:
+        change_type = "adjustment_in"
     try:
         product: Product = db.get_or_404(Product, product_id)
         if direction == "out":
@@ -93,11 +118,9 @@ def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: 
                 )
             product.quantity -= qty
             change_amount = -qty
-            change_type = "adjustment_out"
         else:
             product.quantity += qty
             change_amount = qty
-            change_type = "adjustment_in"
         product.updated_at = datetime.now(timezone.utc)
         movement = StockMovement(
             product_id=product_id,
@@ -108,6 +131,19 @@ def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: 
             timestamp=datetime.now(timezone.utc),
         )
         db.session.add(movement)
+        # Audit log
+        try:
+            from . import audit_service
+            audit_service.log(
+                action="update",
+                entity_type="Product",
+                entity_id=product_id,
+                entity_label=product.name,
+                changes={"quantity": [str(product.quantity - change_amount), str(product.quantity)],
+                         "adjustment_type": [None, change_type]},
+            )
+        except Exception:
+            pass
         db.session.commit()
     except Exception:
         db.session.rollback()

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\stock_take\routes.py
+# hypothesis_version: 6.151.11
+
+[400, '/', '/<int:take_id>', '/<int:take_id>/count', '/create', '/stock-take', '1', 'Counts saved.', 'GET', 'Missing fields', 'POST', 'all', 'apply_adjustments', 'counted_qty', 'danger', 'draft', 'error', 'in_progress', 'notes', 'ok', 'page', 'product_id', 'product_ids', 'scope', 'selected', 'stock_take', 'stock_take.count', 'stock_take.view', 'stock_take/list.html', 'stock_take/view.html', 'success', 'warning']

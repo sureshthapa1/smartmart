@@ -15,6 +15,44 @@ from ...services.decorators import login_required, admin_required
 purchases_bp = Blueprint("purchases", __name__, url_prefix="/purchases")
 
 
+@purchases_bp.route("/<int:purchase_id>")
+@login_required
+def purchase_detail(purchase_id):
+    from ...models.purchase import Purchase
+    purchase = db.get_or_404(Purchase, purchase_id)
+    return render_template("purchases/detail.html", purchase=purchase)
+
+
+@purchases_bp.route("/export-csv")
+@admin_required
+def export_csv():
+    import csv, io
+    from flask import Response
+    from ...models.purchase import Purchase
+    start_raw = request.args.get("start_date", "")
+    end_raw = request.args.get("end_date", "")
+    filters = {}
+    if start_raw:
+        try: filters["start_date"] = date.fromisoformat(start_raw)
+        except ValueError: pass
+    if end_raw:
+        try: filters["end_date"] = date.fromisoformat(end_raw)
+        except ValueError: pass
+    purchases = purchase_manager.list_purchases(filters, per_page=10000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Purchase #", "Supplier", "Date", "Items", "Total Cost (NPR)", "Created By"])
+    for p in purchases:
+        writer.writerow([
+            p.id, p.supplier.name if p.supplier else "",
+            p.purchase_date, len(p.items),
+            float(p.total_cost),
+            p.creator.username if p.creator else "",
+        ])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=purchases.csv"})
+
+
 @purchases_bp.route("/")
 @login_required
 def list_purchases():

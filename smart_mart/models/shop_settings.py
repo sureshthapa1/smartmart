@@ -19,6 +19,7 @@ class ShopSettings(db.Model):
     vat_number = db.Column(db.String(50), nullable=True)
     currency_symbol = db.Column(db.String(10), default="NPR")
     low_stock_threshold = db.Column(db.Integer, default=10)
+    logo_filename = db.Column(db.String(255), nullable=True)
 
     @classmethod
     def get(cls):

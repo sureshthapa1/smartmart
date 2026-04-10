@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\stock_take.py
+# hypothesis_version: 6.151.11
+
+[255, 'Cancelled', 'Completed', 'Draft', 'In Progress', 'Product', 'StockTake', 'StockTakeItem', 'Unknown', 'User', 'all, delete-orphan', 'cancelled', 'completed', 'danger', 'draft', 'in_progress', 'items', 'products.id', 'secondary', 'stock_take', 'stock_take_items', 'stock_takes', 'stock_takes.id', 'success', 'users.id', 'warning']

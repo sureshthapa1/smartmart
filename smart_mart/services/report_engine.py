@@ -67,13 +67,16 @@ def dead_stock(days: int = 90) -> list[Product]:
 
 
 def profit_per_product(start: date, end: date) -> list[dict]:
-    """Return profit per product = (unit_price - cost_price) * qty_sold in [start, end]."""
+    """Return profit per product using historical cost_price stored in SaleItem."""
     rows = db.session.execute(
         db.select(
             Product,
             func.sum(SaleItem.quantity).label("qty_sold"),
             func.sum(SaleItem.subtotal).label("revenue"),
-            # cost per unit at time of sale = product's current cost_price
+            # Use historical cost if stored, fall back to current product cost
+            func.sum(
+                func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
+            ).label("cogs"),
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
@@ -83,19 +86,17 @@ def profit_per_product(start: date, end: date) -> list[dict]:
     result = []
     for r in rows:
         p = r.Product
-        cost = Decimal(str(p.cost_price))
-        sell = Decimal(str(p.selling_price))
-        qty = r.qty_sold
-        # profit = (selling_price - cost_price) * qty_sold
-        profit = (sell - cost) * qty
-        margin = ((sell - cost) / sell * 100) if sell > 0 else Decimal("0")
+        revenue = float(r.revenue)
+        cogs = float(r.cogs)
+        profit = revenue - cogs
+        margin = (profit / revenue * 100) if revenue > 0 else 0
         result.append({
             "product": p,
-            "qty_sold": qty,
-            "revenue": float(r.revenue),
-            "cost": float(cost * qty),
-            "profit": float(profit),
-            "margin": float(margin),
+            "qty_sold": r.qty_sold,
+            "revenue": revenue,
+            "cost": cogs,
+            "profit": profit,
+            "margin": round(margin, 2),
         })
     return result
 
@@ -237,12 +238,15 @@ def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]
 
 
 def product_wise_sales(start: date, end: date) -> list[dict]:
-    """Return detailed sales breakdown per product."""
+    """Return detailed sales breakdown per product using historical cost."""
     rows = db.session.execute(
         db.select(
             Product,
             func.sum(SaleItem.quantity).label("qty_sold"),
             func.sum(SaleItem.subtotal).label("revenue"),
+            func.sum(
+                func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
+            ).label("cogs"),
             func.count(SaleItem.id.distinct()).label("times_sold"),
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
@@ -254,13 +258,14 @@ def product_wise_sales(start: date, end: date) -> list[dict]:
     result = []
     for r in rows:
         p = r.Product
-        cost = float(p.cost_price) * r.qty_sold
-        profit = float(r.revenue) - cost
+        revenue = float(r.revenue)
+        cogs = float(r.cogs)
+        profit = revenue - cogs
         result.append({
             "product": p,
             "qty_sold": r.qty_sold,
-            "revenue": float(r.revenue),
-            "cost": cost,
+            "revenue": revenue,
+            "cost": cogs,
             "profit": profit,
             "times_sold": r.times_sold,
         })

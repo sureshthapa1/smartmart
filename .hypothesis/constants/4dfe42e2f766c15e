@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\advisor\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/advisor', '/api/forecast', '/api/kpis', '/api/report', 'advisor', 'advisor/index.html']

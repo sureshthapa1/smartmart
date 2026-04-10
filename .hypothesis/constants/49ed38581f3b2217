@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\settings\routes.py
+# hypothesis_version: 6.151.11
+
+['.', '/', '/settings', '1', '10', '13', 'GET', 'INV', 'NPR', 'POST', 'Smart Mart', 'address', 'currency_symbol', 'email', 'footer_note', 'gif', 'invoice_prefix', 'jpeg', 'jpg', 'logo', 'low_stock_threshold', 'on', 'pan_number', 'phone', 'png', 'remove_logo', 'settings', 'settings.index', 'settings/index.html', 'shop', 'shop_name', 'success', 'uploads', 'vat_enabled', 'vat_number', 'vat_rate', 'webp', 'website']

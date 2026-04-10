@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\ai_enhancements.py
+# hypothesis_version: 6.151.11
+
+[120, 255, 'CompetitorPriceEntry', 'Customer', 'LoyaltyWallet', 'Product', 'Sale', 'Silver', 'ai_decision_logs', 'all, delete-orphan', 'applied', 'customers.id', 'device_sync_states', 'loyalty_wallets', 'loyalty_wallets.id', 'pending', 'products.id', 'sales.id', 'sync_events', 'transactions', 'users.id', 'wallet']

@@ -103,7 +103,16 @@
             <span class="fw-medium text-primary">#{{ s.invoice_number or s.id }}</span>
           </td>
           <td>
-            <div class="fw-medium">{{ s.customer_name or '—' }}</div>
+            <div class="fw-medium d-flex align-items-center gap-1">
+              {{ s.customer_name or '—' }}
+              {% if s.customer_name and risk_scores %}
+                {% set rk = risk_scores.get(s.customer_name.lower()) %}
+                {% if rk %}
+                  <span class="badge bg-{{ rk.risk_color }} ms-1" style="font-size:.7rem">{{ rk.risk_label }}</span>
+                  {% if rk.has_override %}<span class="badge bg-secondary" style="font-size:.65rem" title="Admin override">★</span>{% endif %}
+                {% endif %}
+              {% endif %}
+            </div>
             {% if s.customer_address %}
             <div class="text-muted small">{{ s.customer_address }}</div>
             {% endif %}

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\loyalty_wallet_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 1.0, 3000, 10000, '1', '100', 'Gold', 'Platinum', 'Silver', 'available', 'billing_redeem', 'customer_id', 'discount', 'earned_points', 'final_amount_paid', 'manual_redeem', 'new_balance', 'payable_total', 'points_balance', 'purchase_earn', 'redeemed_points', 'sale_id', 'tier', 'walk-in customer', 'wallet', 'wallet_id']

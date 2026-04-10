@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\competitor_pricing_service.py
+# hypothesis_version: 6.151.11
+
+[0.68, 0.74, 0.82, 0.98, 1.04, 1.07, 1.08, 100, 'comparisons', 'competitor_name', 'competitor_price', 'confidence', 'cost_price', 'current_price', 'difference', 'difference_pct', 'entry_id', 'observed_at', 'our_price', 'product', 'product_id', 'product_name', 'rationale', 'suggested_price']

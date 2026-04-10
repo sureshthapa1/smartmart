@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\ai_supplier_scorer.py
+# hypothesis_version: 6.151.11
+
+[20.0, 25.0, 100, 180, 10000, 'A', 'B', 'C', 'D', 'N/A', 'No purchase history.', 'Order Frequency', 'Price Consistency', 'Product Diversity', 'Purchase Volume', 'breakdown', 'contact', 'danger', 'diversity', 'frequency', 'generated_at', 'grade', 'grade_color', 'info', 'label', 'last_purchase_date', 'max', 'message', 'price_consistency', 'recent_6m_orders', 'recommendation', 'score', 'scorecards', 'stats', 'success', 'supplier_id', 'supplier_name', 'top_supplier', 'total_purchases', 'total_score', 'total_suppliers', 'total_value', 'unique_products', 'volume', 'warning']

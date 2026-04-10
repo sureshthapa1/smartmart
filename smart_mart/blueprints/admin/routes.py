@@ -329,3 +329,68 @@ def staff_activity():
 
     return render_template("admin/staff_activity.html",
                            activity_data=activity_data, recent=recent)
+
+
+# ── Backup & Restore ──────────────────────────────────────────────────────
+
+@admin_bp.route("/backup")
+@admin_required
+def backup():
+    from ...services import backup_service
+    logs = backup_service.get_backup_logs()
+    files = backup_service.list_backups()
+    return render_template("admin/backup.html", logs=logs, files=files)
+
+
+@admin_bp.route("/backup/create", methods=["POST"])
+@admin_required
+def create_backup():
+    from ...services import backup_service
+    from flask import Response
+    try:
+        result = backup_service.create_backup(user_id=current_user.id, backup_type="manual")
+        # Offer as download
+        return Response(
+            result["json_data"],
+            mimetype="application/json",
+            headers={"Content-Disposition": f"attachment; filename={result['filename']}"},
+        )
+    except Exception as e:
+        flash(f"Backup failed: {e}", "danger")
+        return redirect(url_for("admin.backup"))
+
+
+@admin_bp.route("/backup/delete", methods=["POST"])
+@admin_required
+def delete_backup():
+    from ...services import backup_service
+    filename = request.form.get("filename", "")
+    if backup_service.delete_backup_file(filename):
+        flash(f"Backup '{filename}' deleted.", "success")
+    else:
+        flash("Could not delete backup file.", "danger")
+    return redirect(url_for("admin.backup"))
+
+
+# ── Audit Log ─────────────────────────────────────────────────────────────
+
+@admin_bp.route("/audit-log")
+@admin_required
+def audit_log():
+    from ...services import audit_service
+    from ...models.user import User
+    from ...extensions import db as _db
+
+    entity_type = request.args.get("entity_type", "").strip() or None
+    user_id_raw = request.args.get("user_id", "").strip()
+    user_id = int(user_id_raw) if user_id_raw.isdigit() else None
+    page = request.args.get("page", 1, type=int)
+
+    logs = audit_service.get_logs(entity_type=entity_type, user_id=user_id, page=page)
+    users = _db.session.execute(_db.select(User).order_by(User.username)).scalars().all()
+    entity_types = ["Product", "Sale", "Purchase", "User", "Expense", "StockTake",
+                    "SupplierReturn", "Promotion"]
+    return render_template("admin/audit_log.html",
+                           logs=logs, users=users, entity_types=entity_types,
+                           selected_entity=entity_type or "",
+                           selected_user=user_id_raw, page=page)

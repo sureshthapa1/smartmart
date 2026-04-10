@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\auth\routes.py
+# hypothesis_version: 6.151.11
+
+['/auth', '/change-password', '/login', '/logout', 'GET', 'POST', 'auth', 'auth.login', 'auth/login.html', 'confirm_password', 'current_password', 'danger', 'dashboard.index', 'new_password', 'password', 'success', 'username', 'utf-8']

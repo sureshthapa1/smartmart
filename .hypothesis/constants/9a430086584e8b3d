@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\ai_trend_analyzer.py
+# hypothesis_version: 6.151.11
+
+[999, 1000, '%B %Y', '%Y-%m', '%w', 'Friday', 'Insufficient data.', 'Monday', 'Saturday', 'Sunday', 'Thursday', 'Tuesday', 'Wednesday', 'action', 'avg_sale', 'category', 'clearance_sale', 'cost_price', 'current_stock', 'day', 'day_of_week_pattern', 'days_idle', 'days_of_stock', 'dead_stock', 'dow', 'fast_moving_monthly', 'fast_moving_weekly', 'id', 'insight', 'items', 'label', 'last_sale_date', 'month', 'monthly', 'monthly_pattern', 'name', 'order_count', 'peak_day', 'peak_month', 'period', 'product_id', 'products', 'qty', 'qty_sold', 'quantity', 'recommendation', 'remove', 'revenue', 'seasonal', 'sku', 'start_date', 'stock_value', 'threshold_days', 'total_dead_products', 'velocity_per_day', 'weekly']

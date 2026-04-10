@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\promotions\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/<int:promo_id>/edit', '/api/check', '/create', '/promotions', 'Create', 'Edit', 'GET', 'POST', 'Promotion deleted.', 'Promotion updated.', 'all', 'buy_qty', 'created_by', 'danger', 'discount_value', 'end_date', 'free_qty', 'is_active', 'items', 'min_purchase', 'name', 'on', 'percentage', 'promo_type', 'promotions', 'promotions/form.html', 'promotions/list.html', 'scope', 'scope_value', 'start_date', 'subtotal', 'success']

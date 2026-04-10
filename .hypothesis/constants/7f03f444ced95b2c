@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\ai_simulation.py
+# hypothesis_version: 6.151.11
+
+[100, 999, 'Product not found', 'avg_sale', 'baseline', 'change_pct', 'cogs', 'current_stock', 'days_of_stock_left', 'error', 'expense_change', 'expenses', 'gross_profit', 'id', 'impact', 'margin_change', 'margin_pct', 'name', 'net_profit', 'pct_of_total_revenue', 'period_days', 'price', 'product', 'profit', 'profit_change', 'profit_change_pct', 'qty', 'qty_sold', 'recommendation', 'revenue', 'revenue_at_risk', 'revenue_change', 'scenario', 'simulated', 'sku', 'transactions', 'warning']

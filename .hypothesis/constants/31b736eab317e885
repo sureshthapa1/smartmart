@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\returns\routes.py
+# hypothesis_version: 6.151.11
+
+[403, '/', '/<int:return_id>', '/returns', '0', 'GET', 'POST', 'admin', 'cash', 'danger', 'end_date', 'notes', 'page', 'q', 'quantity', 'reason', 'refund_mode', 'returns', 'returns/create.html', 'returns/detail.html', 'returns/list.html', 'sale_item', 'sale_item_id', 'start_date', 'success']

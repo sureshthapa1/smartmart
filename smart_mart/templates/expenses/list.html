@@ -2,20 +2,60 @@
 {% block title %}Expenses — Smart Mart{% endblock %}
 {% block page_title %}Expense Management{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Expenses</li>{% endblock %}
-
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="page-header">
   <div>
-    <h5 class="fw-bold mb-1">Expenses</h5>
-    <p class="text-muted small mb-0">Track rent, salaries, utilities, and other costs</p>
+    <div class="page-header-title">Expenses</div>
+    <div class="page-header-sub">Track rent, salaries, utilities, and other costs</div>
   </div>
   <a href="{{ url_for('expenses.create_expense') }}" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Add Expense
   </a>
 </div>
 
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  {% set type_colors = {'rent':'#f97316','salary':'#6366f1','utilities':'#06b6d4','purchase':'#22c55e','miscellaneous':'#a855f7','other':'#94a3b8'} %}
+  {% for t, total_t in by_type.items() %}
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">{{ t | capitalize }}</div>
+        <div class="fw-bold" style="font-size:1rem;color:{{ type_colors.get(t,'#64748b') }}">
+          NPR {{ "%.0f"|format(total_t) }}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Monthly chart -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bar-chart me-2 text-primary"></i>Monthly Breakdown by Type</div>
+      <div class="card-body">
+        <canvas id="expenseChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Type breakdown donut -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pie-chart me-2 text-primary"></i>By Type (filtered period)</div>
+      <div class="card-body">
+        <canvas id="typeChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Filters -->
-<div class="card shadow-sm mb-3">
+<div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" class="row g-2 align-items-end">
       <div class="col-auto">
@@ -106,4 +146,54 @@
   </nav>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Monthly stacked bar chart
+const monthlyData = {{ monthly_chart | tojson }};
+const types = {{ expense_types | tojson }};
+const typeColors = {
+  rent:'#f97316', salary:'#6366f1', utilities:'#06b6d4',
+  purchase:'#22c55e', miscellaneous:'#a855f7', other:'#94a3b8'
+};
+const months = [...new Set(monthlyData.map(r => r.month))].sort();
+const datasets = types.map(t => ({
+  label: t.charAt(0).toUpperCase() + t.slice(1),
+  data: months.map(m => {
+    const row = monthlyData.find(r => r.month === m && r.type === t);
+    return row ? row.total : 0;
+  }),
+  backgroundColor: typeColors[t] || '#94a3b8',
+  borderRadius: 3,
+}));
+new Chart(document.getElementById('expenseChart'), {
+  type: 'bar',
+  data: { labels: months, datasets },
+  options: {
+    responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { stacked: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 },
+           callback: v => 'NPR ' + v.toLocaleString() } }
+    }
+  }
+});
+
+// Type donut
+const byType = {{ by_type | tojson }};
+new Chart(document.getElementById('typeChart'), {
+  type: 'doughnut',
+  data: {
+    labels: Object.keys(byType).map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+    datasets: [{ data: Object.values(byType),
+      backgroundColor: Object.keys(byType).map(t => typeColors[t] || '#94a3b8'),
+      borderWidth: 2, borderColor: '#fff' }]
+  },
+  options: {
+    responsive: true, cutout: '65%',
+    plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
+  }
+});
+</script>
 {% endblock %}

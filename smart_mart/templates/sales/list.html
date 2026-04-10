@@ -11,7 +11,7 @@
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('sales.customer_statement') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-person-lines-fill me-1"></i>Customer Statement</a>
-    <a href="{{ url_for('reports.export_sales_csv') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
+    <a href="{{ url_for('reports.export_sales_csv') }}{% if start_date or end_date %}?start_date={{ start_date }}&end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
     <a href="{{ url_for('sales.create_sale') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Sale</a>
   </div>
 </div>
@@ -19,6 +19,11 @@
 <div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div class="input-group" style="max-width:280px">
+        <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" class="form-control border-start-0 ps-0" name="q"
+               value="{{ search_q }}" placeholder="Customer, phone, invoice…">
+      </div>
       <div>
         <label class="form-label small fw-semibold mb-1">From</label>
         <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date }}">
@@ -27,9 +32,22 @@
         <label class="form-label small fw-semibold mb-1">To</label>
         <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date }}">
       </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">Payment</label>
+        <select name="payment" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="cash"   {{ 'selected' if pay_filter == 'cash'   }}>💵 Cash</option>
+          <option value="qr"     {{ 'selected' if pay_filter == 'qr'     }}>📱 QR</option>
+          <option value="card"   {{ 'selected' if pay_filter == 'card'   }}>💳 Card</option>
+          <option value="credit" {{ 'selected' if pay_filter == 'credit' }}>📋 Credit</option>
+          <option value="other"  {{ 'selected' if pay_filter == 'other'  }}>🔄 Other</option>
+        </select>
+      </div>
       <div class="d-flex gap-2 align-self-end">
         <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
-        {% if start_date or end_date %}<a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+        {% if start_date or end_date or search_q or pay_filter %}
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -99,10 +117,10 @@
     <span class="text-muted small">Page {{ page }}</span>
     <div class="d-flex gap-2">
       {% if page > 1 %}
-      <a href="?page={{ page-1 }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
+      <a href="?page={{ page-1 }}&start_date={{ start_date }}&end_date={{ end_date }}&q={{ search_q }}&payment={{ pay_filter }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
       {% endif %}
       {% if sales|length == 20 %}
-      <a href="?page={{ page+1 }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-sm btn-outline-secondary">Next →</a>
+      <a href="?page={{ page+1 }}&start_date={{ start_date }}&end_date={{ end_date }}&q={{ search_q }}&payment={{ pay_filter }}" class="btn btn-sm btn-outline-secondary">Next →</a>
       {% endif %}
     </div>
   </div>

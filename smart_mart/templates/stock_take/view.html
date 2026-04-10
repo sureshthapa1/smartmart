@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ take.reference }}{% endblock %}
+{% block page_title %}Stock Take Detail{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('stock_take.list_takes') }}" class="text-decoration-none">Stock Take</a></li>
+<li class="breadcrumb-item active">{{ take.reference }}</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">{{ take.reference }}</div>
+    {% set lbl, color = take.status_label %}
+    <span class="badge bg-{{ color }}">{{ lbl }}</span>
+  </div>
+  <div class="d-flex gap-2">
+    {% if take.status == 'in_progress' %}
+    <a href="{{ url_for('stock_take.count', take_id=take.id) }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Continue Counting
+    </a>
+    <form method="post" action="{{ url_for('stock_take.cancel', take_id=take.id) }}" class="d-inline">
+      <button type="submit" class="btn btn-outline-danger btn-sm"
+              onclick="return confirm('Cancel this stock take?')">Cancel</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Total Products</div>
+        <div class="fs-4 fw-bold">{{ take.items | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Counted</div>
+        <div class="fs-4 fw-bold text-success">
+          {{ take.items | selectattr('counted_qty', 'ne', None) | list | length }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">With Variance</div>
+        <div class="fs-4 fw-bold text-warning">{{ take.items_with_variance | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small">Net Variance</div>
+        <div class="fs-4 fw-bold {{ 'text-success' if take.total_variance >= 0 else 'text-danger' }}">
+          {{ '+' if take.total_variance > 0 else '' }}{{ take.total_variance }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Items</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th class="text-center">System Qty</th>
+            <th class="text-center">Counted Qty</th>
+            <th class="text-center">Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in take.items %}
+          <tr>
+            <td>{{ item.product.name if item.product else '—' }}</td>
+            <td><code class="text-muted small">{{ item.product.sku if item.product else '' }}</code></td>
+            <td class="text-center">{{ item.system_qty }}</td>
+            <td class="text-center">{{ item.counted_qty if item.counted_qty is not none else '—' }}</td>
+            <td class="text-center">
+              {% if item.counted_qty is not none %}
+                {% set v = item.variance %}
+                <span class="{{ 'text-success fw-semibold' if v > 0 else ('text-danger fw-semibold' if v < 0 else 'text-muted') }}">
+                  {{ '+' if v > 0 else '' }}{{ v }}
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

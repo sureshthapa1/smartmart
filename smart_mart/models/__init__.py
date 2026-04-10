@@ -40,6 +40,12 @@ from .purchase_order import PurchaseOrder, PurchaseOrderItem
 from .stock_transfer import StockTransfer, StockTransferItem
 from .shift import Shift
 from .notification_log import NotificationLog
+from .promotion import Promotion
+from .audit_log import AuditLog
+from .supplier_return import SupplierReturn, SupplierReturnItem
+from .stock_take import StockTake, StockTakeItem
+from .backup_log import BackupLog
+from .customer_risk_score import CustomerRiskScore
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
@@ -60,4 +66,10 @@ __all__ = [
     "StockTransfer", "StockTransferItem",
     "Shift",
     "NotificationLog",
+    "Promotion",
+    "AuditLog",
+    "SupplierReturn", "SupplierReturnItem",
+    "StockTake", "StockTakeItem",
+    "BackupLog",
+    "CustomerRiskScore",
 ]

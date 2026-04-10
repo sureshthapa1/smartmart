@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\user_permissions.py
+# hypothesis_version: 6.151.11
+
+['User', 'UserPermissions', 'id', 'permissions', 'user_id', 'user_permissions', 'users.id']

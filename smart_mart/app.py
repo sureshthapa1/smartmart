@@ -89,6 +89,16 @@ def create_app(config_name="development"):
             except Exception:
                 pass
 
+    # ── Jinja2 custom filters ─────────────────────────────────────────────
+    import json as _json
+
+    @app.template_filter("from_json")
+    def from_json_filter(value):
+        try:
+            return _json.loads(value)
+        except Exception:
+            return {}
+
     # ── Alert count context processor (sidebar badge) ────────────────────
     @app.context_processor
     def inject_alert_count():
@@ -97,6 +107,7 @@ def create_app(config_name="development"):
             if current_user.is_authenticated:
                 from .services.alert_engine import get_low_stock_alerts, get_expiry_alerts
                 from .models.dismissed_alert import DismissedAlert
+                from .models.online_order import OnlineOrder
                 dismissed = set(
                     db.session.execute(
                         db.select(DismissedAlert.alert_key)
@@ -106,10 +117,17 @@ def create_app(config_name="development"):
                 low_stock = [p for p in get_low_stock_alerts() if f"low_stock:{p.id}" not in dismissed]
                 expiry = [p for p in get_expiry_alerts() if f"expiry:{p.id}" not in dismissed]
                 count = len(low_stock) + len(expiry)
-                return {"global_alert_count": count}
+                # Pending online orders badge (admin only)
+                pending_orders = 0
+                if current_user.role == "admin":
+                    pending_orders = db.session.execute(
+                        db.select(db.func.count(OnlineOrder.id))
+                        .where(OnlineOrder.status == "pending")
+                    ).scalar() or 0
+                return {"global_alert_count": count, "pending_orders_count": pending_orders}
         except Exception:
             pass
-        return {"global_alert_count": 0}
+        return {"global_alert_count": 0, "pending_orders_count": 0}
 
     # ── Root redirect ─────────────────────────────────────────────────────
     @app.route("/")
@@ -161,6 +179,10 @@ def _register_blueprints(app):
         (".blueprints.advisor", "advisor_bp"),
         (".blueprints.purchase_orders", "po_bp"),
         (".blueprints.transfers", "transfers_bp"),
+        (".blueprints.supplier_returns", "supplier_returns_bp"),
+        (".blueprints.promotions", "promotions_bp"),
+        (".blueprints.stock_take", "stock_take_bp"),
+        (".blueprints.customers", "customers_bp"),
     ]
 
     for module_path, bp_name in blueprints:

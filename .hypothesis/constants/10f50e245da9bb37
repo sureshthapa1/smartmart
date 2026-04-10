@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\supplier_return.py
+# hypothesis_version: 6.151.11
+
+[120, 255, 'Cancelled', 'Credited', 'Pending', 'Product', 'Purchase', 'Sent', 'Supplier', 'SupplierReturn', 'SupplierReturnItem', 'Unknown', 'User', 'all, delete-orphan', 'cancelled', 'credited', 'danger', 'info', 'items', 'pending', 'products.id', 'purchases.id', 'secondary', 'select', 'sent', 'success', 'supplier_return', 'supplier_returns', 'supplier_returns.id', 'suppliers.id', 'users.id', 'warning']

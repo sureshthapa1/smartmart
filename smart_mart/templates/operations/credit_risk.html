@@ -57,6 +57,12 @@
     <span class="fw-semibold"><i class="bi bi-shield-exclamation me-2 text-primary"></i>Customer Risk Scores</span>
     <div class="d-flex gap-2">
       <input type="text" id="riskSearch" class="form-control form-control-sm" placeholder="Search customer…" style="width:200px">
+      <form method="post" action="{{ url_for('operations.credit_risk_recalculate') }}"
+            onsubmit="return confirm('Recalculate all risk scores?')">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All
+        </button>
+      </form>
     </div>
   </div>
   <div class="table-responsive">
@@ -98,6 +104,7 @@
           </td>
           <td class="text-center">
             <span class="badge bg-{{ s.risk_color }} px-3 py-2" style="font-size:.8rem">{{ s.risk_label }}</span>
+            {% if s.get('has_override') %}<span class="badge bg-secondary ms-1" title="Admin override active">★</span>{% endif %}
           </td>
           <td class="text-end">NPR {{ "%.0f"|format(s.total_borrowed) }}</td>
           <td class="text-end fw-semibold {% if s.total_outstanding > 0 %}text-danger{% else %}text-success{% endif %}">
@@ -119,9 +126,17 @@
             </span>
           </td>
           <td>
+            <div class="d-flex gap-1">
             <a href="{{ url_for('operations.credit_risk_detail', customer_name=s.customer_name) }}" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-eye"></i>
             </a>
+            <button type="button" class="btn btn-sm btn-outline-primary"
+                    data-bs-toggle="modal" data-bs-target="#overrideModal"
+                    data-customer="{{ s.customer_name }}"
+                    data-current="{{ s.get('override_tier', '') or '' }}">
+              {% if s.get('has_override') %}<i class="bi bi-star-fill text-warning"></i>{% else %}<i class="bi bi-pencil"></i>{% endif %}
+            </button>
+            </div>
           </td>
         </tr>
         {% else %}
@@ -136,6 +151,36 @@
 </div>
 {% endblock %}
 
+<!-- Override Modal -->
+<div class="modal fade" id="overrideModal" tabindex="-1" aria-labelledby="overrideModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="overrideModalLabel">Override Risk Tier</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('operations.credit_risk_override') }}">
+        <div class="modal-body">
+          <p class="text-muted small mb-3">Customer: <strong id="overrideCustomerLabel"></strong></p>
+          <input type="hidden" name="customer_name" id="overrideCustomerName">
+          <label class="form-label fw-semibold">Override Tier</label>
+          <select name="override_tier" id="overrideTierSelect" class="form-select">
+            <option value="">— Clear Override —</option>
+            <option value="safe">🟢 Safe</option>
+            <option value="moderate">🟡 Moderate</option>
+            <option value="risky">🔴 Risky</option>
+          </select>
+          <div class="form-text mt-2">Select "Clear Override" to revert to computed tier.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Override</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% block scripts %}
 <script>
 document.getElementById('riskSearch').addEventListener('input', function() {
@@ -144,5 +189,17 @@ document.getElementById('riskSearch').addEventListener('input', function() {
     row.style.display = row.dataset.name.includes(q) ? '' : 'none';
   });
 });
+
+// Populate override modal
+const overrideModal = document.getElementById('overrideModal');
+if (overrideModal) {
+  overrideModal.addEventListener('show.bs.modal', function(e) {
+    const btn = e.relatedTarget;
+    document.getElementById('overrideCustomerName').value = btn.dataset.customer;
+    document.getElementById('overrideCustomerLabel').textContent = btn.dataset.customer;
+    const sel = document.getElementById('overrideTierSelect');
+    sel.value = btn.dataset.current || '';
+  });
+}
 </script>
 {% endblock %}

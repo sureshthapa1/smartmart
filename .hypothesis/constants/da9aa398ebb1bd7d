@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\supplier_return_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'adjustment_in', 'cancelled', 'credited', 'pending', 'product_id', 'quantity', 'reason', 'sent', 'supplier_return', 'unit_cost']

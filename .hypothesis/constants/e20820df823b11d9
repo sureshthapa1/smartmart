@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\promotion_service.py
+# hypothesis_version: 6.151.11
+
+['all', 'buy_qty', 'created_by', 'discount', 'discount_value', 'end_date', 'free_qty', 'id', 'is_active', 'min_purchase', 'name', 'percentage', 'promo_type', 'scope', 'scope_value', 'start_date', 'type']

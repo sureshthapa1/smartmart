@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\purchase.py
+# hypothesis_version: 6.151.11
+
+['Product', 'Purchase', 'PurchaseItem', 'Supplier', 'User', 'all, delete-orphan', 'items', 'products.id', 'purchase', 'purchase_items', 'purchases', 'purchases.id', 'suppliers.id', 'users.id']

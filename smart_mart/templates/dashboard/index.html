@@ -18,12 +18,14 @@
 {% block content %}
 
 {% if nlg_summary %}
+{% if current_user.role == 'admin' %}
 <div class="alert alert-info alert-dismissible fade show d-flex gap-2 mb-3" role="alert" id="nlgBanner">
   <i class="bi bi-stars flex-shrink-0 mt-1"></i>
   <div class="small" style="white-space:pre-line;">{{ nlg_summary }}</div>
   <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"
           onclick="fetch('/api/nlg/dismiss', {method:'POST'})"></button>
 </div>
+{% endif %}
 {% endif %}
 
 <!-- Date Filter Bar -->
@@ -67,7 +69,7 @@
 </div>
 
 <!-- Smart Insights -->
-{% if insights %}
+{% if insights and current_user.role == 'admin' %}
 <div class="d-flex gap-2 mb-4 flex-wrap">
   {% for ins in insights %}
   <span class="badge rounded-pill insight-badge bg-{{ ins.type }} bg-opacity-10 text-{{ ins.type }} border border-{{ ins.type }} border-opacity-25 px-3 py-2">
@@ -89,6 +91,7 @@
       </div>
     </div>
   </div>
+  {% if current_user.role == 'admin' %}
   <div class="col-6 col-xl-3">
     <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6">
       <div class="card-body p-4">
@@ -109,7 +112,6 @@
       </div>
     </div>
   </div>
-  {% if current_user.role == 'admin' %}
   <div class="col-6 col-xl-3">
     <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#7e22ce">
       <div class="card-body p-4">
@@ -117,6 +119,28 @@
         <div class="stat-value">NPR {{ "%.0f"|format(monthly_profit) }}</div>
         <div class="stat-sub">This month</div>
         <div class="stat-bg">🎯</div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  {# Staff: show their own sales count instead of profit/cash #}
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe);color:#155e75">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-calendar-week me-1"></i>This Week</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(weekly_sales) }}</div>
+        <div class="stat-sub">{{ weekly_sales_count }} sales</div>
+        <div class="stat-bg">📅</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#6b21a8">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-calendar-month me-1"></i>This Month</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(monthly_sales) }}</div>
+        <div class="stat-sub">{{ monthly_sales_count }} sales</div>
+        <div class="stat-bg">🗓️</div>
       </div>
     </div>
   </div>
@@ -135,6 +159,7 @@
       </div>
     </div>
   </div>
+  {% if current_user.role == 'admin' %}
   <div class="col-6 col-xl-3">
     <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#9a3412">
       <div class="card-body p-4">
@@ -165,6 +190,19 @@
       </div>
     </div>
   </div>
+  {% else %}
+  {# Staff: show product count (no cost value) #}
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#9a3412">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-box-seam me-1"></i>Products</div>
+        <div class="stat-value">{{ total_products }}</div>
+        <div class="stat-sub">In inventory</div>
+        <div class="stat-bg">📦</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Alert Cards (clickable) -->

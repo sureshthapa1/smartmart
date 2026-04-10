@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\alerts\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/alerts', '/api/summary', '/dismiss', 'POST', 'alerts', 'alerts.index', 'alerts/index.html', 'calendar-x-fill', 'color', 'count', 'danger', 'expiry', 'fire', 'high_demand', 'icon', 'info', 'items', 'label', 'low_stock', 'type', 'warning']

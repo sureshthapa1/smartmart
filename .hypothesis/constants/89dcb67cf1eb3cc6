@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\config.py
+# hypothesis_version: 6.151.11
+
+['DATABASE_URL', 'SECRET_KEY', 'default', 'development', 'production', 'sqlite:///:memory:', 'testing']

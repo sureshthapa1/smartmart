@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\operations.py
+# hypothesis_version: 6.151.11
+
+[120, 255, 'Product', 'Purchase', 'Sale', 'Supplier', 'User', 'app_notifications', 'branches', 'cash', 'cash_sessions', 'info', 'open', 'product_batches', 'products.id', 'purchases.id', 'sales.id', 'supplier_payments', 'suppliers.id', 'users.id']

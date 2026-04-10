@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}{{ cat.name }} — Category Detail{% endblock %}
+{% block page_title %}{{ cat.name }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_categories') }}" class="text-decoration-none">Categories</a></li>
+<li class="breadcrumb-item active">{{ cat.name }}</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem">
+      <i class="bi bi-tag-fill"></i>
+    </div>
+    <div>
+      <div class="page-header-title">{{ cat.name }}</div>
+      <div class="page-header-sub">{{ enriched | length }} product{{ 's' if enriched | length != 1 }}</div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('inventory.edit_category', cat_id=cat.id) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Edit Category
+    </a>
+    <a href="{{ url_for('inventory.list_products') }}?q={{ cat.name }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-box-seam me-1"></i>View in Inventory
+    </a>
+  </div>
+</div>
+
+<!-- KPI cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Products</div>
+        <div class="fw-bold fs-4 text-primary">{{ enriched | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Total Stock</div>
+        <div class="fw-bold fs-4">{{ total_stock }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Stock Value</div>
+        <div class="fw-bold" style="font-size:1rem">NPR {{ "%.0f" | format(total_stock_value) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Revenue 30d</div>
+        <div class="fw-bold text-success" style="font-size:1rem">NPR {{ "%.0f" | format(total_revenue_30d) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Sold 30d</div>
+        <div class="fw-bold text-success" style="font-size:1rem">{{ total_qty_sold_30d }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card text-center h-100">
+      <div class="card-body py-3 px-2">
+        <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase">Stock Alerts</div>
+        <div class="fw-bold" style="font-size:1rem">
+          {% if out_of_stock > 0 %}
+          <span class="text-danger">{{ out_of_stock }} out</span>
+          {% endif %}
+          {% if low_stock > 0 %}
+          <span class="text-warning ms-1">{{ low_stock }} low</span>
+          {% endif %}
+          {% if out_of_stock == 0 and low_stock == 0 %}
+          <span class="text-success">All OK</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Revenue trend chart -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-graph-up me-2 text-primary"></i>Revenue Trend (14 days)</div>
+      <div class="card-body">
+        {% if trend_labels %}
+        <canvas id="trendChart" height="160"></canvas>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-graph-up fs-2 opacity-25 d-block mb-2"></i>No sales data in last 14 days.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Top products by revenue -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-trophy me-2 text-warning"></i>Top Products by Revenue (30 days)</div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th class="text-center">Sold</th>
+              <th class="text-end">Revenue</th>
+              <th class="text-end">Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in enriched[:8] %}
+            <tr>
+              <td class="text-muted small">{{ loop.index }}</td>
+              <td>
+                <div class="fw-semibold" style="font-size:.875rem">{{ e.product.name }}</div>
+                <code class="text-muted" style="font-size:.72rem">{{ e.product.sku }}</code>
+              </td>
+              <td class="text-center">
+                <span class="badge bg-light text-dark border">{{ e.qty_sold_30d }}</span>
+              </td>
+              <td class="text-end fw-semibold text-success">
+                {% if e.revenue_30d > 0 %}NPR {{ "%.0f" | format(e.revenue_30d) }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end small {% if e.profit_30d > 0 %}text-success{% elif e.profit_30d < 0 %}text-danger{% else %}text-muted{% endif %}">
+                {% if e.profit_30d != 0 %}NPR {{ "%.0f" | format(e.profit_30d) }}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No sales data.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Full product table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-box-seam me-2 text-primary"></i>All Products in {{ cat.name }}</span>
+    <a href="{{ url_for('inventory.create_product') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Add Product
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th class="text-end">Cost</th>
+            <th class="text-end">Price</th>
+            <th class="text-center">Stock</th>
+            <th class="text-end">Stock Value</th>
+            <th class="text-end">Revenue 30d</th>
+            <th>Expiry</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in enriched %}
+          {% set p = e.product %}
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                {% if p.image_filename %}
+                <img src="{{ url_for('static', filename='uploads/products/' ~ p.image_filename) }}"
+                     style="width:30px;height:30px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid #e2e8f0">
+                {% else %}
+                <div style="width:30px;height:30px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">📦</div>
+                {% endif %}
+                <span class="fw-semibold" style="font-size:.875rem">{{ p.name }}</span>
+              </div>
+            </td>
+            <td><code class="text-muted" style="font-size:.75rem">{{ p.sku }}</code></td>
+            <td class="text-end text-muted small">{{ "%.2f" | format(p.cost_price | float) }}</td>
+            <td class="text-end fw-semibold">{{ "%.2f" | format(p.selling_price | float) }}</td>
+            <td class="text-center">
+              <span class="badge {% if p.quantity == 0 %}bg-danger{% elif p.quantity <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                {{ p.quantity }} {{ p.unit or 'pcs' }}
+              </span>
+            </td>
+            <td class="text-end text-muted small">NPR {{ "%.0f" | format(p.cost_price | float * p.quantity) }}</td>
+            <td class="text-end">
+              {% if e.revenue_30d > 0 %}
+              <span class="text-success fw-semibold small">NPR {{ "%.0f" | format(e.revenue_30d) }}</span>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if p.expiry_date %}
+                {% set days_left = (p.expiry_date - today).days %}
+                <span class="{% if days_left < 0 %}text-danger fw-semibold{% elif days_left <= 30 %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                  {{ p.expiry_date.strftime('%d %b %Y') }}
+                  {% if days_left < 0 %} <i class="bi bi-exclamation-triangle-fill"></i>
+                  {% elif days_left <= 30 %} ({{ days_left }}d){% endif %}
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Adjust Stock"><i class="bi bi-arrow-left-right"></i></a>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="text-center text-muted py-5">
+              <i class="bi bi-box-seam fs-1 d-block mb-2 opacity-25"></i>
+              No products in this category.
+              <a href="{{ url_for('inventory.create_product') }}">Add one</a>.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% if enriched %}
+        <tfoot>
+          <tr style="background:#f8fafc;font-weight:600">
+            <td colspan="4" class="text-end text-muted small">Totals:</td>
+            <td class="text-center">{{ total_stock }} units</td>
+            <td class="text-end small">NPR {{ "%.0f" | format(total_stock_value) }}</td>
+            <td class="text-end small text-success">NPR {{ "%.0f" | format(total_revenue_30d) }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{% if trend_labels %}
+<script>
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: {{ trend_labels | tojson }},
+    datasets: [{
+      label: 'Revenue (NPR)',
+      data: {{ trend_data | tojson }},
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,.08)',
+      borderWidth: 2,
+      pointRadius: 3,
+      pointBackgroundColor: '#6366f1',
+      fill: true,
+      tension: 0.4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 },
+           callback: v => 'NPR ' + v.toLocaleString() } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -271,3 +271,32 @@ def credit_risk_detail(customer_name):
     from ...services.credit_risk_service import calculate_risk_score
     data = calculate_risk_score(customer_name)
     return render_template("operations/credit_risk_detail.html", data=data, today=date.today())
+
+
+@operations_bp.route("/credit-risk/recalculate", methods=["POST"])
+@admin_required
+def credit_risk_recalculate():
+    from ...services.credit_risk_service import recalculate_all
+    count = recalculate_all()
+    flash(f"Risk scores recalculated for {count} customer(s).", "success")
+    return redirect(url_for("operations.credit_risk"))
+
+
+@operations_bp.route("/credit-risk/override", methods=["POST"])
+@admin_required
+def credit_risk_override():
+    from ...services.credit_risk_service import set_override
+    customer_name = request.form.get("customer_name", "").strip()
+    override_tier = request.form.get("override_tier", "").strip() or None
+    if not customer_name:
+        flash("Customer name is required.", "danger")
+        return redirect(url_for("operations.credit_risk"))
+    try:
+        set_override(customer_name, override_tier, current_user.id)
+        if override_tier:
+            flash(f"Override set to '{override_tier}' for {customer_name}.", "success")
+        else:
+            flash(f"Override cleared for {customer_name}.", "info")
+    except ValueError as e:
+        flash(str(e), "danger")
+    return redirect(url_for("operations.credit_risk"))

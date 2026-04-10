@@ -13,6 +13,7 @@
     {% if current_user.role == 'admin' %}
     <a href="{{ url_for('purchase_orders.list_pos') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-text me-1"></i>Purchase Orders</a>
     <a href="{{ url_for('purchases.list_suppliers') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-people me-1"></i>Suppliers</a>
+    <a href="{{ url_for('purchases.export_csv') }}{% if start_date or end_date %}?start_date={{ start_date }}&end_date={{ end_date }}{% endif %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
     {% endif %}
     <a href="{{ url_for('purchases.bulk_upload') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-cloud-upload me-1"></i>Bulk Upload</a>
     <a href="{{ url_for('purchases.create_purchase') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Purchase</a>
@@ -49,6 +50,7 @@
           <th>Created by</th>
           <th class="text-center">Items</th>
           <th class="text-end">Total Cost (NPR)</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -60,10 +62,14 @@
           <td class="text-muted small">{{ p.creator.username if p.creator else '—' }}</td>
           <td class="text-center"><span class="badge bg-light text-dark border">{{ p.items|length }}</span></td>
           <td class="text-end fw-semibold">{{ "%.2f"|format(p.total_cost|float) }}</td>
+          <td>
+            <a href="{{ url_for('purchases.purchase_detail', purchase_id=p.id) }}"
+               class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="text-center text-muted py-5">
+          <td colspan="7" class="text-center text-muted py-5">
             <i class="bi bi-truck fs-1 d-block mb-2 opacity-25"></i>
             No purchases found. <a href="{{ url_for('purchases.create_purchase') }}">Add one</a>.
           </td>

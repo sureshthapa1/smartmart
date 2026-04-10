@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\shift.py
+# hypothesis_version: 6.151.11
+
+['CashSession', 'User', 'cash_sessions.id', 'open', 'shift', 'shifts', 'users.id']

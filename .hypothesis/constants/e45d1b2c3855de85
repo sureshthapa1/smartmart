@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\report_engine.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, '%H', '%Y-%m', '%Y-W%W', 'Uncategorized', 'active_days', 'avg_sale', 'avg_transaction', 'best_day', 'best_day_revenue', 'category', 'closing', 'cnt', 'cogs', 'cost', 'daily', 'date', 'day', 'discount_rate', 'hour', 'items', 'items_sold', 'label', 'margin', 'monthly', 'opening', 'peak_hour', 'period', 'product', 'profit', 'qty', 'qty_sold', 'revenue', 'role', 'sales_per_day', 'times_sold', 'top_product', 'top_product_qty', 'total', 'total_discount', 'total_items_sold', 'total_revenue', 'total_transactions', 'transactions', 'user', 'username', 'valuation', 'weekly', '—']

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\purchase_manager.py
+# hypothesis_version: 6.151.11
+
+['address', 'contact', 'email', 'end_date', 'name', 'product_id', 'purchase', 'quantity', 'start_date', 'unit_cost']

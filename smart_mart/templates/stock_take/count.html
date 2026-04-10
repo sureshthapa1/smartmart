@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Count — {{ take.reference }}{% endblock %}
+{% block page_title %}Stock Count{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('stock_take.list_takes') }}" class="text-decoration-none">Stock Take</a></li>
+<li class="breadcrumb-item active">{{ take.reference }}</li>
+{% endblock %}
+{% block head %}
+<style>
+  .count-row td { vertical-align: middle; }
+  .variance-pos { color: #16a34a; font-weight: 600; }
+  .variance-neg { color: #dc2626; font-weight: 600; }
+  .count-input { width: 90px; text-align: center; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">{{ take.reference }}</div>
+    <div class="page-header-sub">Enter actual counted quantities for each product</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+      <i class="bi bi-printer me-1"></i>Print Sheet
+    </button>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#completeModal">
+      <i class="bi bi-check-circle me-1"></i>Complete Count
+    </button>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2 px-3 d-flex align-items-center gap-3">
+    <span class="text-muted small">Progress:</span>
+    <div class="progress flex-grow-1" style="height:8px;">
+      {% set counted = take.items | selectattr('counted_qty', 'ne', None) | list | length %}
+      {% set total = take.items | length %}
+      {% set pct = (counted / total * 100) | int if total else 0 %}
+      <div class="progress-bar bg-success" style="width:{{ pct }}%"></div>
+    </div>
+    <span class="fw-semibold small">{{ counted }}/{{ total }}</span>
+  </div>
+</div>
+
+<form method="post" id="countForm">
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Category</th>
+              <th class="text-center">System Qty</th>
+              <th class="text-center">Counted Qty</th>
+              <th class="text-center">Variance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in take.items %}
+            <tr class="count-row" id="row-{{ item.product_id }}">
+              <td class="fw-medium">{{ item.product.name if item.product else '—' }}</td>
+              <td><code class="text-muted small">{{ item.product.sku if item.product else '' }}</code></td>
+              <td class="text-muted small">{{ item.product.category if item.product else '' }}</td>
+              <td class="text-center">{{ item.system_qty }}</td>
+              <td class="text-center">
+                <input type="number" class="form-control form-control-sm count-input"
+                       name="count_{{ item.product_id }}"
+                       id="count_{{ item.product_id }}"
+                       value="{{ item.counted_qty if item.counted_qty is not none else '' }}"
+                       min="0" placeholder="—"
+                       data-system="{{ item.system_qty }}"
+                       data-pid="{{ item.product_id }}"
+                       data-take="{{ take.id }}">
+              </td>
+              <td class="text-center variance-cell" id="var-{{ item.product_id }}">
+                {% if item.counted_qty is not none %}
+                  {% set v = item.variance %}
+                  <span class="{{ 'variance-pos' if v > 0 else ('variance-neg' if v < 0 else 'text-muted') }}">
+                    {{ '+' if v > 0 else '' }}{{ v }}
+                  </span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card-footer bg-white d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-save me-1"></i>Save All Counts
+      </button>
+      <a href="{{ url_for('stock_take.list_takes') }}" class="btn btn-outline-secondary">Back</a>
+    </div>
+  </div>
+</form>
+
+<!-- Complete Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-check-circle text-success me-2"></i>Complete Stock Take</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to apply the counted quantities to inventory?</p>
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Applying adjustments will update product stock levels to match counted quantities.
+        </div>
+        <form method="post" action="{{ url_for('stock_take.complete', take_id=take.id) }}" id="completeForm">
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="apply_adjustments" value="1" id="applyAdj" checked>
+            <label class="form-check-label" for="applyAdj">Apply variances to inventory</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="completeForm" class="btn btn-success">
+          <i class="bi bi-check-lg me-1"></i>Complete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Live variance calculation + auto-save via AJAX
+document.querySelectorAll('.count-input').forEach(input => {
+  input.addEventListener('input', function() {
+    const pid = this.dataset.pid;
+    const system = parseInt(this.dataset.system) || 0;
+    const counted = this.value !== '' ? parseInt(this.value) : null;
+    const varCell = document.getElementById('var-' + pid);
+    if (counted !== null && !isNaN(counted)) {
+      const v = counted - system;
+      varCell.innerHTML = `<span class="${v > 0 ? 'variance-pos' : (v < 0 ? 'variance-neg' : 'text-muted')}">${v > 0 ? '+' : ''}${v}</span>`;
+    } else {
+      varCell.innerHTML = '<span class="text-muted">—</span>';
+    }
+  });
+
+  // Auto-save on blur
+  input.addEventListener('blur', async function() {
+    const pid = this.dataset.pid;
+    const takeId = this.dataset.take;
+    const val = this.value.trim();
+    if (val === '') return;
+    try {
+      await fetch(`/stock-take/${takeId}/api/save-count`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({product_id: parseInt(pid), counted_qty: parseInt(val)}),
+      });
+      this.style.borderColor = '#22c55e';
+      setTimeout(() => this.style.borderColor = '', 1500);
+    } catch(e) {}
+  });
+});
+</script>
+{% endblock %}

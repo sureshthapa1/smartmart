@@ -46,6 +46,7 @@ class SaleItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    cost_price = db.Column(db.Numeric(10, 2), nullable=True)   # cost at time of sale
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
 
     # Relationships

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\__init__.py
+# hypothesis_version: 6.151.11
+
+['AIAlert', 'AIDecisionLog', 'AIFeedbackLog', 'AIModelVersion', 'AIRecommendation', 'AIRetrainingLog', 'AppNotification', 'AuditLog', 'BackupLog', 'Branch', 'CashSession', 'Category', 'CompetitorPriceEntry', 'Customer', 'CustomerRiskScore', 'DeviceSyncState', 'DismissedAlert', 'Expense', 'LoyaltyWallet', 'NotificationLog', 'OnlineOrder', 'OnlineOrderItem', 'Product', 'ProductBatch', 'ProductIconMap', 'ProductVariant', 'Promotion', 'Purchase', 'PurchaseItem', 'PurchaseOrder', 'PurchaseOrderItem', 'Sale', 'SaleItem', 'SaleReturn', 'SaleReturnItem', 'Shift', 'ShopSettings', 'StockMovement', 'StockTake', 'StockTakeItem', 'StockTransfer', 'StockTransferItem', 'Supplier', 'SupplierPayment', 'SupplierReturn', 'SupplierReturnItem', 'SyncEvent', 'User', 'UserActivity', 'UserPermissions']

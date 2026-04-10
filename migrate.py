@@ -67,3 +67,84 @@ with app.app_context():
 
     print("\nMigration complete.")
 
+
+# ── New features migration (Features 1-10) ────────────────────────────────────
+with app.app_context():
+    db.create_all()
+    print("\nNew feature tables created (if any).")
+
+    with db.engine.connect() as conn:
+        def safe_add(table, column, col_type):
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                conn.commit()
+                print(f"  + {table}.{column}")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column" in msg or "already exists" in msg:
+                    print(f"  ~ {table}.{column} already exists")
+                else:
+                    print(f"  ! {table}.{column} ERROR: {e}")
+
+        print("\n--- stock_movements (new types) ---")
+        # change_type column already exists; new values: damage, loss, theft, expiry, supplier_return
+        print("  ~ change_type supports new values: damage, loss, theft, expiry, supplier_return")
+
+        print("\n--- promotions ---")
+        print("  (created by db.create_all)")
+
+        print("\n--- audit_logs ---")
+        print("  (created by db.create_all)")
+
+        print("\n--- supplier_returns / supplier_return_items ---")
+        print("  (created by db.create_all)")
+
+        print("\n--- stock_takes / stock_take_items ---")
+        print("  (created by db.create_all)")
+
+        print("\n--- backup_logs ---")
+        print("  (created by db.create_all)")
+
+    print("\nFeature migration complete.")
+
+# ── Data sync fixes migration ─────────────────────────────────────────────────
+with app.app_context():
+    db.create_all()
+    with db.engine.connect() as conn:
+        def safe_add(table, column, col_type):
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                conn.commit()
+                print(f"  + {table}.{column}")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column" in msg or "already exists" in msg:
+                    print(f"  ~ {table}.{column} already exists")
+                else:
+                    print(f"  ! {table}.{column} ERROR: {e}")
+
+        print("\n--- sale_items (historical cost) ---")
+        safe_add("sale_items", "cost_price", "NUMERIC(10,2)")
+
+    print("\nData sync migration complete.")
+
+# ── Items 1-8 migration ───────────────────────────────────────────────────────
+with app.app_context():
+    db.create_all()
+    with db.engine.connect() as conn:
+        def safe_add(table, column, col_type):
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                conn.commit()
+                print(f"  + {table}.{column}")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column" in msg or "already exists" in msg:
+                    print(f"  ~ {table}.{column} already exists")
+                else:
+                    print(f"  ! {table}.{column} ERROR: {e}")
+
+        print("\n--- shop_settings (logo) ---")
+        safe_add("shop_settings", "logo_filename", "VARCHAR(255)")
+
+    print("\nItems 1-8 migration complete.")

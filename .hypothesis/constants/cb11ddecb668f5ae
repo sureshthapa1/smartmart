@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\transfers\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/<int:transfer_id>', '/create', '/transfers', 'GET', 'POST', 'Transfer cancelled.', 'danger', 'from_branch_id', 'notes', 'product_id', 'quantity', 'success', 'to_branch_id', 'transfers', 'transfers/form.html', 'transfers/list.html']

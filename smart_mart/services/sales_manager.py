@@ -84,7 +84,9 @@ def create_sale(items: list[dict], user_id: int,
             unit_price = item["unit_price"]
             db.session.add(SaleItem(
                 sale_id=sale.id, product_id=product.id,
-                quantity=qty, unit_price=unit_price, subtotal=unit_price * qty,
+                quantity=qty, unit_price=unit_price,
+                cost_price=product.cost_price,   # snapshot cost at time of sale
+                subtotal=unit_price * qty,
             ))
             product.quantity -= qty
             db.session.add(StockMovement(
@@ -104,8 +106,10 @@ def create_sale(items: list[dict], user_id: int,
             from ..models.customer import Customer
             if customer_name and customer_name.strip().lower() != "walk-in customer":
                 Customer.upsert(customer_name, customer_phone, customer_address)
-        except Exception:
-            pass
+                db.session.flush()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Customer upsert failed: %s", e)
 
         try:
             from . import loyalty_wallet_service
@@ -123,6 +127,17 @@ def create_sale(items: list[dict], user_id: int,
         db.session.rollback()
         raise
 
+    # Audit log (outside transaction)
+    try:
+        from . import audit_service
+        audit_service.log("create", "Sale", sale.id,
+                          f"Invoice {sale.invoice_number or sale.id}",
+                          changes={"total_amount": [None, str(sale.total_amount)],
+                                   "payment_mode": [None, sale.payment_mode]})
+        db.session.commit()
+    except Exception:
+        pass
+
     return sale
 
 
@@ -131,12 +146,22 @@ def get_sale(sale_id: int) -> Sale:
 
 
 def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
+    from sqlalchemy import or_
     stmt = db.select(Sale).order_by(Sale.sale_date.desc())
     conditions = []
     if filters.get("start_date"):
         conditions.append(Sale.sale_date >= filters["start_date"])
     if filters.get("end_date"):
         conditions.append(Sale.sale_date <= filters["end_date"])
+    if filters.get("payment_mode"):
+        conditions.append(Sale.payment_mode == filters["payment_mode"])
+    if filters.get("search"):
+        term = f"%{filters['search'].lower()}%"
+        conditions.append(or_(
+            db.func.lower(Sale.customer_name).like(term),
+            db.func.lower(Sale.customer_phone).like(term),
+            db.func.lower(Sale.invoice_number).like(term),
+        ))
     if conditions:
         stmt = stmt.where(and_(*conditions))
     stmt = stmt.limit(per_page).offset((page - 1) * per_page)
@@ -183,6 +208,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     shop_name = "Smart Mart"
     shop_pan = shop_address = shop_phone = shop_email = ""
     footer_note = "Thank you for your business!"
+    shop_logo_path = None
     try:
         from ..models.shop_settings import ShopSettings
         s = ShopSettings.get()
@@ -192,6 +218,12 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         shop_phone = s.phone or ""
         shop_email = s.email or ""
         footer_note = s.footer_note or footer_note
+        if s.logo_filename:
+            import os
+            from flask import current_app
+            logo_path = os.path.join(current_app.static_folder, "uploads", "shop", s.logo_filename)
+            if os.path.exists(logo_path):
+                shop_logo_path = logo_path
     except Exception:
         pass
 

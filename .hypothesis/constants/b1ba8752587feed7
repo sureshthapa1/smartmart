@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\ai_invoice_detector.py
+# hypothesis_version: 6.151.11
+
+[0.0, 0.3, 0.5, 100, 'actual', 'below_cost', 'duplicate_entry', 'error_count', 'errors', 'expected', 'high', 'high_discount', 'insufficient_stock', 'invalid_quantity', 'low', 'medium', 'message', 'missing_product', 'price_anomaly', 'product_id', 'product_not_found', 'quantity', 'row', 'severity', 'suggestions', 'type', 'unit_price', 'unusual_quantity', 'valid', 'warning_count', 'warnings']

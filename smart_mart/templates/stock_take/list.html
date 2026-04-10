@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Stock Takes{% endblock %}
+{% block page_title %}Stock Take{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Stock Take</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Physical Stock Count</div>
+    <div class="page-header-sub">Reconcile system quantities with actual shelf counts</div>
+  </div>
+  <a href="{{ url_for('stock_take.create_take') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Stock Take
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Status</th>
+            <th>Products</th>
+            <th>Variances</th>
+            <th>Created By</th>
+            <th>Date</th>
+            <th>Completed</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for take in takes %}
+          <tr>
+            <td><span class="fw-semibold">{{ take.reference }}</span></td>
+            <td>
+              {% set lbl, color = take.status_label %}
+              <span class="badge bg-{{ color }}">{{ lbl }}</span>
+            </td>
+            <td>{{ take.items | length }}</td>
+            <td>
+              {% set v = take.items_with_variance | length %}
+              {% if v > 0 %}
+                <span class="badge bg-warning text-dark">{{ v }} item{{ 's' if v != 1 }}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>{{ take.creator.username if take.creator else '—' }}</td>
+            <td class="text-muted small">{{ take.created_at.strftime('%d %b %Y') }}</td>
+            <td class="text-muted small">
+              {{ take.completed_at.strftime('%d %b %Y') if take.completed_at else '—' }}
+            </td>
+            <td>
+              <a href="{{ url_for('stock_take.view', take_id=take.id) }}"
+                 class="btn btn-sm btn-outline-secondary">View</a>
+              {% if take.status == 'in_progress' %}
+              <a href="{{ url_for('stock_take.count', take_id=take.id) }}"
+                 class="btn btn-sm btn-primary">Count</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No stock takes yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

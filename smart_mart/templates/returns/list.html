@@ -1,51 +1,140 @@
 {% extends "base.html" %}
-{% block title %}Returns - Smart Mart{% endblock %}
-{% block page_title %}Returns{% endblock %}
+{% block title %}Returns — Smart Mart{% endblock %}
+{% block page_title %}Sale Returns{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Returns</li>{% endblock %}
-
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-header d-flex align-items-center justify-content-between">
-    <span class="fw-semibold"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Recent Returns</span>
-    <span class="badge bg-warning text-dark">{{ returns|length }}</span>
+
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Sale Returns</div>
+    <div class="page-header-sub">{{ total }} return{{ 's' if total != 1 }} · Total refunded: NPR {{ "%.2f"|format(total_refund) }}</div>
   </div>
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead>
-        <tr>
-          <th>Return</th>
-          <th>Sale</th>
-          <th>Date</th>
-          <th>Refund Mode</th>
-          <th class="text-end">Refund</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in returns %}
-        <tr>
-          <td class="fw-semibold">#{{ r.id }}</td>
-          <td>
-            <a href="{{ url_for('sales.sale_detail', sale_id=r.sale_id) }}" class="text-decoration-none">
-              Sale #{{ r.sale_id }}
-            </a>
-          </td>
-          <td class="text-muted small">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td class="text-capitalize">{{ r.refund_mode }}</td>
-          <td class="text-end fw-semibold">NPR {{ "%.2f"|format(r.refund_amount|float) }}</td>
-          <td class="text-end">
-            <a href="{{ url_for('returns.return_detail', return_id=r.id) }}" class="btn btn-sm btn-outline-primary">
-              View
-            </a>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="6" class="text-center text-muted py-4">No returns have been created yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-4">
+    <div class="card metric-card blue text-center">
+      <div class="card-body py-3">
+        <div class="metric-label">Total Returns</div>
+        <div class="metric-value" style="font-size:1.4rem">{{ total }}</div>
+      </div>
+    </div>
   </div>
+  <div class="col-sm-4">
+    <div class="card metric-card orange text-center">
+      <div class="card-body py-3">
+        <div class="metric-label">Total Refunded</div>
+        <div class="metric-value" style="font-size:1.4rem">NPR {{ "%.0f"|format(total_refund) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card metric-card green text-center">
+      <div class="card-body py-3">
+        <div class="metric-label">Avg Refund</div>
+        <div class="metric-value" style="font-size:1.4rem">
+          NPR {{ "%.0f"|format(total_refund / total) if total else 0 }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div class="input-group" style="max-width:260px">
+        <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" class="form-control border-start-0 ps-0" name="q"
+               value="{{ q }}" placeholder="Customer or invoice…">
+      </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">From</label>
+        <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date }}">
+      </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">To</label>
+        <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date }}">
+      </div>
+      <div class="d-flex gap-2 align-self-end">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+        {% if q or start_date or end_date %}
+        <a href="{{ url_for('returns.list_returns') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Return #</th>
+            <th>Sale / Invoice</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Refund Mode</th>
+            <th>Reason</th>
+            <th class="text-end">Refund (NPR)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in returns %}
+          <tr>
+            <td><span class="fw-semibold">#{{ r.id }}</span></td>
+            <td>
+              <a href="{{ url_for('sales.sale_detail', sale_id=r.sale_id) }}"
+                 class="text-decoration-none" style="color:var(--accent)">
+                {{ r.sale.invoice_number or 'Sale #' ~ r.sale_id }}
+              </a>
+            </td>
+            <td class="small">{{ r.sale.customer_name or '<span class="text-muted">Walk-in</span>'|safe }}</td>
+            <td class="text-muted small">{{ r.created_at.strftime('%d %b %Y %H:%M') }}</td>
+            <td>
+              <span class="badge {% if r.refund_mode == 'cash' %}bg-success{% elif r.refund_mode == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+                {{ r.refund_mode | capitalize }}
+              </span>
+            </td>
+            <td class="text-muted small">{{ r.reason or '—' }}</td>
+            <td class="text-end fw-semibold text-danger">{{ "%.2f"|format(r.refund_amount|float) }}</td>
+            <td>
+              <a href="{{ url_for('returns.return_detail', return_id=r.id) }}"
+                 class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">
+              <i class="bi bi-arrow-counterclockwise fs-1 d-block mb-2 opacity-25"></i>
+              {% if q or start_date or end_date %}No returns match your filters.
+              {% else %}No returns yet.{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if total > per_page %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">Page {{ page }}</span>
+    <div class="d-flex gap-2">
+      {% if page > 1 %}
+      <a href="?page={{ page-1 }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-sm btn-outline-secondary">← Prev</a>
+      {% endif %}
+      {% if page * per_page < total %}
+      <a href="?page={{ page+1 }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-sm btn-outline-secondary">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

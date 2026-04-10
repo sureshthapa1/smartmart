@@ -1,33 +1,166 @@
 {% extends "base.html" %}
 {% block title %}Categories — Smart Mart{% endblock %}
 {% block page_title %}Product Categories{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li><li class="breadcrumb-item active">Categories</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
+<li class="breadcrumb-item active">Categories</li>
+{% endblock %}
+{% block head %}
+<style>
+  .cat-card { transition: transform .15s, box-shadow .15s; cursor: pointer; text-decoration: none; color: inherit; }
+  .cat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,.10) !important; }
+  .stat-pill { font-size: .72rem; font-weight: 600; padding: .25em .65em; border-radius: 20px; }
+  .progress-thin { height: 5px; border-radius: 3px; }
+</style>
+{% endblock %}
 {% block content %}
+
 <div class="page-header">
-  <div class="page-header-title">Categories</div>
-  <a href="{{ url_for('inventory.create_category') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Category</a>
+  <div>
+    <div class="page-header-title">Product Categories</div>
+    <div class="page-header-sub">{{ category_data | length }} categories · {{ total_products }} products</div>
+  </div>
+  <a href="{{ url_for('inventory.create_category') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>New Category
+  </a>
 </div>
-<div class="card" style="max-width:600px">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>#</th><th>Name</th><th class="text-end">Actions</th></tr></thead>
-      <tbody>
-        {% for cat in categories %}
-        <tr>
-          <td class="text-muted small">{{ loop.index }}</td>
-          <td><span class="badge rounded-pill" style="background:#e0e7ff;color:#4338ca;font-size:.8rem">{{ cat.name }}</span></td>
-          <td class="text-end">
-            <a href="{{ url_for('inventory.edit_category', cat_id=cat.id) }}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i></a>
-            <form method="post" action="{{ url_for('inventory.delete_category', cat_id=cat.id) }}" class="d-inline" onsubmit="return confirm('Delete {{ cat.name }}?')">
-              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="3" class="text-center text-muted py-4">No categories yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+<!-- Summary bar -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card metric-card blue">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-tags"></i></div>
+        <div>
+          <div class="metric-label">Total Categories</div>
+          <div class="metric-value" style="font-size:1.4rem">{{ category_data | length }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card metric-card green">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon bg-success bg-opacity-10 text-success"><i class="bi bi-cash-stack"></i></div>
+        <div>
+          <div class="metric-label">Total Stock Value</div>
+          <div class="metric-value" style="font-size:1.4rem">NPR {{ "%.0f" | format(total_stock_value) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card metric-card purple">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon bg-purple bg-opacity-10" style="background:rgba(168,85,247,.1);color:#a855f7"><i class="bi bi-graph-up"></i></div>
+        <div>
+          <div class="metric-label">Revenue (30 days)</div>
+          <div class="metric-value" style="font-size:1.4rem">NPR {{ "%.0f" | format(total_revenue_30d) }}</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Category cards grid -->
+{% if category_data %}
+<div class="row g-3">
+  {% for c in category_data %}
+  {% set pct = ((c.revenue_30d / total_revenue_30d * 100) | int) if total_revenue_30d > 0 else 0 %}
+  <div class="col-sm-6 col-xl-4">
+    <a href="{{ url_for('inventory.category_detail', cat_id=c.cat.id) }}" class="card cat-card h-100 d-block">
+      <div class="card-body p-4">
+
+        <!-- Header row -->
+        <div class="d-flex align-items-start justify-content-between mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;flex-shrink:0">
+              <i class="bi bi-tag-fill"></i>
+            </div>
+            <div>
+              <div class="fw-bold" style="font-size:.95rem;color:#0f172a">{{ c.cat.name }}</div>
+              <div class="text-muted" style="font-size:.72rem">{{ c.product_count }} product{{ 's' if c.product_count != 1 }}</div>
+            </div>
+          </div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end">
+            {% if c.out_of_stock > 0 %}
+            <span class="stat-pill bg-danger text-white">{{ c.out_of_stock }} out</span>
+            {% endif %}
+            {% if c.low_stock > 0 %}
+            <span class="stat-pill bg-warning text-dark">{{ c.low_stock }} low</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
+              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Units</div>
+              <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">{{ c.total_stock }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
+              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Value</div>
+              <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">NPR {{ "%.0f" | format(c.stock_value) }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
+              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Revenue 30d</div>
+              <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">NPR {{ "%.0f" | format(c.revenue_30d) }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
+              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sold 30d</div>
+              <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">{{ c.qty_sold_30d }} units</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue share bar -->
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="text-muted" style="font-size:.72rem">Revenue share</span>
+          <span class="fw-semibold" style="font-size:.72rem">{{ pct }}%</span>
+        </div>
+        <div class="progress progress-thin mb-3">
+          <div class="progress-bar bg-primary" style="width:{{ pct }}%"></div>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="d-flex gap-2 pt-1 border-top">
+          <span class="btn btn-sm btn-outline-primary flex-grow-1" style="pointer-events:none">
+            <i class="bi bi-eye me-1"></i>View Details
+          </span>
+          <a href="{{ url_for('inventory.edit_category', cat_id=c.cat.id) }}"
+             class="btn btn-sm btn-outline-secondary"
+             onclick="event.stopPropagation()" title="Edit">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="post" action="{{ url_for('inventory.delete_category', cat_id=c.cat.id) }}"
+                class="d-inline" onclick="event.stopPropagation()"
+                onsubmit="return confirm('Delete {{ c.cat.name }}? Products will become uncategorized.')">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-tags fs-1 d-block mb-2 opacity-25"></i>
+    No categories yet.
+    <a href="{{ url_for('inventory.create_category') }}">Create one</a>.
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

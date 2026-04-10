@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\supplier_returns\routes.py
+# hypothesis_version: 6.151.11
+
+['/', '/<int:return_id>', '/create', '/supplier-returns', 'GET', 'POST', 'danger', 'notes', 'page', 'product_id', 'purchase_id', 'quantity', 'reason', 'status', 'success', 'supplier_id', 'supplier_returns', 'unit_cost']

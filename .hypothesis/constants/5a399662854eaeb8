@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\customer_quality_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 0.82, 0.85, 0.92, 0.99, 'Same phone number', 'approved', 'confidence', 'customer_pair', 'duplicate_name', 'duplicate_phone', 'pending', 'primary_name', 'primary_phone', 'reason', 'rejected', 'suspicious']

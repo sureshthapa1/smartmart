@@ -54,16 +54,19 @@ def index():
         .where(func.date(Sale.sale_date) == today)
     ).scalar() or 0
 
-    # Today profit = today sales - cost of goods sold today
-    today_cogs_rows = db.session.execute(
-        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+    # Today profit = today sales - historical COGS (cost_price at time of sale)
+    today_cogs = db.session.execute(
+        db.select(
+            func.coalesce(
+                func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity),
+                0
+            )
+        )
+        .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(func.date(Sale.sale_date) == today)
-        .group_by(Product.id)
-    ).all()
-    today_cogs = sum(float(r.cost_price) * r.qty for r in today_cogs_rows)
-    today_profit = float(today_sales_amount) - today_cogs
+    ).scalar() or 0
+    today_profit = float(today_sales_amount) - float(today_cogs)
 
     # ── Weekly / Monthly ──────────────────────────────────────────────────
     weekly_sales_amount = db.session.execute(

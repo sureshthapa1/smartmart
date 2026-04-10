@@ -24,8 +24,12 @@ def list_sales():
         p = UserPermissions.get_or_create(current_user.id)
         if not p.can_view_sales:
             abort(403)
+
     start_date = request.args.get("start_date", "").strip() or None
-    end_date = request.args.get("end_date", "").strip() or None
+    end_date   = request.args.get("end_date",   "").strip() or None
+    search_q   = request.args.get("q",          "").strip() or None
+    pay_filter = request.args.get("payment",     "").strip() or None
+    page       = int(request.args.get("page", 1))
 
     filters: dict = {}
     if start_date:
@@ -38,8 +42,11 @@ def list_sales():
             filters["end_date"] = datetime.fromisoformat(end_date)
         except ValueError:
             flash("Invalid end date format.", "danger")
+    if search_q:
+        filters["search"] = search_q
+    if pay_filter:
+        filters["payment_mode"] = pay_filter
 
-    page = int(request.args.get("page", 1))
     sales = sales_manager.list_sales(filters, page=page)
     return render_template(
         "sales/list.html",
@@ -47,6 +54,8 @@ def list_sales():
         page=page,
         start_date=start_date or "",
         end_date=end_date or "",
+        search_q=search_q or "",
+        pay_filter=pay_filter or "",
     )
 
 
@@ -179,6 +188,10 @@ def customer_statement():
                            customers=customers, statement=statement,
                            customer_name=customer_name,
                            today=date.today())
+
+
+@sales_bp.route("/<int:sale_id>/delete", methods=["POST"])
+@admin_required
 def delete_sale(sale_id):
     try:
         sales_manager.delete_sale(sale_id)

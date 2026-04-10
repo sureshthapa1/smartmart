@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\sale_return.py
+# hypothesis_version: 6.151.11
+
+[255, 'Product', 'Sale', 'SaleItem', 'SaleReturn', 'SaleReturnItem', 'User', 'all, delete-orphan', 'cash', 'items', 'products.id', 'return_items', 'returns', 'sale_items.id', 'sale_return', 'sale_return_items', 'sale_returns', 'sale_returns.id', 'sales.id', 'users.id']

@@ -69,6 +69,16 @@
             <label class="form-label">Quantity <span class="text-danger">*</span></label>
             <input type="number" class="form-control" name="quantity" min="1" value="1" required>
           </div>
+          <div class="mb-3" id="adjustTypeGroup" style="display:none;">
+            <label class="form-label">Adjustment Type</label>
+            <select name="adjustment_type" class="form-select" id="adjustType">
+              <option value="adjustment_out">General Adjustment</option>
+              <option value="damage">Damaged Goods</option>
+              <option value="loss">Loss / Shrinkage</option>
+              <option value="theft">Theft</option>
+              <option value="expiry">Expired / Disposed</option>
+            </select>
+          </div>
           <div class="mb-4">
             <label class="form-label">Note</label>
             <textarea class="form-control" name="note" rows="2" placeholder="Optional reason or reference…"></textarea>
@@ -89,6 +99,8 @@ document.querySelectorAll('input[name="direction"]').forEach(r => {
   r.addEventListener('change', () => {
     document.querySelectorAll('.dir-card').forEach(c => { c.style.borderColor=''; c.style.background=''; });
     if (r.checked) { r.nextElementSibling.style.borderColor='var(--accent)'; r.nextElementSibling.style.background='rgba(99,102,241,.08)'; }
+    // Show adjustment type only for stock-out
+    document.getElementById('adjustTypeGroup').style.display = r.value === 'out' ? '' : 'none';
   });
 });
 const checked = document.querySelector('input[name="direction"]:checked');

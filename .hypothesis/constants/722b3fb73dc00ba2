@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\stock_transfer.py
+# hypothesis_version: 6.151.11
+
+['Branch', 'Product', 'StockTransfer', 'StockTransferItem', 'User', 'all, delete-orphan', 'branches.id', 'items', 'pending', 'products.id', 'stock_transfer_items', 'stock_transfers', 'stock_transfers.id', 'transfer', 'transfers_in', 'transfers_out', 'users.id']

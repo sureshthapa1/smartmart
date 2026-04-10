@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\audit_log.py
+# hypothesis_version: 6.151.11
+
+[120, 'User', 'audit_logs', 'created_at', 'entity_id', 'entity_type', 'ix_audit_log_entity', 'ix_audit_log_user_id', 'select', 'user_id', 'users.id']

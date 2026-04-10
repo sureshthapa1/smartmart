@@ -37,6 +37,8 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
                 quantity=qty, unit_cost=unit_cost, subtotal=unit_cost * qty,
             ))
             product.quantity += qty
+            # Update cost price to latest purchase price (weighted average optional, latest used here)
+            product.cost_price = unit_cost
             db.session.add(StockMovement(
                 product_id=product.id, change_amount=qty, change_type="purchase",
                 reference_id=purchase.id, created_by=user_id, timestamp=datetime.now(timezone.utc),

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Audit Log</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Audit Log</div>
+    <div class="page-header-sub">Track who changed what and when</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-end" method="get">
+      <div class="col-md-3">
+        <label class="form-label">Entity Type</label>
+        <select name="entity_type" class="form-select form-select-sm">
+          <option value="">All</option>
+          {% for et in entity_types %}
+          <option value="{{ et }}" {{ 'selected' if selected_entity == et }}>{{ et }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">User</label>
+        <select name="user_id" class="form-select form-select-sm">
+          <option value="">All Users</option>
+          {% for u in users %}
+          <option value="{{ u.id }}" {{ 'selected' if selected_user == u.id | string }}>{{ u.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Entity</th>
+            <th>Record</th>
+            <th>Changes</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="text-muted small">{{ log.created_at.strftime('%d %b %Y %H:%M') }}</td>
+            <td>
+              <span class="badge bg-light text-dark border">{{ log.username or '—' }}</span>
+            </td>
+            <td>
+              <span class="badge bg-{{ 'success' if log.action == 'create' else ('warning text-dark' if log.action == 'update' else 'danger') }}">
+                {{ log.action }}
+              </span>
+            </td>
+            <td class="text-muted small">{{ log.entity_type }}</td>
+            <td>
+              {% if log.entity_label %}
+                <span class="small">{{ log.entity_label }}</span>
+                {% if log.entity_id %}<span class="text-muted small"> #{{ log.entity_id }}</span>{% endif %}
+              {% else %}
+                <span class="text-muted small">#{{ log.entity_id }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if log.changes %}
+                {% set changes = log.changes | from_json %}
+                <div class="small">
+                  {% for field, vals in changes.items() %}
+                  <div><span class="text-muted">{{ field }}:</span>
+                    {% if vals[0] %}<span class="text-danger text-decoration-line-through">{{ vals[0][:30] }}</span> → {% endif %}
+                    <span class="text-success">{{ vals[1][:30] if vals[1] else '—' }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small font-monospace">{{ log.ip_address or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No audit logs found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if logs | length == 50 %}
+  <div class="card-footer text-center">
+    <a href="?entity_type={{ selected_entity }}&user_id={{ selected_user }}&page={{ page + 1 }}"
+       class="btn btn-sm btn-outline-secondary">Load More</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

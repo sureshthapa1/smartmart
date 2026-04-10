@@ -11,7 +11,7 @@ from . import authenticator
 
 def create_user(username: str, password: str, role: str) -> User:
     """Create a new user with a hashed password.
-
+    Staff users automatically get minimal default permissions.
     Raises ValueError if the username already exists.
     """
     user = User(
@@ -25,6 +25,12 @@ def create_user(username: str, password: str, role: str) -> User:
     except IntegrityError:
         db.session.rollback()
         raise ValueError(f"Username '{username}' is already taken.")
+
+    # Auto-create minimal permissions for staff
+    if role == "staff":
+        from ..models.user_permissions import UserPermissions
+        UserPermissions.get_or_create(user.id)
+
     return user
 
 
@@ -63,6 +69,14 @@ def delete_user(user_id: int, current_user_id: int) -> None:
     if user_id == current_user_id:
         raise ValueError("You cannot delete your own account.")
     user: User = db.get_or_404(User, user_id)
+    # Remove associated permissions first to avoid FK constraint violations
+    from ..models.user_permissions import UserPermissions
+    perm = db.session.execute(
+        db.select(UserPermissions).where(UserPermissions.user_id == user_id)
+    ).scalar_one_or_none()
+    if perm:
+        db.session.delete(perm)
+        db.session.flush()
     db.session.delete(user)
     db.session.commit()
 

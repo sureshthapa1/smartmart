@@ -492,3 +492,47 @@ def pricing_suggestion(product_id):
         return jsonify(result)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@api_bp.route("/customer-risk/<path:customer_name>")
+@login_required
+def customer_risk(customer_name):
+    """Return risk score, tier, and outstanding balance for a customer (Req 5.5)."""
+    from ...services.credit_risk_service import get_risk_for_customer
+    from ...models.sale import Sale
+    from sqlalchemy import func as _func
+
+    name = customer_name.strip()
+    if not name:
+        return jsonify({"risk_score": 0, "risk_tier": "safe", "risk_label": "🟢 Safe",
+                        "total_outstanding": 0.0}), 200
+
+    data = get_risk_for_customer(name)
+
+    # Compute outstanding on-the-fly for accuracy
+    from ...models.operations import CustomerCreditPayment
+    credit_sales = db.session.execute(
+        db.select(Sale)
+        .where(
+            _func.lower(Sale.customer_name) == name.lower(),
+            Sale.payment_mode == "credit",
+        )
+    ).scalars().all()
+
+    total_outstanding = 0.0
+    for s in credit_sales:
+        paid = db.session.execute(
+            db.select(_func.coalesce(_func.sum(CustomerCreditPayment.amount), 0))
+            .where(CustomerCreditPayment.sale_id == s.id)
+        ).scalar() or 0
+        total_outstanding += max(0.0, float(s.total_amount) - float(paid))
+
+    return jsonify({
+        "customer_name": name,
+        "risk_score": data["score"],
+        "risk_tier": data["risk_level"],
+        "risk_label": data["risk_label"],
+        "risk_color": data["risk_color"],
+        "total_outstanding": round(total_outstanding, 2),
+        "has_override": data.get("has_override", False),
+    })

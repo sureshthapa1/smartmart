@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\po_manager.py
+# hypothesis_version: 6.151.11
+
+['cancelled', 'draft', 'partial', 'product_id', 'quantity', 'received', 'sent', 'unit_cost']

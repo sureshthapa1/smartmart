@@ -161,11 +161,13 @@ def adjust_stock(product_id):
     if request.method == "POST":
         direction = request.form.get("direction", "in")
         note = request.form.get("note", "").strip()
+        adjustment_type = request.form.get("adjustment_type", "").strip() or None
         try:
             qty = int(request.form.get("quantity", 0))
             if qty <= 0:
                 raise ValueError("Quantity must be a positive integer.")
-            inventory_manager.adjust_stock(product_id, qty, direction, note, current_user.id)
+            inventory_manager.adjust_stock(product_id, qty, direction, note, current_user.id,
+                                           adjustment_type=adjustment_type)
             flash(f"Stock {'added' if direction == 'in' else 'removed'} successfully.", "success")
             return redirect(url_for("inventory.list_products"))
         except ValueError as e:
@@ -178,8 +180,157 @@ def adjust_stock(product_id):
 @inventory_bp.route("/categories")
 @admin_required
 def list_categories():
+    from sqlalchemy import func, case
+    from ...models.sale import Sale, SaleItem
+    from datetime import date, timedelta
+
+    # Base category list
     cats = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
-    return render_template("inventory/categories.html", categories=cats)
+
+    # Build per-category stats in one pass
+    # Product counts + stock per category
+    product_stats = db.session.execute(
+        db.select(
+            Product.category,
+            func.count(Product.id).label("product_count"),
+            func.coalesce(func.sum(Product.quantity), 0).label("total_stock"),
+            func.coalesce(func.sum(Product.quantity * Product.cost_price), 0).label("stock_value"),
+            func.coalesce(func.sum(Product.quantity * Product.selling_price), 0).label("retail_value"),
+            func.sum(case((Product.quantity == 0, 1), else_=0)).label("out_of_stock"),
+            func.sum(case((Product.quantity <= 10, 1), else_=0)).label("low_stock"),
+        )
+        .group_by(Product.category)
+    ).all()
+    stats_map = {r.category or "": r for r in product_stats}
+
+    # Revenue per category (last 30 days)
+    thirty_days_ago = date.today() - timedelta(days=30)
+    rev_rows = db.session.execute(
+        db.select(
+            Product.category,
+            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
+            func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
+        )
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= thirty_days_ago)
+        .group_by(Product.category)
+    ).all()
+    rev_map = {r.category or "": r for r in rev_rows}
+
+    # Combine
+    category_data = []
+    for cat in cats:
+        s = stats_map.get(cat.name, None)
+        r = rev_map.get(cat.name, None)
+        category_data.append({
+            "cat": cat,
+            "product_count": s.product_count if s else 0,
+            "total_stock": int(s.total_stock) if s else 0,
+            "stock_value": float(s.stock_value) if s else 0.0,
+            "retail_value": float(s.retail_value) if s else 0.0,
+            "out_of_stock": int(s.out_of_stock) if s else 0,
+            "low_stock": int(s.low_stock) if s else 0,
+            "revenue_30d": float(r.revenue) if r else 0.0,
+            "qty_sold_30d": int(r.qty_sold) if r else 0,
+        })
+
+    # Summary totals
+    total_products = sum(c["product_count"] for c in category_data)
+    total_stock_value = sum(c["stock_value"] for c in category_data)
+    total_revenue_30d = sum(c["revenue_30d"] for c in category_data)
+
+    return render_template("inventory/categories.html",
+                           category_data=category_data,
+                           total_products=total_products,
+                           total_stock_value=total_stock_value,
+                           total_revenue_30d=total_revenue_30d)
+
+
+@inventory_bp.route("/categories/<int:cat_id>")
+@admin_required
+def category_detail(cat_id):
+    from sqlalchemy import func, case
+    from ...models.sale import Sale, SaleItem
+    from ...models.stock_movement import StockMovement
+    from datetime import date, timedelta
+
+    cat = db.get_or_404(Category, cat_id)
+    products = db.session.execute(
+        db.select(Product).where(Product.category == cat.name).order_by(Product.name)
+    ).scalars().all()
+
+    # Per-product sales stats (last 30 days)
+    thirty_days_ago = date.today() - timedelta(days=30)
+    sales_stats = db.session.execute(
+        db.select(
+            SaleItem.product_id,
+            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
+            func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
+            func.count(SaleItem.id.distinct()).label("txn_count"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(
+            SaleItem.product_id.in_([p.id for p in products]),
+            func.date(Sale.sale_date) >= thirty_days_ago,
+        )
+        .group_by(SaleItem.product_id)
+    ).all()
+    sales_map = {r.product_id: r for r in sales_stats}
+
+    # Category-level totals
+    total_stock = sum(p.quantity for p in products)
+    total_stock_value = sum(float(p.cost_price) * p.quantity for p in products)
+    total_retail_value = sum(float(p.selling_price) * p.quantity for p in products)
+    total_revenue_30d = sum(float(sales_map[p.id].revenue) if p.id in sales_map else 0 for p in products)
+    total_qty_sold_30d = sum(int(sales_map[p.id].qty_sold) if p.id in sales_map else 0 for p in products)
+    out_of_stock = sum(1 for p in products if p.quantity == 0)
+    low_stock = sum(1 for p in products if 0 < p.quantity <= 10)
+
+    # Daily revenue trend (last 14 days) for this category
+    trend_rows = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
+        )
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .join(Product, Product.id == SaleItem.product_id)
+        .where(
+            Product.category == cat.name,
+            func.date(Sale.sale_date) >= date.today() - timedelta(days=13),
+        )
+        .group_by(func.date(Sale.sale_date))
+        .order_by(func.date(Sale.sale_date))
+    ).all()
+    trend_labels = [str(r.day) for r in trend_rows]
+    trend_data = [float(r.revenue) for r in trend_rows]
+
+    # Enrich products with their stats
+    enriched = []
+    for p in products:
+        s = sales_map.get(p.id)
+        enriched.append({
+            "product": p,
+            "revenue_30d": float(s.revenue) if s else 0.0,
+            "qty_sold_30d": int(s.qty_sold) if s else 0,
+            "txn_count": int(s.txn_count) if s else 0,
+            "profit_30d": (float(s.revenue) - float(p.cost_price) * int(s.qty_sold)) if s else 0.0,
+        })
+    # Sort by revenue desc
+    enriched.sort(key=lambda x: x["revenue_30d"], reverse=True)
+
+    return render_template("inventory/category_detail.html",
+                           cat=cat, enriched=enriched,
+                           total_stock=total_stock,
+                           total_stock_value=total_stock_value,
+                           total_retail_value=total_retail_value,
+                           total_revenue_30d=total_revenue_30d,
+                           total_qty_sold_30d=total_qty_sold_30d,
+                           out_of_stock=out_of_stock,
+                           low_stock=low_stock,
+                           trend_labels=trend_labels,
+                           trend_data=trend_data,
+                           today=date.today())
 
 
 @inventory_bp.route("/categories/create", methods=["GET", "POST"])
@@ -385,6 +536,31 @@ def bulk_upload():
     return render_template("inventory/bulk_upload.html")
 
 
+@inventory_bp.route("/export-csv")
+@admin_required
+def export_csv():
+    """Export full product list as CSV."""
+    import csv, io
+    from flask import Response
+    products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Name", "SKU", "Category", "Cost Price", "Selling Price",
+                     "Quantity", "Unit", "Supplier", "Expiry Date"])
+    for p in products:
+        writer.writerow([
+            p.name, p.sku, p.category or "",
+            float(p.cost_price), float(p.selling_price),
+            p.quantity, p.unit or "pcs",
+            p.supplier.name if p.supplier else "",
+            p.expiry_date.isoformat() if p.expiry_date else "",
+        ])
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=inventory.csv"}
+    )
+
+
 @inventory_bp.route("/labels", methods=["GET", "POST"])
 @login_required
 def print_labels():
@@ -410,6 +586,93 @@ def download_product_sample():
         sample, mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=bulk_products_sample.csv"}
     )
+
+
+# ── Product Variants ─────────────────────────────────────────────────────────
+
+@inventory_bp.route("/<int:product_id>/variants")
+@admin_required
+def product_variants(product_id):
+    product = db.get_or_404(Product, product_id)
+    from ...models.product_variant import ProductVariant
+    variants = db.session.execute(
+        db.select(ProductVariant).where(ProductVariant.product_id == product_id)
+        .order_by(ProductVariant.variant_name)
+    ).scalars().all()
+    return render_template("inventory/variants.html", product=product, variants=variants)
+
+
+@inventory_bp.route("/<int:product_id>/variants/create", methods=["GET", "POST"])
+@admin_required
+def create_variant(product_id):
+    product = db.get_or_404(Product, product_id)
+    from ...models.product_variant import ProductVariant
+    from sqlalchemy.exc import IntegrityError
+    if request.method == "POST":
+        variant_name = request.form.get("variant_name", "").strip()
+        sku = request.form.get("sku", "").strip()
+        cost_price = float(request.form.get("cost_price", 0) or 0)
+        selling_price = float(request.form.get("selling_price", 0) or 0)
+        quantity = int(request.form.get("quantity", 0) or 0)
+        barcode = request.form.get("barcode", "").strip() or None
+        if not variant_name or not sku:
+            flash("Variant name and SKU are required.", "danger")
+        else:
+            try:
+                v = ProductVariant(
+                    product_id=product_id,
+                    variant_name=variant_name,
+                    sku=sku,
+                    cost_price=cost_price,
+                    selling_price=selling_price,
+                    quantity=quantity,
+                    barcode=barcode,
+                    is_active=True,
+                )
+                db.session.add(v)
+                db.session.commit()
+                flash(f"Variant '{variant_name}' added.", "success")
+                return redirect(url_for("inventory.product_variants", product_id=product_id))
+            except IntegrityError:
+                db.session.rollback()
+                flash(f"SKU '{sku}' already exists.", "danger")
+    return render_template("inventory/variant_form.html", product=product, variant=None, action="Add")
+
+
+@inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_variant(product_id, variant_id):
+    product = db.get_or_404(Product, product_id)
+    from ...models.product_variant import ProductVariant
+    from sqlalchemy.exc import IntegrityError
+    variant = db.get_or_404(ProductVariant, variant_id)
+    if request.method == "POST":
+        variant.variant_name = request.form.get("variant_name", "").strip()
+        variant.sku = request.form.get("sku", "").strip()
+        variant.cost_price = float(request.form.get("cost_price", 0) or 0)
+        variant.selling_price = float(request.form.get("selling_price", 0) or 0)
+        variant.quantity = int(request.form.get("quantity", 0) or 0)
+        variant.barcode = request.form.get("barcode", "").strip() or None
+        variant.is_active = request.form.get("is_active") == "on"
+        try:
+            db.session.commit()
+            flash("Variant updated.", "success")
+            return redirect(url_for("inventory.product_variants", product_id=product_id))
+        except IntegrityError:
+            db.session.rollback()
+            flash("SKU already exists.", "danger")
+    return render_template("inventory/variant_form.html", product=product, variant=variant, action="Edit")
+
+
+@inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/delete", methods=["POST"])
+@admin_required
+def delete_variant(product_id, variant_id):
+    from ...models.product_variant import ProductVariant
+    v = db.get_or_404(ProductVariant, variant_id)
+    db.session.delete(v)
+    db.session.commit()
+    flash("Variant deleted.", "success")
+    return redirect(url_for("inventory.product_variants", product_id=product_id))
 
 
 # ---------------------------------------------------------------------------

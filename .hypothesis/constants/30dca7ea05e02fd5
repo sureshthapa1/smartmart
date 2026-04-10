@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\purchase_order.py
+# hypothesis_version: 6.151.11
+
+['Cancelled', 'Draft', 'Partial', 'Product', 'Purchase', 'PurchaseOrder', 'PurchaseOrderItem', 'Received', 'Sent', 'Supplier', 'Unknown', 'User', 'all, delete-orphan', 'cancelled', 'danger', 'draft', 'info', 'items', 'order', 'partial', 'products.id', 'purchase_order', 'purchase_order_items', 'purchase_orders', 'purchase_orders.id', 'purchases.id', 'received', 'secondary', 'sent', 'success', 'suppliers.id', 'users.id', 'warning']

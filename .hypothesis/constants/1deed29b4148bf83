@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\inventory_manager.py
+# hypothesis_version: 6.151.11
+
+['Product', 'adjustment_in', 'adjustment_out', 'adjustment_type', 'category', 'cost_price', 'create', 'damage', 'expiry', 'expiry_date', 'image_filename', 'in', 'loss', 'name', 'out', 'pcs', 'quantity', 'selling_price', 'sku', 'supplier_id', 'theft', 'unit', 'update']

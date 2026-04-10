@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Supplier Returns{% endblock %}
+{% block page_title %}Supplier Returns{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Supplier Returns</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Supplier Returns</div>
+    <div class="page-header-sub">Return defective or excess goods back to suppliers</div>
+  </div>
+  <a href="{{ url_for('supplier_returns.create_return') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Return
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Supplier</th>
+            <th>Items</th>
+            <th>Credit Value</th>
+            <th>Status</th>
+            <th>Reason</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sr in returns %}
+          <tr>
+            <td><span class="fw-semibold">{{ sr.reference }}</span></td>
+            <td>{{ sr.supplier.name if sr.supplier else '—' }}</td>
+            <td>{{ sr.items | length }}</td>
+            <td class="fw-semibold">NPR {{ "%.2f" | format(sr.total_value) }}</td>
+            <td>
+              {% set lbl, color = sr.status_label %}
+              <span class="badge bg-{{ color }}">{{ lbl }}</span>
+            </td>
+            <td class="text-muted small">{{ sr.reason or '—' }}</td>
+            <td class="text-muted small">{{ sr.created_at.strftime('%d %b %Y') }}</td>
+            <td>
+              <a href="{{ url_for('supplier_returns.view_return', return_id=sr.id) }}"
+                 class="btn btn-sm btn-outline-secondary">View</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No supplier returns yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Promotions{% endblock %}
+{% block page_title %}Promotions{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Promotions</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Promotional Pricing</div>
+    <div class="page-header-sub">Time-based discounts, bundle deals, and special offers</div>
+  </div>
+  <a href="{{ url_for('promotions.create_promotion') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Promotion
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Scope</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in promos %}
+          <tr>
+            <td class="fw-semibold">{{ p.name }}</td>
+            <td><span class="badge bg-light text-dark border">{{ p.type_label }}</span></td>
+            <td>
+              {% if p.promo_type == 'percentage' %}{{ p.discount_value }}%
+              {% elif p.promo_type == 'fixed' %}NPR {{ p.discount_value }}
+              {% elif p.promo_type == 'bogo' %}Buy {{ p.buy_qty }} Get {{ p.free_qty }} Free
+              {% elif p.promo_type == 'bundle' %}NPR {{ p.discount_value }}
+              {% endif %}
+            </td>
+            <td class="text-muted small">
+              {% if p.scope == 'all' %}All Products
+              {% elif p.scope == 'category' %}Category: {{ p.scope_value }}
+              {% elif p.scope == 'product' %}Product #{{ p.scope_value }}
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ p.start_date }}</td>
+            <td class="text-muted small">{{ p.end_date }}</td>
+            <td>
+              {% if p.is_currently_active %}
+                <span class="badge bg-success">Active</span>
+              {% elif not p.is_active %}
+                <span class="badge bg-secondary">Disabled</span>
+              {% elif p.end_date < today %}
+                <span class="badge bg-danger">Expired</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Upcoming</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('promotions.edit_promotion', promo_id=p.id) }}"
+                 class="btn btn-sm btn-outline-secondary">Edit</a>
+              <form method="post" action="{{ url_for('promotions.delete_promotion', promo_id=p.id) }}"
+                    class="d-inline" onsubmit="return confirm('Delete this promotion?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No promotions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

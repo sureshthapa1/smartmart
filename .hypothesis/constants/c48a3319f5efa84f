@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\purchases\routes.py
+# hypothesis_version: 6.151.11
+
+[403, 10000, '.csv', '.xls', '.xlsx', '/', '/<int:purchase_id>', '/bulk-upload', '/create', '/download-sample', '/export-csv', '/purchases', '/suppliers', '/suppliers/create', '0', 'Content-Disposition', 'Created By', 'Date', 'GET', 'Invalid date format.', 'Items', 'POST', 'Purchase #', 'Supplier', 'Supplier deleted.', 'Total Cost (NPR)', 'address', 'admin', 'barcode', 'category', 'contact', 'cost', 'cost_price', 'danger', 'email', 'end_date', 'file', 'name', 'page', 'price', 'product', 'product name', 'product_id', 'purchase_date', 'purchases', 'purchases/list.html', 'qty', 'quantity', 'selling_price', 'sku', 'start_date', 'success', 'supplier_id', 'text/csv', 'unit cost', 'unit_cost', 'utf-8-sig', 'warning']

@@ -46,6 +46,24 @@ def list_expenses():
 
     total_amount = sum(float(e.amount) for e in all_expenses)
 
+    # By-type totals for summary cards and donut chart
+    by_type: dict = {}
+    for e in all_expenses:
+        by_type[e.expense_type] = by_type.get(e.expense_type, 0) + float(e.amount)
+
+    # Monthly breakdown for stacked bar chart (last 6 months, all data)
+    from sqlalchemy import extract
+    monthly_rows = db.session.execute(
+        db.select(
+            db.func.strftime('%Y-%m', Expense.expense_date).label("month"),
+            Expense.expense_type.label("type"),
+            db.func.sum(Expense.amount).label("total"),
+        )
+        .group_by(db.func.strftime('%Y-%m', Expense.expense_date), Expense.expense_type)
+        .order_by(db.func.strftime('%Y-%m', Expense.expense_date))
+    ).all()
+    monthly_chart = [{"month": r.month, "type": r.type, "total": float(r.total)} for r in monthly_rows]
+
     return render_template("expenses/list.html",
                            expenses=expenses,
                            total_amount=total_amount,
@@ -55,7 +73,9 @@ def list_expenses():
                            start_date=start_raw,
                            end_date=end_raw,
                            type_filter=type_filter,
-                           expense_types=EXPENSE_TYPES)
+                           expense_types=EXPENSE_TYPES,
+                           by_type=by_type,
+                           monthly_chart=monthly_chart)
 
 
 @expenses_bp.route("/create", methods=["GET", "POST"])

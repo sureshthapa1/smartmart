@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\sales\routes.py
+# hypothesis_version: 6.151.11
+
+[403, '/', '/<int:sale_id>', '/create', '/customer-statement', '/sales', '0', 'Content-Disposition', 'GET', 'POST', 'admin', 'application/pdf', 'cash', 'credit', 'customer_address', 'customer_name', 'customer_phone', 'danger', 'discount_amount', 'discount_note', 'end_date', 'loyalty_points', 'name', 'outstanding_credit', 'page', 'payment', 'payment_mode', 'product_id', 'q', 'quantity', 'sales', 'sales.list_sales', 'sales.sale_detail', 'sales/create.html', 'sales/detail.html', 'sales/list.html', 'search', 'start_date', 'success', 'total_discounts', 'total_spent', 'total_transactions', 'unit_price', 'wallet_redeem_points']

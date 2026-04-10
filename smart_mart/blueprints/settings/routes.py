@@ -1,11 +1,29 @@
 """Settings blueprint — shop configuration (admin only)."""
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+import os
+import uuid
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app
 from ...models.shop_settings import ShopSettings
 from ...extensions import db
 from ...services.decorators import admin_required
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
+
+ALLOWED_IMG = {"jpg", "jpeg", "png", "gif", "webp"}
+
+
+def _save_logo(file) -> str | None:
+    if not file or file.filename == "":
+        return None
+    ext = file.filename.rsplit(".", 1)[-1].lower()
+    if ext not in ALLOWED_IMG:
+        return None
+    filename = f"shop_logo_{uuid.uuid4().hex[:8]}.{ext}"
+    upload_dir = os.path.join(current_app.static_folder, "uploads", "shop")
+    os.makedirs(upload_dir, exist_ok=True)
+    file.save(os.path.join(upload_dir, filename))
+    return filename
 
 
 @settings_bp.route("/", methods=["GET", "POST"])
@@ -26,6 +44,30 @@ def index():
         s.vat_number = request.form.get("vat_number", "").strip() or None
         s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
         s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
+
+        # Logo upload
+        logo_file = request.files.get("logo")
+        new_logo = _save_logo(logo_file)
+        if new_logo:
+            # Delete old logo
+            if s.logo_filename:
+                try:
+                    old_path = os.path.join(current_app.static_folder, "uploads", "shop", s.logo_filename)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                except Exception:
+                    pass
+            s.logo_filename = new_logo
+        if request.form.get("remove_logo") == "1":
+            if s.logo_filename:
+                try:
+                    old_path = os.path.join(current_app.static_folder, "uploads", "shop", s.logo_filename)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                except Exception:
+                    pass
+            s.logo_filename = None
+
         db.session.commit()
         flash("Settings saved successfully.", "success")
         return redirect(url_for("settings.index"))

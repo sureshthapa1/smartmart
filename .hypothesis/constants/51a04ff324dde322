@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\models\sale.py
+# hypothesis_version: 6.151.11
+
+[120, 255, 'Product', 'Sale', 'SaleItem', 'SaleReturn', 'SaleReturnItem', 'User', 'all, delete-orphan', 'cash', 'customer_name', 'items', 'ix_sale_date', 'ix_sale_item_sale_id', 'ix_sale_payment_mode', 'payment_mode', 'product_id', 'products.id', 'sale', 'sale_date', 'sale_id', 'sale_item', 'sale_items', 'sales', 'sales.id', 'users.id']

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Backup & Restore{% endblock %}
+{% block page_title %}Backup & Restore{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Backup</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Database Backup</div>
+    <div class="page-header-sub">Download a full JSON snapshot of all data</div>
+  </div>
+  <form method="post" action="{{ url_for('admin.create_backup') }}">
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-download me-1"></i>Create & Download Backup
+    </button>
+  </form>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Backup History</div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Filename</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>Status</th>
+              <th>Created By</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in logs %}
+            <tr>
+              <td class="small font-monospace">{{ log.filename }}</td>
+              <td><span class="badge bg-{{ 'primary' if log.backup_type == 'manual' else 'secondary' }}">{{ log.backup_type }}</span></td>
+              <td class="text-muted small">
+                {% if log.file_size_bytes %}{{ "%.1f" | format(log.file_size_bytes / 1024) }} KB{% else %}—{% endif %}
+              </td>
+              <td><span class="badge bg-{{ 'success' if log.status == 'success' else 'danger' }}">{{ log.status }}</span></td>
+              <td class="text-muted small">{{ log.creator.username if log.creator else 'system' }}</td>
+              <td class="text-muted small">{{ log.created_at.strftime('%d %b %Y %H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-3">No backups yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-folder2 me-2"></i>Backup Files on Disk</div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>File</th><th>Size</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for f in files %}
+            <tr>
+              <td class="small font-monospace" style="word-break:break-all;">{{ f.filename }}</td>
+              <td class="text-muted small">{{ "%.1f" | format(f.size_bytes / 1024) }} KB</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.delete_backup') }}"
+                      onsubmit="return confirm('Delete this backup file?')">
+                  <input type="hidden" name="filename" value="{{ f.filename }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No files on disk.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-info-circle text-info"></i>
+          <span class="fw-semibold small">About Backups</span>
+        </div>
+        <ul class="small text-muted mb-0">
+          <li>Backups are full JSON exports of all database tables</li>
+          <li>Files are saved to the <code>backups/</code> folder</li>
+          <li>Download and store copies off-site regularly</li>
+          <li>To restore, contact your system administrator</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\sync_service.py
+# hypothesis_version: 6.151.11
+
+[1.0, 200, 500, '+00:00', 'Z', 'address', 'applied', 'category', 'client_timestamp', 'client_wins', 'conflict', 'conflict_reason', 'conflicts', 'cost_price', 'created', 'customer', 'device_id', 'entity_id', 'entity_type', 'events', 'id', 'ignored', 'last_event_id', 'message', 'name', 'operation', 'payload', 'phone', 'product', 'quantity', 'results', 'selling_price', 'server_timestamp', 'server_wins', 'sku', 'status', 'strategy', 'sync_event_id', 'unknown', 'updated', 'upsert', '{}']

@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\services\ai_profit_leak.py
+# hypothesis_version: 6.151.11
+
+[0.2, 15.0, 100, 'No discount data.', 'Unknown', 'adjustment_out', 'by_staff', 'cost_price', 'count', 'current_stock', 'discount_losses', 'generated_at', 'id', 'insight', 'low_margin', 'low_margin_products', 'margin_pct', 'name', 'period_days', 'qty_sold_total', 'recommendation', 'sale', 'selling_price', 'shrinkage', 'shrinkage_items', 'shrinkage_value', 'sku', 'threshold_pct', 'total_discount', 'total_discount_given', 'user_id', 'username']

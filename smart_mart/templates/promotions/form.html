@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Promotion{% endblock %}
+{% block page_title %}{{ action }} Promotion{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('promotions.list_promotions') }}" class="text-decoration-none">Promotions</a></li>
+<li class="breadcrumb-item active">{{ action }}</li>
+{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-tag me-2 text-primary"></i>{{ action }} Promotion</div>
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required
+                   value="{{ promo.name if promo else '' }}" placeholder="e.g. Summer Sale 10% Off">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Type</label>
+              <select name="promo_type" class="form-select" id="promoType">
+                <option value="percentage" {{ 'selected' if promo and promo.promo_type == 'percentage' }}>Percentage Discount (%)</option>
+                <option value="fixed" {{ 'selected' if promo and promo.promo_type == 'fixed' }}>Fixed Amount Off (NPR)</option>
+                <option value="bogo" {{ 'selected' if promo and promo.promo_type == 'bogo' }}>Buy X Get Y Free</option>
+                <option value="bundle" {{ 'selected' if promo and promo.promo_type == 'bundle' }}>Bundle Price</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="discountValueGroup">
+              <label class="form-label" id="discountLabel">Discount Value</label>
+              <input type="number" name="discount_value" class="form-control" min="0" step="0.01"
+                     value="{{ promo.discount_value | float if promo else 0 }}">
+            </div>
+          </div>
+          <div class="row g-3 mb-3" id="bogoGroup" style="display:none;">
+            <div class="col-md-6">
+              <label class="form-label">Buy Qty</label>
+              <input type="number" name="buy_qty" class="form-control" min="1"
+                     value="{{ promo.buy_qty or 2 }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Get Free Qty</label>
+              <input type="number" name="free_qty" class="form-control" min="1"
+                     value="{{ promo.free_qty or 1 }}">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Scope</label>
+              <select name="scope" class="form-select" id="scopeSelect">
+                <option value="all" {{ 'selected' if not promo or promo.scope == 'all' }}>All Products</option>
+                <option value="category" {{ 'selected' if promo and promo.scope == 'category' }}>Specific Category</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="scopeValueGroup" style="display:none;">
+              <label class="form-label">Category</label>
+              <select name="scope_value" class="form-select">
+                <option value="">— Select —</option>
+                {% for cat in categories %}
+                <option value="{{ cat.name }}" {{ 'selected' if promo and promo.scope_value == cat.name }}>{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Minimum Purchase (NPR, optional)</label>
+            <input type="number" name="min_purchase" class="form-control" min="0" step="0.01"
+                   value="{{ promo.min_purchase | float if promo and promo.min_purchase else '' }}"
+                   placeholder="Leave blank for no minimum">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Start Date <span class="text-danger">*</span></label>
+              <input type="date" name="start_date" class="form-control" required
+                     value="{{ promo.start_date.isoformat() if promo else today }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">End Date <span class="text-danger">*</span></label>
+              <input type="date" name="end_date" class="form-control" required
+                     value="{{ promo.end_date.isoformat() if promo else today }}">
+            </div>
+          </div>
+          <div class="mb-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
+                     {{ 'checked' if not promo or promo.is_active }}>
+              <label class="form-check-label" for="isActive">Active</label>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg me-1"></i>{{ action }}
+            </button>
+            <a href="{{ url_for('promotions.list_promotions') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const promoType = document.getElementById('promoType');
+const bogoGroup = document.getElementById('bogoGroup');
+const discountLabel = document.getElementById('discountLabel');
+const scopeSelect = document.getElementById('scopeSelect');
+const scopeValueGroup = document.getElementById('scopeValueGroup');
+
+function updateForm() {
+  const t = promoType.value;
+  bogoGroup.style.display = t === 'bogo' ? '' : 'none';
+  if (t === 'percentage') discountLabel.textContent = 'Discount (%)';
+  else if (t === 'fixed') discountLabel.textContent = 'Discount Amount (NPR)';
+  else if (t === 'bundle') discountLabel.textContent = 'Bundle Price (NPR)';
+  else discountLabel.textContent = 'Discount Value';
+  scopeValueGroup.style.display = scopeSelect.value !== 'all' ? '' : 'none';
+}
+promoType.addEventListener('change', updateForm);
+scopeSelect.addEventListener('change', updateForm);
+updateForm();
+</script>
+{% endblock %}

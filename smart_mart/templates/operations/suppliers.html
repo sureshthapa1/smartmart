@@ -1,79 +1,355 @@
 {% extends "base.html" %}
-{% block title %}Supplier Payments - Smart Mart{% endblock %}
+{% block title %}Supplier Payments — Smart Mart{% endblock %}
 {% block page_title %}Supplier Payments{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Supplier Payments</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Supplier Payments</li>
+{% endblock %}
+{% block head %}
+<style>
+  .supplier-card { transition: box-shadow .15s; }
+  .supplier-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,.09) !important; }
+  .pay-badge { font-size:.7rem; padding:.25em .6em; border-radius:20px; font-weight:600; }
+  .history-row { font-size:.8rem; }
+</style>
+{% endblock %}
 {% block content %}
-<div class="card shadow-sm mb-4">
-  <div class="card-header fw-semibold">Record Supplier Payment</div>
-  <div class="card-body">
-    <form method="post" class="row g-3">
-      <input type="hidden" name="action" value="pay">
-      <div class="col-md-3">
-        <select name="supplier_id" class="form-select" required>
-          {% for row in data.rows %}<option value="{{ row.supplier.id }}">{{ row.supplier.name }}</option>{% endfor %}
-        </select>
+
+<!-- Summary bar -->
+{% set total_outstanding = data.rows | sum(attribute='outstanding') %}
+{% set total_purchases   = data.rows | sum(attribute='total_purchases') %}
+{% set total_paid        = data.rows | sum(attribute='total_paid') %}
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card metric-card blue">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:rgba(59,130,246,.1);color:#3b82f6;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">
+          <i class="bi bi-truck"></i>
+        </div>
+        <div>
+          <div class="metric-label">Total Purchases</div>
+          <div class="metric-value" style="font-size:1.25rem">NPR {{ "%.0f" | format(total_purchases) }}</div>
+        </div>
       </div>
-      <div class="col-md-3">
-        <select name="purchase_id" class="form-select">
-          <option value="">Any Purchase</option>
-          {% for p in purchases %}<option value="{{ p.id }}">Purchase #{{ p.id }}</option>{% endfor %}
-        </select>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card metric-card green">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:rgba(34,197,94,.1);color:#22c55e;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">
+          <i class="bi bi-check-circle"></i>
+        </div>
+        <div>
+          <div class="metric-label">Total Paid</div>
+          <div class="metric-value" style="font-size:1.25rem">NPR {{ "%.0f" | format(total_paid) }}</div>
+        </div>
       </div>
-      <div class="col-md-2"><input type="number" step="0.01" min="0.01" name="amount" class="form-control" placeholder="Amount" required></div>
-      <div class="col-md-2">
-        <select name="payment_mode" class="form-select">
-          <option value="cash">Cash</option>
-          <option value="qr">QR</option>
-          <option value="card">Card</option>
-        </select>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card metric-card orange">
+      <div class="card-body p-3 d-flex align-items-center gap-3">
+        <div class="metric-icon" style="background:rgba(249,115,22,.1);color:#f97316;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">
+          <i class="bi bi-exclamation-circle"></i>
+        </div>
+        <div>
+          <div class="metric-label">Outstanding Due</div>
+          <div class="metric-value" style="font-size:1.25rem;color:{% if total_outstanding > 0 %}#f97316{% else %}#22c55e{% endif %}">
+            NPR {{ "%.0f" | format(total_outstanding) }}
+          </div>
+        </div>
       </div>
-      <div class="col-md-2"><input name="note" class="form-control" placeholder="Note (optional)"></div>
-      <div class="col-12"><button class="btn btn-primary" type="submit">Record Payment</button></div>
-    </form>
+    </div>
   </div>
 </div>
-<div class="card shadow-sm">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span class="fw-semibold">Supplier Balances</span>
-    <small class="text-muted">{{ data.total }} supplier{{ 's' if data.total != 1 }}</small>
+
+<!-- Per-supplier cards -->
+{% for row in data.rows %}
+<div class="card supplier-card mb-4">
+
+  <!-- Supplier header -->
+  <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1rem;flex-shrink:0">
+        {{ row.supplier.name[0].upper() }}
+      </div>
+      <div>
+        <div class="fw-bold" style="font-size:.95rem">{{ row.supplier.name }}</div>
+        <div class="text-muted small">
+          {% if row.supplier.contact %}{{ row.supplier.contact }}{% endif %}
+          {% if row.supplier.email %} · {{ row.supplier.email }}{% endif %}
+        </div>
+      </div>
+    </div>
+    <!-- Balance pills -->
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <span class="pay-badge" style="background:#dbeafe;color:#1e40af">
+        Purchases: NPR {{ "%.2f" | format(row.total_purchases) }}
+      </span>
+      <span class="pay-badge" style="background:#dcfce7;color:#166534">
+        Paid: NPR {{ "%.2f" | format(row.total_paid) }}
+      </span>
+      <span class="pay-badge {% if row.outstanding > 0 %}bg-warning text-dark{% else %}bg-success text-white{% endif %}">
+        {% if row.outstanding > 0 %}Due: NPR {{ "%.2f" | format(row.outstanding) }}
+        {% else %}✓ Fully Paid{% endif %}
+      </span>
+      <!-- Pay Now button -->
+      {% if row.outstanding > 0 %}
+      <button class="btn btn-sm btn-primary"
+              onclick="openPayModal({{ row.supplier.id }}, '{{ row.supplier.name | e }}', {{ row.outstanding }})">
+        <i class="bi bi-cash-coin me-1"></i>Pay Now
+      </button>
+      {% endif %}
+    </div>
   </div>
-  <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead><tr><th>Supplier</th><th class="text-end">Total Purchases</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th><th>Recent Payments</th></tr></thead>
-      <tbody>
-      {% for row in data.rows %}
-        <tr>
-          <td class="fw-semibold">{{ row.supplier.name }}</td>
-          <td class="text-end">NPR {{ "%.2f"|format(row.total_purchases) }}</td>
-          <td class="text-end">NPR {{ "%.2f"|format(row.total_paid) }}</td>
-          <td class="text-end fw-semibold {% if row.outstanding > 0 %}text-warning{% else %}text-success{% endif %}">NPR {{ "%.2f"|format(row.outstanding) }}</td>
-          <td>
-            {% if row.payments %}
-            <small class="text-muted">
-              {% for sp in row.payments[:2] %}
-                NPR {{ "%.2f"|format(sp.amount|float) }} ({{ sp.payment_mode }}) on {{ sp.paid_at.strftime('%Y-%m-%d') }}{% if not loop.last %}, {% endif %}
+
+  <div class="card-body p-0">
+    <div class="row g-0">
+
+      <!-- Left: Purchase history -->
+      <div class="col-lg-6" style="border-right:1px solid #f1f5f9">
+        <div class="px-4 py-3">
+          <div class="fw-semibold small text-muted mb-2 text-uppercase" style="letter-spacing:.06em;font-size:.7rem">
+            <i class="bi bi-bag-check me-1"></i>Purchase History
+          </div>
+          {% if row.purchases %}
+          <div style="max-height:200px;overflow-y:auto">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th style="font-size:.7rem">Purchase #</th>
+                  <th style="font-size:.7rem">Date</th>
+                  <th class="text-end" style="font-size:.7rem">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in row.purchases %}
+                <tr class="history-row">
+                  <td><span class="text-muted">#{{ p.id }}</span></td>
+                  <td class="text-muted">{{ p.purchase_date.strftime('%d %b %Y') if p.purchase_date else '—' }}</td>
+                  <td class="text-end fw-semibold">NPR {{ "%.2f" | format(p.total_cost | float) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted small py-2">No purchases recorded.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Right: Payment history -->
+      <div class="col-lg-6">
+        <div class="px-4 py-3">
+          <div class="fw-semibold small text-muted mb-2 text-uppercase" style="letter-spacing:.06em;font-size:.7rem">
+            <i class="bi bi-clock-history me-1"></i>Payment History
+          </div>
+          {% if row.payments %}
+          <div style="max-height:200px;overflow-y:auto">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th style="font-size:.7rem">Date</th>
+                  <th style="font-size:.7rem">Mode</th>
+                  <th style="font-size:.7rem">Note</th>
+                  <th class="text-end" style="font-size:.7rem">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for sp in row.payments %}
+                <tr class="history-row">
+                  <td class="text-muted">{{ sp.paid_at.strftime('%d %b %Y') }}</td>
+                  <td>
+                    <span class="badge bg-light text-dark border" style="font-size:.65rem">
+                      {% if sp.payment_mode == 'cash' %}💵{% elif sp.payment_mode == 'qr' %}📱{% elif sp.payment_mode == 'card' %}💳{% else %}🔄{% endif %}
+                      {{ sp.payment_mode | capitalize }}
+                    </span>
+                  </td>
+                  <td class="text-muted" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                    {{ sp.note or '—' }}
+                  </td>
+                  <td class="text-end fw-semibold text-success">NPR {{ "%.2f" | format(sp.amount | float) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-end text-muted small fw-semibold">Total Paid:</td>
+                  <td class="text-end fw-bold text-success">NPR {{ "%.2f" | format(row.total_paid) }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted small py-2">No payments recorded yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Progress bar -->
+    {% if row.total_purchases > 0 %}
+    {% set paid_pct = [(row.total_paid / row.total_purchases * 100) | int, 100] | min %}
+    <div class="px-4 pb-3">
+      <div class="d-flex justify-content-between mb-1">
+        <span class="text-muted" style="font-size:.72rem">Payment progress</span>
+        <span class="fw-semibold" style="font-size:.72rem">{{ paid_pct }}% paid</span>
+      </div>
+      <div class="progress" style="height:6px;border-radius:4px">
+        <div class="progress-bar {% if paid_pct == 100 %}bg-success{% elif paid_pct >= 50 %}bg-primary{% else %}bg-warning{% endif %}"
+             style="width:{{ paid_pct }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-truck fs-1 d-block mb-2 opacity-25"></i>
+    No suppliers found. <a href="{{ url_for('purchases.create_supplier') }}">Add a supplier</a>.
+  </div>
+</div>
+{% endfor %}
+
+<!-- Pagination -->
+{% if data.pages > 1 %}
+<div class="d-flex justify-content-center mt-3">
+  <nav><ul class="pagination pagination-sm mb-0">
+    {% for p in range(1, data.pages + 1) %}
+    <li class="page-item {% if p == data.page %}active{% endif %}">
+      <a class="page-link" href="{{ url_for('operations.suppliers', page=p) }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+  </ul></nav>
+</div>
+{% endif %}
+
+
+<!-- ── Pay Now Modal ──────────────────────────────────────────────────────── -->
+<div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payModalLabel">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('operations.suppliers') }}" id="payForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="payModalLabel">
+            <i class="bi bi-cash-coin text-primary me-2"></i>Record Supplier Payment
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- Supplier (hidden + display) -->
+          <input type="hidden" name="supplier_id" id="modal_supplier_id">
+          <div class="mb-3">
+            <label class="form-label">Supplier</label>
+            <input type="text" class="form-control" id="modal_supplier_name" readonly
+                   style="background:#f8fafc;font-weight:600">
+          </div>
+
+          <!-- Link to a specific purchase (optional) -->
+          <div class="mb-3">
+            <label class="form-label">Link to Purchase <span class="text-muted small">(optional)</span></label>
+            <select name="purchase_id" id="modal_purchase_id" class="form-select">
+              <option value="">— Not linked to a specific purchase —</option>
+              {% for p in purchases %}
+              <option value="{{ p.id }}" data-supplier="{{ p.supplier_id }}">
+                Purchase #{{ p.id }} — {{ p.purchase_date }} — NPR {{ "%.2f" | format(p.total_cost | float) }}
+              </option>
               {% endfor %}
-              {% if row.payments|length > 2 %}&hellip;{% endif %}
-            </small>
-            {% else %}-{% endif %}
-          </td>
-        </tr>
-      {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No suppliers yet.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+            </select>
+            <div class="form-text">Linking helps track which purchase is being paid off.</div>
+          </div>
+
+          <!-- Amount -->
+          <div class="mb-3">
+            <label class="form-label">Amount (NPR) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">NPR</span>
+              <input type="number" name="amount" id="modal_amount" class="form-control"
+                     min="0.01" step="0.01" required placeholder="0.00">
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                      id="payFullBtn" title="Pay full outstanding amount">Pay Full</button>
+            </div>
+            <div class="form-text">Outstanding: <strong id="modal_outstanding" class="text-warning">—</strong></div>
+          </div>
+
+          <!-- Payment mode -->
+          <div class="mb-3">
+            <label class="form-label">Payment Mode <span class="text-danger">*</span></label>
+            <div class="d-flex gap-3 flex-wrap">
+              {% for val, label, icon in [('cash','Cash','💵'),('qr','QR / eSewa','📱'),('card','Card','💳'),('bank','Bank Transfer','🏦'),('other','Other','🔄')] %}
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="payment_mode"
+                       id="pm_{{ val }}" value="{{ val }}" {{ 'checked' if val == 'cash' }}>
+                <label class="form-check-label" for="pm_{{ val }}">{{ icon }} {{ label }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Note -->
+          <div class="mb-1">
+            <label class="form-label">Note <span class="text-muted small">(optional)</span></label>
+            <input type="text" name="note" class="form-control"
+                   placeholder="e.g. Partial payment, Invoice #123…">
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg me-1"></i>Record Payment
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
-  {% if data.pages > 1 %}
-  <div class="card-footer d-flex justify-content-center">
-    <nav><ul class="pagination pagination-sm mb-0">
-      {% for p in range(1, data.pages + 1) %}
-      <li class="page-item {% if p == data.page %}active{% endif %}">
-        <a class="page-link" href="{{ url_for('operations.suppliers', page=p) }}">{{ p }}</a>
-      </li>
-      {% endfor %}
-    </ul></nav>
-  </div>
-  {% endif %}
 </div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Build a map of supplier_id → outstanding for the Pay Full button
+const outstandingMap = {
+  {% for row in data.rows %}
+  {{ row.supplier.id }}: {{ row.outstanding }},
+  {% endfor %}
+};
+
+function openPayModal(supplierId, supplierName, outstanding) {
+  document.getElementById('modal_supplier_id').value = supplierId;
+  document.getElementById('modal_supplier_name').value = supplierName;
+  document.getElementById('modal_outstanding').textContent = 'NPR ' + outstanding.toFixed(2);
+  document.getElementById('modal_amount').value = '';
+  document.getElementById('modal_amount').max = outstanding;
+
+  // Filter purchase dropdown to this supplier only
+  const sel = document.getElementById('modal_purchase_id');
+  Array.from(sel.options).forEach(opt => {
+    if (opt.value === '') { opt.style.display = ''; return; }
+    opt.style.display = (opt.dataset.supplier == supplierId) ? '' : 'none';
+  });
+  sel.value = '';
+
+  // Pay Full button
+  document.getElementById('payFullBtn').onclick = () => {
+    document.getElementById('modal_amount').value = outstanding.toFixed(2);
+  };
+
+  new bootstrap.Modal(document.getElementById('payModal')).show();
+}
+
+// If page loaded with a supplier_id pre-selected (e.g. from a link), auto-open
+const urlParams = new URLSearchParams(window.location.search);
+const preSupplier = urlParams.get('pay');
+if (preSupplier) {
+  const row = document.querySelector(`[data-supplier-id="${preSupplier}"]`);
+  if (row) row.click();
+}
+</script>
 {% endblock %}

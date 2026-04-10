@@ -16,6 +16,7 @@
     <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-tags me-1"></i>Categories</a>
     <a href="{{ url_for('inventory.bulk_upload') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-cloud-upload me-1"></i>Bulk Upload</a>
     {% endif %}
+    <a href="{{ url_for('inventory.export_csv') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
     <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Product</a>
   </div>
 </div>
@@ -81,6 +82,7 @@
               <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
               <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Adjust Stock"><i class="bi bi-arrow-left-right"></i></a>
               {% if current_user.role == 'admin' %}
+              <a href="{{ url_for('inventory.product_variants', product_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Variants"><i class="bi bi-collection"></i></a>
               <a href="{{ url_for('ai.product_analysis', product_id=p.id) }}" class="btn btn-sm btn-outline-info" title="AI Analysis"><i class="bi bi-robot"></i></a>
               <form method="post" action="{{ url_for('inventory.delete_product', product_id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete {{ p.name }}?')">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
