@@ -23,6 +23,8 @@ def index():
     notifications = operations_manager.ensure_notifications()[:10]
     loyalty = operations_manager.get_loyalty_summary()[:10]
     branches = operations_manager.list_branches()
+    from ...services.credit_risk_service import get_risk_summary
+    risk_summary = get_risk_summary()
     return render_template(
         "operations/index.html",
         credit_records=credit_data["records"],
@@ -32,6 +34,7 @@ def index():
         notifications=notifications,
         loyalty=loyalty,
         branches=branches,
+        risky_count=risk_summary["risky"],
     )
 
 
@@ -217,7 +220,6 @@ def backup_export():
 
 
 @operations_bp.route("/eod", methods=["GET"])
-@admin_required
 def eod_summary():
     from datetime import date
     from ...services.eod_summary import get_eod_summary
@@ -252,3 +254,20 @@ def shifts():
     open_shift_obj = get_open_shift(current_user.id)
     all_shifts = list_shifts()
     return render_template("operations/shifts.html", open_shift=open_shift_obj, shifts=all_shifts)
+
+
+@operations_bp.route("/credit-risk")
+@admin_required
+def credit_risk():
+    from ...services.credit_risk_service import get_all_customer_risk_scores, get_risk_summary
+    scores = get_all_customer_risk_scores()
+    summary = get_risk_summary()
+    return render_template("operations/credit_risk.html", scores=scores, summary=summary)
+
+
+@operations_bp.route("/credit-risk/<path:customer_name>")
+@admin_required
+def credit_risk_detail(customer_name):
+    from ...services.credit_risk_service import calculate_risk_score
+    data = calculate_risk_score(customer_name)
+    return render_template("operations/credit_risk_detail.html", data=data, today=date.today())

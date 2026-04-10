@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Credit Risk Scores — Smart Mart{% endblock %}
+{% block page_title %}Customer Credit Risk{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Credit Risk</li>
+{% endblock %}
+{% block content %}
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label">🟢 Safe Customers</div>
+        <div class="stat-value">{{ summary.safe }}</div>
+        <div class="stat-sub">Pay on time</div>
+        <div class="stat-bg">✅</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#92400e">
+      <div class="card-body p-4">
+        <div class="stat-label">🟡 Watch</div>
+        <div class="stat-value">{{ summary.watch }}</div>
+        <div class="stat-sub">Sometimes late</div>
+        <div class="stat-bg">⚠️</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b">
+      <div class="card-body p-4">
+        <div class="stat-label">🔴 Risky</div>
+        <div class="stat-value">{{ summary.risky }}</div>
+        <div class="stat-sub">Overdue / high outstanding</div>
+        <div class="stat-bg">🚨</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
+      <div class="card-body p-4">
+        <div class="stat-label">Total Outstanding</div>
+        <div class="stat-value" style="font-size:1.4rem">NPR {{ "%.0f"|format(summary.total_outstanding) }}</div>
+        <div class="stat-sub">Across {{ summary.total }} customers</div>
+        <div class="stat-bg">💳</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Risk Table -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span class="fw-semibold"><i class="bi bi-shield-exclamation me-2 text-primary"></i>Customer Risk Scores</span>
+    <div class="d-flex gap-2">
+      <input type="text" id="riskSearch" class="form-control form-control-sm" placeholder="Search customer…" style="width:200px">
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle" id="riskTable">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th class="text-center">Risk Score</th>
+          <th class="text-center">Status</th>
+          <th class="text-end">Total Borrowed</th>
+          <th class="text-end">Outstanding</th>
+          <th class="text-center">Overdue</th>
+          <th class="text-center">Avg Days to Pay</th>
+          <th class="text-center">On-Time %</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in scores %}
+        <tr class="risk-row" data-name="{{ s.customer_name | lower }}">
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:32px;height:32px;border-radius:50%;background:{% if s.risk_level == 'safe' %}linear-gradient(135deg,#22c55e,#16a34a){% elif s.risk_level == 'watch' %}linear-gradient(135deg,#f59e0b,#d97706){% else %}linear-gradient(135deg,#ef4444,#dc2626){% endif %};display:flex;align-items:center;justify-content:center;font-size:.75rem;color:#fff;font-weight:700;flex-shrink:0">
+                {{ s.customer_name[0].upper() }}
+              </div>
+              <div>
+                <div class="fw-semibold" style="font-size:.875rem">{{ s.customer_name }}</div>
+                <div class="text-muted" style="font-size:.72rem">{{ s.total_credit_sales }} credit sale{{ 's' if s.total_credit_sales != 1 }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="text-center">
+            <div style="font-size:1.1rem;font-weight:800;color:{% if s.score >= 70 %}#22c55e{% elif s.score >= 40 %}#f59e0b{% else %}#ef4444{% endif %}">
+              {{ s.score }}
+            </div>
+            <div class="progress mt-1" style="height:4px;border-radius:2px;width:60px;margin:0 auto">
+              <div class="progress-bar" style="width:{{ s.score }}%;background:{% if s.score >= 70 %}#22c55e{% elif s.score >= 40 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+            </div>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-{{ s.risk_color }} px-3 py-2" style="font-size:.8rem">{{ s.risk_label }}</span>
+          </td>
+          <td class="text-end">NPR {{ "%.0f"|format(s.total_borrowed) }}</td>
+          <td class="text-end fw-semibold {% if s.total_outstanding > 0 %}text-danger{% else %}text-success{% endif %}">
+            NPR {{ "%.0f"|format(s.total_outstanding) }}
+          </td>
+          <td class="text-center">
+            {% if s.overdue_count > 0 %}
+            <span class="badge bg-danger">{{ s.overdue_count }}</span>
+            {% else %}
+            <span class="text-success">—</span>
+            {% endif %}
+          </td>
+          <td class="text-center text-muted small">
+            {{ s.avg_days_to_pay ~ ' days' if s.avg_days_to_pay else '—' }}
+          </td>
+          <td class="text-center">
+            <span class="badge {% if s.paid_on_time_pct >= 80 %}bg-success{% elif s.paid_on_time_pct >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+              {{ s.paid_on_time_pct }}%
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('operations.credit_risk_detail', customer_name=s.customer_name) }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-5">
+          <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
+          No customers with credit history yet.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('riskSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.risk-row').forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
+});
+</script>
+{% endblock %}

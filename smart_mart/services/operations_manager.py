@@ -410,7 +410,9 @@ def get_reorder_suggestions(days: int = 30) -> list[dict]:
 
 # ---------------------------------------------------------------------------
 # Loyalty — redeem via operations page
-# ---------------------------------------------------------------------------def redeem_loyalty_points(customer_name: str, points: int, note: str | None = None) -> int:
+# ---------------------------------------------------------------------------
+
+def redeem_loyalty_points(customer_name: str, points: int, note: str | None = None) -> int:
     """Deduct points for a customer. Returns new balance. Raises ValueError if insufficient."""
     customer_name = customer_name.strip()
     if points <= 0:

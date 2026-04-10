@@ -39,20 +39,23 @@
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6">
-      <div class="card-body p-4">
-        <div class="stat-label">Branches</div>
-        <div class="stat-value">{{ branches|length }}</div>
-        <div class="stat-sub">{{ branches|selectattr('is_active')|list|length }} active</div>
-        <div class="stat-bg">🏪</div>
+    <a href="{{ url_for('operations.credit_risk') }}" class="text-decoration-none">
+      <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#7e22ce">
+        <div class="card-body p-4">
+          <div class="stat-label">🔴 Risky Customers</div>
+          <div class="stat-value">{{ risky_count }}</div>
+          <div class="stat-sub">Click to view risk scores →</div>
+          <div class="stat-bg">🛡️</div>
+        </div>
       </div>
-    </div>
+    </a>
   </div>
 </div>
 
 <div class="row g-3 mb-4">
   {% set nav_items = [
     ('operations.credits',      'bi-credit-card-2-back', 'Credit Ledger',       '#fef3c7', '#92400e', 'Track & collect outstanding credit sales'),
+    ('operations.credit_risk',  'bi-shield-exclamation', 'Credit Risk Scores',  '#fee2e2', '#991b1b', '🟢 Safe / 🔴 Risky customer scoring'),
     ('operations.suppliers',    'bi-truck',              'Supplier Payments',    '#dbeafe', '#1e40af', 'Record payments to suppliers'),
     ('operations.closing',      'bi-safe2',              'Daily Closing',        '#dcfce7', '#166534', 'Open & close cash sessions'),
     ('operations.shifts',       'bi-person-badge',       'Shift Management',     '#f0f9ff', '#0369a1', 'Track staff shifts & handovers'),
