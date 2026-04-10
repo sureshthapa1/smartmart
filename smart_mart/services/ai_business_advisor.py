@@ -452,5 +452,159 @@ def full_advisor_report() -> dict:
         "opportunities": growth_opportunities(),
         "forecast": revenue_forecast_30d(),
         "kpis": kpi_scorecard(),
+        "product_actions": product_action_recommendations(),
         "generated_at": datetime.now().isoformat(),
     }
+
+
+# ── Product Action Advisor ────────────────────────────────────────────────────
+
+def product_action_recommendations() -> list[dict]:
+    """
+    Per-product AI recommendations:
+    - "Increase price" — high demand, healthy stock, low margin
+    - "Stop stocking" — dead stock + low/negative margin
+    - "Buy more" — fast moving + low stock
+    - "Run promotion" — slow moving but decent margin
+    - "Review pricing" — selling below cost
+    """
+    today = date.today()
+    days_30 = today - timedelta(days=30)
+    days_90 = today - timedelta(days=90)
+
+    # Sales velocity per product (last 30 days)
+    velocity_rows = db.session.execute(
+        db.select(
+            SaleItem.product_id,
+            func.sum(SaleItem.quantity).label("qty_sold_30d"),
+            func.sum(SaleItem.subtotal).label("revenue_30d"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= days_30)
+        .group_by(SaleItem.product_id)
+    ).all()
+    velocity = {r.product_id: {"qty": int(r.qty_sold_30d), "rev": float(r.revenue_30d)} for r in velocity_rows}
+
+    # Sales in last 90 days (for dead stock check)
+    sold_90d = set(db.session.execute(
+        db.select(SaleItem.product_id.distinct())
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= days_90)
+    ).scalars().all())
+
+    # All active products
+    products = db.session.execute(
+        db.select(Product).where(Product.quantity >= 0)
+        .order_by(Product.name)
+    ).scalars().all()
+
+    # Average daily sales across all products (for "fast" threshold)
+    total_daily_avg = db.session.execute(
+        db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= days_30)
+    ).scalar() or 0
+    avg_daily_units = float(total_daily_avg) / 30 if total_daily_avg else 1
+
+    actions = []
+
+    for p in products:
+        cost = float(p.cost_price or 0)
+        price = float(p.selling_price or 0)
+        qty = p.quantity
+        margin_pct = ((price - cost) / price * 100) if price > 0 else 0
+        v = velocity.get(p.id, {"qty": 0, "rev": 0.0})
+        qty_sold_30d = v["qty"]
+        daily_velocity = qty_sold_30d / 30
+
+        # ── Rule 1: Selling below cost → Review pricing immediately ──────
+        if cost > 0 and price < cost:
+            actions.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "action": "review_pricing",
+                "action_label": "⚠️ Review Pricing",
+                "color": "danger",
+                "priority": 1,
+                "reason": f"Selling at NPR {price:,.0f} but costs NPR {cost:,.0f} — losing NPR {cost-price:,.0f} per unit.",
+                "recommendation": f"Increase price to at least NPR {cost * 1.15:,.0f} (15% margin).",
+                "data": {"cost": cost, "price": price, "margin_pct": round(margin_pct, 1), "qty_sold_30d": qty_sold_30d},
+            })
+
+        # ── Rule 2: Stop stocking — no sales in 90 days + low margin ─────
+        elif p.id not in sold_90d and qty > 0 and margin_pct < 20:
+            actions.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "action": "stop_stocking",
+                "action_label": "🚫 Stop Stocking",
+                "color": "danger",
+                "priority": 2,
+                "reason": f"No sales in 90+ days. {qty} units sitting idle. Margin only {margin_pct:.0f}%.",
+                "recommendation": f"Clear remaining {qty} units via discount or return to supplier. Do not reorder.",
+                "data": {"qty_in_stock": qty, "days_no_sale": 90, "margin_pct": round(margin_pct, 1)},
+            })
+
+        # ── Rule 3: Buy more — fast moving + low stock ────────────────────
+        elif daily_velocity > 0 and qty > 0:
+            days_of_stock = qty / daily_velocity
+            if days_of_stock < 7 and qty_sold_30d >= 5:
+                actions.append({
+                    "product_id": p.id,
+                    "product_name": p.name,
+                    "action": "buy_more",
+                    "action_label": "🛒 Buy More",
+                    "color": "success",
+                    "priority": 3,
+                    "reason": f"Selling {qty_sold_30d} units/month. Only {qty} units left — {days_of_stock:.0f} days of stock.",
+                    "recommendation": f"Order at least {max(qty_sold_30d, 30)} units to cover 30 days of demand.",
+                    "data": {"qty_in_stock": qty, "qty_sold_30d": qty_sold_30d, "days_of_stock": round(days_of_stock, 1)},
+                })
+
+        # ── Rule 4: Increase price — high demand + low margin ─────────────
+        elif qty_sold_30d >= 10 and 0 < margin_pct < 20 and price > cost:
+            suggested_price = round(cost * 1.25, -1)  # 25% margin, rounded to 10s
+            actions.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "action": "increase_price",
+                "action_label": "💰 Increase Price",
+                "color": "warning",
+                "priority": 4,
+                "reason": f"Selling {qty_sold_30d} units/month but margin is only {margin_pct:.0f}%. High demand = pricing power.",
+                "recommendation": f"Increase price from NPR {price:,.0f} to NPR {suggested_price:,.0f} to reach 25% margin.",
+                "data": {"current_price": price, "suggested_price": suggested_price, "margin_pct": round(margin_pct, 1), "qty_sold_30d": qty_sold_30d},
+            })
+
+        # ── Rule 5: Run promotion — slow moving but good margin ───────────
+        elif p.id not in sold_90d and qty > 0 and margin_pct >= 30:
+            discount_price = round(price * 0.85, -1)
+            actions.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "action": "run_promotion",
+                "action_label": "🏷️ Run Promotion",
+                "color": "info",
+                "priority": 5,
+                "reason": f"No sales in 90 days but {margin_pct:.0f}% margin gives room for a discount.",
+                "recommendation": f"Offer 15% off (NPR {discount_price:,.0f}) to clear {qty} units and free up capital.",
+                "data": {"qty_in_stock": qty, "margin_pct": round(margin_pct, 1), "suggested_promo_price": discount_price},
+            })
+
+        # ── Rule 6: Out of stock — was selling well ───────────────────────
+        elif qty == 0 and qty_sold_30d >= 3:
+            actions.append({
+                "product_id": p.id,
+                "product_name": p.name,
+                "action": "restock_urgent",
+                "action_label": "🚨 Restock Now",
+                "color": "danger",
+                "priority": 1,
+                "reason": f"Out of stock! Was selling {qty_sold_30d} units last month — losing sales every day.",
+                "recommendation": f"Order immediately. Estimated lost revenue: NPR {qty_sold_30d * price:,.0f}/month.",
+                "data": {"qty_sold_30d": qty_sold_30d, "estimated_lost_revenue": round(qty_sold_30d * price, 2)},
+            })
+
+    # Sort by priority then by impact
+    actions.sort(key=lambda x: (x["priority"], -x["data"].get("qty_sold_30d", 0)))
+    return actions[:30]  # top 30 most actionable

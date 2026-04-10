@@ -45,3 +45,10 @@ def api_forecast():
 def api_kpis():
     _require_perm("can_view_advisor")
     return jsonify(ai_business_advisor.kpi_scorecard())
+
+
+@advisor_bp.route("/api/product-actions")
+@login_required
+def api_product_actions():
+    _require_perm("can_view_advisor")
+    return jsonify(ai_business_advisor.product_action_recommendations())

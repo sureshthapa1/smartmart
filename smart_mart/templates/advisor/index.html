@@ -198,6 +198,78 @@
     </div>
   </div>
 </div>
+
+<!-- ── Product Action Recommendations ─────────────────────────────────── -->
+{% set pa = report.product_actions %}
+{% if pa %}
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span class="fw-bold"><i class="bi bi-lightning-charge-fill text-warning me-2"></i>Product Action Recommendations</span>
+    <span class="badge bg-primary rounded-pill">{{ pa|length }} actions</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Product</th>
+          <th>Action</th>
+          <th>Why</th>
+          <th>What to do</th>
+          <th class="text-center">Key Metric</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in pa %}
+        <tr>
+          <td>
+            <a href="{{ url_for('inventory.edit_product', product_id=a.product_id) }}"
+               class="fw-semibold text-decoration-none" style="font-size:.875rem">
+              {{ a.product_name }}
+            </a>
+          </td>
+          <td>
+            <span class="badge bg-{{ a.color }} px-3 py-2" style="font-size:.78rem;white-space:nowrap">
+              {{ a.action_label }}
+            </span>
+          </td>
+          <td class="text-muted small" style="max-width:260px">{{ a.reason }}</td>
+          <td class="small" style="max-width:260px;color:#0f172a">{{ a.recommendation }}</td>
+          <td class="text-center">
+            {% set d = a.data %}
+            {% if a.action == 'buy_more' %}
+              <div class="fw-bold text-success">{{ d.qty_sold_30d }} sold/mo</div>
+              <div class="text-muted" style="font-size:.72rem">{{ d.days_of_stock }} days left</div>
+            {% elif a.action == 'increase_price' %}
+              <div class="fw-bold text-warning">{{ d.margin_pct }}% margin</div>
+              <div class="text-muted" style="font-size:.72rem">NPR {{ "%.0f"|format(d.suggested_price) }} suggested</div>
+            {% elif a.action == 'stop_stocking' %}
+              <div class="fw-bold text-danger">{{ d.qty_in_stock }} units idle</div>
+              <div class="text-muted" style="font-size:.72rem">{{ d.margin_pct }}% margin</div>
+            {% elif a.action == 'restock_urgent' %}
+              <div class="fw-bold text-danger">0 in stock</div>
+              <div class="text-muted" style="font-size:.72rem">NPR {{ "%.0f"|format(d.estimated_lost_revenue) }} lost/mo</div>
+            {% elif a.action == 'run_promotion' %}
+              <div class="fw-bold text-info">{{ d.margin_pct }}% margin</div>
+              <div class="text-muted" style="font-size:.72rem">NPR {{ "%.0f"|format(d.suggested_promo_price) }} promo price</div>
+            {% elif a.action == 'review_pricing' %}
+              <div class="fw-bold text-danger">-{{ (d.cost - d.price)|abs|round(0)|int }} loss/unit</div>
+              <div class="text-muted" style="font-size:.72rem">Cost NPR {{ "%.0f"|format(d.cost) }}</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body text-center text-muted py-4">
+    <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+    No urgent product actions right now. Your inventory looks healthy!
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
