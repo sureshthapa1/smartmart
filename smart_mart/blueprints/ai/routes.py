@@ -554,3 +554,160 @@ def api_combos():
 def api_customer_profitability():
     """GET /ai/api/customers/profitability"""
     return jsonify(customer_profitability())
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FEEDBACK LEARNING LOOP
+# ═══════════════════════════════════════════════════════════════════════════
+
+@ai_bp.route("/feedback")
+@admin_required
+def feedback_loop():
+    """Feedback Learning Loop dashboard."""
+    from ...models.ai_memory import AIRecommendation, AIFeedbackLog, AIRetrainingLog, AIModelVersion
+    from ...extensions import db as _db
+    from sqlalchemy import func
+
+    # Recent recommendations with feedback
+    recs = _db.session.execute(
+        _db.select(AIRecommendation).order_by(AIRecommendation.created_at.desc()).limit(50)
+    ).scalars().all()
+
+    # Feedback stats
+    total = len(recs)
+    accepted = sum(1 for r in recs if r.status == "accepted")
+    rejected = sum(1 for r in recs if r.status == "rejected")
+    pending = sum(1 for r in recs if r.status == "pending")
+
+    # Recent retraining logs
+    training_logs = _db.session.execute(
+        _db.select(AIRetrainingLog).order_by(AIRetrainingLog.started_at.desc()).limit(10)
+    ).scalars().all()
+
+    # Active model versions
+    model_versions = _db.session.execute(
+        _db.select(AIModelVersion).where(AIModelVersion.is_active == True)
+        .order_by(AIModelVersion.model_name)
+    ).scalars().all()
+
+    return render_template("ai/feedback_loop.html",
+                           recs=recs, total=total, accepted=accepted,
+                           rejected=rejected, pending=pending,
+                           training_logs=training_logs,
+                           model_versions=model_versions)
+
+
+@ai_bp.route("/feedback/<int:rec_id>/action", methods=["POST"])
+@admin_required
+def feedback_action(rec_id):
+    """Accept or reject an AI recommendation."""
+    from ...models.ai_memory import AIRecommendation, AIFeedbackLog
+    from ...extensions import db as _db
+    from datetime import datetime, timezone
+    from flask import redirect, url_for, flash
+
+    rec = _db.get_or_404(AIRecommendation, rec_id)
+    action = request.form.get("action", "")
+    note = request.form.get("note", "").strip()
+
+    if action in ("accepted", "rejected", "modified"):
+        rec.status = action
+        rec.feedback_note = note or None
+        rec.acted_at = datetime.now(timezone.utc)
+        _db.session.add(AIFeedbackLog(
+            recommendation_id=rec.id,
+            action=action,
+            outcome=request.form.get("outcome", "neutral"),
+            notes=note or None,
+        ))
+        _db.session.commit()
+        flash(f"Recommendation marked as {action}.", "success")
+
+    return redirect(url_for("ai.feedback_loop"))
+
+
+@ai_bp.route("/feedback/retrain", methods=["POST"])
+@admin_required
+def trigger_retrain():
+    """Manually trigger model retraining."""
+    from ...services.ai_learning_engine import run_full_retraining
+    from flask import redirect, url_for, flash
+    result = run_full_retraining(trigger="manual")
+    flash(f"Retraining complete — {result.get('demand_forecast', {}).get('products_trained', 0)} models updated.", "success")
+    return redirect(url_for("ai.feedback_loop"))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMPETITOR PRICING UI
+# ═══════════════════════════════════════════════════════════════════════════
+
+@ai_bp.route("/competitor-pricing")
+@admin_required
+def competitor_pricing():
+    """Competitor price tracking dashboard."""
+    from ...models.ai_enhancements import CompetitorPriceEntry, CompetitorPriceSuggestion
+    from ...models.product import Product
+    from ...extensions import db as _db
+    from sqlalchemy import func
+
+    products = _db.session.execute(
+        _db.select(Product).order_by(Product.name)
+    ).scalars().all()
+
+    # Recent entries grouped by product
+    entries = _db.session.execute(
+        _db.select(CompetitorPriceEntry).order_by(CompetitorPriceEntry.observed_at.desc()).limit(100)
+    ).scalars().all()
+
+    # Products with competitor data
+    products_with_data = _db.session.execute(
+        _db.select(
+            Product,
+            func.count(CompetitorPriceEntry.id).label("entry_count"),
+            func.max(CompetitorPriceEntry.observed_at).label("last_updated"),
+        )
+        .outerjoin(CompetitorPriceEntry, CompetitorPriceEntry.product_id == Product.id)
+        .group_by(Product.id)
+        .having(func.count(CompetitorPriceEntry.id) > 0)
+        .order_by(func.max(CompetitorPriceEntry.observed_at).desc())
+    ).all()
+
+    return render_template("ai/competitor_pricing.html",
+                           products=products,
+                           entries=entries,
+                           products_with_data=products_with_data)
+
+
+@ai_bp.route("/competitor-pricing/add", methods=["POST"])
+@admin_required
+def add_competitor_price():
+    """Add a competitor price entry."""
+    from ...services.competitor_pricing_service import add_competitor_price as _add
+    from flask_login import current_user
+    from flask import redirect, url_for, flash
+    try:
+        _add(
+            product_id=int(request.form.get("product_id", 0)),
+            competitor_name=request.form.get("competitor_name", "").strip(),
+            competitor_price=float(request.form.get("competitor_price", 0)),
+            captured_by_user_id=current_user.id,
+            notes=request.form.get("notes", "").strip() or None,
+        )
+        flash("Competitor price recorded.", "success")
+    except Exception as e:
+        flash(str(e), "danger")
+    return redirect(url_for("ai.competitor_pricing"))
+
+
+@ai_bp.route("/competitor-pricing/suggest/<int:product_id>", methods=["POST"])
+@admin_required
+def get_price_suggestion(product_id):
+    """Generate AI pricing suggestion for a product."""
+    from ...services.competitor_pricing_service import generate_pricing_suggestion
+    from flask import redirect, url_for, flash
+    try:
+        result = generate_pricing_suggestion(product_id)
+        flash(f"AI suggests NPR {result['suggested_price']:.2f} for {result['product_name']} — {result['rationale']}", "info")
+    except ValueError as e:
+        flash(str(e), "danger")
+    return redirect(url_for("ai.competitor_pricing"))

@@ -65,9 +65,14 @@ class AIRetrainingLog(db.Model):
     """Logs of scheduled retraining runs."""
     __tablename__ = "ai_retraining_log"
     id = db.Column(db.Integer, primary_key=True)
-    trigger = db.Column(db.String(50), nullable=False)  # scheduled/manual/drift_detected
+    model_name = db.Column(db.String(80), nullable=True)
+    trigger = db.Column(db.String(50), nullable=False)
     models_retrained = db.Column(db.Text, nullable=True)  # JSON list
     started_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default="running")  # running/completed/failed
     summary = db.Column(db.Text, nullable=True)
+    samples_used = db.Column(db.Integer, nullable=True)
+    new_accuracy = db.Column(db.Float, nullable=True)
+    improvement = db.Column(db.Float, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)

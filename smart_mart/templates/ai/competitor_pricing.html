@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Competitor Pricing — Smart Mart{% endblock %}
+{% block page_title %}Competitor Price Tracker{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item">AI</li><li class="breadcrumb-item active">Competitor Pricing</li>{% endblock %}
+{% block content %}
+
+<div class="row g-3 mb-4">
+  <!-- Add Price Form -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-2 text-primary"></i>Record Competitor Price</div>
+      <div class="card-body p-4">
+        <form method="post" action="{{ url_for('ai.add_competitor_price') }}" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Product <span class="text-danger">*</span></label>
+            <select name="product_id" class="form-select" required>
+              <option value="">— Select product —</option>
+              {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Competitor Name <span class="text-danger">*</span></label>
+            <input type="text" name="competitor_name" class="form-control" placeholder="e.g. Bhatbhateni, Big Mart" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Their Price (NPR) <span class="text-danger">*</span></label>
+            <input type="number" name="competitor_price" class="form-control" step="0.01" min="0" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <input type="text" name="notes" class="form-control" placeholder="Where observed, date, etc.">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1"></i>Save Price</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Products with competitor data -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Price Comparison</div>
+      {% if products_with_data %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Our Price</th><th class="text-end">Competitor</th><th class="text-end">Difference</th><th>Last Updated</th><th></th></tr></thead>
+          <tbody>
+            {% for row in products_with_data %}
+            {% set p = row.Product %}
+            {% set latest = entries | selectattr('product_id', 'equalto', p.id) | list | first %}
+            {% if latest %}
+            {% set diff = p.selling_price|float - latest.competitor_price|float %}
+            {% set diff_pct = (diff / latest.competitor_price|float * 100) if latest.competitor_price|float > 0 else 0 %}
+            <tr>
+              <td class="fw-semibold">{{ p.name }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format(p.selling_price|float) }}</td>
+              <td class="text-end">NPR {{ "%.2f"|format(latest.competitor_price|float) }}<br><small class="text-muted">{{ latest.competitor_name }}</small></td>
+              <td class="text-end fw-semibold {% if diff > 0 %}text-danger{% elif diff < 0 %}text-success{% endif %}">
+                {% if diff > 0 %}+{% endif %}NPR {{ "%.2f"|format(diff) }}
+                <br><small>({% if diff_pct > 0 %}+{% endif %}{{ "%.1f"|format(diff_pct) }}%)</small>
+              </td>
+              <td class="text-muted small">{{ latest.observed_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <form method="post" action="{{ url_for('ai.get_price_suggestion', product_id=p.id) }}">
+                  <button class="btn btn-sm btn-outline-primary" type="submit" title="Get AI suggestion">
+                    <i class="bi bi-stars"></i> AI Suggest
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-bar-chart-line fs-1 d-block mb-2 opacity-25"></i>
+        No competitor prices recorded yet. Add your first entry on the left.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Entries -->
+{% if entries %}
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-clock-history me-2 text-muted"></i>Recent Entries</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Product</th><th>Competitor</th><th class="text-end">Their Price</th><th class="text-end">Our Price</th><th>Notes</th><th>Recorded</th></tr></thead>
+      <tbody>
+        {% for e in entries[:20] %}
+        <tr>
+          <td class="fw-semibold">{{ e.product.name if e.product else '—' }}</td>
+          <td>{{ e.competitor_name }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(e.competitor_price|float) }}</td>
+          <td class="text-end">{% if e.product %}NPR {{ "%.2f"|format(e.product.selling_price|float) }}{% else %}—{% endif %}</td>
+          <td class="text-muted small">{{ e.notes or '—' }}</td>
+          <td class="text-muted small">{{ e.observed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

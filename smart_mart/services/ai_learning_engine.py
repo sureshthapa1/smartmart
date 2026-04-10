@@ -19,7 +19,7 @@ from sqlalchemy import func
 from ..extensions import db
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
-from ..models.ai_memory import AIModelVersion, AITrainingLog
+from ..models.ai_memory import AIModelVersion, AIRetrainingLog as AITrainingLog
 
 
 def _get_daily_sales_series(product_id: int, days: int = 90) -> list[float]:
@@ -123,7 +123,7 @@ def retrain_demand_model(product_id: int = None, trigger: str = "manual") -> dic
                 version=last + 1,
                 accuracy_score=round(accuracy, 4),
                 parameters=params,
-                training_samples=len([x for x in series if x > 0]),
+                data_points_used=len([x for x in series if x > 0]),
                 is_active=True,
             )
             db.session.add(new_version)
@@ -209,7 +209,7 @@ def retrain_anomaly_thresholds(trigger: str = "scheduled") -> dict:
             model_name="anomaly_thresholds",
             version=last + 1,
             parameters=params,
-            training_samples=len(daily_rows),
+            data_points_used=len(daily_rows),
             is_active=True,
         ))
 
