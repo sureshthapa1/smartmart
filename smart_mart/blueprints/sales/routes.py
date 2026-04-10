@@ -148,6 +148,7 @@ def thermal_receipt(sale_id):
 def customer_statement():
     """Per-customer purchase history, credit, and loyalty statement."""
     from ...models.customer import Customer
+    from ...models.sale import Sale
     from ...models.operations import CustomerLoyaltyTransaction, CustomerCreditPayment
     from sqlalchemy import func
 
