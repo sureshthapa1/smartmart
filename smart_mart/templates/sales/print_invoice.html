@@ -46,12 +46,18 @@
   <div class="page">
     <!-- Header -->
     <div class="header">
-      <div>
-        <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
-        <div class="shop-meta">
-          {% if shop and shop.address %}{{ shop.address }}<br>{% endif %}
-          {% if shop and shop.phone %}Tel: {{ shop.phone }}<br>{% endif %}
-          {% if shop and shop.pan_number %}PAN: {{ shop.pan_number }}{% endif %}
+      <div style="display:flex;align-items:center;gap:14px;">
+        {% if shop and shop.logo_filename %}
+        <img src="{{ url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
+             alt="Logo" style="height:60px;width:auto;object-fit:contain;flex-shrink:0;">
+        {% endif %}
+        <div>
+          <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+          <div class="shop-meta">
+            {% if shop and shop.address %}{{ shop.address }}<br>{% endif %}
+            {% if shop and shop.phone %}Tel: {{ shop.phone }}<br>{% endif %}
+            {% if shop and shop.pan_number %}PAN: {{ shop.pan_number }}{% endif %}
+          </div>
         </div>
       </div>
       <div class="invoice-title">

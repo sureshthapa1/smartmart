@@ -260,13 +260,25 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     story = []
 
     # ── HEADER: two-column layout ─────────────────────────────────────────
-    # Left column: shop name + details stacked
+    # Left column: logo + shop name + details
     # Right column: TAX INVOICE + invoice number + date
-    left_col = [
+    left_col = []
+
+    # Add logo if available
+    if shop_logo_path:
+        try:
+            from reportlab.platypus import Image as RLImage
+            logo_img = RLImage(shop_logo_path, width=3*cm, height=1.5*cm, kind='proportional')
+            left_col.append(logo_img)
+            left_col.append(Spacer(1, 4))
+        except Exception:
+            pass
+
+    left_col.append(
         Paragraph(f"<b>{shop_name}</b>",
                   S("sn", fontSize=16, fontName="Helvetica-Bold",
-                    textColor=navy, spaceAfter=4, leading=20)),
-    ]
+                    textColor=navy, spaceAfter=4, leading=20))
+    )
     contact_parts = []
     if shop_address:
         contact_parts.append(shop_address)

@@ -29,6 +29,12 @@
   </style>
 </head>
 <body>
+  {% if shop and shop.logo_filename %}
+  <div class="center" style="margin-bottom:4px">
+    <img src="{{ url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
+         alt="Logo" style="max-height:40px;max-width:60mm;object-fit:contain;">
+  </div>
+  {% endif %}
   <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
   {% if shop and shop.address %}<div class="center" style="font-size:10px">{{ shop.address }}</div>{% endif %}
   {% if shop and shop.phone %}<div class="center" style="font-size:10px">Tel: {{ shop.phone }}</div>{% endif %}
