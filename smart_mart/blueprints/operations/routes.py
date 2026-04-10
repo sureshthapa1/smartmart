@@ -7,7 +7,7 @@ from ...extensions import db
 from ...models.operations import CashSession, ProductBatch
 from ...models.product import Product
 from ...models.purchase import Purchase
-from ...services.decorators import admin_required
+from ...services.decorators import admin_required, login_required
 from ...services import operations_manager
 
 operations_bp = Blueprint("operations", __name__, url_prefix="/operations")
@@ -39,8 +39,14 @@ def index():
 
 
 @operations_bp.route("/credits", methods=["GET", "POST"])
-@admin_required
+@login_required
 def credits():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        from flask import abort
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_credits:
+            abort(403)
     if request.method == "POST":
         try:
             operations_manager.record_credit_payment(
@@ -84,8 +90,14 @@ def suppliers():
 
 
 @operations_bp.route("/closing", methods=["GET", "POST"])
-@admin_required
+@login_required
 def closing():
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        from flask import abort
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_manage_cash_session:
+            abort(403)
     if request.method == "POST":
         action = request.form.get("action")
         try:

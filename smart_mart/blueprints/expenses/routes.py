@@ -16,9 +16,21 @@ expenses_bp = Blueprint("expenses", __name__, url_prefix="/expenses")
 EXPENSE_TYPES = ["rent", "salary", "utilities", "purchase", "miscellaneous", "other"]
 
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
 @expenses_bp.route("/")
-@admin_required
+@login_required
 def list_expenses():
+    _require_perm("can_view_expenses")
     start_raw = request.args.get("start_date", "")
     end_raw = request.args.get("end_date", "")
     type_filter = request.args.get("type", "")
@@ -79,8 +91,9 @@ def list_expenses():
 
 
 @expenses_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_expense():
+    _require_perm("can_manage_expenses")
     if request.method == "POST":
         expense_type = request.form.get("expense_type", "").strip()
         amount_raw = request.form.get("amount", "").strip()
@@ -131,8 +144,9 @@ def create_expense():
 
 
 @expenses_bp.route("/<int:expense_id>/edit", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_expense(expense_id):
+    _require_perm("can_manage_expenses")
     expense = db.get_or_404(Expense, expense_id)
 
     if request.method == "POST":
@@ -178,8 +192,9 @@ def edit_expense(expense_id):
 
 
 @expenses_bp.route("/<int:expense_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_expense(expense_id):
+    _require_perm("can_manage_expenses")
     expense = db.get_or_404(Expense, expense_id)
     db.session.delete(expense)
     db.session.commit()

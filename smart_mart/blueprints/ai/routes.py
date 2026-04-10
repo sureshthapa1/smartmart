@@ -19,10 +19,23 @@ from ...models.product import Product
 
 ai_bp = Blueprint("ai", __name__, url_prefix="/ai")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @ai_bp.route("/insights")
-@admin_required
+@login_required
 def insights():
+    _require_perm("can_view_ai_insights")
     """AI-generated business insights page."""
     insights_data = ai_engine.generate_insights()
     forecasts = ai_engine.forecast_sales(days_ahead=7)
@@ -46,8 +59,9 @@ def insights():
 
 
 @ai_bp.route("/product/<int:product_id>")
-@admin_required
+@login_required
 def product_analysis(product_id):
+    _require_perm("can_view_ai_insights")
     """Detailed AI analysis for a single product."""
     product = db.get_or_404(Product, product_id)
     demand = ai_engine.demand_prediction(product_id)
@@ -99,8 +113,9 @@ def chatbot_query():
 # ── JSON API endpoints for charts ─────────────────────────────────────────────
 
 @ai_bp.route("/api/forecast")
-@admin_required
+@login_required
 def api_forecast():
+    _require_perm("can_view_advisor")
     forecasts = ai_engine.forecast_sales(days_ahead=7)
     return jsonify({
         "labels": [f["day_name"] for f in forecasts],
@@ -274,8 +289,9 @@ def api_simulate_stockout(product_id):
 # ═══════════════════════════════════════════════════════════════════════════
 
 @ai_bp.route("/advanced")
-@admin_required
+@login_required
 def advanced_dashboard():
+    _require_perm("can_view_ai_insights")
     """Full advanced AI dashboard."""
     from ...models.supplier import Supplier
     suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
@@ -317,8 +333,9 @@ def api_anomalies():
 
 
 @ai_bp.route("/anomalies")
-@admin_required
+@login_required
 def anomalies_page():
+    _require_perm("can_view_ai_insights")
     from ...services.ai_anomaly_detection import full_anomaly_report
     report = full_anomaly_report(30)
     return render_template("ai/anomalies.html", report=report)
@@ -422,8 +439,9 @@ def api_cashflow_predict():
 
 
 @ai_bp.route("/cashflow")
-@admin_required
+@login_required
 def cashflow_page():
+    _require_perm("can_view_ai_insights")
     from ...services.ai_cashflow_prediction import predict_cashflow
     data = predict_cashflow(30)
     return render_template("ai/cashflow.html", data=data)
@@ -463,8 +481,9 @@ from ...services.ai_customer_intelligence import (
 
 
 @ai_bp.route("/customers")
-@admin_required
+@login_required
 def customer_intelligence():
+    _require_perm("can_view_ai_insights")
     """Customer Intelligence Dashboard."""
     tiers = tier_customers()
     churn = churn_prediction()
@@ -478,8 +497,9 @@ def customer_intelligence():
 
 
 @ai_bp.route("/customers/<string:customer_name>")
-@admin_required
+@login_required
 def customer_profile(customer_name):
+    _require_perm("can_view_ai_insights")
     """Individual customer deep analysis."""
     behavior = customer_behavior(customer_name)
     recs = personalized_recommendations(customer_name)
@@ -561,8 +581,9 @@ def api_customer_profitability():
 # ═══════════════════════════════════════════════════════════════════════════
 
 @ai_bp.route("/feedback")
-@admin_required
+@login_required
 def feedback_loop():
+    _require_perm("can_view_ai_insights")
     """Feedback Learning Loop dashboard."""
     from ...models.ai_memory import AIRecommendation, AIFeedbackLog, AIRetrainingLog, AIModelVersion
     from ...extensions import db as _db
@@ -598,8 +619,9 @@ def feedback_loop():
 
 
 @ai_bp.route("/feedback/<int:rec_id>/action", methods=["POST"])
-@admin_required
+@login_required
 def feedback_action(rec_id):
+    _require_perm("can_view_ai_insights")
     """Accept or reject an AI recommendation."""
     from ...models.ai_memory import AIRecommendation, AIFeedbackLog
     from ...extensions import db as _db
@@ -627,8 +649,9 @@ def feedback_action(rec_id):
 
 
 @ai_bp.route("/feedback/retrain", methods=["POST"])
-@admin_required
+@login_required
 def trigger_retrain():
+    _require_perm("can_view_ai_insights")
     """Manually trigger model retraining."""
     from ...services.ai_learning_engine import run_full_retraining
     from flask import redirect, url_for, flash
@@ -642,8 +665,9 @@ def trigger_retrain():
 # ═══════════════════════════════════════════════════════════════════════════
 
 @ai_bp.route("/competitor-pricing")
-@admin_required
+@login_required
 def competitor_pricing():
+    _require_perm("can_view_ai_insights")
     """Competitor price tracking dashboard."""
     from ...models.ai_enhancements import CompetitorPriceEntry, CompetitorPriceSuggestion
     from ...models.product import Product
@@ -679,8 +703,9 @@ def competitor_pricing():
 
 
 @ai_bp.route("/competitor-pricing/add", methods=["POST"])
-@admin_required
+@login_required
 def add_competitor_price():
+    _require_perm("can_view_ai_insights")
     """Add a competitor price entry."""
     from ...services.competitor_pricing_service import add_competitor_price as _add
     from flask_login import current_user
@@ -700,8 +725,9 @@ def add_competitor_price():
 
 
 @ai_bp.route("/competitor-pricing/suggest/<int:product_id>", methods=["POST"])
-@admin_required
+@login_required
 def get_price_suggestion(product_id):
+    _require_perm("can_view_ai_insights")
     """Generate AI pricing suggestion for a product."""
     from ...services.competitor_pricing_service import generate_pricing_suggestion
     from flask import redirect, url_for, flash

@@ -12,6 +12,18 @@ from ...services.decorators import login_required, admin_required
 
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @customers_bp.route("/create", methods=["GET", "POST"])
 @login_required
@@ -108,8 +120,9 @@ def customer_profile(customer_id):
 
 
 @customers_bp.route("/<int:customer_id>/edit", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_customer(customer_id):
+    _require_perm("can_manage_customers")
     customer = db.get_or_404(Customer, customer_id)
     if request.method == "POST":
         customer.name = request.form.get("name", "").strip() or customer.name
@@ -122,8 +135,9 @@ def edit_customer(customer_id):
 
 
 @customers_bp.route("/<int:customer_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_customer(customer_id):
+    _require_perm("can_manage_customers")
     customer = db.get_or_404(Customer, customer_id)
     db.session.delete(customer)
     db.session.commit()
@@ -132,8 +146,9 @@ def delete_customer(customer_id):
 
 
 @customers_bp.route("/export-csv")
-@admin_required
+@login_required
 def export_csv():
+    _require_perm("can_view_customers")
     import csv, io
     customers = db.session.execute(
         db.select(Customer).order_by(Customer.visit_count.desc())

@@ -13,18 +13,32 @@ from ...services.decorators import admin_required, login_required
 
 supplier_returns_bp = Blueprint("supplier_returns", __name__, url_prefix="/supplier-returns")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @supplier_returns_bp.route("/")
-@admin_required
+@login_required
 def list_returns():
+    _require_perm("can_view_supplier_returns")
     page = request.args.get("page", 1, type=int)
     returns = supplier_return_service.list_supplier_returns(page=page)
     return render_template("supplier_returns/list.html", returns=returns, page=page)
 
 
 @supplier_returns_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_return():
+    _require_perm("can_manage_supplier_returns")
     suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
     purchases = db.session.execute(
@@ -65,16 +79,18 @@ def create_return():
 
 
 @supplier_returns_bp.route("/<int:return_id>")
-@admin_required
+@login_required
 def view_return(return_id):
+    _require_perm("can_view_supplier_returns")
     from ...models.supplier_return import SupplierReturn
     sr = db.get_or_404(SupplierReturn, return_id)
     return render_template("supplier_returns/detail.html", sr=sr)
 
 
 @supplier_returns_bp.route("/<int:return_id>/status", methods=["POST"])
-@admin_required
+@login_required
 def update_status(return_id):
+    _require_perm("can_manage_supplier_returns")
     status = request.form.get("status", "")
     try:
         supplier_return_service.update_status(return_id, status)

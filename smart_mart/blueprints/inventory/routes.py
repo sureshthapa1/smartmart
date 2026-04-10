@@ -15,6 +15,17 @@ from ...services.decorators import admin_required, login_required
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
 
+def _require_perm(perm: str):
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != 'admin':
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "bmp"}
 
 
@@ -178,8 +189,9 @@ def adjust_stock(product_id):
 # --- Category management (admin only) ---
 
 @inventory_bp.route("/categories")
-@admin_required
+@login_required
 def list_categories():
+    _require_perm("can_manage_categories")
     from sqlalchemy import func, case
     from ...models.sale import Sale, SaleItem
     from datetime import date, timedelta
@@ -248,8 +260,9 @@ def list_categories():
 
 
 @inventory_bp.route("/categories/<int:cat_id>")
-@admin_required
+@login_required
 def category_detail(cat_id):
+    _require_perm("can_manage_categories")
     from sqlalchemy import func, case
     from ...models.sale import Sale, SaleItem
     from ...models.stock_movement import StockMovement
@@ -334,8 +347,9 @@ def category_detail(cat_id):
 
 
 @inventory_bp.route("/categories/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_category():
+    _require_perm("can_manage_categories")
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         if not name:
@@ -356,8 +370,9 @@ def create_category():
 
 
 @inventory_bp.route("/categories/<int:cat_id>/edit", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_category(cat_id):
+    _require_perm("can_manage_categories")
     cat = db.get_or_404(Category, cat_id)
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -372,8 +387,9 @@ def edit_category(cat_id):
 
 
 @inventory_bp.route("/categories/<int:cat_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_category(cat_id):
+    _require_perm("can_manage_categories")
     cat = db.get_or_404(Category, cat_id)
     db.session.delete(cat)
     db.session.commit()
@@ -591,8 +607,9 @@ def download_product_sample():
 # ── Product Variants ─────────────────────────────────────────────────────────
 
 @inventory_bp.route("/<int:product_id>/variants")
-@admin_required
+@login_required
 def product_variants(product_id):
+    _require_perm("can_manage_variants")
     product = db.get_or_404(Product, product_id)
     from ...models.product_variant import ProductVariant
     variants = db.session.execute(
@@ -603,8 +620,9 @@ def product_variants(product_id):
 
 
 @inventory_bp.route("/<int:product_id>/variants/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_variant(product_id):
+    _require_perm("can_manage_variants")
     product = db.get_or_404(Product, product_id)
     from ...models.product_variant import ProductVariant
     from sqlalchemy.exc import IntegrityError
@@ -640,8 +658,9 @@ def create_variant(product_id):
 
 
 @inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/edit", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_variant(product_id, variant_id):
+    _require_perm("can_manage_variants")
     product = db.get_or_404(Product, product_id)
     from ...models.product_variant import ProductVariant
     from sqlalchemy.exc import IntegrityError
@@ -665,8 +684,9 @@ def edit_variant(product_id, variant_id):
 
 
 @inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_variant(product_id, variant_id):
+    _require_perm("can_manage_variants")
     from ...models.product_variant import ProductVariant
     v = db.get_or_404(ProductVariant, variant_id)
     db.session.delete(v)

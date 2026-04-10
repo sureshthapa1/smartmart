@@ -13,18 +13,32 @@ from ...services.decorators import admin_required, login_required
 
 promotions_bp = Blueprint("promotions", __name__, url_prefix="/promotions")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @promotions_bp.route("/")
-@admin_required
+@login_required
 def list_promotions():
+    _require_perm("can_view_promotions")
     promos = promotion_service.list_promotions()
     today = date.today()
     return render_template("promotions/list.html", promos=promos, today=today)
 
 
 @promotions_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_promotion():
+    _require_perm("can_manage_promotions")
     categories = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
     if request.method == "POST":
         data = _form_to_data(request.form)
@@ -40,8 +54,9 @@ def create_promotion():
 
 
 @promotions_bp.route("/<int:promo_id>/edit", methods=["GET", "POST"])
-@admin_required
+@login_required
 def edit_promotion(promo_id):
+    _require_perm("can_manage_promotions")
     from ...models.promotion import Promotion
     promo = db.get_or_404(Promotion, promo_id)
     categories = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
@@ -58,8 +73,9 @@ def edit_promotion(promo_id):
 
 
 @promotions_bp.route("/<int:promo_id>/delete", methods=["POST"])
-@admin_required
+@login_required
 def delete_promotion(promo_id):
+    _require_perm("can_manage_promotions")
     try:
         promotion_service.delete_promotion(promo_id)
         flash("Promotion deleted.", "success")

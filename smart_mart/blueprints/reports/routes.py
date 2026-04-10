@@ -12,6 +12,18 @@ from ...services.decorators import login_required, admin_required
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/reports")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 def _get_risk_map() -> dict:
     """Return {customer_name_lower: risk_data} for credit ledger badges."""
@@ -46,8 +58,9 @@ def _get_date_range():
 
 
 @reports_bp.route("/cash-flow")
-@admin_required
+@login_required
 def cash_flow():
+    _require_perm("can_view_reports")
     from sqlalchemy import func, and_
     from ...extensions import db
     from ...models.sale import Sale, SaleItem
@@ -138,8 +151,9 @@ def cash_flow():
 
 
 @reports_bp.route("/sales")
-@admin_required
+@login_required
 def sales_report():
+    _require_perm("can_view_sales_report")
     start, end, start_raw, end_raw = _get_date_range()
     period = request.args.get("period", "daily")
     summary = report_engine.sales_summary(start, end)
@@ -157,8 +171,9 @@ def sales_report():
 
 
 @reports_bp.route("/top-products")
-@admin_required
+@login_required
 def top_products():
+    _require_perm("can_view_sales_report")
     start, end, start_raw, end_raw = _get_date_range()
     rows = report_engine.top_products(start, end)
     return render_template("reports/top_products.html", rows=rows,
@@ -166,8 +181,9 @@ def top_products():
 
 
 @reports_bp.route("/least-products")
-@admin_required
+@login_required
 def least_products():
+    _require_perm("can_view_sales_report")
     start, end, start_raw, end_raw = _get_date_range()
     rows = report_engine.least_products(start, end)
     return render_template("reports/top_products.html", rows=rows,
@@ -175,15 +191,17 @@ def least_products():
 
 
 @reports_bp.route("/dead-stock")
-@admin_required
+@login_required
 def dead_stock():
+    _require_perm("can_view_stock_report")
     products = report_engine.dead_stock()
     return render_template("reports/dead_stock.html", products=products)
 
 
 @reports_bp.route("/profitability")
-@admin_required
+@login_required
 def profitability():
+    _require_perm("can_view_profit_report")
     start, end, start_raw, end_raw = _get_date_range()
     rows = report_engine.profitability_analysis(start, end)
     return render_template("reports/profitability.html", rows=rows,
@@ -191,8 +209,9 @@ def profitability():
 
 
 @reports_bp.route("/category-performance")
-@admin_required
+@login_required
 def category_performance():
+    _require_perm("can_view_reports")
     start, end, start_raw, end_raw = _get_date_range()
     rows = report_engine.category_performance(start, end)
     return render_template("reports/category_performance.html", rows=rows,
@@ -200,15 +219,17 @@ def category_performance():
 
 
 @reports_bp.route("/inventory-valuation")
-@admin_required
+@login_required
 def inventory_valuation():
+    _require_perm("can_view_stock_report")
     data = report_engine.inventory_valuation()
     return render_template("reports/inventory_valuation.html", data=data)
 
 
 @reports_bp.route("/stock-analysis")
-@admin_required
+@login_required
 def stock_analysis():
+    _require_perm("can_view_stock_report")
     start, end, start_raw, end_raw = _get_date_range()
     rows = report_engine.opening_closing_stock(start, end)
     return render_template("reports/stock_analysis.html", rows=rows,
@@ -218,8 +239,9 @@ def stock_analysis():
 # --- Export endpoints ---
 
 @reports_bp.route("/profitability/export-csv")
-@admin_required
+@login_required
 def export_profitability_csv():
+    _require_perm("can_view_profit_report")
     start, end, _, _ = _get_date_range()
     rows = report_engine.profitability_analysis(start, end)
     data = [{"Product": r["product"].name, "SKU": r["product"].sku,
@@ -231,8 +253,9 @@ def export_profitability_csv():
 
 
 @reports_bp.route("/staff-efficiency")
-@admin_required
+@login_required
 def staff_efficiency():
+    _require_perm("can_view_reports")
     start, end, start_raw, end_raw = _get_date_range()
     data = report_engine.staff_efficiency_report(start, end)
     return render_template("reports/staff_efficiency.html",
@@ -272,8 +295,9 @@ def export_sales_csv():
 
 
 @reports_bp.route("/top-products/export-csv")
-@admin_required
+@login_required
 def export_top_products_csv():
+    _require_perm("can_view_sales_report")
     start, end, _, _ = _get_date_range()
     rows = report_engine.top_products(start, end)
     import csv, io
@@ -288,8 +312,9 @@ def export_top_products_csv():
 
 
 @reports_bp.route("/category-performance/export-csv")
-@admin_required
+@login_required
 def export_category_csv():
+    _require_perm("can_view_reports")
     start, end, _, _ = _get_date_range()
     rows = report_engine.category_performance(start, end)
     import csv, io
@@ -304,8 +329,9 @@ def export_category_csv():
 
 
 @reports_bp.route("/inventory-valuation/export-csv")
-@admin_required
+@login_required
 def export_inventory_csv():
+    _require_perm("can_view_stock_report")
     data = report_engine.inventory_valuation()
     import csv, io
     output = io.StringIO()
@@ -322,8 +348,9 @@ def export_inventory_csv():
 
 
 @reports_bp.route("/staff-efficiency/export-csv")
-@admin_required
+@login_required
 def export_staff_csv():
+    _require_perm("can_view_reports")
     start, end, _, _ = _get_date_range()
     data = report_engine.staff_efficiency_report(start, end)
     import csv, io
@@ -339,8 +366,9 @@ def export_staff_csv():
 
 
 @reports_bp.route("/credit-udharo")
-@admin_required
+@login_required
 def credit_udharo():
+    _require_perm("can_view_credit_report")
     from ...extensions import db
     from ...models.sale import Sale
 
@@ -401,8 +429,9 @@ def credit_udharo():
 
 
 @reports_bp.route("/credit-udharo/<int:sale_id>/mark-collected", methods=["POST"])
-@admin_required
+@login_required
 def mark_credit_collected(sale_id):
+    _require_perm("can_view_credit_report")
     from ...extensions import db
     from ...models.sale import Sale
     sale = db.get_or_404(Sale, sale_id)
@@ -414,8 +443,9 @@ def mark_credit_collected(sale_id):
 
 
 @reports_bp.route("/credit-udharo/<int:sale_id>/set-due-date", methods=["POST"])
-@admin_required
+@login_required
 def set_credit_due_date(sale_id):
+    _require_perm("can_view_credit_report")
     from ...extensions import db
     from ...models.sale import Sale
     from flask import redirect, url_for

@@ -68,79 +68,81 @@
   {% for c in category_data %}
   {% set pct = ((c.revenue_30d / total_revenue_30d * 100) | int) if total_revenue_30d > 0 else 0 %}
   <div class="col-sm-6 col-xl-4">
-    <a href="{{ url_for('inventory.category_detail', cat_id=c.cat.id) }}" class="card cat-card h-100 d-block">
-      <div class="card-body p-4">
+    <div class="card cat-card h-100">
+      <div class="card-body p-4 d-flex flex-column">
 
-        <!-- Header row -->
-        <div class="d-flex align-items-start justify-content-between mb-3">
-          <div class="d-flex align-items-center gap-2">
-            <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;flex-shrink:0">
-              <i class="bi bi-tag-fill"></i>
+        <!-- Header row — clicking this navigates to detail -->
+        <a href="{{ url_for('inventory.category_detail', cat_id=c.cat.id) }}" class="text-decoration-none text-reset flex-grow-1">
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;flex-shrink:0">
+                <i class="bi bi-tag-fill"></i>
+              </div>
+              <div>
+                <div class="fw-bold" style="font-size:.95rem;color:#0f172a">{{ c.cat.name }}</div>
+                <div class="text-muted" style="font-size:.72rem">{{ c.product_count }} product{{ 's' if c.product_count != 1 }}</div>
+              </div>
             </div>
-            <div>
-              <div class="fw-bold" style="font-size:.95rem;color:#0f172a">{{ c.cat.name }}</div>
-              <div class="text-muted" style="font-size:.72rem">{{ c.product_count }} product{{ 's' if c.product_count != 1 }}</div>
+            <div class="d-flex gap-1 flex-wrap justify-content-end">
+              {% if c.out_of_stock > 0 %}
+              <span class="stat-pill bg-danger text-white">{{ c.out_of_stock }} out</span>
+              {% endif %}
+              {% if c.low_stock > 0 %}
+              <span class="stat-pill bg-warning text-dark">{{ c.low_stock }} low</span>
+              {% endif %}
             </div>
           </div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end">
-            {% if c.out_of_stock > 0 %}
-            <span class="stat-pill bg-danger text-white">{{ c.out_of_stock }} out</span>
-            {% endif %}
-            {% if c.low_stock > 0 %}
-            <span class="stat-pill bg-warning text-dark">{{ c.low_stock }} low</span>
-            {% endif %}
-          </div>
-        </div>
 
-        <!-- Stats grid -->
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
-              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Units</div>
-              <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">{{ c.total_stock }}</div>
+          <!-- Stats grid -->
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
+                <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Units</div>
+                <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">{{ c.total_stock }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
+                <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Value</div>
+                <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">NPR {{ "%.0f" | format(c.stock_value) }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
+                <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Revenue 30d</div>
+                <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">NPR {{ "%.0f" | format(c.revenue_30d) }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
+                <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sold 30d</div>
+                <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">{{ c.qty_sold_30d }} units</div>
+              </div>
             </div>
           </div>
-          <div class="col-6">
-            <div style="background:#f8fafc;border-radius:8px;padding:.6rem .75rem">
-              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Stock Value</div>
-              <div class="fw-bold" style="font-size:1.05rem;color:#0f172a">NPR {{ "%.0f" | format(c.stock_value) }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
-              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Revenue 30d</div>
-              <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">NPR {{ "%.0f" | format(c.revenue_30d) }}</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div style="background:#f0fdf4;border-radius:8px;padding:.6rem .75rem">
-              <div class="text-muted" style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Sold 30d</div>
-              <div class="fw-bold" style="font-size:1.05rem;color:#16a34a">{{ c.qty_sold_30d }} units</div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Revenue share bar -->
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <span class="text-muted" style="font-size:.72rem">Revenue share</span>
-          <span class="fw-semibold" style="font-size:.72rem">{{ pct }}%</span>
-        </div>
-        <div class="progress progress-thin mb-3">
-          <div class="progress-bar bg-primary" style="width:{{ pct }}%"></div>
-        </div>
+          <!-- Revenue share bar -->
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="text-muted" style="font-size:.72rem">Revenue share</span>
+            <span class="fw-semibold" style="font-size:.72rem">{{ pct }}%</span>
+          </div>
+          <div class="progress progress-thin mb-3">
+            <div class="progress-bar bg-primary" style="width:{{ pct }}%"></div>
+          </div>
+        </a>
 
-        <!-- Footer actions -->
-        <div class="d-flex gap-2 pt-1 border-top">
-          <span class="btn btn-sm btn-outline-primary flex-grow-1" style="pointer-events:none">
+        <!-- Footer actions — outside the <a> so they work independently -->
+        <div class="d-flex gap-2 pt-2 border-top mt-auto">
+          <a href="{{ url_for('inventory.category_detail', cat_id=c.cat.id) }}"
+             class="btn btn-sm btn-outline-primary flex-grow-1">
             <i class="bi bi-eye me-1"></i>View Details
-          </span>
+          </a>
           <a href="{{ url_for('inventory.edit_category', cat_id=c.cat.id) }}"
-             class="btn btn-sm btn-outline-secondary"
-             onclick="event.stopPropagation()" title="Edit">
+             class="btn btn-sm btn-outline-secondary" title="Edit">
             <i class="bi bi-pencil"></i>
           </a>
           <form method="post" action="{{ url_for('inventory.delete_category', cat_id=c.cat.id) }}"
-                class="d-inline" onclick="event.stopPropagation()"
+                class="d-inline"
                 onsubmit="return confirm('Delete {{ c.cat.name }}? Products will become uncategorized.')">
             <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
               <i class="bi bi-trash"></i>
@@ -149,7 +151,7 @@
         </div>
 
       </div>
-    </a>
+    </div>
   </div>
   {% endfor %}
 </div>

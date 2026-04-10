@@ -12,18 +12,32 @@ from ...services.decorators import admin_required, login_required
 
 stock_take_bp = Blueprint("stock_take", __name__, url_prefix="/stock-take")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @stock_take_bp.route("/")
-@admin_required
+@login_required
 def list_takes():
+    _require_perm("can_view_stock_take")
     page = request.args.get("page", 1, type=int)
     takes = stock_take_service.list_stock_takes(page=page)
     return render_template("stock_take/list.html", takes=takes, page=page)
 
 
 @stock_take_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_take():
+    _require_perm("can_manage_stock_take")
     if request.method == "POST":
         notes = request.form.get("notes", "").strip() or None
         scope = request.form.get("scope", "all")
@@ -47,8 +61,9 @@ def create_take():
 
 
 @stock_take_bp.route("/<int:take_id>/count", methods=["GET", "POST"])
-@admin_required
+@login_required
 def count(take_id):
+    _require_perm("can_manage_stock_take")
     take = db.get_or_404(StockTake, take_id)
     if take.status not in ("draft", "in_progress"):
         flash("This stock take is already completed or cancelled.", "warning")
@@ -71,8 +86,9 @@ def count(take_id):
 
 
 @stock_take_bp.route("/<int:take_id>/complete", methods=["POST"])
-@admin_required
+@login_required
 def complete(take_id):
+    _require_perm("can_manage_stock_take")
     apply = request.form.get("apply_adjustments") == "1"
     try:
         take = stock_take_service.complete_stock_take(take_id, current_user.id, apply)
@@ -87,8 +103,9 @@ def complete(take_id):
 
 
 @stock_take_bp.route("/<int:take_id>/cancel", methods=["POST"])
-@admin_required
+@login_required
 def cancel(take_id):
+    _require_perm("can_manage_stock_take")
     try:
         stock_take_service.cancel_stock_take(take_id)
         flash("Stock take cancelled.", "warning")
@@ -98,15 +115,17 @@ def cancel(take_id):
 
 
 @stock_take_bp.route("/<int:take_id>")
-@admin_required
+@login_required
 def view(take_id):
+    _require_perm("can_view_stock_take")
     take = db.get_or_404(StockTake, take_id)
     return render_template("stock_take/view.html", take=take)
 
 
 @stock_take_bp.route("/<int:take_id>/api/save-count", methods=["POST"])
-@admin_required
+@login_required
 def api_save_count(take_id):
+    _require_perm("can_manage_stock_take")
     """AJAX endpoint to save a single product count."""
     data = request.get_json() or {}
     product_id = data.get("product_id")

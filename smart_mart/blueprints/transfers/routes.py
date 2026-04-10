@@ -5,21 +5,35 @@ from ...extensions import db
 from ...models.product import Product
 from ...models.operations import Branch
 from ...services import transfer_manager
-from ...services.decorators import admin_required
+from ...services.decorators import admin_required, login_required
 
 transfers_bp = Blueprint("transfers", __name__, url_prefix="/transfers")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @transfers_bp.route("/")
-@admin_required
+@login_required
 def list_transfers():
+    _require_perm("can_view_transfers")
     transfers = transfer_manager.list_transfers()
     return render_template("transfers/list.html", transfers=transfers)
 
 
 @transfers_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_transfer():
+    _require_perm("can_manage_transfers")
     branches = db.session.execute(db.select(Branch).where(Branch.is_active == True).order_by(Branch.name)).scalars().all()
     products = db.session.execute(db.select(Product).where(Product.quantity > 0).order_by(Product.name)).scalars().all()
     if request.method == "POST":
@@ -52,16 +66,18 @@ def create_transfer():
 
 
 @transfers_bp.route("/<int:transfer_id>")
-@admin_required
+@login_required
 def transfer_detail(transfer_id):
+    _require_perm("can_view_transfers")
     from ...models.stock_transfer import StockTransfer
     t = db.get_or_404(StockTransfer, transfer_id)
     return render_template("transfers/detail.html", transfer=t)
 
 
 @transfers_bp.route("/<int:transfer_id>/complete", methods=["POST"])
-@admin_required
+@login_required
 def complete_transfer(transfer_id):
+    _require_perm("can_manage_transfers")
     try:
         t = transfer_manager.complete_transfer(transfer_id)
         flash(f"Transfer #{t.id} completed. Stock deducted.", "success")
@@ -71,8 +87,9 @@ def complete_transfer(transfer_id):
 
 
 @transfers_bp.route("/<int:transfer_id>/cancel", methods=["POST"])
-@admin_required
+@login_required
 def cancel_transfer(transfer_id):
+    _require_perm("can_manage_transfers")
     try:
         transfer_manager.cancel_transfer(transfer_id)
         flash("Transfer cancelled.", "success")

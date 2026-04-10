@@ -198,35 +198,72 @@ def clear_data():
 
 PERMISSION_GROUPS = {
     "Inventory": [
-        ("can_view_inventory", "View Products"),
+        ("can_view_inventory", "View Products & Stock"),
         ("can_add_product", "Add Products"),
         ("can_edit_product", "Edit Products"),
         ("can_delete_product", "Delete Products"),
-        ("can_adjust_stock", "Adjust Stock"),
+        ("can_adjust_stock", "Adjust Stock Manually"),
         ("can_bulk_upload_products", "Bulk Upload Products"),
+        ("can_manage_categories", "Manage Categories"),
+        ("can_manage_variants", "Manage Product Variants"),
+        ("can_print_labels", "Print Price Labels"),
+        ("can_view_stock_take", "View Stock Takes"),
+        ("can_manage_stock_take", "Create & Complete Stock Takes"),
     ],
     "Sales": [
-        ("can_view_sales", "View Sales"),
-        ("can_create_sale", "Create Sales"),
+        ("can_view_sales", "View Sales List"),
+        ("can_create_sale", "Create New Sales (POS)"),
         ("can_delete_sale", "Delete / Reverse Sales"),
-        ("can_give_discount", "Give Discounts"),
-        ("can_download_invoice", "Download Invoices"),
+        ("can_give_discount", "Apply Discounts"),
+        ("can_download_invoice", "Download & Print Invoices"),
+        ("can_view_customer_statement", "View Customer Statements"),
+    ],
+    "Returns": [
+        ("can_view_returns", "View Sale Returns"),
+        ("can_create_return", "Process Sale Returns"),
+        ("can_view_supplier_returns", "View Supplier Returns"),
+        ("can_manage_supplier_returns", "Create Supplier Returns"),
     ],
     "Purchases": [
         ("can_view_purchases", "View Purchases"),
         ("can_create_purchase", "Create Purchases"),
         ("can_bulk_upload_purchases", "Bulk Upload Purchases"),
         ("can_manage_suppliers", "View & Manage Suppliers"),
+        ("can_view_purchase_orders", "View Purchase Orders"),
+        ("can_manage_purchase_orders", "Create & Manage Purchase Orders"),
     ],
-    "Returns": [
-        ("can_view_returns", "View Returns"),
-        ("can_create_return", "Process Returns"),
+    "Customers": [
+        ("can_view_customers", "View Customer List & Profiles"),
+        ("can_manage_customers", "Add & Edit Customers"),
+    ],
+    "Finance": [
+        ("can_manage_credits", "View & Record Credit Payments (Udharo)"),
+        ("can_manage_cash_session", "Open & Close Cash Sessions"),
+        ("can_view_expenses", "View Expenses"),
+        ("can_manage_expenses", "Add & Edit Expenses"),
+    ],
+    "Reports": [
+        ("can_view_reports", "View All Reports"),
+        ("can_view_sales_report", "Sales Report"),
+        ("can_view_profit_report", "Profitability Report"),
+        ("can_view_stock_report", "Stock & Inventory Reports"),
+        ("can_view_credit_report", "Credit / Udharo Report"),
     ],
     "Online Orders": [
         ("can_view_online_orders", "View Online Orders"),
-        ("can_manage_online_orders", "Create / Update Orders & Payment"),
+        ("can_manage_online_orders", "Create & Update Online Orders"),
     ],
-    "Other": [
+    "Promotions & Transfers": [
+        ("can_view_promotions", "View Promotions"),
+        ("can_manage_promotions", "Create & Edit Promotions"),
+        ("can_view_transfers", "View Stock Transfers"),
+        ("can_manage_transfers", "Create Stock Transfers"),
+    ],
+    "AI & Insights": [
+        ("can_view_ai_insights", "View AI Insights & Analytics"),
+        ("can_view_advisor", "View Business Advisor"),
+    ],
+    "General": [
         ("can_view_alerts", "View Alerts"),
         ("can_view_dashboard", "View Dashboard"),
     ],

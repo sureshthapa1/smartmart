@@ -10,18 +10,32 @@ from ...services.decorators import admin_required, login_required
 
 po_bp = Blueprint("purchase_orders", __name__, url_prefix="/purchase-orders")
 
+def _require_perm(perm: str):
+    """Abort 403 if staff user lacks the given permission."""
+    from flask import abort
+    from flask_login import current_user as _cu
+    if _cu.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(_cu.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+
 
 @po_bp.route("/")
-@admin_required
+@login_required
 def list_pos():
+    _require_perm("can_view_purchase_orders")
     status = request.args.get("status", "")
     pos = po_manager.list_pos(status or None)
     return render_template("purchase_orders/list.html", pos=pos, status_filter=status)
 
 
 @po_bp.route("/create", methods=["GET", "POST"])
-@admin_required
+@login_required
 def create_po():
+    _require_perm("can_manage_purchase_orders")
     suppliers = db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
     if request.method == "POST":
@@ -56,16 +70,18 @@ def create_po():
 
 
 @po_bp.route("/<int:po_id>")
-@admin_required
+@login_required
 def po_detail(po_id):
+    _require_perm("can_view_purchase_orders")
     from ...models.purchase_order import PurchaseOrder
     po = db.get_or_404(PurchaseOrder, po_id)
     return render_template("purchase_orders/detail.html", po=po)
 
 
 @po_bp.route("/<int:po_id>/send", methods=["POST"])
-@admin_required
+@login_required
 def send_po(po_id):
+    _require_perm("can_manage_purchase_orders")
     try:
         po = po_manager.send_po(po_id)
         flash(f"PO {po.po_number} marked as sent.", "success")
@@ -75,8 +91,9 @@ def send_po(po_id):
 
 
 @po_bp.route("/<int:po_id>/receive", methods=["POST"])
-@admin_required
+@login_required
 def receive_po(po_id):
+    _require_perm("can_manage_purchase_orders")
     from ...models.purchase_order import PurchaseOrder, PurchaseOrderItem
     po = db.get_or_404(PurchaseOrder, po_id)
     received = {}
@@ -95,8 +112,9 @@ def receive_po(po_id):
 
 
 @po_bp.route("/<int:po_id>/cancel", methods=["POST"])
-@admin_required
+@login_required
 def cancel_po(po_id):
+    _require_perm("can_manage_purchase_orders")
     try:
         po = po_manager.cancel_po(po_id)
         flash(f"PO {po.po_number} cancelled.", "success")
