@@ -172,24 +172,16 @@ def index():
         insights.append({"type": "info", "icon": "bi-trophy",
                           "text": f"Top seller this month: {top5[0].Product.name}"})
 
-    # ── NLG daily summary (shown once per day per admin) ─────────────────
+    # ── NLG daily summary — always regenerated so it reflects live data ──
     nlg_summary = None
     from flask_login import current_user as cu
-    from flask import session as flask_session
     if cu.role == "admin":
-        today_str = str(today)
-        if flask_session.get("nlg_summary_date") != today_str:
-            try:
-                from ...services.ai_nlg import generate_daily_report
-                nlg_data = generate_daily_report()
-                nlg_summary = nlg_data.get("narrative", "")
-                flask_session["nlg_summary_date"] = today_str
-                flask_session["nlg_summary_text"] = nlg_summary
-                flask_session.modified = True
-            except Exception:
-                pass
-        else:
-            nlg_summary = flask_session.get("nlg_summary_text")
+        try:
+            from ...services.ai_nlg import generate_daily_report
+            nlg_data = generate_daily_report()
+            nlg_summary = nlg_data.get("narrative", "")
+        except Exception:
+            pass
 
     return render_template("dashboard/index.html",
                            # Sales

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Add Customer — Smart Mart{% endblock %}
+{% block page_title %}Add Customer{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('customers.list_customers') }}" class="text-decoration-none">Customers</a></li>
+<li class="breadcrumb-item active">Add Customer</li>
+{% endblock %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-person-plus me-2 text-primary"></i>New Customer</div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required autofocus placeholder="e.g. Ram Bahadur">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Phone</label>
+            <input type="text" name="phone" class="form-control" placeholder="98XXXXXXXX">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-medium">Address</label>
+            <input type="text" name="address" class="form-control" placeholder="e.g. Kathmandu, Baneshwor">
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Customer</button>
+            <a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

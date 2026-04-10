@@ -13,6 +13,33 @@ from ...services.decorators import login_required, admin_required
 customers_bp = Blueprint("customers", __name__, url_prefix="/customers")
 
 
+@customers_bp.route("/create", methods=["GET", "POST"])
+@login_required
+def create_customer():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip() or None
+        address = request.form.get("address", "").strip() or None
+        email = request.form.get("email", "").strip() or None
+        if not name:
+            flash("Customer name is required.", "danger")
+            return render_template("customers/create.html")
+        # Check duplicate phone
+        if phone:
+            existing = db.session.execute(
+                db.select(Customer).where(Customer.phone == phone)
+            ).scalar_one_or_none()
+            if existing:
+                flash(f"A customer with phone {phone} already exists.", "warning")
+                return render_template("customers/create.html")
+        customer = Customer(name=name, phone=phone, address=address)
+        db.session.add(customer)
+        db.session.commit()
+        flash(f"Customer '{name}' added.", "success")
+        return redirect(url_for("customers.customer_profile", customer_id=customer.id))
+    return render_template("customers/create.html")
+
+
 @customers_bp.route("/")
 @login_required
 def list_customers():

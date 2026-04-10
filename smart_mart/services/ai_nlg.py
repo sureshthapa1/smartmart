@@ -73,9 +73,15 @@ def generate_daily_report() -> dict:
         .limit(1)
     ).first()
 
-    # Low stock count
+    # Low stock count — use configured threshold
+    try:
+        from ..models.shop_settings import ShopSettings as _SS
+        _s = _SS.get()
+        _threshold = _s.low_stock_threshold or 10
+    except Exception:
+        _threshold = 10
     low_stock_count = db.session.execute(
-        db.select(func.count(Product.id)).where(Product.quantity <= 10)
+        db.select(func.count(Product.id)).where(Product.quantity <= _threshold)
     ).scalar() or 0
 
     # COGS today

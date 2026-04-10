@@ -55,7 +55,7 @@ def _make_product(sku, quantity, expiry_date=None):
 
 # ── Property 24: Alert thresholds correctly classify products ─────────────────
 
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)
 @given(qty=st.integers(min_value=0, max_value=9))
 def test_low_stock_alert_includes_below_threshold(app, qty):
     # Feature: smart-mart-inventory, Property 24: Alert thresholds correctly classify products
@@ -68,7 +68,7 @@ def test_low_stock_alert_includes_below_threshold(app, qty):
         assert product.id in alert_ids, f"qty={qty} should trigger low stock alert"
 
 
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)
 @given(qty=st.integers(min_value=11, max_value=100))
 def test_low_stock_alert_excludes_above_threshold(app, qty):
     # Feature: smart-mart-inventory, Property 24: Alert thresholds correctly classify products

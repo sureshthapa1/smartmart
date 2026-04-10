@@ -1,0 +1,4 @@
+# file: C:\Users\hp\Documents\Mart Project\smart_mart\blueprints\customers\routes.py
+# hypothesis_version: 6.151.11
+
+['%Y-%m-%d', '/', '/<int:customer_id>', '/create', '/customers', '/export-csv', 'Address', 'Content-Disposition', 'Created', 'Customer updated.', 'GET', 'Last Visit', 'Name', 'POST', 'Phone', 'Visits', 'address', 'cash', 'credit', 'customers', 'customers/edit.html', 'customers/list.html', 'danger', 'email', 'name', 'page', 'phone', 'q', 'recent', 'sort', 'success', 'text/csv', 'visits', 'warning']

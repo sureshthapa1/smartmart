@@ -148,3 +148,37 @@ with app.app_context():
         safe_add("shop_settings", "logo_filename", "VARCHAR(255)")
 
     print("\nItems 1-8 migration complete.")
+
+# ── AI model columns migration ────────────────────────────────────────────────
+with app.app_context():
+    db.create_all()
+    with db.engine.connect() as conn:
+        def safe_add(table, column, col_type):
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                conn.commit()
+                print(f"  + {table}.{column}")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column" in msg or "already exists" in msg:
+                    print(f"  ~ {table}.{column} already exists")
+                else:
+                    print(f"  ! {table}.{column} ERROR: {e}")
+
+        print("\n--- ai_retraining_log (new columns) ---")
+        safe_add("ai_retraining_log", "model_name", "VARCHAR(80)")
+        safe_add("ai_retraining_log", "models_retrained", "TEXT")
+        safe_add("ai_retraining_log", "samples_used", "INTEGER")
+        safe_add("ai_retraining_log", "new_accuracy", "FLOAT")
+        safe_add("ai_retraining_log", "improvement", "FLOAT")
+        safe_add("ai_retraining_log", "error_message", "TEXT")
+
+        print("\n--- customer_risk_scores ---")
+        safe_add("customer_risk_scores", "risk_score", "INTEGER DEFAULT 0")
+        safe_add("customer_risk_scores", "risk_tier", "VARCHAR(20) DEFAULT 'safe'")
+        safe_add("customer_risk_scores", "override_tier", "VARCHAR(20)")
+        safe_add("customer_risk_scores", "override_by", "INTEGER")
+        safe_add("customer_risk_scores", "override_at", "DATETIME")
+        safe_add("customer_risk_scores", "last_computed_at", "DATETIME")
+
+    print("\nAI columns migration complete.")
