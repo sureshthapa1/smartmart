@@ -145,6 +145,38 @@ def delete_customer(customer_id):
     return redirect(url_for("customers.list_customers"))
 
 
+@customers_bp.route("/<int:customer_id>/loyalty-card")
+@login_required
+def loyalty_card(customer_id):
+    """Printable loyalty card with QR code."""
+    customer = db.get_or_404(Customer, customer_id)
+
+    # Get loyalty wallet
+    wallet = None
+    try:
+        from ...models.ai_enhancements import LoyaltyWallet
+        wallet = db.session.execute(
+            db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer.id)
+        ).scalar_one_or_none()
+    except Exception:
+        pass
+
+    # Get shop settings
+    from ...models.shop_settings import ShopSettings
+    shop = ShopSettings.get()
+
+    # QR code encodes the customer statement URL
+    from flask import request as _req
+    base_url = _req.host_url.rstrip('/')
+    qr_data = f"{base_url}/sales/customer-statement?name={customer.name}"
+
+    return render_template("customers/loyalty_card.html",
+                           customer=customer,
+                           wallet=wallet,
+                           shop=shop,
+                           qr_data=qr_data)
+
+
 @customers_bp.route("/export-csv")
 @login_required
 def export_csv():

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loyalty Card — {{ customer.name }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      gap: 1.5rem;
+    }
+
+    .print-btn {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      padding: .6rem 1.5rem;
+      border-radius: 8px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .print-btn:hover { background: #4f46e5; }
+
+    /* Card — standard credit card size 85.6mm × 54mm at 96dpi ≈ 324×204px */
+    .card-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .loyalty-card {
+      width: 340px;
+      height: 215px;
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #312e81 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1.1rem 1.25rem;
+    }
+
+    /* Decorative circles */
+    .loyalty-card::before {
+      content: '';
+      position: absolute;
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: rgba(99,102,241,.2);
+      top: -60px; right: -40px;
+    }
+    .loyalty-card::after {
+      content: '';
+      position: absolute;
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      background: rgba(139,92,246,.15);
+      bottom: -50px; left: -30px;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      position: relative;
+      z-index: 1;
+    }
+    .shop-name {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+    }
+    .card-label {
+      font-size: .65rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #818cf8;
+      background: rgba(99,102,241,.2);
+      padding: .2rem .5rem;
+      border-radius: 20px;
+    }
+
+    .card-middle {
+      position: relative;
+      z-index: 1;
+    }
+    .customer-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -.3px;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .customer-phone {
+      font-size: .72rem;
+      color: #94a3b8;
+      margin-top: .2rem;
+    }
+
+    .card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      position: relative;
+      z-index: 1;
+    }
+    .points-section {}
+    .points-label {
+      font-size: .6rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #94a3b8;
+    }
+    .points-value {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fbbf24;
+      line-height: 1;
+    }
+    .points-sub {
+      font-size: .6rem;
+      color: #94a3b8;
+      margin-top: .1rem;
+    }
+    .tier-badge {
+      font-size: .65rem;
+      font-weight: 700;
+      padding: .25rem .6rem;
+      border-radius: 20px;
+      letter-spacing: .05em;
+    }
+    .tier-silver { background: rgba(148,163,184,.2); color: #cbd5e1; }
+    .tier-gold { background: rgba(251,191,36,.2); color: #fbbf24; }
+    .tier-platinum { background: rgba(99,102,241,.3); color: #a5b4fc; }
+
+    /* Back of card */
+    .loyalty-card-back {
+      width: 340px;
+      height: 215px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 20px 60px rgba(0,0,0,.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      gap: 1rem;
+    }
+    .card-back-info { flex: 1; }
+    .card-back-title {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #6366f1;
+      margin-bottom: .5rem;
+    }
+    .card-back-rule {
+      font-size: .68rem;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: .3rem;
+    }
+    .card-back-rule strong { color: #0f172a; }
+    .qr-section { text-align: center; flex-shrink: 0; }
+    .qr-section img { width: 80px; height: 80px; border-radius: 6px; }
+    .qr-label { font-size: .58rem; color: #94a3b8; margin-top: .3rem; }
+
+    .card-id {
+      font-size: .58rem;
+      color: #94a3b8;
+      margin-top: .75rem;
+      text-align: center;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; gap: 0; }
+      .print-btn, .back-label { display: none; }
+      .card-wrap { gap: 0; }
+      .loyalty-card, .loyalty-card-back {
+        box-shadow: none;
+        border: 1px solid #e2e8f0;
+        page-break-inside: avoid;
+        margin: 4mm auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-btn" onclick="window.print()">
+    🖨️ Print Card
+  </button>
+
+  <div class="card-wrap">
+
+    <!-- FRONT -->
+    <div style="font-size:.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.08em;align-self:flex-start">Front</div>
+    <div class="loyalty-card">
+      <div class="card-top">
+        <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+        <div class="card-label">Loyalty Card</div>
+      </div>
+      <div class="card-middle">
+        <div class="customer-name">{{ customer.name }}</div>
+        {% if customer.phone %}
+        <div class="customer-phone">{{ customer.phone }}</div>
+        {% endif %}
+      </div>
+      <div class="card-bottom">
+        <div class="points-section">
+          <div class="points-label">Points Balance</div>
+          <div class="points-value">{{ wallet.points_balance if wallet else 0 }}</div>
+          <div class="points-sub">
+            {% if wallet %}
+              {{ wallet.lifetime_points_earned }} earned total
+            {% else %}
+              Start earning today
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          {% if wallet %}
+            {% if wallet.tier == 'Platinum' %}
+              <span class="tier-badge tier-platinum">🏆 Platinum</span>
+            {% elif wallet.tier == 'Gold' %}
+              <span class="tier-badge tier-gold">🥇 Gold</span>
+            {% else %}
+              <span class="tier-badge tier-silver">🥈 Silver</span>
+            {% endif %}
+          {% else %}
+            <span class="tier-badge tier-silver">🥈 Silver</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK -->
+    <div style="font-size:.7rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.08em;align-self:flex-start;margin-top:.5rem" class="back-label">Back</div>
+    <div class="loyalty-card-back">
+      <div class="card-back-info">
+        <div class="card-back-title">How it works</div>
+        {% set shop_ppr = shop.loyalty_points_per_rupee|float if shop and shop.loyalty_points_per_rupee else 0.01 %}
+        {% set shop_rpp = shop.loyalty_rupee_per_point|float if shop and shop.loyalty_rupee_per_point else 1.0 %}
+        {% set earn_per = (1/shop_ppr)|round(0)|int if shop_ppr > 0 else 100 %}
+        <div class="card-back-rule">🛒 <strong>Earn:</strong> 1 point for every NPR {{ earn_per }} spent</div>
+        <div class="card-back-rule">💰 <strong>Redeem:</strong> 1 point = NPR {{ shop_rpp|round(2) }} discount</div>
+        <div class="card-back-rule">⭐ <strong>Tiers:</strong> Silver → Gold (3,000 pts) → Platinum (10,000 pts)</div>
+        <div class="card-back-rule" style="margin-top:.4rem;color:#94a3b8;font-size:.62rem;">
+          Card ID: SM-{{ '%06d' % customer.id }} &bull; Member since {{ customer.created_at.strftime('%b %Y') if customer.created_at else '—' }}
+        </div>
+      </div>
+      <div class="qr-section">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={{ qr_data | urlencode }}&bgcolor=ffffff&color=0f172a&margin=4"
+             alt="QR Code">
+        <div class="qr-label">Scan to check<br>points balance</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card-id" style="color:#94a3b8;font-size:.7rem;">
+    Card ID: SM-{{ '%06d' % customer.id }} &bull; {{ shop.shop_name if shop else 'Smart Mart' }}
+  </div>
+
+</body>
+</html>

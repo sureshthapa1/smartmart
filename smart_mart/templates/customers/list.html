@@ -121,6 +121,10 @@
                    class="btn btn-sm btn-outline-primary" title="View Profile">
                   <i class="bi bi-eye"></i>
                 </a>
+                <a href="{{ url_for('customers.loyalty_card', customer_id=c.id) }}"
+                   target="_blank" class="btn btn-sm btn-outline-info" title="Print Loyalty Card">
+                  <i class="bi bi-credit-card"></i>
+                </a>
                 {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}"
                    class="btn btn-sm btn-outline-secondary" title="Edit">
