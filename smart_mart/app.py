@@ -59,14 +59,12 @@ def create_app(config_name="development"):
         )
         return response
 
-    # ── Auto-create DB tables on first request ────────────────────────────
-    @app.before_request
-    def create_tables():
+    # ── Auto-create DB tables once at startup ────────────────────────────
+    with app.app_context():
         try:
             db.create_all()
         except Exception as exc:
             app.logger.warning("db.create_all() failed: %s", exc)
-        app.before_request_funcs[None].remove(create_tables)
 
     # ── Session permanent (8hr timeout from config) ───────────────────────
     @app.before_request

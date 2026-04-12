@@ -42,3 +42,17 @@ Thumbs.db
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Uploads (user-uploaded files — not persisted on Render free tier)
+smart_mart/static/uploads/shop/*.png
+smart_mart/static/uploads/shop/*.jpg
+smart_mart/static/uploads/shop/*.jpeg
+smart_mart/static/uploads/shop/*.gif
+smart_mart/static/uploads/shop/*.webp
+
+# Hypothesis test database
+.hypothesis/
+
+# Logs
+logs/
+*.log

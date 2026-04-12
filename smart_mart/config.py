@@ -2,6 +2,13 @@ import os
 from datetime import timedelta
 
 
+def _fix_db_url(url: str | None) -> str | None:
+    """Render gives postgres:// but SQLAlchemy 2.x needs postgresql://"""
+    if url and url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -14,16 +21,16 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "sqlite:///smart_mart_dev.db"
-    )
+    SQLALCHEMY_DATABASE_URI = _fix_db_url(
+        os.environ.get("DATABASE_URL")
+    ) or "sqlite:///smart_mart_dev.db"
 
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "sqlite:///smart_mart.db"
-    )
+    SQLALCHEMY_DATABASE_URI = _fix_db_url(
+        os.environ.get("DATABASE_URL")
+    ) or "sqlite:///smart_mart.db"
     WTF_CSRF_ENABLED = True
 
     @classmethod
