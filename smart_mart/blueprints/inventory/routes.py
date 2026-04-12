@@ -543,18 +543,21 @@ def bulk_upload():
                     existing.expiry_date = expiry_date
                 updated += 1
             else:
-                # Create new product
+                # Create new product directly (no internal commit — we commit at end)
                 try:
-                    from ...services import inventory_manager
-                    inventory_manager.create_product({
-                        "name": name, "category": cat_val, "sku": sku,
-                        "cost_price": cost, "selling_price": sell,
-                        "quantity": qty, "unit": unit,
-                        "supplier_id": supplier_id, "expiry_date": expiry_date,
-                    })
+                    from sqlalchemy.exc import IntegrityError
+                    p_obj = Product(
+                        name=name, category=cat_val, sku=sku,
+                        cost_price=cost, selling_price=sell,
+                        quantity=qty, unit=unit,
+                        supplier_id=supplier_id, expiry_date=expiry_date,
+                    )
+                    db.session.add(p_obj)
+                    db.session.flush()  # catch duplicate SKU immediately
                     created += 1
-                except ValueError as e:
-                    errors.append(f"Row {row_num}: {e}")
+                except Exception as e:
+                    db.session.rollback()
+                    errors.append(f"Row {row_num}: '{name}' skipped — {e}")
                     skipped += 1
                     continue
 
@@ -566,7 +569,7 @@ def bulk_upload():
             return render_template("inventory/bulk_upload.html")
 
         flash(f"✅ Bulk upload complete — {created} created, {updated} updated, {skipped} skipped.", "success")
-        for err in errors[:5]:
+        for err in errors:
             flash(err, "warning")
         return redirect(url_for("inventory.list_products"))
 
