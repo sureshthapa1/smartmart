@@ -124,6 +124,15 @@
         </tr>
         {% endfor %}
       </tbody>
+      {% if orders %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="3" class="text-end text-muted small">{{ orders|length }} order{{ 's' if orders|length != 1 }}</td>
+          <td class="text-end text-success">NPR {{ "%.2f"|format(orders | map(attribute='total_amount') | map('float') | sum) }}</td>
+          <td colspan="5"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
 </div>

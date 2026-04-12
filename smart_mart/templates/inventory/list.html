@@ -100,6 +100,18 @@
         </tr>
         {% endfor %}
       </tbody>
+      {% if products %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td class="text-muted small">{{ products|length }} product{{ 's' if products|length != 1 }}</td>
+          <td></td>
+          <td></td>
+          {% if current_user.role == 'admin' %}<td></td>{% endif %}
+          <td class="text-end fw-bold">{{ products | map(attribute='quantity') | sum }} units total</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
   <!-- Pagination -->

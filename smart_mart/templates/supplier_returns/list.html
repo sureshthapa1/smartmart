@@ -53,6 +53,15 @@
           <tr><td colspan="8" class="text-center text-muted py-4">No supplier returns yet.</td></tr>
           {% endfor %}
         </tbody>
+        {% if returns %}
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td colspan="3" class="text-end text-muted small">{{ returns|length }} return{{ 's' if returns|length != 1 }}</td>
+            <td class="text-end text-warning">NPR {{ "%.2f"|format(returns | map(attribute='total_value') | map('float') | sum) }}</td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+        {% endif %}
       </table>
     </div>
   </div>

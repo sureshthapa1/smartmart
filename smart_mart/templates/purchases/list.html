@@ -76,6 +76,15 @@
         </tr>
         {% endfor %}
       </tbody>
+      {% if purchases %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="5" class="text-end text-muted small">{{ purchases|length }} purchase{{ 's' if purchases|length != 1 }}</td>
+          <td class="text-end text-primary">NPR {{ "%.2f"|format(purchases | map(attribute='total_cost') | map('float') | sum) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
 </div>

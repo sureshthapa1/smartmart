@@ -110,6 +110,15 @@
         </tr>
         {% endfor %}
       </tbody>
+      {% if sales %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="6" class="text-end text-muted small">{{ sales|length }} record{{ 's' if sales|length != 1 }} shown</td>
+          <td class="text-end text-success">NPR {{ "%.2f"|format(sales | map(attribute='total_amount') | map('float') | sum) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
   {% if sales|length == 20 or page > 1 %}

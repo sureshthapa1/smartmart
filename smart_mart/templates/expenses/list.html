@@ -126,6 +126,15 @@
         <tr><td colspan="6" class="text-center text-muted py-5">No expenses recorded yet.</td></tr>
         {% endfor %}
       </tbody>
+      {% if expenses %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="4" class="text-end text-muted small">{{ expenses|length }} shown of {{ total }}</td>
+          <td class="text-end text-danger">NPR {{ "%.2f"|format(expenses | map(attribute='amount') | map('float') | sum) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   </div>
 </div>

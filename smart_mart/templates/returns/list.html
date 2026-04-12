@@ -118,6 +118,15 @@
           </tr>
           {% endfor %}
         </tbody>
+        {% if returns %}
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td colspan="6" class="text-end text-muted small">{{ returns|length }} return{{ 's' if returns|length != 1 }}</td>
+            <td class="text-end text-danger">NPR {{ "%.2f"|format(returns | map(attribute='refund_amount') | map('float') | sum) }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+        {% endif %}
       </table>
     </div>
   </div>
