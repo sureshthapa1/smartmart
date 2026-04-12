@@ -16,26 +16,34 @@ with app.app_context():
     db.create_all()
     print("Tables created.")
 
-    # Create default admin if none exists
     from smart_mart.models.user import User
     from smart_mart.services.authenticator import hash_password
+
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@1234")
+    admin_username = os.environ.get("ADMIN_USERNAME", "admin")
+
+    # Always upsert the admin — ensures password is correct on every deploy
     admin = db.session.execute(
-        db.select(User).where(User.role == "admin").limit(1)
+        db.select(User).where(User.username == admin_username)
     ).scalar_one_or_none()
+
     if not admin:
-        admin_password = os.environ.get("ADMIN_PASSWORD", "changeme123")
         admin = User(
-            username="admin",
+            username=admin_username,
             password_hash=hash_password(admin_password),
             role="admin",
         )
         db.session.add(admin)
         db.session.commit()
-        print(f"Admin user created. Username: admin")
+        print(f"Admin user created: {admin_username}")
     else:
-        print(f"Admin user already exists: {admin.username}")
+        # Update password on every deploy so env var always wins
+        admin.password_hash = hash_password(admin_password)
+        db.session.commit()
+        print(f"Admin password updated: {admin_username}")
 
-    # Create default shop settings
+    print(f"Login with: username={admin_username}  password={admin_password}")
+
     from smart_mart.models.shop_settings import ShopSettings
     ShopSettings.get()
     print("Shop settings ready.")
