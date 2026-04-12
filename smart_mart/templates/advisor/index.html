@@ -92,7 +92,48 @@
                 <span class="badge bg-{{ r.color }} bg-opacity-10 text-{{ r.color }}" style="font-size:.65rem">{{ r.priority }}</span>
               </div>
               <div class="text-muted small mb-1">{{ r.insight }}</div>
-              <div style="font-size:.8rem;color:#6366f1"><i class="bi bi-arrow-right-circle me-1"></i>{{ r.action }}</div>
+              <div style="font-size:.8rem;color:#6366f1" class="mb-2">
+                <i class="bi bi-arrow-right-circle me-1"></i>{{ r.action }}
+              </div>
+
+              {# Show affected products/items #}
+              {% if r.products %}
+              <div class="mt-2">
+                {% if r.category in ('Inventory',) and r.products[0].get('id') %}
+                  {# Product list with links #}
+                  <div class="d-flex flex-wrap gap-1">
+                    {% for p in r.products %}
+                    <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}"
+                       class="badge text-decoration-none"
+                       style="background:#f1f5f9;color:#475569;font-size:.72rem;padding:.3em .6em;border-radius:6px;border:1px solid #e2e8f0;">
+                      {{ p.name }}
+                      {% if p.get('qty') is not none %}<span style="color:#94a3b8"> ({{ p.qty }} {{ p.get('unit','pcs') }})</span>{% endif %}
+                      {% if p.get('margin') is not none %}<span style="color:#ef4444"> {{ p.margin }}%</span>{% endif %}
+                      {% if p.get('value') %}<span style="color:#94a3b8"> NPR {{ "%.0f"|format(p.value) }}</span>{% endif %}
+                    </a>
+                    {% endfor %}
+                  </div>
+                {% elif r.category == 'Cash Flow' %}
+                  {# Credit customers #}
+                  <div class="d-flex flex-wrap gap-1">
+                    {% for p in r.products %}
+                    <span class="badge" style="background:#fef9c3;color:#854d0e;font-size:.72rem;padding:.3em .6em;border-radius:6px;">
+                      {{ p.name }} — NPR {{ "%.0f"|format(p.value) }}
+                    </span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+              {% endif %}
+
+              {# Action link #}
+              {% if r.get('link') %}
+              <div class="mt-2">
+                <a href="{{ r.link }}" class="btn btn-sm btn-outline-{{ r.color }} py-0 px-2" style="font-size:.75rem;">
+                  <i class="bi bi-arrow-right me-1"></i>{{ r.get('link_label', 'View') }}
+                </a>
+              </div>
+              {% endif %}
             </div>
           </div>
         </div>

@@ -151,6 +151,8 @@ def strategic_recommendations() -> list[dict]:
                 "title": f"Revenue down {abs(rev_change):.0f}% vs last month",
                 "insight": f"Revenue dropped from NPR {rev_pm:,.0f} to NPR {rev_m:,.0f}.",
                 "action": "Review pricing, run promotions, check if top products are out of stock.",
+                "link": "/reports/sales", "link_label": "View Sales Report",
+                "products": [],
             })
         elif rev_change > 20:
             recs.append({
@@ -159,62 +161,103 @@ def strategic_recommendations() -> list[dict]:
                 "title": f"Revenue up {rev_change:.0f}% — strong growth",
                 "insight": f"Revenue grew from NPR {rev_pm:,.0f} to NPR {rev_m:,.0f}.",
                 "action": "Ensure stock levels can sustain demand. Consider expanding top categories.",
+                "link": "/reports/sales", "link_label": "View Sales Report",
+                "products": [],
             })
 
-    # 2. Margin health
+    # 2. Margin health — show lowest margin products
     cogs_m = _period_cogs(month_start, today)
     gross_margin = (rev_m - cogs_m) / rev_m * 100 if rev_m else 0
-    if gross_margin < 15:
+    if gross_margin < 25:
+        # Find lowest margin products
+        low_margin_products = db.session.execute(
+            db.select(Product)
+            .where(Product.selling_price > 0)
+            .where(Product.cost_price > 0)
+            .order_by(
+                ((Product.selling_price - Product.cost_price) / Product.selling_price).asc()
+            )
+            .limit(5)
+        ).scalars().all()
+        product_list = [
+            {"id": p.id, "name": p.name,
+             "margin": round((float(p.selling_price) - float(p.cost_price)) / float(p.selling_price) * 100, 1),
+             "cost": float(p.cost_price), "price": float(p.selling_price)}
+            for p in low_margin_products
+        ]
         recs.append({
-            "category": "Profitability", "priority": "critical",
-            "icon": "bi-exclamation-triangle-fill", "color": "danger",
-            "title": f"Gross margin critically low at {gross_margin:.1f}%",
-            "insight": "Cost of goods is consuming most of your revenue.",
-            "action": "Negotiate better supplier prices. Review products sold below cost. Increase selling prices on low-margin items.",
-        })
-    elif gross_margin < 25:
-        recs.append({
-            "category": "Profitability", "priority": "warning",
-            "icon": "bi-percent", "color": "warning",
-            "title": f"Gross margin at {gross_margin:.1f}% — room to improve",
-            "insight": "Industry average for retail is 25-40%.",
-            "action": "Identify your 5 lowest-margin products and either reprice or replace them.",
-        })
-
-    # 3. Out of stock products
-    out_of_stock = db.session.execute(
-        db.select(func.count(Product.id)).where(Product.quantity == 0)
-    ).scalar() or 0
-    if out_of_stock > 0:
-        recs.append({
-            "category": "Inventory", "priority": "critical" if out_of_stock > 5 else "warning",
-            "icon": "bi-box-seam", "color": "danger" if out_of_stock > 5 else "warning",
-            "title": f"{out_of_stock} product{'s' if out_of_stock > 1 else ''} out of stock",
-            "insight": "Out-of-stock items directly lose sales and damage customer trust.",
-            "action": "Create purchase orders immediately for out-of-stock items. Enable reorder alerts.",
+            "category": "Profitability", "priority": "critical" if gross_margin < 15 else "warning",
+            "icon": "bi-exclamation-triangle-fill" if gross_margin < 15 else "bi-percent",
+            "color": "danger" if gross_margin < 15 else "warning",
+            "title": f"Gross margin {'critically low' if gross_margin < 15 else 'below target'} at {gross_margin:.1f}%",
+            "insight": f"Industry average for retail is 25-40%. Your lowest margin products are shown below.",
+            "action": "Increase selling prices on low-margin items or negotiate better supplier costs.",
+            "link": "/reports/profitability", "link_label": "View Profitability Report",
+            "products": product_list,
         })
 
-    # 4. Dead stock
+    # 3. Out of stock — show which products
+    out_of_stock_products = db.session.execute(
+        db.select(Product).where(Product.quantity == 0).order_by(Product.name).limit(10)
+    ).scalars().all()
+    if out_of_stock_products:
+        recs.append({
+            "category": "Inventory", "priority": "critical",
+            "icon": "bi-box-seam", "color": "danger",
+            "title": f"{len(out_of_stock_products)} product{'s' if len(out_of_stock_products) > 1 else ''} out of stock",
+            "insight": "Out-of-stock items directly lose sales every day.",
+            "action": "Create purchase orders immediately for these items.",
+            "link": "/purchases/create", "link_label": "Create Purchase Order",
+            "products": [{"id": p.id, "name": p.name, "sku": p.sku, "qty": 0} for p in out_of_stock_products],
+        })
+
+    # 4. Dead stock — show which products
     cutoff_30 = today - timedelta(days=30)
-    dead_count = db.session.execute(
-        db.select(func.count(Product.id))
+    sold_ids = db.session.execute(
+        db.select(SaleItem.product_id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(func.date(Sale.sale_date) >= cutoff_30)
+    ).scalars().all()
+    dead_products = db.session.execute(
+        db.select(Product)
         .where(Product.quantity > 0)
-        .where(~Product.id.in_(
-            db.select(SaleItem.product_id)
-            .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= cutoff_30)
-        ))
-    ).scalar() or 0
-    if dead_count > 0:
+        .where(~Product.id.in_(sold_ids) if sold_ids else db.true())
+        .order_by(Product.quantity.desc())
+        .limit(8)
+    ).scalars().all()
+    if dead_products:
         recs.append({
             "category": "Inventory", "priority": "warning",
             "icon": "bi-hourglass-split", "color": "warning",
-            "title": f"{dead_count} products with no sales in 30 days",
-            "insight": "Dead stock ties up capital and takes up shelf space.",
-            "action": "Run clearance promotions. Bundle slow items with fast movers. Consider returning to supplier.",
+            "title": f"{len(dead_products)} products with no sales in 30 days",
+            "insight": "Dead stock ties up capital and shelf space.",
+            "action": "Run clearance promotions or return to supplier.",
+            "link": "/reports/dead-stock", "link_label": "View Dead Stock Report",
+            "products": [{"id": p.id, "name": p.name, "qty": p.quantity,
+                          "value": round(float(p.cost_price) * p.quantity, 0)} for p in dead_products],
         })
 
-    # 5. Expense ratio
+    # 5. Low stock — show which products need reorder
+    low_stock_products = db.session.execute(
+        db.select(Product)
+        .where(Product.quantity > 0)
+        .where(Product.quantity <= 10)
+        .order_by(Product.quantity.asc())
+        .limit(8)
+    ).scalars().all()
+    if low_stock_products:
+        recs.append({
+            "category": "Inventory", "priority": "warning",
+            "icon": "bi-exclamation-circle", "color": "warning",
+            "title": f"{len(low_stock_products)} products running low on stock",
+            "insight": "These products will run out soon if not restocked.",
+            "action": "Place purchase orders before they reach zero.",
+            "link": "/purchases/create", "link_label": "Create Purchase",
+            "products": [{"id": p.id, "name": p.name, "qty": p.quantity, "unit": p.unit or "pcs"}
+                         for p in low_stock_products],
+        })
+
+    # 6. Expense ratio
     exp_m = _period_expenses(month_start, today)
     if rev_m > 0:
         exp_ratio = exp_m / rev_m * 100
@@ -224,49 +267,34 @@ def strategic_recommendations() -> list[dict]:
                 "icon": "bi-receipt", "color": "warning",
                 "title": f"Expenses at {exp_ratio:.0f}% of revenue",
                 "insight": f"NPR {exp_m:,.0f} in expenses against NPR {rev_m:,.0f} revenue.",
-                "action": "Review recurring expenses. Identify areas to cut without impacting operations.",
+                "action": "Review recurring expenses. Identify areas to cut.",
+                "link": "/expenses/", "link_label": "View Expenses",
+                "products": [],
             })
 
-    # 6. Customer retention
-    total_customers = db.session.execute(db.select(func.count(Customer.id))).scalar() or 0
-    repeat_customers = db.session.execute(
-        db.select(func.count(Customer.id)).where(Customer.visit_count > 1)
-    ).scalar() or 0
-    if total_customers > 10:
-        retention_rate = repeat_customers / total_customers * 100
-        if retention_rate < 30:
-            recs.append({
-                "category": "Customers", "priority": "warning",
-                "icon": "bi-people", "color": "info",
-                "title": f"Customer retention at {retention_rate:.0f}% — below target",
-                "insight": f"Only {repeat_customers} of {total_customers} customers return.",
-                "action": "Launch loyalty program. Send follow-up offers. Improve customer experience.",
-            })
-
-    # 7. Supplier concentration risk
-    supplier_count = db.session.execute(db.select(func.count(Supplier.id))).scalar() or 0
-    if supplier_count < 3:
-        recs.append({
-            "category": "Supply Chain", "priority": "warning",
-            "icon": "bi-truck", "color": "warning",
-            "title": "Low supplier diversity — concentration risk",
-            "insight": f"Only {supplier_count} supplier{'s' if supplier_count != 1 else ''} on record.",
-            "action": "Add backup suppliers for your top 5 products to avoid stockouts if one supplier fails.",
-        })
-
-    # 8. Payment mode analysis
+    # 7. Credit exposure
     credit_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(Sale.payment_mode == "credit",
-               func.date(Sale.sale_date) >= month_start)
+        .where(Sale.payment_mode == "credit", func.date(Sale.sale_date) >= month_start)
     ).scalar() or 0
     if rev_m > 0 and _money(credit_sales) / rev_m > 0.3:
+        # Show top credit customers
+        credit_customers = db.session.execute(
+            db.select(Sale.customer_name, func.sum(Sale.total_amount).label("total"))
+            .where(Sale.payment_mode == "credit", Sale.credit_collected == False,
+                   Sale.customer_name.isnot(None))
+            .group_by(Sale.customer_name)
+            .order_by(func.sum(Sale.total_amount).desc())
+            .limit(5)
+        ).all()
         recs.append({
             "category": "Cash Flow", "priority": "warning",
             "icon": "bi-credit-card-2-back", "color": "warning",
             "title": f"Credit sales at {_money(credit_sales)/rev_m*100:.0f}% of revenue",
             "insight": "High credit exposure can cause cash flow problems.",
-            "action": "Set credit limits per customer. Follow up on overdue collections. Offer small discounts for cash payment.",
+            "action": "Follow up on overdue collections. Set credit limits per customer.",
+            "link": "/reports/credit-udharo", "link_label": "View Credit Report",
+            "products": [{"name": r.customer_name, "value": float(r.total)} for r in credit_customers],
         })
 
     # Sort: critical first
