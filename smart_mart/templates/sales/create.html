@@ -508,6 +508,8 @@
             customerAddress.value = el.dataset.address;
             suggestions.style.display = 'none';
             loadCustomerIntelligence(parseInt(el.dataset.id));
+            // Load loyalty wallet when customer selected from autofill
+            loadWallet(el.dataset.name, el.dataset.phone);
           });
         });
       } catch(e) {}
@@ -835,13 +837,16 @@
 
   // Load wallet when customer name changes
   let walletTimer = null;
-  document.getElementById('customerName').addEventListener('input', function() {
+  function triggerWalletLoad() {
     clearTimeout(walletTimer);
     walletTimer = setTimeout(() => {
+      const name = document.getElementById('customerName').value.trim();
       const phone = document.getElementById('customerPhone')?.value?.trim() || '';
-      loadWallet(this.value.trim(), phone);
+      loadWallet(name, phone);
     }, 600);
-  });
+  }
+  document.getElementById('customerName').addEventListener('input', triggerWalletLoad);
+  document.getElementById('customerName').addEventListener('change', triggerWalletLoad);
   </script>
 </body>
 </html>

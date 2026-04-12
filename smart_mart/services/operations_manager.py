@@ -684,3 +684,132 @@ def export_backup_snapshot() -> bytes:
         ],
     }
     return json.dumps(snapshot, indent=2).encode("utf-8")
+
+
+def get_loyalty_analytics() -> dict:
+    """Full loyalty programme analytics — totals, daily, monthly, top customers."""
+    from ..models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+    from ..models.customer import Customer
+    from .db_compat import date_format_year_month
+    from datetime import date, timedelta
+
+    today = date.today()
+    month_start = today.replace(day=1)
+    last_30 = today - timedelta(days=29)
+
+    # ── Overall totals ────────────────────────────────────────────────────
+    totals = db.session.execute(
+        db.select(
+            func.coalesce(func.sum(
+                db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)
+            ), 0).label("total_earned"),
+            func.coalesce(func.sum(
+                db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)
+            ), 0).label("total_redeemed"),
+            func.coalesce(func.sum(
+                db.case((LoyaltyWalletTransaction.points_change < 0,
+                         -LoyaltyWalletTransaction.points_change * LoyaltyWalletTransaction.rupee_value /
+                         db.case((LoyaltyWalletTransaction.points_change != 0, -LoyaltyWalletTransaction.points_change), else_=1)),
+                        else_=0)
+            ), 0).label("total_discount_given"),
+        )
+    ).one()
+
+    # Simpler discount total
+    discount_total = db.session.execute(
+        db.select(func.coalesce(func.sum(LoyaltyWalletTransaction.rupee_value), 0))
+        .where(LoyaltyWalletTransaction.points_change < 0)
+    ).scalar() or 0
+
+    total_wallets = db.session.execute(db.select(func.count(LoyaltyWallet.id))).scalar() or 0
+    active_wallets = db.session.execute(
+        db.select(func.count(LoyaltyWallet.id)).where(LoyaltyWallet.points_balance > 0)
+    ).scalar() or 0
+
+    # ── Monthly trend (last 6 months) ─────────────────────────────────────
+    monthly = db.session.execute(
+        db.select(
+            date_format_year_month(LoyaltyWalletTransaction.created_at).label("month"),
+            func.sum(db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
+            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
+            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, LoyaltyWalletTransaction.rupee_value), else_=0)).label("discount"),
+        )
+        .where(LoyaltyWalletTransaction.created_at >= today - timedelta(days=180))
+        .group_by(date_format_year_month(LoyaltyWalletTransaction.created_at))
+        .order_by(date_format_year_month(LoyaltyWalletTransaction.created_at))
+    ).all()
+
+    monthly_data = [
+        {"month": r.month, "earned": int(r.earned or 0),
+         "redeemed": int(r.redeemed or 0), "discount": float(r.discount or 0)}
+        for r in monthly
+    ]
+
+    # ── Daily trend (last 30 days) ────────────────────────────────────────
+    daily = db.session.execute(
+        db.select(
+            func.date(LoyaltyWalletTransaction.created_at).label("day"),
+            func.sum(db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
+            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
+        )
+        .where(func.date(LoyaltyWalletTransaction.created_at) >= last_30)
+        .group_by(func.date(LoyaltyWalletTransaction.created_at))
+        .order_by(func.date(LoyaltyWalletTransaction.created_at))
+    ).all()
+
+    daily_data = [
+        {"day": str(r.day), "earned": int(r.earned or 0), "redeemed": int(r.redeemed or 0)}
+        for r in daily
+    ]
+
+    # ── Top customers by points balance ───────────────────────────────────
+    top_customers = db.session.execute(
+        db.select(Customer.name, Customer.phone, LoyaltyWallet.points_balance,
+                  LoyaltyWallet.lifetime_points_earned, LoyaltyWallet.lifetime_points_redeemed,
+                  LoyaltyWallet.tier)
+        .join(LoyaltyWallet, LoyaltyWallet.customer_id == Customer.id)
+        .order_by(LoyaltyWallet.points_balance.desc())
+        .limit(10)
+    ).all()
+
+    top_data = [
+        {"name": r.name, "phone": r.phone or "—",
+         "balance": int(r.points_balance or 0),
+         "earned": int(r.lifetime_points_earned or 0),
+         "redeemed": int(r.lifetime_points_redeemed or 0),
+         "tier": r.tier or "Silver"}
+        for r in top_customers
+    ]
+
+    # ── This month summary ────────────────────────────────────────────────
+    month_earned = db.session.execute(
+        db.select(func.coalesce(func.sum(LoyaltyWalletTransaction.points_change), 0))
+        .where(LoyaltyWalletTransaction.points_change > 0)
+        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+    ).scalar() or 0
+
+    month_redeemed = db.session.execute(
+        db.select(func.coalesce(func.sum(-LoyaltyWalletTransaction.points_change), 0))
+        .where(LoyaltyWalletTransaction.points_change < 0)
+        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+    ).scalar() or 0
+
+    month_discount = db.session.execute(
+        db.select(func.coalesce(func.sum(LoyaltyWalletTransaction.rupee_value), 0))
+        .where(LoyaltyWalletTransaction.points_change < 0)
+        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+    ).scalar() or 0
+
+    return {
+        "total_earned": int(totals.total_earned or 0),
+        "total_redeemed": int(totals.total_redeemed or 0),
+        "total_discount_given": float(discount_total),
+        "total_wallets": total_wallets,
+        "active_wallets": active_wallets,
+        "month_earned": int(month_earned),
+        "month_redeemed": int(month_redeemed),
+        "month_discount": float(month_discount),
+        "monthly_trend": monthly_data,
+        "daily_trend": daily_data,
+        "top_customers": top_data,
+    }
