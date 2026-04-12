@@ -327,10 +327,15 @@ def bulk_upload():
                         "cost_price": cost,
                         "selling_price": cost,
                         "quantity": 0,
+                        "supplier_id": int(supplier_id_raw),  # link supplier immediately
                     })
                 except Exception as e:
                     parse_errors.append(f"Row {row_num}: could not create product '{product_name}': {e}")
                     continue
+            else:
+                # Update supplier on existing product if not set
+                if not product.supplier_id and supplier_id_raw:
+                    product.supplier_id = int(supplier_id_raw)
 
             items.append({"product_id": product.id, "quantity": qty, "unit_cost": cost})
 
