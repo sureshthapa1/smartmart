@@ -78,7 +78,7 @@ def delete_product(product_id: int) -> None:
     db.session.commit()
 
 
-def get_products(search: str | None = None, page: int = 1, per_page: int = 20) -> list[Product]:
+def get_products(search: str | None = None, page: int = 1, per_page: int = 100) -> list[Product]:
     """Return paginated products with optional search by name/category/SKU."""
     stmt = db.select(Product).order_by(Product.name)
     if search:

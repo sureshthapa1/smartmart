@@ -62,8 +62,25 @@ def _delete_product_image(filename: str) -> None:
 @login_required
 def list_products():
     search = request.args.get("q", "").strip() or None
-    products = inventory_manager.get_products(search=search)
-    return render_template("inventory/list.html", products=products, search=search or "")
+    page = request.args.get("page", 1, type=int)
+    products = inventory_manager.get_products(search=search, page=page)
+    # Get total count for pagination
+    from sqlalchemy import func as _func, or_
+    stmt = db.select(_func.count(Product.id))
+    if search:
+        term = search.strip().lower()
+        stmt = stmt.where(
+            or_(
+                db.func.lower(Product.name).contains(term),
+                db.func.lower(Product.category).contains(term),
+                db.func.lower(Product.sku) == term,
+            )
+        )
+    total = db.session.execute(stmt).scalar() or 0
+    per_page = 100
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return render_template("inventory/list.html", products=products, search=search or "",
+                           page=page, total=total, total_pages=total_pages, per_page=per_page)
 
 
 @inventory_bp.route("/create", methods=["GET", "POST"])
