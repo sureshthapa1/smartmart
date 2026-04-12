@@ -486,7 +486,7 @@ def bulk_upload():
             if not sku:
                 sku = f"{name[:4].upper().replace(' ', '')}-{_uuid.uuid4().hex[:4].upper()}"
 
-            # Resolve supplier
+            # Resolve supplier — create if not found
             supplier_id = None
             if supplier_name:
                 from ...models.supplier import Supplier
@@ -495,8 +495,12 @@ def bulk_upload():
                         db.func.lower(Supplier.name) == supplier_name.lower()
                     )
                 ).scalar_one_or_none()
-                if sup:
-                    supplier_id = sup.id
+                if not sup:
+                    # Auto-create supplier
+                    sup = Supplier(name=supplier_name.strip())
+                    db.session.add(sup)
+                    db.session.flush()
+                supplier_id = sup.id
 
             # Resolve/create category
             cat_val = category or None
