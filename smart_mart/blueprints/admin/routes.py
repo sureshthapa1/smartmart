@@ -431,3 +431,27 @@ def audit_log():
                            logs=logs, users=users, entity_types=entity_types,
                            selected_entity=entity_type or "",
                            selected_user=user_id_raw, page=page)
+
+
+@admin_bp.route("/sync-visit-counts", methods=["POST"])
+@admin_required
+def sync_visit_counts():
+    """Sync customer visit_count from actual sales records."""
+    from ...models.customer import Customer
+    from ...models.sale import Sale
+    from ...extensions import db
+    from sqlalchemy import func
+
+    customers = db.session.execute(db.select(Customer)).scalars().all()
+    updated = 0
+    for c in customers:
+        actual = db.session.execute(
+            db.select(func.count(Sale.id))
+            .where(func.lower(Sale.customer_name) == c.name.lower())
+        ).scalar() or 0
+        if actual != c.visit_count:
+            c.visit_count = actual
+            updated += 1
+    db.session.commit()
+    flash(f"Visit counts synced — {updated} customer(s) updated.", "success")
+    return redirect(url_for("admin.staff_activity"))

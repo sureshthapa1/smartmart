@@ -105,6 +105,24 @@ with app.app_context():
     ShopSettings.get()
     db.session.commit()
     print("Shop settings ready.")
+
+    # Sync customer visit counts from actual sales
+    from smart_mart.models.customer import Customer
+    from smart_mart.models.sale import Sale
+    from sqlalchemy import func as _f
+    customers = db.session.execute(db.select(Customer)).scalars().all()
+    synced = 0
+    for c in customers:
+        actual = db.session.execute(
+            db.select(_f.count(Sale.id))
+            .where(_f.lower(Sale.customer_name) == c.name.lower())
+        ).scalar() or 0
+        if actual != c.visit_count:
+            c.visit_count = actual
+            synced += 1
+    if synced:
+        db.session.commit()
+        print(f"Synced visit counts for {synced} customer(s).")
 EOF
 
 echo "=== Build complete ==="
