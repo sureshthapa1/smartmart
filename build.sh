@@ -44,6 +44,7 @@ with app.app_context():
         safe_add(conn, "ai_retraining_log", "error_message", "TEXT")
         # Shop settings
         safe_add(conn, "shop_settings", "logo_filename", "VARCHAR(255)")
+        safe_add(conn, "shop_settings", "logo_data", "TEXT")
         safe_add(conn, "shop_settings", "loyalty_points_per_rupee", "NUMERIC(8,4) DEFAULT 0.01")
         safe_add(conn, "shop_settings", "loyalty_rupee_per_point", "NUMERIC(8,4) DEFAULT 1.00")
         # User permissions — all new columns

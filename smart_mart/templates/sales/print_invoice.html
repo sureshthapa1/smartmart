@@ -47,8 +47,8 @@
     <!-- Header -->
     <div class="header">
       <div style="display:flex;align-items:center;gap:14px;">
-        {% if shop and shop.logo_filename %}
-        <img src="{{ url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
+        {% if shop and (shop.logo_filename or shop.logo_data) %}
+        <img src="{{ shop.logo_data if shop.logo_data else url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
              alt="Logo" style="height:60px;width:auto;object-fit:contain;flex-shrink:0;">
         {% endif %}
         <div>

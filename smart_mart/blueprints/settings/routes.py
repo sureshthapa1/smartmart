@@ -13,17 +13,29 @@ settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
 ALLOWED_IMG = {"jpg", "jpeg", "png", "gif", "webp"}
 
 
-def _save_logo(file) -> str | None:
+def _save_logo(file) -> tuple[str | None, str | None]:
+    """Save logo to filesystem AND return base64 data URI for DB storage."""
     if not file or file.filename == "":
-        return None
+        return None, None
     ext = file.filename.rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_IMG:
-        return None
+        return None, None
+    import base64
+    file_bytes = file.read()
+    # Save to filesystem (local dev)
     filename = f"shop_logo_{uuid.uuid4().hex[:8]}.{ext}"
-    upload_dir = os.path.join(current_app.static_folder, "uploads", "shop")
-    os.makedirs(upload_dir, exist_ok=True)
-    file.save(os.path.join(upload_dir, filename))
-    return filename
+    try:
+        upload_dir = os.path.join(current_app.static_folder, "uploads", "shop")
+        os.makedirs(upload_dir, exist_ok=True)
+        with open(os.path.join(upload_dir, filename), "wb") as f:
+            f.write(file_bytes)
+    except Exception:
+        pass
+    # Also encode as base64 for DB (works on Render)
+    mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+    b64 = base64.b64encode(file_bytes).decode("utf-8")
+    logo_data = f"data:{mime};base64,{b64}"
+    return filename, logo_data
 
 
 @settings_bp.route("/", methods=["GET", "POST"])
@@ -53,9 +65,9 @@ def index():
 
         # Logo upload
         logo_file = request.files.get("logo")
-        new_logo = _save_logo(logo_file)
-        if new_logo:
-            # Delete old logo
+        new_filename, new_logo_data = _save_logo(logo_file)
+        if new_filename:
+            # Delete old filesystem logo
             if s.logo_filename:
                 try:
                     old_path = os.path.join(current_app.static_folder, "uploads", "shop", s.logo_filename)
@@ -63,7 +75,8 @@ def index():
                         os.remove(old_path)
                 except Exception:
                     pass
-            s.logo_filename = new_logo
+            s.logo_filename = new_filename
+            s.logo_data = new_logo_data  # store in DB for Render persistence
         if request.form.get("remove_logo") == "1":
             if s.logo_filename:
                 try:
@@ -73,6 +86,7 @@ def index():
                 except Exception:
                     pass
             s.logo_filename = None
+            s.logo_data = None
 
         db.session.commit()
         flash("Settings saved successfully.", "success")

@@ -218,7 +218,10 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         shop_phone = s.phone or ""
         shop_email = s.email or ""
         footer_note = s.footer_note or footer_note
-        if s.logo_filename:
+        if s.logo_data:
+            # Use base64 data from DB (works on Render)
+            shop_logo_path = s.logo_data  # will be handled as data URI
+        elif s.logo_filename:
             import os
             from flask import current_app
             logo_path = os.path.join(current_app.static_folder, "uploads", "shop", s.logo_filename)
@@ -268,7 +271,15 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     if shop_logo_path:
         try:
             from reportlab.platypus import Image as RLImage
-            logo_img = RLImage(shop_logo_path, width=3*cm, height=1.5*cm, kind='proportional')
+            import io as _io
+            if shop_logo_path.startswith("data:"):
+                # base64 data URI — decode to bytes
+                import base64
+                header, b64data = shop_logo_path.split(",", 1)
+                img_bytes = base64.b64decode(b64data)
+                logo_img = RLImage(_io.BytesIO(img_bytes), width=3*cm, height=1.5*cm, kind='proportional')
+            else:
+                logo_img = RLImage(shop_logo_path, width=3*cm, height=1.5*cm, kind='proportional')
             left_col.append(logo_img)
             left_col.append(Spacer(1, 4))
         except Exception:
