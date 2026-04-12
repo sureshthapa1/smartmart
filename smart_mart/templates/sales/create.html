@@ -238,8 +238,8 @@
           <div class="ms-auto d-flex align-items-center gap-2">
             <i class="bi bi-upc-scan text-muted"></i>
             <input type="text" id="barcodeInput" class="form-control form-control-sm"
-                   style="width:180px;" placeholder="Scan barcode / SKU…"
-                   autocomplete="off">
+                   style="width:200px;" placeholder="Scan barcode / type SKU…"
+                   autocomplete="off" title="Scan product barcode or type SKU and press Enter">
           </div>
         </div>
         <div class="card-body p-0">
@@ -280,7 +280,7 @@
   <script>
     const PRODUCTS = [
       {% for p in products %}
-      { id: {{ p.id }}, name: {{ p.name | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}
+      { id: {{ p.id }}, name: {{ p.name | tojson }}, sku: {{ p.sku | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
 
@@ -458,22 +458,67 @@
     this.submit();
   });
   const barcodeInput = document.getElementById('barcodeInput');
+
+  function findProductBySku(query) {
+    const q = query.trim();
+    if (!q) return null;
+    // 1. Exact SKU match (case-insensitive) — what barcode scanners send
+    let found = PRODUCTS.find(p => p.sku && p.sku.toLowerCase() === q.toLowerCase());
+    // 2. Exact name match
+    if (!found) found = PRODUCTS.find(p => p.name.toLowerCase() === q.toLowerCase());
+    // 3. Partial name match
+    if (!found) found = PRODUCTS.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
+    return found;
+  }
+
+  function handleBarcodeScan(sku) {
+    if (!sku) return;
+    const product = findProductBySku(sku);
+    if (product) {
+      // Check if product already in cart — increment qty instead of adding new row
+      let found = false;
+      document.querySelectorAll('tr.sale-item-row').forEach(row => {
+        const sel = row.querySelector('.product-select');
+        if (sel && parseInt(sel.value) === product.id) {
+          const qtyInput = row.querySelector('.qty-input');
+          if (qtyInput) {
+            qtyInput.value = parseInt(qtyInput.value || 1) + 1;
+            qtyInput.dispatchEvent(new Event('input'));
+            found = true;
+          }
+        }
+      });
+      if (!found) addRow(product.id, 1, product.price);
+      barcodeInput.value = '';
+      barcodeInput.style.borderColor = '#22c55e';
+      setTimeout(() => barcodeInput.style.borderColor = '', 800);
+      barcodeInput.focus();
+    } else {
+      barcodeInput.style.borderColor = '#ef4444';
+      barcodeInput.title = 'SKU not found: ' + sku;
+      setTimeout(() => { barcodeInput.style.borderColor = ''; barcodeInput.title = ''; }, 2000);
+    }
+  }
+
+  // Barcode scanners send characters rapidly then press Enter
+  let barcodeBuffer = '';
+  let barcodeTimer = null;
+
   barcodeInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const sku = this.value.trim();
-      if (!sku) return;
-      const product = PRODUCTS.find(p => p.name.toLowerCase() === sku.toLowerCase()) ||
-                      PRODUCTS.find(p => p.id == sku);
-      if (product) {
-        addRow(product.id, 1, product.price);
-        this.value = '';
-        this.focus();
-      } else {
-        this.style.borderColor = '#ef4444';
-        setTimeout(() => this.style.borderColor = '', 1500);
-      }
+      clearTimeout(barcodeTimer);
+      handleBarcodeScan(this.value.trim());
     }
+  });
+
+  // Also handle rapid input (some scanners don't send Enter)
+  barcodeInput.addEventListener('input', function() {
+    clearTimeout(barcodeTimer);
+    barcodeTimer = setTimeout(() => {
+      const val = this.value.trim();
+      if (val.length >= 3) handleBarcodeScan(val);
+    }, 300);
   });
 
   // ── Customer Autofill + Smart Billing Intelligence ───────────────────
