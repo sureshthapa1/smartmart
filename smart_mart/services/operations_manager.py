@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func
+from sqlalchemy import case as sa_case
 
 from ..extensions import db
 from ..models.customer import Customer
@@ -701,15 +702,15 @@ def get_loyalty_analytics() -> dict:
     totals = db.session.execute(
         db.select(
             func.coalesce(func.sum(
-                db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)
+                sa_case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)
             ), 0).label("total_earned"),
             func.coalesce(func.sum(
-                db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)
+                sa_case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)
             ), 0).label("total_redeemed"),
             func.coalesce(func.sum(
-                db.case((LoyaltyWalletTransaction.points_change < 0,
+                sa_case((LoyaltyWalletTransaction.points_change < 0,
                          -LoyaltyWalletTransaction.points_change * LoyaltyWalletTransaction.rupee_value /
-                         db.case((LoyaltyWalletTransaction.points_change != 0, -LoyaltyWalletTransaction.points_change), else_=1)),
+                         sa_case((LoyaltyWalletTransaction.points_change != 0, -LoyaltyWalletTransaction.points_change), else_=1)),
                         else_=0)
             ), 0).label("total_discount_given"),
         )
@@ -730,9 +731,9 @@ def get_loyalty_analytics() -> dict:
     monthly = db.session.execute(
         db.select(
             date_format_year_month(LoyaltyWalletTransaction.created_at).label("month"),
-            func.sum(db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
-            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
-            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, LoyaltyWalletTransaction.rupee_value), else_=0)).label("discount"),
+            func.sum(sa_case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
+            func.sum(sa_case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
+            func.sum(sa_case((LoyaltyWalletTransaction.points_change < 0, LoyaltyWalletTransaction.rupee_value), else_=0)).label("discount"),
         )
         .where(LoyaltyWalletTransaction.created_at >= today - timedelta(days=180))
         .group_by(date_format_year_month(LoyaltyWalletTransaction.created_at))
@@ -749,8 +750,8 @@ def get_loyalty_analytics() -> dict:
     daily = db.session.execute(
         db.select(
             func.date(LoyaltyWalletTransaction.created_at).label("day"),
-            func.sum(db.case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
-            func.sum(db.case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
+            func.sum(sa_case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
+            func.sum(sa_case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
         )
         .where(func.date(LoyaltyWalletTransaction.created_at) >= last_30)
         .group_by(func.date(LoyaltyWalletTransaction.created_at))

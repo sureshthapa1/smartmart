@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, case as sa_case
 
 from ..extensions import db
 from ..models.product import Product
@@ -426,7 +426,7 @@ def discount_analysis(start: date, end: date) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
             func.coalesce(func.sum(Sale.discount_amount), 0).label("total_discount"),
             func.count(
-                db.case((Sale.discount_amount > 0, Sale.id), else_=None)
+                sa_case((Sale.discount_amount > 0, Sale.id), else_=None)
             ).label("discounted_sales"),
         )
         .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
@@ -442,7 +442,7 @@ def discount_analysis(start: date, end: date) -> dict:
             func.count(Sale.id).label("sales"),
             func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
-            func.count(db.case((Sale.discount_amount > 0, Sale.id), else_=None)).label("disc_sales"),
+            func.count(sa_case((Sale.discount_amount > 0, Sale.id), else_=None)).label("disc_sales"),
         )
         .join(User, User.id == Sale.user_id)
         .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))

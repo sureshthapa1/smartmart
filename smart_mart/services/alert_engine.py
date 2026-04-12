@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from sqlalchemy import func
+from sqlalchemy import case as sa_case
 
 from ..extensions import db
 from ..models.product import Product
