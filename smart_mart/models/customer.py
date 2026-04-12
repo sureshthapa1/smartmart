@@ -14,6 +14,8 @@ class Customer(db.Model):
     name = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(50), nullable=True)
     address = db.Column(db.String(255), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    birthday = db.Column(db.Date, nullable=True)
     visit_count = db.Column(db.Integer, default=1)
     last_visit = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

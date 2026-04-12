@@ -36,9 +36,11 @@
         <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Apply</button>
         <a href="{{ url_for('reports.sales_report') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
       </div>
-      <div class="col-auto ms-auto">
+      <div class="col-auto ms-auto d-flex gap-2">
         <a href="{{ url_for('reports.export_sales_csv') }}?start_date={{ start_date }}&end_date={{ end_date }}"
-           class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
+           class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+        <a href="{{ url_for('reports.export_sales_excel') }}?start_date={{ start_date }}&end_date={{ end_date }}"
+           class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
       </div>
     </form>
   </div>

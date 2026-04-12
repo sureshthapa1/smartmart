@@ -47,7 +47,7 @@ def update_product(product_id: int, data: dict) -> Product:
     """Update fields on an existing product."""
     product: Product = db.get_or_404(Product, product_id)
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
-                 "quantity", "supplier_id", "expiry_date", "image_filename", "unit")
+                 "quantity", "supplier_id", "expiry_date", "image_filename", "unit", "reorder_point")
     for field in updatable:
         if field in data:
             setattr(product, field, data[field])

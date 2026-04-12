@@ -21,6 +21,7 @@ class Product(db.Model):
     expiry_date = db.Column(db.Date, nullable=True)
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
+    reorder_point = db.Column(db.Integer, nullable=True, default=10)  # MOQ alert threshold
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False,
                            default=lambda: datetime.now(timezone.utc),

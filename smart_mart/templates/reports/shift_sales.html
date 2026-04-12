@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Shift-wise Sales — Smart Mart{% endblock %}
+{% block page_title %}Shift-wise Sales Report{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Shift Sales</li>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-clock-history me-2 text-primary"></i>Sales by Shift (Last 30 Shifts)</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Staff</th>
+          <th>Shift Start</th>
+          <th>Shift End</th>
+          <th class="text-center">Duration</th>
+          <th class="text-center">Sales</th>
+          <th class="text-center">Items Sold</th>
+          <th class="text-end">Revenue (NPR)</th>
+          <th class="text-end">Avg/Sale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in shift_data %}
+        <tr>
+          <td class="fw-semibold">{{ d.user.username if d.user else '—' }}</td>
+          <td class="text-muted small">{{ d.shift.started_at | nst('%Y-%m-%d %H:%M') if d.shift.started_at else '—' }}</td>
+          <td class="text-muted small">
+            {% if d.shift.ended_at %}{{ d.shift.ended_at | nst('%H:%M') }}
+            {% else %}<span class="badge bg-success">Active</span>{% endif %}
+          </td>
+          <td class="text-center text-muted small">{{ d.duration_hrs }}h</td>
+          <td class="text-center">{{ d.sales_count }}</td>
+          <td class="text-center">{{ d.items_sold }}</td>
+          <td class="text-end fw-semibold text-success">{{ "%.0f"|format(d.revenue) }}</td>
+          <td class="text-end text-muted small">
+            {{ "%.0f"|format(d.revenue / d.sales_count) if d.sales_count else '—' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-5">No shift data yet. Start a shift from Operations → Shifts.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

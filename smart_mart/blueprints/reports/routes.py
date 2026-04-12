@@ -458,3 +458,102 @@ def set_credit_due_date(sale_id):
     except ValueError:
         flash("Invalid date.", "danger")
     return redirect(url_for("reports.credit_udharo"))
+
+
+# ── Excel Export Endpoints ────────────────────────────────────────────────────
+
+@reports_bp.route("/sales/export-excel")
+@login_required
+def export_sales_excel():
+    _require_perm("can_view_sales_report")
+    from flask import Response
+    start, end, _, _ = _get_date_range()
+    rows = report_engine.product_wise_sales(start, end)
+    data = [{"Product": r["product"].name, "SKU": r["product"].sku,
+             "Qty Sold": r["qty_sold"], "Revenue (NPR)": float(r["revenue"]),
+             "Profit (NPR)": float(r.get("profit", 0))} for r in rows]
+    xlsx = exporter.export_report_excel(data, f"Sales Report {start} to {end}",
+                                        ["Product", "SKU", "Qty Sold", "Revenue (NPR)", "Profit (NPR)"])
+    return Response(xlsx, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename=sales_{start}_{end}.xlsx"})
+
+
+@reports_bp.route("/inventory-valuation/export-excel")
+@login_required
+def export_inventory_excel():
+    _require_perm("can_view_stock_report")
+    from flask import Response
+    result = report_engine.inventory_valuation()
+    items = result.get("items", []) if isinstance(result, dict) else result
+    data = [{"Product": r["product"].name, "SKU": r["product"].sku,
+             "Category": r["product"].category or "",
+             "Qty": r["product"].quantity,
+             "Cost Price": float(r["product"].cost_price),
+             "Valuation (NPR)": float(r["valuation"])} for r in items]
+    xlsx = exporter.export_report_excel(data, "Inventory Valuation",
+                                        ["Product", "SKU", "Category", "Qty", "Cost Price", "Valuation (NPR)"])
+    return Response(xlsx, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=inventory_valuation.xlsx"})
+
+
+@reports_bp.route("/profitability/export-excel")
+@login_required
+def export_profitability_excel():
+    _require_perm("can_view_profit_report")
+    from flask import Response
+    start, end, _, _ = _get_date_range()
+    rows = report_engine.profitability_analysis(start, end)
+    data = [{"Product": r.get("name", ""), "Revenue": float(r.get("revenue", 0)),
+             "COGS": float(r.get("cogs", 0)), "Profit": float(r.get("profit", 0)),
+             "Margin %": float(r.get("margin_pct", 0))} for r in rows]
+    xlsx = exporter.export_report_excel(data, f"Profitability {start} to {end}",
+                                        ["Product", "Revenue", "COGS", "Profit", "Margin %"])
+    return Response(xlsx, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=profitability.xlsx"})
+
+
+@reports_bp.route("/shift-sales")
+@login_required
+def shift_sales():
+    _require_perm("can_view_reports")
+    from ...models.shift import Shift
+    from ...models.sale import Sale, SaleItem
+    from ...models.user import User
+    from ...extensions import db as _db
+    from sqlalchemy import func as _f
+
+    shifts = _db.session.execute(
+        _db.select(Shift).order_by(Shift.started_at.desc()).limit(30)
+    ).scalars().all()
+
+    shift_data = []
+    for shift in shifts:
+        if not shift.started_at:
+            continue
+        import datetime as _dt
+        end = shift.ended_at or _dt.datetime.now(_dt.timezone.utc)
+        sales = _db.session.execute(
+            _db.select(Sale)
+            .where(Sale.user_id == shift.user_id)
+            .where(Sale.sale_date >= shift.started_at)
+            .where(Sale.sale_date <= end)
+        ).scalars().all()
+        revenue = sum(float(s.total_amount) for s in sales)
+        items_sold = sum(
+            _db.session.execute(
+                _db.select(_f.coalesce(_f.sum(SaleItem.quantity), 0))
+                .where(SaleItem.sale_id == s.id)
+            ).scalar() or 0
+            for s in sales
+        )
+        user = _db.session.get(User, shift.user_id)
+        shift_data.append({
+            "shift": shift,
+            "user": user,
+            "sales_count": len(sales),
+            "revenue": revenue,
+            "items_sold": items_sold,
+            "duration_hrs": round((end - shift.started_at).total_seconds() / 3600, 1) if shift.started_at else 0,
+        })
+
+    return render_template("reports/shift_sales.html", shift_data=shift_data)

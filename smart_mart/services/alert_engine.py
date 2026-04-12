@@ -12,11 +12,22 @@ from ..models.sale import SaleItem, Sale
 
 
 def get_low_stock_alerts(threshold: int | None = None) -> list[Product]:
-    """Return products at or below the low-stock threshold (default 10)."""
+    """Return products at or below their individual reorder_point (or global threshold)."""
     if threshold is None:
-        from flask import current_app
-        threshold = current_app.config.get("LOW_STOCK_THRESHOLD", 10)
-    stmt = db.select(Product).where(Product.quantity <= threshold).order_by(Product.quantity)
+        try:
+            from flask import current_app
+            threshold = current_app.config.get("LOW_STOCK_THRESHOLD", 10)
+        except Exception:
+            threshold = 10
+    # Use per-product reorder_point if set, else global threshold
+    from sqlalchemy import case
+    effective_threshold = case(
+        (Product.reorder_point.isnot(None), Product.reorder_point),
+        else_=threshold
+    )
+    stmt = (db.select(Product)
+            .where(Product.quantity <= effective_threshold)
+            .order_by(Product.quantity))
     return db.session.execute(stmt).scalars().all()
 
 

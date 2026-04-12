@@ -27,7 +27,11 @@
       </form>
       <a href="{{ url_for('reports.export_profitability_csv') }}?start_date={{ start_date }}&end_date={{ end_date }}"
          class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-download me-1"></i>Export CSV
+        <i class="bi bi-filetype-csv me-1"></i>CSV
+      </a>
+      <a href="{{ url_for('reports.export_profitability_excel') }}?start_date={{ start_date }}&end_date={{ end_date }}"
+         class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Excel
       </a>
     </div>
   </div>

@@ -182,3 +182,28 @@ with app.app_context():
         safe_add("customer_risk_scores", "last_computed_at", "DATETIME")
 
     print("\nAI columns migration complete.")
+
+# ── Features 3,5,6,7,8,10,11,12 migration ────────────────────────────────────
+with app.app_context():
+    db.create_all()
+    with db.engine.connect() as conn:
+        def safe_add(table, column, col_type):
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+                conn.commit()
+                print(f"  + {table}.{column}")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate" in msg or "already exists" in msg:
+                    print(f"  ~ {table}.{column} already exists")
+                else:
+                    print(f"  ! {table}.{column} ERROR: {e}")
+
+        print("\n--- customers (birthday, email) ---")
+        safe_add("customers", "birthday", "DATE")
+        safe_add("customers", "email", "VARCHAR(120)")
+
+        print("\n--- products (reorder_point) ---")
+        safe_add("products", "reorder_point", "INTEGER DEFAULT 10")
+
+    print("\nFeatures migration complete.")

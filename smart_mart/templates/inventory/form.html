@@ -154,10 +154,19 @@
             </div>
 
             <!-- Expiry Date -->
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label fw-medium">Expiry Date</label>
               <input type="date" class="form-control" name="expiry_date"
                      value="{{ product.expiry_date.strftime('%Y-%m-%d') if product and product.expiry_date else '' }}">
+            </div>
+
+            <!-- Reorder Point (MOQ Alert) -->
+            <div class="col-md-3">
+              <label class="form-label fw-medium">Reorder Point</label>
+              <input type="number" class="form-control" name="reorder_point" min="0"
+                     value="{{ product.reorder_point if product and product.reorder_point is not none else 10 }}"
+                     placeholder="10">
+              <div class="form-text">Alert when stock falls below this.</div>
             </div>
 
             <!-- Product Image (admin only) -->

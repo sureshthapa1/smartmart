@@ -33,10 +33,10 @@ def create_customer():
         phone = request.form.get("phone", "").strip() or None
         address = request.form.get("address", "").strip() or None
         email = request.form.get("email", "").strip() or None
+        birthday_raw = request.form.get("birthday", "").strip() or None
         if not name:
             flash("Customer name is required.", "danger")
             return render_template("customers/create.html")
-        # Check duplicate phone
         if phone:
             existing = db.session.execute(
                 db.select(Customer).where(Customer.phone == phone)
@@ -44,7 +44,14 @@ def create_customer():
             if existing:
                 flash(f"A customer with phone {phone} already exists.", "warning")
                 return render_template("customers/create.html")
-        customer = Customer(name=name, phone=phone, address=address)
+        from datetime import date as _date
+        birthday = None
+        if birthday_raw:
+            try:
+                birthday = _date.fromisoformat(birthday_raw)
+            except ValueError:
+                pass
+        customer = Customer(name=name, phone=phone, address=address, email=email, birthday=birthday)
         db.session.add(customer)
         db.session.commit()
         flash(f"Customer '{name}' added.", "success")
@@ -146,6 +153,16 @@ def edit_customer(customer_id):
         customer.name = request.form.get("name", "").strip() or customer.name
         customer.phone = request.form.get("phone", "").strip() or None
         customer.address = request.form.get("address", "").strip() or None
+        customer.email = request.form.get("email", "").strip() or None
+        birthday_raw = request.form.get("birthday", "").strip()
+        if birthday_raw:
+            try:
+                from datetime import date as _date
+                customer.birthday = _date.fromisoformat(birthday_raw)
+            except ValueError:
+                pass
+        elif request.form.get("clear_birthday") == "1":
+            customer.birthday = None
         db.session.commit()
         flash("Customer updated.", "success")
         return redirect(url_for("customers.customer_profile", customer_id=customer_id))
@@ -242,3 +259,29 @@ def export_csv():
         output.getvalue(), mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=customers.csv"}
     )
+
+
+@customers_bp.route("/birthdays-today")
+@login_required
+def birthdays_today():
+    """Return customers with birthday today or in next 7 days."""
+    from datetime import date, timedelta
+    today = date.today()
+    customers = db.session.execute(db.select(Customer).where(Customer.birthday.isnot(None))).scalars().all()
+    upcoming = []
+    for c in customers:
+        if c.birthday:
+            bday_this_year = c.birthday.replace(year=today.year)
+            if bday_this_year < today:
+                bday_this_year = c.birthday.replace(year=today.year + 1)
+            days_until = (bday_this_year - today).days
+            if 0 <= days_until <= 7:
+                upcoming.append({
+                    "id": c.id, "name": c.name, "phone": c.phone or "",
+                    "birthday": c.birthday.strftime("%b %d"),
+                    "days_until": days_until,
+                    "is_today": days_until == 0,
+                })
+    upcoming.sort(key=lambda x: x["days_until"])
+    from flask import jsonify
+    return jsonify(upcoming)

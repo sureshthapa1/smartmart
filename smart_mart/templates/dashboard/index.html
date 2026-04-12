@@ -28,6 +28,9 @@
 {% endif %}
 {% endif %}
 
+<!-- Birthday Alerts (loaded via JS) -->
+<div id="birthdayAlerts"></div>
+
 <!-- Date Filter Bar -->
 <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
   <span class="text-muted small fw-medium me-1">View:</span>
@@ -419,5 +422,21 @@ loadChart("{{ url_for('api.sales_trend') }}", 'salesChart', 'Sales (NPR)', '#636
 {% if current_user.role == 'admin' %}
 // profit chart removed from dashboard — available in Reports
 {% endif %}
+
+// Birthday alerts
+fetch('/customers/birthdays-today')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) return;
+    const box = document.getElementById('birthdayAlerts');
+    const items = data.map(c =>
+      `<span class="fw-semibold">${c.name}</span>${c.is_today ? ' 🎂 Today!' : ` (in ${c.days_until} day${c.days_until>1?'s':''})`}`
+    ).join(' &bull; ');
+    box.innerHTML = `<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-3">
+      <i class="bi bi-cake2-fill flex-shrink-0 mt-1"></i>
+      <div class="small"><strong>Upcoming Birthdays:</strong> ${items} — Consider sending a special offer!</div>
+      <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+    </div>`;
+  }).catch(() => {});
 </script>
 {% endblock %}

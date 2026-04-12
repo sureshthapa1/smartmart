@@ -118,11 +118,31 @@
       const opts=PRODUCTS.map(p=>`<option value="${p.id}" data-cost="${p.cost}">${p.name}</option>`).join('');
       tr.innerHTML=`<td><select id="${sid}" name="items[${idx}][product_id]" required><option value="">— Select —</option>${opts}</select></td>
         <td><input type="number" class="form-control form-control-sm qty-in" name="items[${idx}][quantity]" min="1" value="1" required></td>
-        <td><input type="number" class="form-control form-control-sm cost-in" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required></td>
+        <td>
+          <input type="number" class="form-control form-control-sm cost-in" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required>
+          <div class="price-history text-muted" style="font-size:.68rem;margin-top:2px;"></div>
+        </td>
         <td class="sub-cell text-end fw-medium">0.00</td>
         <td><button type="button" class="btn btn-sm btn-outline-danger del-btn"><i class="bi bi-trash"></i></button></td>`;
       document.getElementById('itemsBody').appendChild(tr);
-      new TomSelect(`#${sid}`,{placeholder:'Search product…',maxOptions:50,onChange(v){const p=PRODUCTS.find(x=>x.id==v);if(p)tr.querySelector('.cost-in').value=p.cost.toFixed(2);recalcRow(tr);}});
+      new TomSelect(`#${sid}`,{placeholder:'Search product…',maxOptions:50,onChange(v){
+        const p=PRODUCTS.find(x=>x.id==v);
+        if(p) tr.querySelector('.cost-in').value=p.cost.toFixed(2);
+        recalcRow(tr);
+        // Load price history
+        if(v) {
+          fetch(`/api/products/${v}/price-history`)
+            .then(r=>r.json())
+            .then(hist=>{
+              const ph = tr.querySelector('.price-history');
+              if(hist.length) {
+                ph.innerHTML = '📋 Last: ' + hist.slice(0,3).map(h=>`NPR ${h.cost} (${h.date.slice(0,7)}, ${h.supplier})`).join(' | ');
+              } else {
+                ph.innerHTML = 'No purchase history';
+              }
+            }).catch(()=>{});
+        }
+      }});
       tr.querySelector('.qty-in').addEventListener('input',()=>recalcRow(tr));
       tr.querySelector('.cost-in').addEventListener('input',()=>recalcRow(tr));
       tr.querySelector('.del-btn').addEventListener('click',()=>{tr.remove();recalcTotal();});

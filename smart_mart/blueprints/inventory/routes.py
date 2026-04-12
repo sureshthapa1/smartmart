@@ -794,6 +794,7 @@ def _form_to_data(form) -> dict:
         "supplier_id": int(form.get("supplier_id")) if form.get("supplier_id") else None,
         "expiry_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
+        "reorder_point": int(form.get("reorder_point", 10) or 10),
     }
     expiry_raw = form.get("expiry_date", "").strip()
     if expiry_raw:

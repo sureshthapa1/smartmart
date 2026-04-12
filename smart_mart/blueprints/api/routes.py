@@ -544,3 +544,27 @@ def customer_risk(customer_name):
         "total_outstanding": round(total_outstanding, 2),
         "has_override": data.get("has_override", False),
     })
+
+
+@api_bp.route("/products/<int:product_id>/price-history")
+@login_required
+def product_price_history(product_id):
+    """Return last 5 purchase prices for a product from each supplier."""
+    from ...models.purchase import Purchase, PurchaseItem
+    from ...models.supplier import Supplier
+    rows = db.session.execute(
+        db.select(
+            PurchaseItem.unit_cost,
+            Purchase.purchase_date,
+            Supplier.name.label("supplier_name"),
+        )
+        .join(Purchase, Purchase.id == PurchaseItem.purchase_id)
+        .join(Supplier, Supplier.id == Purchase.supplier_id)
+        .where(PurchaseItem.product_id == product_id)
+        .order_by(Purchase.purchase_date.desc())
+        .limit(5)
+    ).all()
+    return jsonify([
+        {"cost": float(r.unit_cost), "date": str(r.purchase_date), "supplier": r.supplier_name}
+        for r in rows
+    ])
