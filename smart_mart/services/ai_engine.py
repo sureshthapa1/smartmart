@@ -425,7 +425,7 @@ def forecast_product_demand(product_id: int, days_ahead: int = 7) -> list[dict]:
 # ── 6. Chatbot Assistant ──────────────────────────────────────────────────────
 
 def chatbot_query(message: str) -> str:
-    """Enhanced chatbot — fuzzy keyword matching with rich responses."""
+    """Enhanced chatbot — priority-ordered keyword matching with rich responses."""
     msg = message.lower().strip()
     today = date.today()
     month_start = today.replace(day=1)
@@ -449,9 +449,305 @@ def chatbot_query(message: str) -> str:
     def _has(*words):
         return any(w in msg for w in words)
 
-    # ── Greetings ─────────────────────────────────────────────────────────
-    if _has("hello", "hi", "hey", "namaste", "namaskar"):
+    # ── Greetings (only if message is JUST a greeting) ────────────────────
+    if msg in ("hello", "hi", "hey", "namaste", "namaskar") or \
+       (len(msg.split()) <= 2 and _has("hello", "hi", "hey", "namaste", "namaskar")):
         return "👋 Namaste! I'm your Smart Mart AI assistant.\n\nAsk me anything about your business — sales, stock, profit, customers, forecasts. Type **help** to see all I can do."
+
+    # ── Help ──────────────────────────────────────────────────────────────
+    if _has("help", "what can you", "commands", "what do you know"):
+        return ("🤖 **I can answer questions about:**\n\n"
+                "📊 **Sales:** today, yesterday, this week, this month, last month\n"
+                "💰 **Finance:** profit, expenses, cash balance\n"
+                "📦 **Inventory:** low stock, dead stock, stock of [product]\n"
+                "👥 **Customers:** top customers, credit/udharo, loyalty points\n"
+                "🏆 **Products:** top seller, best product, least selling\n"
+                "🔮 **Forecast:** tomorrow, next week prediction\n"
+                "⚠️ **Alerts:** what needs attention\n\n"
+                "Try: *'today sales'*, *'low stock'*, *'top product'*, *'profit this month'*")
+
+    # ── PROFIT (check BEFORE monthly sales to avoid conflict) ─────────────
+    if _has("profit", "earning", "nafa", "margin"):
+        try:
+            from . import cash_flow_manager
+            pl = cash_flow_manager.profit_loss(month_start, today)
+            rev = float(pl.get('revenue', 0))
+            profit = float(pl.get('profit', 0))
+            exp = float(pl.get('expenses', 0))
+            margin = (profit / rev * 100) if rev > 0 else 0
+            return (f"💰 **This Month's Profit**\n"
+                    f"Revenue: NPR {rev:,.2f}\n"
+                    f"Expenses: NPR {exp:,.2f}\n"
+                    f"Net Profit: NPR {profit:,.2f}\n"
+                    f"Margin: {margin:.1f}%")
+        except Exception:
+            return "💰 Profit data unavailable right now."
+
+    # ── EXPENSES (check before "cost" which is too broad) ─────────────────
+    if _has("expense", "kharcha", "spending") or \
+       (msg in ("cost", "costs") or "total expense" in msg or "monthly expense" in msg):
+        from ..models.expense import Expense
+        total_exp = db.session.execute(
+            db.select(func.coalesce(func.sum(Expense.amount), 0))
+            .where(Expense.expense_date >= month_start)
+        ).scalar() or 0
+        by_type = db.session.execute(
+            db.select(Expense.expense_type, func.sum(Expense.amount).label("total"))
+            .where(Expense.expense_date >= month_start)
+            .group_by(Expense.expense_type)
+            .order_by(func.sum(Expense.amount).desc())
+        ).all()
+        breakdown = "\n".join(f"  • {r.expense_type}: NPR {float(r.total):,.0f}" for r in by_type)
+        return f"💸 **This Month's Expenses**\nTotal: NPR {float(total_exp):,.2f}\n\n{breakdown}"
+
+    # ── CASH BALANCE (specific phrase only) ───────────────────────────────
+    if "cash balance" in msg or "kitna paisa" in msg or msg in ("balance", "cash"):
+        try:
+            from . import cash_flow_manager
+            balance = cash_flow_manager.daily_balance(today)
+            return f"💵 **Today's Cash Balance:** NPR {float(balance):,.2f}"
+        except Exception:
+            return "💵 Cash balance unavailable."
+
+    # ── FORECAST (check before "tomorrow" which could match other things) ──
+    if _has("forecast", "predict", "bholi") or \
+       "next week" in msg or "tomorrow sale" in msg or msg == "tomorrow":
+        forecasts = forecast_sales(days_ahead=7)
+        if forecasts:
+            tomorrow = forecasts[0]
+            week_total = sum(f["predicted_sales"] for f in forecasts)
+            lines = "\n".join(f"  {f['day_name']}: NPR {f['predicted_sales']:,.0f}" for f in forecasts[:5])
+            return (f"🔮 **Sales Forecast**\n"
+                    f"Tomorrow ({tomorrow['day_name']}): NPR {tomorrow['predicted_sales']:,.0f}\n"
+                    f"Next 7 days: NPR {week_total:,.0f}\n\n"
+                    f"Daily breakdown:\n{lines}")
+        return "🔮 Not enough data for forecast yet. Need at least 7 days of sales history."
+
+    # ── TODAY'S SALES ─────────────────────────────────────────────────────
+    if _has("today", "aaj") and _has("sale", "revenue", "income", "earn", "becha"):
+        total = _rev(today)
+        count = _cnt(today)
+        profit_today = 0
+        try:
+            cogs = db.session.execute(
+                db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
+                .join(SaleItem, SaleItem.product_id == Product.id)
+                .join(Sale, Sale.id == SaleItem.sale_id)
+                .where(func.date(Sale.sale_date) == today)
+            ).scalar() or 0
+            profit_today = total - float(cogs)
+        except Exception:
+            pass
+        if total == 0:
+            return f"📊 No sales recorded today yet.\n\nYesterday's sales: NPR {_rev(yesterday, yesterday):,.0f}"
+        return (f"📊 **Today's Sales**\n"
+                f"Revenue: NPR {total:,.2f}\n"
+                f"Transactions: {count}\n"
+                f"Avg order: NPR {total/count:,.0f}\n"
+                f"Est. profit: NPR {profit_today:,.0f}")
+
+    # ── YESTERDAY ─────────────────────────────────────────────────────────
+    if _has("yesterday", "kal") and not _has("forecast"):
+        total = _rev(yesterday, yesterday)
+        count = _cnt(yesterday, yesterday)
+        return f"📅 **Yesterday's Sales**\nRevenue: NPR {total:,.2f} from {count} transaction(s)."
+
+    # ── LAST MONTH (check before "this month") ────────────────────────────
+    if _has("last month", "pichlo mahina"):
+        prev_end = month_start - timedelta(days=1)
+        prev_start = prev_end.replace(day=1)
+        total = _rev(prev_start, prev_end)
+        count = _cnt(prev_start, prev_end)
+        return f"📆 **Last Month's Sales**\nRevenue: NPR {total:,.2f} from {count} transaction(s)."
+
+    # ── THIS WEEK ─────────────────────────────────────────────────────────
+    if _has("this week", "weekly", "week sale", "hapta"):
+        total = _rev(week_start)
+        count = _cnt(week_start)
+        daily_avg = total / max((today - week_start).days + 1, 1)
+        return (f"📅 **This Week's Sales**\n"
+                f"Revenue: NPR {total:,.2f}\n"
+                f"Transactions: {count}\n"
+                f"Daily avg: NPR {daily_avg:,.0f}")
+
+    # ── THIS MONTH SALES ──────────────────────────────────────────────────
+    if _has("this month", "monthly", "month sale", "mahina"):
+        total = _rev(month_start)
+        count = _cnt(month_start)
+        days_passed = (today - month_start).days + 1
+        projected = total / days_passed * 30
+        return (f"📆 **This Month's Sales**\n"
+                f"Revenue: NPR {total:,.2f}\n"
+                f"Transactions: {count}\n"
+                f"Projected month-end: NPR {projected:,.0f}")
+
+    # ── TOP PRODUCTS ──────────────────────────────────────────────────────
+    if _has("top product", "best seller", "best selling", "most sold", "popular"):
+        rows = db.session.execute(
+            db.select(Product, func.sum(SaleItem.quantity).label("qty"),
+                      func.sum(SaleItem.subtotal).label("rev"))
+            .join(SaleItem, SaleItem.product_id == Product.id)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(func.date(Sale.sale_date) >= month_start)
+            .group_by(Product.id)
+            .order_by(func.sum(SaleItem.quantity).desc())
+            .limit(5)
+        ).all()
+        if rows:
+            lines = "\n".join(f"  {i+1}. {r.Product.name} — {r.qty} units (NPR {float(r.rev):,.0f})" for i, r in enumerate(rows))
+            return f"🏆 **Top 5 Products This Month**\n{lines}"
+        return "No sales data this month yet."
+
+    # ── LEAST SELLING ─────────────────────────────────────────────────────
+    if _has("least selling", "slow moving", "worst product"):
+        rows = db.session.execute(
+            db.select(Product, func.sum(SaleItem.quantity).label("qty"))
+            .join(SaleItem, SaleItem.product_id == Product.id)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(func.date(Sale.sale_date) >= month_start)
+            .group_by(Product.id)
+            .order_by(func.sum(SaleItem.quantity).asc())
+            .limit(5)
+        ).all()
+        if rows:
+            lines = "\n".join(f"  {i+1}. {r.Product.name} — {r.qty} units" for i, r in enumerate(rows))
+            return f"📉 **Least Selling Products This Month**\n{lines}"
+        return "No sales data this month yet."
+
+    # ── LOW STOCK ─────────────────────────────────────────────────────────
+    if _has("low stock", "stock low", "running out", "restock", "kam stock"):
+        products = db.session.execute(
+            db.select(Product).where(Product.quantity <= 10).order_by(Product.quantity).limit(8)
+        ).scalars().all()
+        if products:
+            lines = "\n".join(f"  • {p.name}: {p.quantity} {p.unit or 'pcs'}" for p in products)
+            return f"⚠️ **Low Stock Products ({len(products)})**\n{lines}\n\nConsider restocking these items."
+        return "✅ All products have sufficient stock (above 10 units)."
+
+    # ── OUT OF STOCK ──────────────────────────────────────────────────────
+    if _has("out of stock", "zero stock", "finished", "sesh"):
+        products = db.session.execute(
+            db.select(Product).where(Product.quantity == 0).order_by(Product.name)
+        ).scalars().all()
+        if products:
+            names = "\n".join(f"  • {p.name}" for p in products)
+            return f"🚨 **Out of Stock ({len(products)} products)**\n{names}"
+        return "✅ No products are out of stock."
+
+    # ── DEAD STOCK ────────────────────────────────────────────────────────
+    if _has("dead stock", "not selling", "slow stock", "bikena"):
+        dead = detect_dead_stock(days=30)
+        if dead:
+            lines = "\n".join(f"  • {d['product'].name} ({d['product'].quantity} in stock)" for d in dead[:5])
+            return f"💤 **Dead Stock — No Sales in 30 Days ({len(dead)} products)**\n{lines}"
+        return "✅ No dead stock. All products sold in the last 30 days."
+
+    # ── STOCK OF SPECIFIC PRODUCT ─────────────────────────────────────────
+    if "stock of" in msg or "stock" in msg:
+        products = db.session.execute(db.select(Product)).scalars().all()
+        for p in products:
+            if p.name.lower() in msg:
+                return (f"📦 **{p.name}**\n"
+                        f"Stock: {p.quantity} {p.unit or 'pcs'}\n"
+                        f"Price: NPR {float(p.selling_price):,.2f}\n"
+                        f"SKU: {p.sku}")
+
+    # ── TOTAL PRODUCTS ────────────────────────────────────────────────────
+    if _has("how many product", "total product", "product count", "kitna product"):
+        count = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
+        low = db.session.execute(db.select(func.count(Product.id)).where(Product.quantity <= 10)).scalar() or 0
+        zero = db.session.execute(db.select(func.count(Product.id)).where(Product.quantity == 0)).scalar() or 0
+        return f"📦 **Inventory Summary**\nTotal products: {count}\nLow stock: {low}\nOut of stock: {zero}"
+
+    # ── TOP CUSTOMERS ─────────────────────────────────────────────────────
+    if _has("top customer", "best customer", "loyal customer", "vip"):
+        from ..models.customer import Customer
+        rows = db.session.execute(
+            db.select(Customer).order_by(Customer.visit_count.desc()).limit(5)
+        ).scalars().all()
+        if rows:
+            lines = "\n".join(f"  {i+1}. {c.name} — {c.visit_count} visits" for i, c in enumerate(rows))
+            return f"👥 **Top 5 Customers by Visits**\n{lines}"
+        return "No customer data yet."
+
+    if _has("how many customer", "total customer", "customer count"):
+        from ..models.customer import Customer
+        count = db.session.execute(db.select(func.count(Customer.id))).scalar() or 0
+        return f"👥 You have **{count} registered customers**."
+
+    # ── CREDIT / UDHARO ───────────────────────────────────────────────────
+    if _has("credit", "udharo", "udhar", "outstanding", "due payment"):
+        outstanding = db.session.execute(
+            db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+            .where(Sale.payment_mode == "credit", Sale.credit_collected == False)
+        ).scalar() or 0
+        count = db.session.execute(
+            db.select(func.count(Sale.id))
+            .where(Sale.payment_mode == "credit", Sale.credit_collected == False)
+        ).scalar() or 0
+        overdue = db.session.execute(
+            db.select(func.count(Sale.id))
+            .where(Sale.payment_mode == "credit", Sale.credit_collected == False,
+                   Sale.credit_due_date < today)
+        ).scalar() or 0
+        return (f"💳 **Credit / Udharo Summary**\n"
+                f"Total outstanding: NPR {float(outstanding):,.2f}\n"
+                f"Open credit sales: {count}\n"
+                f"Overdue: {overdue}")
+
+    # ── LOYALTY POINTS ────────────────────────────────────────────────────
+    if _has("loyalty", "points", "reward"):
+        from ..models.ai_enhancements import LoyaltyWallet
+        total_pts = db.session.execute(
+            db.select(func.coalesce(func.sum(LoyaltyWallet.points_balance), 0))
+        ).scalar() or 0
+        members = db.session.execute(
+            db.select(func.count(LoyaltyWallet.id)).where(LoyaltyWallet.points_balance > 0)
+        ).scalar() or 0
+        return (f"⭐ **Loyalty Programme**\n"
+                f"Active members: {members}\n"
+                f"Total points outstanding: {int(total_pts):,} pts")
+
+    # ── ALERTS ────────────────────────────────────────────────────────────
+    if _has("alert", "attention", "problem", "issue", "warning", "urgent"):
+        alerts = []
+        low = db.session.execute(db.select(func.count(Product.id)).where(Product.quantity <= 10)).scalar() or 0
+        zero = db.session.execute(db.select(func.count(Product.id)).where(Product.quantity == 0)).scalar() or 0
+        overdue = db.session.execute(
+            db.select(func.count(Sale.id))
+            .where(Sale.payment_mode == "credit", Sale.credit_collected == False,
+                   Sale.credit_due_date < today)
+        ).scalar() or 0
+        if zero: alerts.append(f"🚨 {zero} product(s) out of stock")
+        if low: alerts.append(f"⚠️ {low} product(s) low on stock")
+        if overdue: alerts.append(f"💳 {overdue} overdue credit payment(s)")
+        if alerts:
+            return "🔔 **Needs Attention:**\n" + "\n".join(alerts)
+        return "✅ Everything looks good! No urgent alerts."
+
+    # ── PURCHASES ─────────────────────────────────────────────────────────
+    if _has("purchase", "kharida") or "supplier" in msg:
+        from ..models.purchase import Purchase
+        count = db.session.execute(
+            db.select(func.count(Purchase.id))
+            .where(func.date(Purchase.purchase_date) >= month_start)
+        ).scalar() or 0
+        total = db.session.execute(
+            db.select(func.coalesce(func.sum(Purchase.total_cost), 0))
+            .where(func.date(Purchase.purchase_date) >= month_start)
+        ).scalar() or 0
+        return f"🛒 **This Month's Purchases**\nOrders: {count}\nTotal cost: NPR {float(total):,.2f}"
+
+    # ── FALLBACK ──────────────────────────────────────────────────────────
+    return ("🤔 I didn't quite understand that.\n\n"
+            "Try asking:\n"
+            "• *'today sales'*\n"
+            "• *'low stock'*\n"
+            "• *'profit this month'*\n"
+            "• *'top product'*\n"
+            "• *'credit outstanding'*\n"
+            "• *'forecast'*\n\n"
+            "Or type **help** for all commands.")
 
     # ── Help ──────────────────────────────────────────────────────────────
     if _has("help", "what can you", "commands", "what do you know"):
