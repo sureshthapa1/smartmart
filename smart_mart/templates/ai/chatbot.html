@@ -6,40 +6,40 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-8">
-    <div class="card shadow-sm border-0" style="height:70vh;display:flex;flex-direction:column;">
+    <div class="card shadow-sm border-0" style="height:75vh;display:flex;flex-direction:column;">
+
+      <!-- Header -->
       <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
-        <div style="width:36px;height:36px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">🤖</div>
+        <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🤖</div>
         <div>
           <div class="fw-bold">Smart Mart AI Assistant</div>
-          <div class="text-muted" style="font-size:.75rem;">Ask about sales, stock, profit, forecasts…</div>
+          <div class="text-muted" style="font-size:.72rem;">Ask anything about your business in plain English</div>
         </div>
-        <span class="badge bg-success rounded-pill ms-auto">Online</span>
+        <div class="ms-auto d-flex gap-2 align-items-center">
+          <span class="badge bg-success rounded-pill">● Online</span>
+          <button class="btn btn-sm btn-outline-secondary" id="clearBtn" title="Clear chat">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
       </div>
 
-      <!-- Chat messages -->
+      <!-- Messages -->
       <div id="chatMessages" class="flex-grow-1 p-3 overflow-auto" style="background:#f8fafc;">
-        <!-- Welcome message -->
         <div class="d-flex gap-2 mb-3">
-          <div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
-          <div class="rounded-3 p-3 shadow-sm" style="background:#fff;max-width:80%;font-size:.875rem;">
-            👋 Hello! I'm your Smart Mart AI assistant.<br><br>
-            I can help you with:<br>
-            • Today's / weekly / monthly sales<br>
-            • Top products & best sellers<br>
-            • Low stock & restock alerts<br>
-            • Sales forecasts<br>
-            • Profit & cash balance<br>
-            • Dead stock detection<br><br>
-            Type <strong>help</strong> to see all commands.
+          <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
+          <div class="rounded-3 p-3 shadow-sm" style="background:#fff;max-width:85%;font-size:.875rem;line-height:1.6;">
+            👋 <strong>Namaste!</strong> I'm your Smart Mart AI assistant.<br><br>
+            Ask me anything about your business — sales, stock, profit, customers, forecasts.<br><br>
+            <span class="text-muted" style="font-size:.78rem;">Try the quick buttons below ↓</span>
           </div>
         </div>
       </div>
 
-      <!-- Quick suggestions -->
-      <div class="px-3 py-2 border-top" style="background:#fff;">
-        <div class="d-flex gap-1 flex-wrap mb-2">
-          {% for q in ["Today's sales", "Top product", "Low stock", "Sales forecast", "Profit", "Dead stock"] %}
-          <button class="btn btn-outline-secondary btn-sm quick-q" data-q="{{ q }}">{{ q }}</button>
+      <!-- Quick questions -->
+      <div class="px-3 pt-2 pb-1 border-top" style="background:#fff;">
+        <div class="d-flex gap-1 flex-wrap">
+          {% for q in ["Today's sales","This month profit","Low stock","Top product","Credit outstanding","Sales forecast","Dead stock","Top customers","Expenses","Loyalty points"] %}
+          <button class="btn btn-outline-secondary btn-sm quick-q mb-1" data-q="{{ q }}" style="font-size:.75rem;">{{ q }}</button>
           {% endfor %}
         </div>
       </div>
@@ -48,11 +48,14 @@
       <div class="p-3 border-top" style="background:#fff;">
         <div class="input-group">
           <input type="text" id="chatInput" class="form-control"
-                 placeholder="Ask anything about your business…"
-                 autocomplete="off">
-          <button class="btn btn-primary" id="sendBtn">
+                 placeholder="Ask about sales, stock, profit, customers…"
+                 autocomplete="off" style="border-radius:10px 0 0 10px;">
+          <button class="btn btn-primary px-3" id="sendBtn" style="border-radius:0 10px 10px 0;">
             <i class="bi bi-send-fill"></i>
           </button>
+        </div>
+        <div class="text-muted mt-1" style="font-size:.68rem;">
+          Try: "today sales", "low stock", "profit this month", "top product", "credit outstanding"
         </div>
       </div>
     </div>
@@ -66,14 +69,38 @@ const messages = document.getElementById('chatMessages');
 const input = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 
+function formatText(text) {
+  // Convert **bold** to <strong>
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+}
+
+function timeStr() {
+  return new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+}
+
 function addMessage(text, isUser) {
   const div = document.createElement('div');
   div.className = 'd-flex gap-2 mb-3' + (isUser ? ' flex-row-reverse' : '');
+
   const avatar = isUser
-    ? `<div style="width:32px;height:32px;background:#22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">👤</div>`
-    : `<div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>`;
-  const bubble = `<div class="rounded-3 p-3 shadow-sm" style="background:${isUser ? '#6366f1' : '#fff'};color:${isUser ? '#fff' : '#0f172a'};max-width:80%;font-size:.875rem;white-space:pre-line;">${text}</div>`;
-  div.innerHTML = isUser ? bubble + avatar : avatar + bubble;
+    ? `<div style="width:32px;height:32px;background:#22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;color:#fff;font-weight:700;">U</div>`
+    : `<div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">🤖</div>`;
+
+  const bgColor = isUser ? '#6366f1' : '#fff';
+  const textColor = isUser ? '#fff' : '#0f172a';
+
+  div.innerHTML = `${isUser ? '' : avatar}
+    <div style="max-width:85%;">
+      <div class="rounded-3 p-3 shadow-sm" style="background:${bgColor};color:${textColor};font-size:.875rem;line-height:1.6;">
+        ${formatText(text)}
+      </div>
+      <div class="text-muted mt-1" style="font-size:.65rem;${isUser ? 'text-align:right;' : ''}">${timeStr()}</div>
+    </div>
+    ${isUser ? avatar : ''}`;
+
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }
@@ -82,20 +109,36 @@ function addTyping() {
   const div = document.createElement('div');
   div.id = 'typing';
   div.className = 'd-flex gap-2 mb-3';
-  div.innerHTML = `<div style="width:32px;height:32px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
+  div.innerHTML = `
+    <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">🤖</div>
     <div class="rounded-3 p-3 shadow-sm" style="background:#fff;font-size:.875rem;">
       <span class="text-muted">Thinking</span>
-      <span class="dots">...</span>
+      <span id="typingDots">.</span>
     </div>`;
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
+
+  // Animate dots
+  let dots = 1;
+  window._typingInterval = setInterval(() => {
+    dots = (dots % 3) + 1;
+    const el = document.getElementById('typingDots');
+    if (el) el.textContent = '.'.repeat(dots);
+  }, 400);
+}
+
+function removeTyping() {
+  clearInterval(window._typingInterval);
+  document.getElementById('typing')?.remove();
 }
 
 async function sendMessage(text) {
   if (!text.trim()) return;
   addMessage(text, true);
   input.value = '';
+  sendBtn.disabled = true;
   addTyping();
+
   try {
     const res = await fetch("{{ url_for('ai.chatbot_query') }}", {
       method: 'POST',
@@ -103,11 +146,14 @@ async function sendMessage(text) {
       body: JSON.stringify({ message: text }),
     });
     const data = await res.json();
-    document.getElementById('typing')?.remove();
+    removeTyping();
     addMessage(data.reply, false);
   } catch {
-    document.getElementById('typing')?.remove();
-    addMessage('Sorry, something went wrong. Please try again.', false);
+    removeTyping();
+    addMessage('⚠️ Something went wrong. Please try again.', false);
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
   }
 }
 
@@ -116,6 +162,16 @@ input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(inpu
 
 document.querySelectorAll('.quick-q').forEach(btn => {
   btn.addEventListener('click', () => sendMessage(btn.dataset.q));
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  fetch("{{ url_for('ai.chatbot_query') }}", {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: '__clear__'}),
+  }).catch(() => {});
+  messages.innerHTML = '';
+  addMessage('Chat cleared. How can I help you?', false);
 });
 </script>
 {% endblock %}
