@@ -1,77 +1,163 @@
 {% extends "base.html" %}
 {% block title %}Print Labels — Smart Mart{% endblock %}
 {% block page_title %}Product Labels{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li><li class="breadcrumb-item active">Print Labels</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
+<li class="breadcrumb-item active">Print Labels</li>
+{% endblock %}
+
 {% block head %}
 <style>
   @media print {
-    .no-print { display: none !important; }
-    body { background: #fff; }
-    #labelSheet { display: flex !important; flex-wrap: wrap; gap: 4px; padding: 8px; }
-    .label-card { page-break-inside: avoid; }
+    /* Hide everything except the label sheet */
+    body > * { display: none !important; }
+    #printArea { display: block !important; }
+    #printArea .label-grid {
+      display: flex !important;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px;
+    }
+    .label-card {
+      width: 85mm;
+      border: 1px solid #000 !important;
+      page-break-inside: avoid;
+    }
   }
+
   .label-card {
-    width: 90mm; border: 1px dashed #cbd5e1; border-radius: 6px;
-    padding: 8px 10px; background: #fff; font-family: monospace;
-    display: inline-block; margin: 4px;
+    width: 85mm;
+    min-height: 45mm;
+    border: 1px dashed #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #fff;
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 4px;
+    box-sizing: border-box;
   }
-  .label-name { font-size: 11px; font-weight: 700; color: #0f172a; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .label-price { font-size: 16px; font-weight: 800; color: #6366f1; }
+  .label-shop { font-size: 8px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+  .label-name { font-size: 11px; font-weight: 700; color: #0f172a; margin: 3px 0 2px; line-height: 1.2; }
+  .label-price { font-size: 20px; font-weight: 800; color: #6366f1; line-height: 1; }
   .label-sku { font-size: 9px; color: #64748b; margin-top: 2px; }
-  .label-barcode { font-family: 'Libre Barcode 128', monospace; font-size: 32px; line-height: 1; display: block; margin-top: 2px; }
-  #labelSheet { display: flex; flex-wrap: wrap; gap: 4px; }
+  .label-barcode-wrap { text-align: center; margin-top: 4px; }
+  .label-barcode-wrap img { width: 60px; height: 60px; }
+  .label-sku-text { font-size: 8px; color: #475569; text-align: center; margin-top: 1px; font-family: monospace; }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128&display=swap" rel="stylesheet">
 {% endblock %}
+
 {% block content %}
-<div class="row g-3 no-print">
+
+<!-- Selection form (hidden on print) -->
+<div class="row g-3" id="selectionArea">
   <div class="col-lg-4">
     <div class="card">
-      <div class="card-header fw-semibold"><i class="bi bi-upc me-2 text-primary"></i>Select Products</div>
+      <div class="card-header fw-semibold">
+        <i class="bi bi-upc me-2 text-primary"></i>Select Products
+      </div>
       <div class="card-body">
         <form method="post" id="labelForm">
-          <div style="max-height:400px;overflow-y:auto" class="mb-3">
+          <div style="max-height:420px;overflow-y:auto" class="mb-3">
             {% for p in products %}
             <div class="form-check mb-1">
-              <input class="form-check-input" type="checkbox" name="product_ids" value="{{ p.id }}" id="p{{ p.id }}" {% if p.id in selected_ids %}checked{% endif %}>
-              <label class="form-check-label small" for="p{{ p.id }}">{{ p.name }} <span class="text-muted">({{ p.sku }})</span></label>
+              <input class="form-check-input" type="checkbox" name="product_ids"
+                     value="{{ p.id }}" id="p{{ p.id }}"
+                     {% if p.id in selected_ids %}checked{% endif %}>
+              <label class="form-check-label small" for="p{{ p.id }}">
+                {{ p.name }}
+                <span class="text-muted">({{ p.sku }})</span>
+              </label>
             </div>
             {% endfor %}
           </div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=true)">All</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=false)">None</button>
-            <button type="submit" class="btn btn-primary btn-sm ms-auto"><i class="bi bi-eye me-1"></i>Preview</button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=true)">
+              All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=false)">
+              None
+            </button>
+            <button type="submit" class="btn btn-primary btn-sm ms-auto">
+              <i class="bi bi-eye me-1"></i>Generate Labels
+            </button>
           </div>
         </form>
       </div>
     </div>
   </div>
+
   <div class="col-lg-8">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">Label Preview</span>
-        {% if selected_ids %}
-        <button onclick="window.print()" class="btn btn-sm btn-primary"><i class="bi bi-printer me-1"></i>Print Labels</button>
+        <span class="fw-semibold">
+          Label Preview
+          {% if label_data %}
+          <span class="badge bg-primary ms-2">{{ label_data|length }} labels</span>
+          {% endif %}
+        </span>
+        {% if label_data %}
+        <button onclick="window.print()" class="btn btn-sm btn-primary">
+          <i class="bi bi-printer me-1"></i>Print Labels
+        </button>
         {% endif %}
       </div>
-      <div class="card-body">
-        {% if selected_ids %}
-        <div id="labelSheet">
-          {% for p in products if p.id in selected_ids %}
+      <div class="card-body p-2">
+        {% if label_data %}
+        <div class="d-flex flex-wrap">
+          {% for item in label_data %}
           <div class="label-card">
-            <div class="label-name">{{ p.name }}</div>
-            <div class="label-price">NPR {{ "%.2f"|format(p.selling_price|float) }}</div>
-            <div class="label-sku">SKU: {{ p.sku }}{% if p.category %} &bull; {{ p.category }}{% endif %}</div>
-            <span class="label-barcode">{{ p.sku }}</span>
+            <div>
+              <div class="label-shop">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+              <div class="label-name">{{ item.name }}</div>
+              <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
+              <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>
+            </div>
+            <div class="label-barcode-wrap">
+              {% if item.barcode_b64 %}
+              <img src="{{ item.barcode_b64 }}" alt="{{ item.sku }}">
+              {% endif %}
+              <div class="label-sku-text">{{ item.sku }}</div>
+            </div>
           </div>
           {% endfor %}
         </div>
         {% else %}
-        <div class="text-center text-muted py-5"><i class="bi bi-upc fs-1 d-block mb-2"></i>Select products and click Preview.</div>
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-upc fs-1 d-block mb-2 opacity-25"></i>
+          Select products and click Generate Labels.
+        </div>
         {% endif %}
       </div>
     </div>
   </div>
 </div>
+
+<!-- Print-only area (invisible on screen, shown on print) -->
+<div id="printArea" style="display:none;">
+  {% if label_data %}
+  <div class="label-grid">
+    {% for item in label_data %}
+    <div class="label-card">
+      <div>
+        <div class="label-shop">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+        <div class="label-name">{{ item.name }}</div>
+        <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
+        <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>
+      </div>
+      <div class="label-barcode-wrap">
+        {% if item.barcode_b64 %}
+        <img src="{{ item.barcode_b64 }}" alt="{{ item.sku }}">
+        {% endif %}
+        <div class="label-sku-text">{{ item.sku }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}

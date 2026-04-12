@@ -603,13 +603,53 @@ def export_csv():
 
 @inventory_bp.route("/labels", methods=["GET", "POST"])
 @login_required
+@login_required
 def print_labels():
     """Generate printable barcode/price labels for products."""
+    _require_perm("can_print_labels")
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
     selected_ids = []
+    label_data = []
+
     if request.method == "POST":
         selected_ids = [int(x) for x in request.form.getlist("product_ids") if x.isdigit()]
-    return render_template("inventory/labels.html", products=products, selected_ids=selected_ids)
+        # Generate barcode images as base64 for selected products
+        for p in products:
+            if p.id in selected_ids:
+                barcode_b64 = _generate_barcode_b64(p.sku)
+                label_data.append({
+                    "id": p.id,
+                    "name": p.name,
+                    "sku": p.sku,
+                    "price": float(p.selling_price),
+                    "category": p.category or "",
+                    "barcode_b64": barcode_b64,
+                })
+
+    return render_template("inventory/labels.html",
+                           products=products,
+                           selected_ids=selected_ids,
+                           label_data=label_data,
+                           shop=__import__('smart_mart.models.shop_settings', fromlist=['ShopSettings']).ShopSettings.get())
+
+
+def _generate_barcode_b64(sku: str) -> str:
+    """Generate a Code128 barcode as base64 PNG."""
+    try:
+        import qrcode
+        import io
+        import base64
+        # Use QR code as barcode (works without barcode library)
+        qr = qrcode.QRCode(version=1, box_size=3, border=1,
+                           error_correction=qrcode.constants.ERROR_CORRECT_L)
+        qr.add_data(sku)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        return ""
 
 
 @inventory_bp.route("/bulk-upload/sample")
