@@ -165,16 +165,41 @@ def loyalty_card(customer_id):
     from ...models.shop_settings import ShopSettings
     shop = ShopSettings.get()
 
-    # QR code encodes the customer statement URL
-    from flask import request as _req
-    base_url = _req.host_url.rstrip('/')
-    qr_data = f"{base_url}/sales/customer-statement?name={customer.name}"
+    # Build QR data — use configured site URL or request host
+    from flask import current_app
+    site_url = current_app.config.get("SITE_URL", "").rstrip("/")
+    if not site_url:
+        from flask import request as _req
+        site_url = _req.host_url.rstrip("/")
+    qr_data = f"{site_url}/sales/customer-statement?name={customer.name}"
+
+    # Generate QR code as base64 PNG (no external API)
+    qr_image_b64 = _generate_qr_b64(qr_data)
 
     return render_template("customers/loyalty_card.html",
                            customer=customer,
                            wallet=wallet,
                            shop=shop,
+                           qr_image_b64=qr_image_b64,
                            qr_data=qr_data)
+
+
+def _generate_qr_b64(data: str) -> str:
+    """Generate a QR code and return it as a base64-encoded PNG data URI."""
+    try:
+        import qrcode
+        import io
+        import base64
+        qr = qrcode.QRCode(version=1, box_size=4, border=2)
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#0f172a", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        return ""
 
 
 @customers_bp.route("/export-csv")
