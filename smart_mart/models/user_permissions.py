@@ -91,7 +91,7 @@ class UserPermissions(db.Model):
         if p is None:
             p = cls(user_id=user_id)
             db.session.add(p)
-            db.session.commit()
+            db.session.flush()
         return p
 
     def to_dict(self) -> dict:

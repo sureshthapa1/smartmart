@@ -31,12 +31,12 @@ class ShopSettings(db.Model):
         if s is None:
             s = cls()
             db.session.add(s)
-            db.session.commit()
+            db.session.flush()
         return s
 
     def next_invoice_number(self) -> str:
         """Return the next invoice number and increment the counter."""
         num = f"{self.invoice_prefix}-{self.invoice_counter:05d}"
         self.invoice_counter += 1
-        db.session.commit()
+        db.session.flush()  # flush only — caller commits
         return num

@@ -25,4 +25,4 @@ class ProductIconMap(db.Model):
             existing.emoji = emoji
         else:
             db.session.add(cls(product_name_lower=name.strip().lower(), emoji=emoji))
-        db.session.commit()
+        db.session.flush()
