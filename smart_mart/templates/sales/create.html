@@ -522,6 +522,9 @@
 
       // Offers
       const offersList = document.getElementById('aiOffersList');
+      // Reset any previously applied offer state
+      const prevClear = document.getElementById('clearOfferBtn');
+      if (prevClear) prevClear.style.display = 'none';
       if (recs.offers && recs.offers.length) {
         offersList.innerHTML = recs.offers.slice(0, 3).map(o => `
           <div class="d-flex align-items-center justify-content-between gap-2 mb-2 p-2 rounded-2"
@@ -567,13 +570,51 @@
     const match = offerText.match(/(\d+)%/);
     if (match) {
       const pct = parseInt(match[1]);
-      // Calculate discount from current subtotal
       let subtotal = 0;
       document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
       const discount = Math.round(subtotal * pct / 100 * 100) / 100;
       document.getElementById('discountInput').value = discount.toFixed(2);
       document.getElementById('discountNote').value = offerText;
       recalcTotal();
+
+      // Mark this button as applied, disable all others with clear message
+      document.querySelectorAll('.apply-offer-btn').forEach(b => {
+        if (b === btn) {
+          b.textContent = '✓ Applied';
+          b.classList.replace('btn-outline-success', 'btn-success');
+          b.disabled = true;
+        } else {
+          b.textContent = 'Apply';
+          b.classList.replace('btn-success', 'btn-outline-secondary');
+          b.disabled = true;
+          b.title = 'Only one offer can be applied at a time';
+        }
+      });
+
+      // Show a clear button
+      let clearBtn = document.getElementById('clearOfferBtn');
+      if (!clearBtn) {
+        clearBtn = document.createElement('button');
+        clearBtn.id = 'clearOfferBtn';
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn btn-sm btn-outline-danger mt-2 w-100';
+        clearBtn.textContent = '✕ Clear applied offer';
+        document.getElementById('aiOffersSection').appendChild(clearBtn);
+      }
+      clearBtn.style.display = '';
+      clearBtn.onclick = function() {
+        document.getElementById('discountInput').value = '0';
+        document.getElementById('discountNote').value = '';
+        recalcTotal();
+        document.querySelectorAll('.apply-offer-btn').forEach(b => {
+          b.textContent = 'Apply';
+          b.classList.replace('btn-success', 'btn-outline-success');
+          b.classList.replace('btn-outline-secondary', 'btn-outline-success');
+          b.disabled = false;
+          b.title = '';
+        });
+        clearBtn.style.display = 'none';
+      };
     }
     // Track feedback
     if (activeCustomerId) {
@@ -583,9 +624,6 @@
         body: JSON.stringify({applied: true, offer: offerText}),
       }).catch(() => {});
     }
-    btn.textContent = '✓ Applied';
-    btn.classList.replace('btn-outline-success', 'btn-success');
-    btn.disabled = true;
   }
 
   // ── Product Icon Memory ───────────────────────────────────────────────
