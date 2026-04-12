@@ -557,3 +557,23 @@ def shift_sales():
         })
 
     return render_template("reports/shift_sales.html", shift_data=shift_data)
+
+
+@reports_bp.route("/discount-analysis")
+@login_required
+def discount_analysis():
+    _require_perm("can_view_reports")
+    start, end, start_raw, end_raw = _get_date_range()
+    data = report_engine.discount_analysis(start, end)
+    return render_template("reports/discount_analysis.html",
+                           data=data, start_date=start_raw, end_date=end_raw)
+
+
+@reports_bp.route("/customer-analysis")
+@login_required
+def customer_analysis():
+    _require_perm("can_view_reports")
+    start, end, start_raw, end_raw = _get_date_range()
+    data = report_engine.customer_analysis(start, end)
+    return render_template("reports/customer_analysis.html",
+                           data=data, start_date=start_raw, end_date=end_raw)

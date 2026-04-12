@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Customer Analysis — Smart Mart{% endblock %}
+{% block page_title %}Customer Analysis{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Customer Analysis</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+
+<!-- Date Filter -->
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <label class="form-label small text-muted mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div>
+        <label class="form-label small text-muted mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      <a href="{{ url_for('reports.customer_analysis') }}" class="btn btn-outline-secondary btn-sm">This Month</a>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card text-center h-100">
+      <div class="card-body p-4">
+        <div class="text-muted small fw-semibold text-uppercase mb-1">Named Customers</div>
+        <div class="fs-2 fw-bold text-primary">{{ data.unique_customers }}</div>
+        <div class="text-muted small">unique buyers this period</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card text-center h-100">
+      <div class="card-body p-4">
+        <div class="text-muted small fw-semibold text-uppercase mb-1">Walk-in Sales</div>
+        <div class="fs-2 fw-bold text-secondary">{{ data.walkin_sales }}</div>
+        <div class="text-muted small">anonymous transactions</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card text-center h-100">
+      <div class="card-body p-4">
+        <div class="text-muted small fw-semibold text-uppercase mb-1">Top Customer Revenue</div>
+        <div class="fs-2 fw-bold text-success">
+          {% if data.top_buyers %}NPR {{ "%.0f"|format(data.top_buyers[0].revenue) }}{% else %}—{% endif %}
+        </div>
+        <div class="text-muted small">{{ data.top_buyers[0].name if data.top_buyers else '—' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Payment Mode Chart -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-pie-chart me-2 text-primary"></i>Sales by Payment Mode</div>
+      <div class="card-body">
+        <canvas id="paymentChart" height="200"></canvas>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Mode</th><th class="text-end">Count</th><th class="text-end">Revenue (NPR)</th></tr></thead>
+          <tbody>
+            {% for p in data.payment_breakdown %}
+            <tr>
+              <td>
+                {% if p.mode == 'cash' %}💵 Cash
+                {% elif p.mode == 'qr' %}📱 QR / Digital
+                {% elif p.mode == 'card' %}💳 Card
+                {% elif p.mode == 'credit' %}📋 Credit / Udharo
+                {% else %}🔄 Other{% endif %}
+              </td>
+              <td class="text-end">{{ p.count }}</td>
+              <td class="text-end fw-semibold text-success">{{ "%.0f"|format(p.revenue) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>Total</td>
+              <td class="text-end">{{ data.payment_breakdown | map(attribute='count') | sum }}</td>
+              <td class="text-end text-success">NPR {{ "%.0f"|format(data.payment_breakdown | map(attribute='revenue') | map('float') | sum) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Buyers Table -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy me-2 text-warning"></i>Top Customers by Revenue</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Customer</th>
+              <th class="text-end">Purchases</th>
+              <th class="text-end">Revenue (NPR)</th>
+              <th class="text-end">Avg Order</th>
+              <th class="text-end">Discount</th>
+              <th class="text-end">Points</th>
+              <th>Last Buy</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in data.top_buyers %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td>
+                <div class="fw-semibold">{{ c.name }}</div>
+              </td>
+              <td class="text-end">{{ c.purchases }}</td>
+              <td class="text-end fw-bold text-success">{{ "%.0f"|format(c.revenue) }}</td>
+              <td class="text-end text-muted small">{{ "%.0f"|format(c.avg_order) }}</td>
+              <td class="text-end {% if c.discount > 0 %}text-danger{% else %}text-muted{% endif %} small">
+                {% if c.discount > 0 %}{{ "%.0f"|format(c.discount) }}{% else %}—{% endif %}
+              </td>
+              <td class="text-end">
+                {% if c.loyalty_points > 0 %}
+                <span class="badge bg-warning text-dark">{{ c.loyalty_points }} pts</span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-muted small">{{ c.last_purchase }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">No named customer sales in this period.</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if data.top_buyers %}
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td colspan="3" class="text-end text-muted small">{{ data.top_buyers|length }} customers</td>
+              <td class="text-end text-success">NPR {{ "%.0f"|format(data.top_buyers | map(attribute='revenue') | map('float') | sum) }}</td>
+              <td></td>
+              <td class="text-end text-danger">NPR {{ "%.0f"|format(data.top_buyers | map(attribute='discount') | map('float') | sum) }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const pm = {{ data.payment_breakdown | tojson }};
+if (pm.length) {
+  const colors = {'cash':'#22c55e','qr':'#06b6d4','card':'#6366f1','credit':'#f59e0b','other':'#94a3b8'};
+  new Chart(document.getElementById('paymentChart'), {
+    type: 'doughnut',
+    data: {
+      labels: pm.map(p => p.mode.toUpperCase()),
+      datasets: [{
+        data: pm.map(p => p.revenue),
+        backgroundColor: pm.map(p => colors[p.mode] || '#94a3b8'),
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: ctx => ` NPR ${ctx.parsed.toLocaleString()}` } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

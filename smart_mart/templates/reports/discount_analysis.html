@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Discount Analysis — Smart Mart{% endblock %}
+{% block page_title %}Discount Analysis{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Discount Analysis</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+
+<!-- Date Filter -->
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <label class="form-label small text-muted mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div>
+        <label class="form-label small text-muted mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      <a href="{{ url_for('reports.discount_analysis') }}" class="btn btn-outline-secondary btn-sm">This Month</a>
+    </form>
+  </div>
+</div>
+
+{% set s = data.summary %}
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b">
+      <div class="card-body p-4">
+        <div class="stat-label">Total Discount Given</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(s.total_discount) }}</div>
+        <div class="stat-sub">{{ s.discounted_sales }} discounted sales</div>
+        <div class="stat-bg">🏷️</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef9c3,#fef08a);color:#854d0e">
+      <div class="card-body p-4">
+        <div class="stat-label">Discount Rate</div>
+        <div class="stat-value">{{ s.discount_rate }}%</div>
+        <div class="stat-sub">of gross sales</div>
+        <div class="stat-bg">📉</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
+      <div class="card-body p-4">
+        <div class="stat-label">Net Revenue</div>
+        <div class="stat-value" style="font-size:1.3rem">NPR {{ "%.0f"|format(s.total_revenue) }}</div>
+        <div class="stat-sub">after discounts</div>
+        <div class="stat-bg">💰</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
+      <div class="card-body p-4">
+        <div class="stat-label">Gross Before Discount</div>
+        <div class="stat-value" style="font-size:1.3rem">NPR {{ "%.0f"|format(s.gross_before_discount) }}</div>
+        <div class="stat-sub">{{ s.total_sales }} total sales</div>
+        <div class="stat-bg">📊</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Daily Trend Chart -->
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-graph-down-arrow me-2 text-danger"></i>Daily Discount Trend</div>
+      <div class="card-body">
+        <canvas id="discountTrendChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- By Payment Mode -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-2 text-primary"></i>Sales by Payment Mode</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Mode</th><th class="text-end">Sales</th><th class="text-end">Revenue</th><th class="text-end">Discount</th></tr></thead>
+          <tbody>
+            {% for p in data.by_payment %}
+            <tr>
+              <td>
+                {% if p.mode == 'cash' %}💵 Cash
+                {% elif p.mode == 'qr' %}📱 QR
+                {% elif p.mode == 'card' %}💳 Card
+                {% elif p.mode == 'credit' %}📋 Credit
+                {% else %}🔄 Other{% endif %}
+              </td>
+              <td class="text-end">{{ p.count }}</td>
+              <td class="text-end text-success fw-semibold">{{ "%.0f"|format(p.revenue) }}</td>
+              <td class="text-end text-danger">{{ "%.0f"|format(p.discount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>Total</td>
+              <td class="text-end">{{ data.by_payment | map(attribute='count') | sum }}</td>
+              <td class="text-end text-success">{{ "%.0f"|format(data.by_payment | map(attribute='revenue') | map('float') | sum) }}</td>
+              <td class="text-end text-danger">{{ "%.0f"|format(data.by_payment | map(attribute='discount') | map('float') | sum) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- By Staff -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-person-badge me-2 text-primary"></i>Discount by Staff</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>Staff</th><th class="text-end">Sales</th><th class="text-end">Disc. Sales</th><th class="text-end">Discount (NPR)</th><th class="text-end">Rate</th></tr>
+          </thead>
+          <tbody>
+            {% for s in data.by_staff %}
+            <tr>
+              <td class="fw-semibold">{{ s.username }}</td>
+              <td class="text-end">{{ s.sales }}</td>
+              <td class="text-end text-muted">{{ s.disc_sales }}</td>
+              <td class="text-end fw-bold {% if s.discount > 0 %}text-danger{% endif %}">NPR {{ "%.0f"|format(s.discount) }}</td>
+              <td class="text-end">
+                {% if s.rate > 0 %}
+                <span class="badge {% if s.rate > 10 %}bg-danger{% elif s.rate > 5 %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ s.rate }}%</span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No data</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if data.by_staff %}
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>Total</td>
+              <td class="text-end">{{ data.by_staff | map(attribute='sales') | sum }}</td>
+              <td class="text-end">{{ data.by_staff | map(attribute='disc_sales') | sum }}</td>
+              <td class="text-end text-danger">NPR {{ "%.0f"|format(data.by_staff | map(attribute='discount') | map('float') | sum) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- By Reason -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-chat-text me-2 text-warning"></i>Discount by Reason</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>Reason</th><th class="text-end">Times</th><th class="text-end">Total (NPR)</th></tr>
+          </thead>
+          <tbody>
+            {% for r in data.by_reason %}
+            <tr>
+              <td class="small">{{ r.reason[:50] }}{% if r.reason|length > 50 %}…{% endif %}</td>
+              <td class="text-end">{{ r.count }}</td>
+              <td class="text-end fw-bold text-danger">{{ "%.0f"|format(r.total) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No discounts recorded</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if data.by_reason %}
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>Total</td>
+              <td class="text-end">{{ data.by_reason | map(attribute='count') | sum }}</td>
+              <td class="text-end text-danger">NPR {{ "%.0f"|format(data.by_reason | map(attribute='total') | map('float') | sum) }}</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- By Customer -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-people me-2 text-success"></i>Top Discount Recipients (Customers)</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Customer</th><th class="text-end">Purchases</th><th class="text-end">Revenue (NPR)</th><th class="text-end">Discount (NPR)</th><th class="text-end">Disc %</th></tr>
+      </thead>
+      <tbody>
+        {% for c in data.by_customer %}
+        {% set gross_c = c.revenue + c.discount %}
+        {% set rate_c = (c.discount / gross_c * 100) | round(1) if gross_c > 0 else 0 %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          <td class="fw-semibold">{{ c.name }}</td>
+          <td class="text-end">{{ c.purchases }}</td>
+          <td class="text-end text-success">{{ "%.0f"|format(c.revenue) }}</td>
+          <td class="text-end fw-bold text-danger">{{ "%.0f"|format(c.discount) }}</td>
+          <td class="text-end">
+            <span class="badge {% if rate_c > 10 %}bg-danger{% elif rate_c > 5 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ rate_c }}%</span>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No discounts given to named customers in this period.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if data.by_customer %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="3" class="text-end text-muted small">{{ data.by_customer|length }} customers</td>
+          <td class="text-end text-success">NPR {{ "%.0f"|format(data.by_customer | map(attribute='revenue') | map('float') | sum) }}</td>
+          <td class="text-end text-danger">NPR {{ "%.0f"|format(data.by_customer | map(attribute='discount') | map('float') | sum) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const daily = {{ data.daily_trend | tojson }};
+if (daily.length) {
+  new Chart(document.getElementById('discountTrendChart'), {
+    type: 'bar',
+    data: {
+      labels: daily.map(d => d.day),
+      datasets: [
+        { label: 'Revenue (NPR)', data: daily.map(d => d.revenue), backgroundColor: 'rgba(99,102,241,.6)', borderRadius: 3 },
+        { label: 'Discount (NPR)', data: daily.map(d => d.discount), backgroundColor: 'rgba(239,68,68,.7)', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+</script>
+{% endblock %}

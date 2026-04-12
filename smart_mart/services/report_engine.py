@@ -411,3 +411,249 @@ def staff_efficiency_report(start: date, end: date) -> list[dict]:
     # Sort by revenue descending
     result.sort(key=lambda x: x["total_revenue"], reverse=True)
     return result
+
+
+# ── Discount Analysis ─────────────────────────────────────────────────────────
+
+def discount_analysis(start: date, end: date) -> dict:
+    """Comprehensive discount analysis — by staff, customer, reason, trend."""
+    from ..models.user import User
+
+    # ── Overall summary ───────────────────────────────────────────────────
+    summary = db.session.execute(
+        db.select(
+            func.count(Sale.id).label("total_sales"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("total_discount"),
+            func.count(
+                db.case((Sale.discount_amount > 0, Sale.id), else_=None)
+            ).label("discounted_sales"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+    ).one()
+
+    gross = float(summary.total_revenue) + float(summary.total_discount)
+    discount_rate = (float(summary.total_discount) / gross * 100) if gross > 0 else 0
+
+    # ── By staff ──────────────────────────────────────────────────────────
+    by_staff = db.session.execute(
+        db.select(
+            User.username,
+            func.count(Sale.id).label("sales"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+            func.count(db.case((Sale.discount_amount > 0, Sale.id), else_=None)).label("disc_sales"),
+        )
+        .join(User, User.id == Sale.user_id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(User.id, User.username)
+        .order_by(func.sum(Sale.discount_amount).desc())
+    ).all()
+
+    staff_data = []
+    for r in by_staff:
+        gross_r = float(r.revenue) + float(r.discount)
+        rate = (float(r.discount) / gross_r * 100) if gross_r > 0 else 0
+        staff_data.append({
+            "username": r.username,
+            "sales": r.sales,
+            "discount": float(r.discount),
+            "revenue": float(r.revenue),
+            "disc_sales": r.disc_sales,
+            "rate": round(rate, 1),
+        })
+
+    # ── By customer ───────────────────────────────────────────────────────
+    by_customer = db.session.execute(
+        db.select(
+            Sale.customer_name,
+            func.count(Sale.id).label("sales"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+        )
+        .where(and_(
+            func.date(Sale.sale_date) >= start,
+            func.date(Sale.sale_date) <= end,
+            Sale.discount_amount > 0,
+            Sale.customer_name.isnot(None),
+        ))
+        .group_by(Sale.customer_name)
+        .order_by(func.sum(Sale.discount_amount).desc())
+        .limit(20)
+    ).all()
+
+    customer_data = [
+        {"name": r.customer_name or "Walk-in", "sales": r.sales,
+         "discount": float(r.discount), "revenue": float(r.revenue)}
+        for r in by_customer
+    ]
+
+    # ── By reason (discount_note) ─────────────────────────────────────────
+    by_reason = db.session.execute(
+        db.select(
+            Sale.discount_note,
+            func.count(Sale.id).label("count"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("total"),
+        )
+        .where(and_(
+            func.date(Sale.sale_date) >= start,
+            func.date(Sale.sale_date) <= end,
+            Sale.discount_amount > 0,
+        ))
+        .group_by(Sale.discount_note)
+        .order_by(func.sum(Sale.discount_amount).desc())
+        .limit(15)
+    ).all()
+
+    reason_data = [
+        {"reason": r.discount_note or "No reason given",
+         "count": r.count, "total": float(r.total)}
+        for r in by_reason
+    ]
+
+    # ── Daily trend ───────────────────────────────────────────────────────
+    daily = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+            func.count(Sale.id).label("sales"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(func.date(Sale.sale_date))
+        .order_by(func.date(Sale.sale_date))
+    ).all()
+
+    daily_data = [
+        {"day": str(r.day), "discount": float(r.discount),
+         "revenue": float(r.revenue), "sales": r.sales}
+        for r in daily
+    ]
+
+    # ── By payment mode ───────────────────────────────────────────────────
+    by_payment = db.session.execute(
+        db.select(
+            Sale.payment_mode,
+            func.count(Sale.id).label("count"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Sale.payment_mode)
+        .order_by(func.sum(Sale.total_amount).desc())
+    ).all()
+
+    payment_data = [
+        {"mode": r.payment_mode or "cash", "count": r.count,
+         "revenue": float(r.revenue), "discount": float(r.discount)}
+        for r in by_payment
+    ]
+
+    return {
+        "summary": {
+            "total_sales": summary.total_sales,
+            "total_revenue": float(summary.total_revenue),
+            "total_discount": float(summary.total_discount),
+            "discounted_sales": summary.discounted_sales,
+            "discount_rate": round(discount_rate, 2),
+            "gross_before_discount": round(gross, 2),
+        },
+        "by_staff": staff_data,
+        "by_customer": customer_data,
+        "by_reason": reason_data,
+        "daily_trend": daily_data,
+        "by_payment": payment_data,
+    }
+
+
+def customer_analysis(start: date, end: date) -> dict:
+    """Deep customer analysis — spending, frequency, payment modes, top buyers."""
+    from ..models.customer import Customer
+    from ..models.ai_enhancements import LoyaltyWallet
+
+    # Top customers by revenue
+    top_buyers = db.session.execute(
+        db.select(
+            Sale.customer_name,
+            func.count(Sale.id).label("purchases"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
+            func.max(Sale.sale_date).label("last_purchase"),
+        )
+        .where(and_(
+            func.date(Sale.sale_date) >= start,
+            func.date(Sale.sale_date) <= end,
+            Sale.customer_name.isnot(None),
+        ))
+        .group_by(Sale.customer_name)
+        .order_by(func.sum(Sale.total_amount).desc())
+        .limit(20)
+    ).all()
+
+    buyer_data = []
+    for r in top_buyers:
+        avg_order = float(r.revenue) / r.purchases if r.purchases else 0
+        # Get loyalty points
+        pts = 0
+        try:
+            cust = db.session.execute(
+                db.select(Customer).where(func.lower(Customer.name) == r.customer_name.lower())
+            ).scalar_one_or_none()
+            if cust:
+                wallet = db.session.execute(
+                    db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == cust.id)
+                ).scalar_one_or_none()
+                pts = int(wallet.points_balance) if wallet else 0
+        except Exception:
+            pass
+        buyer_data.append({
+            "name": r.customer_name,
+            "purchases": r.purchases,
+            "revenue": float(r.revenue),
+            "discount": float(r.discount),
+            "avg_order": round(avg_order, 2),
+            "last_purchase": str(r.last_purchase)[:10] if r.last_purchase else "—",
+            "loyalty_points": pts,
+        })
+
+    # Payment mode breakdown
+    payment_breakdown = db.session.execute(
+        db.select(
+            Sale.payment_mode,
+            func.count(Sale.id).label("count"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Sale.payment_mode)
+        .order_by(func.count(Sale.id).desc())
+    ).all()
+
+    # New vs returning customers
+    all_customers_period = db.session.execute(
+        db.select(Sale.customer_name.distinct())
+        .where(and_(
+            func.date(Sale.sale_date) >= start,
+            func.date(Sale.sale_date) <= end,
+            Sale.customer_name.isnot(None),
+        ))
+    ).scalars().all()
+
+    # Walk-in count
+    walkin_count = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(and_(
+            func.date(Sale.sale_date) >= start,
+            func.date(Sale.sale_date) <= end,
+            db.or_(Sale.customer_name.is_(None), func.lower(Sale.customer_name) == "walk-in customer"),
+        ))
+    ).scalar() or 0
+
+    return {
+        "top_buyers": buyer_data,
+        "payment_breakdown": [
+            {"mode": r.payment_mode or "cash", "count": r.count, "revenue": float(r.revenue)}
+            for r in payment_breakdown
+        ],
+        "unique_customers": len(all_customers_period),
+        "walkin_sales": walkin_count,
+    }

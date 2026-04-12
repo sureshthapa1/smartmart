@@ -497,6 +497,18 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.discount_analysis' %}active{% endif %}"
+                 href="{{ url_for('reports.discount_analysis') }}">
+                <i class="bi bi-tag"></i>Discount Analysis
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.customer_analysis' %}active{% endif %}"
+                 href="{{ url_for('reports.customer_analysis') }}">
+                <i class="bi bi-people"></i>Customer Analysis
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'operations.eod_summary' %}active{% endif %}"
                  href="{{ url_for('operations.eod_summary') }}">
                 <i class="bi bi-sun"></i>End of Day
