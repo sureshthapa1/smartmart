@@ -65,14 +65,15 @@ def list_expenses():
 
     # Monthly breakdown for stacked bar chart (last 6 months, all data)
     from sqlalchemy import extract
+    from ..services.db_compat import date_format_year_month as _ym
     monthly_rows = db.session.execute(
         db.select(
-            db.func.strftime('%Y-%m', Expense.expense_date).label("month"),
+            _ym(Expense.expense_date).label("month"),
             Expense.expense_type.label("type"),
             db.func.sum(Expense.amount).label("total"),
         )
-        .group_by(db.func.strftime('%Y-%m', Expense.expense_date), Expense.expense_type)
-        .order_by(db.func.strftime('%Y-%m', Expense.expense_date))
+        .group_by(_ym(Expense.expense_date), Expense.expense_type)
+        .order_by(_ym(Expense.expense_date))
     ).all()
     monthly_chart = [{"month": r.month, "type": r.type, "total": float(r.total)} for r in monthly_rows]
 

@@ -11,6 +11,7 @@ from ..extensions import db
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
 from ..models.stock_movement import StockMovement
+from .db_compat import date_format_year_month, date_format_year_week, date_format_hour
 
 
 def sales_report(start: date, end: date, granularity: str = "daily") -> list[dict]:
@@ -204,24 +205,24 @@ def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]
     if period == "weekly":
         rows = db.session.execute(
             db.select(
-                func.strftime('%Y-W%W', Sale.sale_date).label("period"),
+                date_format_year_week(Sale.sale_date).label("period"),
                 func.sum(Sale.total_amount).label("total"),
                 func.count(Sale.id).label("transactions"),
             )
             .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
-            .group_by(func.strftime('%Y-W%W', Sale.sale_date))
-            .order_by(func.strftime('%Y-W%W', Sale.sale_date))
+            .group_by(date_format_year_week(Sale.sale_date))
+            .order_by(date_format_year_week(Sale.sale_date))
         ).all()
     elif period == "monthly":
         rows = db.session.execute(
             db.select(
-                func.strftime('%Y-%m', Sale.sale_date).label("period"),
+                date_format_year_month(Sale.sale_date).label("period"),
                 func.sum(Sale.total_amount).label("total"),
                 func.count(Sale.id).label("transactions"),
             )
             .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
-            .group_by(func.strftime('%Y-%m', Sale.sale_date))
-            .order_by(func.strftime('%Y-%m', Sale.sale_date))
+            .group_by(date_format_year_month(Sale.sale_date))
+            .order_by(date_format_year_month(Sale.sale_date))
         ).all()
     else:  # daily
         rows = db.session.execute(
@@ -303,13 +304,13 @@ def hourly_sales(start: date, end: date) -> list[dict]:
     """Return sales grouped by hour of day (peak hours analysis)."""
     rows = db.session.execute(
         db.select(
-            func.strftime('%H', Sale.sale_date).label("hour"),
+            date_format_hour(Sale.sale_date).label("hour"),
             func.sum(Sale.total_amount).label("total"),
             func.count(Sale.id).label("transactions"),
         )
         .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
-        .group_by(func.strftime('%H', Sale.sale_date))
-        .order_by(func.strftime('%H', Sale.sale_date))
+        .group_by(date_format_hour(Sale.sale_date))
+        .order_by(date_format_hour(Sale.sale_date))
     ).all()
     return [{"hour": int(r.hour), "label": f"{int(r.hour):02d}:00",
              "total": float(r.total), "transactions": r.transactions} for r in rows]
@@ -354,11 +355,11 @@ def staff_efficiency_report(start: date, end: date) -> list[dict]:
         # Peak hour
         peak_row = db.session.execute(
             db.select(
-                func.strftime('%H', Sale.sale_date).label("hour"),
+                date_format_hour(Sale.sale_date).label("hour"),
                 func.count(Sale.id).label("cnt")
             )
             .where(Sale.id.in_(sale_ids))
-            .group_by(func.strftime('%H', Sale.sale_date))
+            .group_by(date_format_hour(Sale.sale_date))
             .order_by(func.count(Sale.id).desc())
             .limit(1)
         ).first()

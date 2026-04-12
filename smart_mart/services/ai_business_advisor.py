@@ -13,6 +13,7 @@ from ..models.expense import Expense
 from ..models.purchase import Purchase
 from ..models.customer import Customer
 from ..models.supplier import Supplier
+from .db_compat import date_format_hour
 
 
 def _money(v) -> float:
@@ -316,11 +317,11 @@ def growth_opportunities() -> list[dict]:
     # Underperforming hours (if enough data)
     hourly = db.session.execute(
         db.select(
-            func.strftime('%H', Sale.sale_date).label("hour"),
+            date_format_hour(Sale.sale_date).label("hour"),
             func.count(Sale.id).label("cnt")
         )
         .where(func.date(Sale.sale_date) >= today - timedelta(days=30))
-        .group_by(func.strftime('%H', Sale.sale_date))
+        .group_by(date_format_hour(Sale.sale_date))
         .order_by(func.count(Sale.id))
         .limit(3)
     ).all()

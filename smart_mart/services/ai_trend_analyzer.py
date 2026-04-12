@@ -14,6 +14,7 @@ from sqlalchemy import and_, func
 from ..extensions import db
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
+from .db_compat import date_format_year_month, date_format_dow
 
 
 def _week_label(d: date) -> str:
@@ -137,7 +138,7 @@ def seasonal_demand_patterns(product_id: int = None) -> dict:
     # Monthly pattern (last 12 months)
     monthly = db.session.execute(
         db.select(
-            func.strftime('%Y-%m', Sale.sale_date).label("month"),
+            date_format_year_month(Sale.sale_date).label("month"),
             func.sum(SaleItem.quantity).label("qty"),
             func.sum(SaleItem.subtotal).label("revenue"),
         )
@@ -145,14 +146,14 @@ def seasonal_demand_patterns(product_id: int = None) -> dict:
         .where(*(
             [SaleItem.product_id == product_id] if product_id else []
         ))
-        .group_by(func.strftime('%Y-%m', Sale.sale_date))
-        .order_by(func.strftime('%Y-%m', Sale.sale_date))
+        .group_by(date_format_year_month(Sale.sale_date))
+        .order_by(date_format_year_month(Sale.sale_date))
     ).all()
 
     # Day-of-week pattern
     dow = db.session.execute(
         db.select(
-            func.strftime('%w', Sale.sale_date).label("dow"),
+            date_format_dow(Sale.sale_date).label("dow"),
             func.sum(SaleItem.quantity).label("qty"),
             func.avg(Sale.total_amount).label("avg_sale"),
         )
@@ -160,14 +161,21 @@ def seasonal_demand_patterns(product_id: int = None) -> dict:
         .where(*(
             [SaleItem.product_id == product_id] if product_id else []
         ))
-        .group_by(func.strftime('%w', Sale.sale_date))
-        .order_by(func.strftime('%w', Sale.sale_date))
+        .group_by(date_format_dow(Sale.sale_date))
+        .order_by(date_format_dow(Sale.sale_date))
     ).all()
 
     dow_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
     monthly_data = [{"month": r.month, "qty": r.qty, "revenue": float(r.revenue)} for r in monthly]
-    dow_data = [{"day": dow_names[int(r.dow)], "qty": r.qty, "avg_sale": float(r.avg_sale)} for r in dow]
+    # PostgreSQL to_char D gives 1-7 (1=Sunday), SQLite %w gives 0-6 (0=Sunday)
+    def _dow_index(val):
+        try:
+            v = int(val)
+            return v - 1 if v >= 1 else v  # normalize to 0-6
+        except Exception:
+            return 0
+    dow_data = [{"day": dow_names[_dow_index(r.dow) % 7], "qty": r.qty, "avg_sale": float(r.avg_sale)} for r in dow]
 
     # Find peak month and peak day
     peak_month = max(monthly_data, key=lambda x: x["qty"])["month"] if monthly_data else None

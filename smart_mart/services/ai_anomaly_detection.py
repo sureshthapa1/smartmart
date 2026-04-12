@@ -14,6 +14,7 @@ from sqlalchemy import func
 from ..extensions import db
 from ..models.sale import Sale, SaleItem
 from ..models.product import Product
+from .db_compat import hour_extract
 
 
 def detect_price_anomalies(days: int = 30) -> list[dict]:
@@ -144,8 +145,8 @@ def detect_off_hours_transactions(start_hour: int = 8, end_hour: int = 20) -> li
         db.select(Sale)
         .where(
             db.or_(
-                func.strftime('%H', Sale.sale_date).cast(db.Integer) < start_hour,
-                func.strftime('%H', Sale.sale_date).cast(db.Integer) >= end_hour,
+                hour_extract(Sale.sale_date) < start_hour,
+                hour_extract(Sale.sale_date) >= end_hour,
             )
         )
         .order_by(Sale.sale_date.desc())
