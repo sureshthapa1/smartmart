@@ -20,6 +20,9 @@ class ShopSettings(db.Model):
     currency_symbol = db.Column(db.String(10), default="NPR")
     low_stock_threshold = db.Column(db.Integer, default=10)
     logo_filename = db.Column(db.String(255), nullable=True)
+    # Loyalty programme settings
+    loyalty_points_per_rupee = db.Column(db.Numeric(8, 4), default=0.01)   # pts earned per NPR spent (0.01 = 1pt per NPR 100)
+    loyalty_rupee_per_point = db.Column(db.Numeric(8, 4), default=1.00)    # NPR discount per point redeemed
 
     @classmethod
     def get(cls):

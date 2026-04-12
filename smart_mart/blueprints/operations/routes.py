@@ -178,7 +178,8 @@ def loyalty():
         except ValueError as exc:
             flash(str(exc), "danger")
         return redirect(url_for("operations.loyalty"))
-    return render_template("operations/loyalty.html", loyalty=operations_manager.get_loyalty_summary())
+    return render_template("operations/loyalty.html", loyalty=operations_manager.get_loyalty_summary(),
+                           s=__import__('smart_mart.models.shop_settings', fromlist=['ShopSettings']).ShopSettings.get())
 
 
 @operations_bp.route("/branches", methods=["GET", "POST"])

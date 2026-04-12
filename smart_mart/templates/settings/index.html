@@ -122,6 +122,41 @@
             </div>
           </div>
 
+          <hr class="my-3">
+          <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
+            <i class="bi bi-star me-1"></i>Loyalty Programme
+          </h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Points Earned per NPR Spent</label>
+              <div class="input-group">
+                <span class="input-group-text">1 pt per NPR</span>
+                <input type="number" class="form-control"
+                       value="{{ (1 / s.loyalty_points_per_rupee)|round(0)|int if s.loyalty_points_per_rupee and s.loyalty_points_per_rupee > 0 else 100 }}"
+                       min="1" step="1" id="loyaltyEarnInput">
+              </div>
+              <div class="form-text">e.g. enter <strong>100</strong> → customer earns 1 point per NPR 100 spent. Enter <strong>50</strong> → 1 point per NPR 50.</div>
+              <input type="hidden" name="loyalty_points_per_rupee" id="loyaltyEarnHidden">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Discount per Point Redeemed</label>
+              <div class="input-group">
+                <span class="input-group-text">NPR</span>
+                <input type="number" name="loyalty_rupee_per_point" class="form-control"
+                       value="{{ s.loyalty_rupee_per_point|float|round(2) if s.loyalty_rupee_per_point else 1.0 }}"
+                       min="0.01" step="0.01">
+                <span class="input-group-text">per point</span>
+              </div>
+              <div class="form-text">e.g. <strong>1</strong> → 1 point = NPR 1 discount. <strong>2</strong> → 1 point = NPR 2 discount.</div>
+            </div>
+            <div class="col-12">
+              <div class="alert alert-info py-2 mb-0 small" id="loyaltyPreview">
+                <i class="bi bi-info-circle me-1"></i>
+                <span id="loyaltyPreviewText">Loading preview…</span>
+              </div>
+            </div>
+          </div>
+
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary px-4">
               <i class="bi bi-check-lg me-1"></i>Save Settings
@@ -161,4 +196,33 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateLoyaltyPreview() {
+  const earnPer = parseFloat(document.getElementById('loyaltyEarnInput').value) || 100;
+  const redeemEl = document.querySelector('input[name="loyalty_rupee_per_point"]');
+  const redeemVal = redeemEl ? parseFloat(redeemEl.value) || 1 : 1;
+  const ppr = 1 / earnPer;
+  document.getElementById('loyaltyEarnHidden').value = ppr.toFixed(6);
+  const pts = Math.floor(1000 * ppr);
+  document.getElementById('loyaltyPreviewText').textContent =
+    'Customer earns 1 point for every NPR ' + earnPer + ' spent. ' +
+    'Each point = NPR ' + redeemVal.toFixed(2) + ' discount. ' +
+    'Example: NPR 1,000 purchase = ' + pts + ' points = NPR ' + (pts * redeemVal).toFixed(2) + ' discount.';
+}
+const earnInput = document.getElementById('loyaltyEarnInput');
+if (earnInput) {
+  earnInput.addEventListener('input', updateLoyaltyPreview);
+  const redeemInput = document.querySelector('input[name="loyalty_rupee_per_point"]');
+  if (redeemInput) redeemInput.addEventListener('input', updateLoyaltyPreview);
+  document.querySelector('form').addEventListener('submit', function() {
+    const ep = parseFloat(earnInput.value) || 100;
+    document.getElementById('loyaltyEarnHidden').value = (1/ep).toFixed(6);
+    earnInput.disabled = true;
+  });
+  updateLoyaltyPreview();
+}
+</script>
 {% endblock %}

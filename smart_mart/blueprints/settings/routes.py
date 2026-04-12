@@ -44,6 +44,12 @@ def index():
         s.vat_number = request.form.get("vat_number", "").strip() or None
         s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
         s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
+        # Loyalty rates
+        try:
+            s.loyalty_points_per_rupee = float(request.form.get("loyalty_points_per_rupee", "0.01") or 0.01)
+            s.loyalty_rupee_per_point = float(request.form.get("loyalty_rupee_per_point", "1.00") or 1.00)
+        except (ValueError, TypeError):
+            pass
 
         # Logo upload
         logo_file = request.files.get("logo")

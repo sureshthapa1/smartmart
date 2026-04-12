@@ -28,7 +28,12 @@
             <button class="btn btn-warning w-100" type="submit">Redeem Points</button>
           </div>
         </form>
-        <div class="mt-3 text-muted small">1 point = NPR 1 discount &bull; Earned at 1 pt per NPR 100 spent</div>
+        <div class="mt-3 text-muted small">
+          {% set ppr = s.loyalty_points_per_rupee|float if s else 0.01 %}
+          {% set rpp = s.loyalty_rupee_per_point|float if s else 1.0 %}
+          {% set earn_per = (1/ppr)|round(0)|int if ppr > 0 else 100 %}
+          1 point = NPR {{ rpp }} discount &bull; Earned at 1 pt per NPR {{ earn_per }} spent
+        </div>
       </div>
     </div>
   </div>
@@ -37,16 +42,22 @@
       <div class="card-header fw-semibold">Customer Loyalty Points</div>
       <div class="table-responsive">
         <table class="table table-hover mb-0">
-          <thead><tr><th>Customer</th><th class="text-end">Points Balance</th><th class="text-end">Transactions</th></tr></thead>
+          <thead><tr><th>Customer</th><th>Tier</th><th class="text-end">Balance</th><th class="text-end">Lifetime Earned</th><th class="text-end">Transactions</th></tr></thead>
           <tbody>
           {% for row in loyalty %}
             <tr>
-              <td>{{ row.customer_name }}</td>
-              <td class="text-end fw-semibold {% if row.points > 0 %}text-success{% elif row.points < 0 %}text-danger{% endif %}">{{ row.points }}</td>
-              <td class="text-end">{{ row.entries }}</td>
+              <td class="fw-semibold">{{ row.customer_name }}</td>
+              <td>
+                {% if row.tier == 'Platinum' %}<span class="badge bg-primary">🏆 Platinum</span>
+                {% elif row.tier == 'Gold' %}<span class="badge bg-warning text-dark">🥇 Gold</span>
+                {% else %}<span class="badge bg-secondary">🥈 Silver</span>{% endif %}
+              </td>
+              <td class="text-end fw-bold {% if row.points > 0 %}text-success{% endif %}">{{ row.points }} pts</td>
+              <td class="text-end text-muted small">{{ row.lifetime }} pts</td>
+              <td class="text-end text-muted small">{{ row.entries }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="3" class="text-center text-muted py-4">No loyalty activity yet.</td></tr>
+            <tr><td colspan="5" class="text-center text-muted py-4">No loyalty activity yet.</td></tr>
           {% endfor %}
           </tbody>
         </table>

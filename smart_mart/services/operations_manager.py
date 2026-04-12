@@ -413,44 +413,68 @@ def get_reorder_suggestions(days: int = 30) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def redeem_loyalty_points(customer_name: str, points: int, note: str | None = None) -> int:
-    """Deduct points for a customer. Returns new balance. Raises ValueError if insufficient."""
+    """Deduct points for a customer via the wallet. Returns new balance."""
     customer_name = customer_name.strip()
     if points <= 0:
         raise ValueError("Redemption points must be greater than zero.")
-    current_balance = _get_loyalty_balance(customer_name)
-    if points > current_balance:
-        raise ValueError(f"Insufficient points. Available: {current_balance}.")
-    db.session.add(
-        CustomerLoyaltyTransaction(
-            customer_name=customer_name,
-            sale_id=None,
-            points_change=-points,
-            reason=f"redemption{': ' + note.strip() if note else ''}",
-        )
-    )
-    db.session.commit()
-    return current_balance - points
+    from ..models.customer import Customer
+    from ..models.ai_enhancements import LoyaltyWallet
+    from . import loyalty_wallet_service
+    customer = db.session.execute(
+        db.select(Customer).where(db.func.lower(Customer.name) == customer_name.lower())
+    ).scalar_one_or_none()
+    if not customer:
+        raise ValueError(f"Customer '{customer_name}' not found.")
+    wallet = db.session.execute(
+        db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer.id)
+    ).scalar_one_or_none()
+    if not wallet or wallet.points_balance < points:
+        available = int(wallet.points_balance) if wallet else 0
+        raise ValueError(f"Insufficient points. Available: {available}.")
+    loyalty_wallet_service.redeem_points_manual(wallet.id, points, note or "manual_redeem")
+    return int(wallet.points_balance)
 
 
 def _get_loyalty_balance(customer_name: str) -> int:
-    result = db.session.execute(
-        db.select(func.coalesce(func.sum(CustomerLoyaltyTransaction.points_change), 0))
-        .where(CustomerLoyaltyTransaction.customer_name == customer_name)
-    ).scalar()
-    return max(0, int(result or 0))
+    from ..models.customer import Customer
+    from ..models.ai_enhancements import LoyaltyWallet
+    customer = db.session.execute(
+        db.select(Customer).where(db.func.lower(Customer.name) == customer_name.strip().lower())
+    ).scalar_one_or_none()
+    if not customer:
+        return 0
+    wallet = db.session.execute(
+        db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer.id)
+    ).scalar_one_or_none()
+    return int(wallet.points_balance) if wallet else 0
 
 
 def get_loyalty_summary() -> list[dict]:
+    from ..models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+    from ..models.customer import Customer
     rows = db.session.execute(
         db.select(
-            CustomerLoyaltyTransaction.customer_name,
-            func.coalesce(func.sum(CustomerLoyaltyTransaction.points_change), 0).label("points"),
-            func.count(CustomerLoyaltyTransaction.id).label("entries"),
+            Customer.name.label("customer_name"),
+            LoyaltyWallet.points_balance.label("points"),
+            LoyaltyWallet.lifetime_points_earned.label("lifetime"),
+            LoyaltyWallet.tier.label("tier"),
+            func.count(LoyaltyWalletTransaction.id).label("entries"),
         )
-        .group_by(CustomerLoyaltyTransaction.customer_name)
-        .order_by(func.sum(CustomerLoyaltyTransaction.points_change).desc())
+        .join(LoyaltyWallet, LoyaltyWallet.customer_id == Customer.id)
+        .outerjoin(LoyaltyWalletTransaction, LoyaltyWalletTransaction.wallet_id == LoyaltyWallet.id)
+        .group_by(Customer.id, LoyaltyWallet.id)
+        .order_by(LoyaltyWallet.points_balance.desc())
     ).all()
-    return [{"customer_name": r.customer_name, "points": int(r.points), "entries": r.entries} for r in rows]
+    return [
+        {
+            "customer_name": r.customer_name,
+            "points": int(r.points or 0),
+            "lifetime": int(r.lifetime or 0),
+            "tier": r.tier or "Silver",
+            "entries": r.entries,
+        }
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------------------------
