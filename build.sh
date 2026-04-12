@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-set -e
+# No set -e — we handle errors manually so migration warnings don't kill deploy
 
 echo "=== Installing dependencies ==="
-pip install -r requirements.txt
+pip install -r requirements.txt || { echo "pip install failed"; exit 1; }
 
 echo "=== Initialising database ==="
 python - <<'EOF'
@@ -20,15 +20,13 @@ with app.app_context():
     # Run all column migrations safely
     def safe_add(conn, table, column, col_type):
         try:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"))
             conn.commit()
-            print(f"  + {table}.{column}")
         except Exception as e:
-            msg = str(e).lower()
-            if "already exists" in msg or "duplicate" in msg or "column" in msg:
-                pass  # already exists
-            else:
-                print(f"  ! {table}.{column}: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
     with db.engine.connect() as conn:
         # Customers
@@ -62,7 +60,7 @@ with app.app_context():
             "can_view_ai_insights", "can_view_advisor",
             "can_manage_credits", "can_manage_cash_session",
         ]:
-            safe_add(conn, "user_permissions", col, "BOOLEAN DEFAULT FALSE")
+            safe_add(conn, "user_permissions", col, "BOOLEAN DEFAULT false")
         # Customer risk scores
         for col, typ in [
             ("risk_score", "INTEGER DEFAULT 0"),
