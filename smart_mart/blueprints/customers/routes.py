@@ -153,7 +153,10 @@ def edit_customer(customer_id):
         customer.name = request.form.get("name", "").strip() or customer.name
         customer.phone = request.form.get("phone", "").strip() or None
         customer.address = request.form.get("address", "").strip() or None
-        customer.email = request.form.get("email", "").strip() or None
+        try:
+            customer.email = request.form.get("email", "").strip() or None
+        except Exception:
+            pass
         birthday_raw = request.form.get("birthday", "").strip()
         if birthday_raw:
             try:
@@ -162,9 +165,16 @@ def edit_customer(customer_id):
             except ValueError:
                 pass
         elif request.form.get("clear_birthday") == "1":
-            customer.birthday = None
-        db.session.commit()
-        flash("Customer updated.", "success")
+            try:
+                customer.birthday = None
+            except Exception:
+                pass
+        try:
+            db.session.commit()
+            flash("Customer updated.", "success")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating customer: {e}", "danger")
         return redirect(url_for("customers.customer_profile", customer_id=customer_id))
     return render_template("customers/edit.html", customer=customer)
 
@@ -174,9 +184,34 @@ def edit_customer(customer_id):
 def delete_customer(customer_id):
     _require_perm("can_manage_customers")
     customer = db.get_or_404(Customer, customer_id)
-    db.session.delete(customer)
-    db.session.commit()
-    flash(f"Customer '{customer.name}' deleted.", "success")
+    try:
+        # Delete related records that have FK to customers (PostgreSQL requires this)
+        from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction, CustomerDuplicateFlag
+        # Delete loyalty wallet transactions first, then wallet
+        wallet = db.session.execute(
+            db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer_id)
+        ).scalar_one_or_none()
+        if wallet:
+            db.session.execute(
+                db.delete(LoyaltyWalletTransaction).where(LoyaltyWalletTransaction.wallet_id == wallet.id)
+            )
+            db.session.delete(wallet)
+        # Delete duplicate flags
+        db.session.execute(
+            db.delete(CustomerDuplicateFlag).where(
+                db.or_(
+                    CustomerDuplicateFlag.primary_customer_id == customer_id,
+                    CustomerDuplicateFlag.duplicate_customer_id == customer_id,
+                )
+            )
+        )
+        db.session.flush()
+        db.session.delete(customer)
+        db.session.commit()
+        flash(f"Customer '{customer.name}' deleted.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Could not delete customer: {e}", "danger")
     return redirect(url_for("customers.list_customers"))
 
 
