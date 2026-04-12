@@ -272,9 +272,10 @@
       const tbody = document.getElementById('itemsBody');
       const tr = document.createElement('tr');
       tr.dataset.idx = idx;
+      tr.className = 'sale-item-row';
       tr.innerHTML = `
         <td>
-          <select class="form-select form-select-sm product-select" name="items[${idx}][product_id]" required>
+          <select class="form-select form-select-sm product-select item-product-name" name="items[${idx}][product_id]" required>
             ${buildOptions(productId || null)}
           </select>
         </td>
@@ -566,18 +567,41 @@
   }
 
   function applyOffer(offerText, offerType, btn) {
-    // Parse discount % from offer text
     const match = offerText.match(/(\d+)%/);
     if (match) {
       const pct = parseInt(match[1]);
-      let subtotal = 0;
-      document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
-      const discount = Math.round(subtotal * pct / 100 * 100) / 100;
+      let discount = 0;
+
+      if (offerType === 'product') {
+        // Product-specific offer — only discount that product's line total
+        const productMatch = offerText.match(/off on (.+)$/i);
+        if (productMatch) {
+          const targetName = productMatch[1].trim().toLowerCase();
+          let productSubtotal = 0;
+          document.querySelectorAll('tr.sale-item-row').forEach(row => {
+            const sel = row.querySelector('.product-select');
+            const selectedText = sel ? sel.options[sel.selectedIndex]?.text?.trim().toLowerCase() : '';
+            if (selectedText && selectedText.includes(targetName)) {
+              productSubtotal += parseFloat(row.querySelector('.subtotal-cell')?.textContent) || 0;
+            }
+          });
+          // If product is in cart use its subtotal, else fall back to whole bill
+          let billTotal = 0;
+          document.querySelectorAll('.subtotal-cell').forEach(c => billTotal += parseFloat(c.textContent) || 0);
+          discount = Math.round((productSubtotal > 0 ? productSubtotal : billTotal) * pct / 100 * 100) / 100;
+        }
+      } else {
+        // Loyalty / retention / festival — whole bill
+        let subtotal = 0;
+        document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
+        discount = Math.round(subtotal * pct / 100 * 100) / 100;
+      }
+
       document.getElementById('discountInput').value = discount.toFixed(2);
       document.getElementById('discountNote').value = offerText;
       recalcTotal();
 
-      // Mark this button as applied, disable all others with clear message
+      // Mark applied, disable others
       document.querySelectorAll('.apply-offer-btn').forEach(b => {
         if (b === btn) {
           b.textContent = '✓ Applied';
@@ -591,7 +615,7 @@
         }
       });
 
-      // Show a clear button
+      // Clear button
       let clearBtn = document.getElementById('clearOfferBtn');
       if (!clearBtn) {
         clearBtn = document.createElement('button');

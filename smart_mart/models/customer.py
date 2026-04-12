@@ -32,13 +32,19 @@ class Customer(db.Model):
                     existing.phone = phone
                 if address:
                     existing.address = address
-                existing.visit_count = (existing.visit_count or 0) + 1
+                # Only increment visit_count if this is a new day visit
+                from datetime import date
+                today = date.today()
+                last = existing.last_visit.date() if existing.last_visit else None
+                if last != today:
+                    existing.visit_count = (existing.visit_count or 0) + 1
                 existing.last_visit = datetime.now(timezone.utc)
             else:
                 db.session.add(cls(
                     name=name.strip(),
                     phone=phone or None,
                     address=address or None,
+                    visit_count=1,
                 ))
         except Exception:
             db.session.rollback()
