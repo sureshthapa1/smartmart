@@ -145,6 +145,34 @@
             </div>
             <!-- Credit Risk Warning (shown when Credit payment mode + named customer) -->
             <div id="creditRiskWarning" class="col-12" style="display:none;"></div>
+
+            <!-- Loyalty Points Redemption (shown when named customer has points) -->
+            <div id="loyaltyBox" class="col-12" style="display:none;">
+              <div class="border rounded-3 p-3" style="background:linear-gradient(135deg,#fefce8,#fef9c3);border-color:#fbbf24!important;">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-star-fill text-warning"></i>
+                    <span class="fw-semibold small">Loyalty Points</span>
+                    <span class="badge bg-warning text-dark" id="loyaltyBalance">0 pts</span>
+                    <span class="text-muted" style="font-size:.72rem;" id="loyaltyValue"></span>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="wallet_redeem_points" id="walletRedeemPoints" value="0">
+                    <input type="number" id="redeemInput" class="form-control form-control-sm"
+                           style="width:100px;" min="0" step="1" placeholder="Points to use"
+                           title="Enter points to redeem">
+                    <button type="button" class="btn btn-warning btn-sm fw-semibold" id="applyLoyaltyBtn">
+                      Apply
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="clearLoyaltyBtn" style="display:none;">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div id="loyaltyAppliedMsg" class="text-success small mt-1 fw-semibold" style="display:none;"></div>
+              </div>
+            </div>
+
             <div class="col-md-4">
               <label class="form-label fw-medium small">Discount (NPR)</label>
               <input type="number" name="discount_amount" class="form-control form-control-sm"
@@ -713,6 +741,106 @@
   document.getElementById('customerName').addEventListener('change', () => {
     clearTimeout(riskCheckTimer);
     riskCheckTimer = setTimeout(checkCreditRisk, 500);
+  });
+
+  // ── Loyalty Points Redemption ─────────────────────────────────────────
+  const loyaltyBox = document.getElementById('loyaltyBox');
+  const loyaltyBalance = document.getElementById('loyaltyBalance');
+  const loyaltyValue = document.getElementById('loyaltyValue');
+  const redeemInput = document.getElementById('redeemInput');
+  const walletRedeemPoints = document.getElementById('walletRedeemPoints');
+  const applyLoyaltyBtn = document.getElementById('applyLoyaltyBtn');
+  const clearLoyaltyBtn = document.getElementById('clearLoyaltyBtn');
+  const loyaltyAppliedMsg = document.getElementById('loyaltyAppliedMsg');
+  let walletData = null;
+
+  function loadWallet(name, phone) {
+    if (!name || name.toLowerCase() === 'walk-in customer') {
+      loyaltyBox.style.display = 'none';
+      walletData = null;
+      return;
+    }
+    const params = new URLSearchParams({ customer_name: name });
+    if (phone) params.append('customer_phone', phone);
+    fetch('/api/loyalty/wallet?' + params)
+      .then(r => r.json())
+      .then(data => {
+        walletData = data;
+        if (!data.available || data.points_balance <= 0) {
+          loyaltyBox.style.display = 'none';
+          return;
+        }
+        loyaltyBox.style.display = '';
+        loyaltyBalance.textContent = data.points_balance + ' pts';
+        // Show NPR value
+        fetch('/api/loyalty/redeem-preview', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ customer_name: name, points: data.points_balance, gross_total: 0 })
+        }).then(r => r.json()).then(preview => {
+          const rpp = preview.rupee_per_point || 1;
+          loyaltyValue.textContent = '= NPR ' + (data.points_balance * rpp).toFixed(2) + ' max discount';
+          redeemInput.max = data.points_balance;
+        }).catch(() => {
+          loyaltyValue.textContent = '';
+        });
+      })
+      .catch(() => { loyaltyBox.style.display = 'none'; });
+  }
+
+  applyLoyaltyBtn.addEventListener('click', function() {
+    const pts = parseInt(redeemInput.value) || 0;
+    if (pts <= 0) { alert('Enter points to redeem.'); return; }
+    if (!walletData || pts > walletData.points_balance) {
+      alert('Not enough points. Available: ' + (walletData ? walletData.points_balance : 0));
+      return;
+    }
+    const name = document.getElementById('customerName').value.trim();
+    let subtotal = 0;
+    document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
+
+    fetch('/api/loyalty/redeem-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ customer_name: name, points: pts, gross_total: subtotal })
+    })
+    .then(r => r.json())
+    .then(preview => {
+      const discount = preview.discount || 0;
+      const actualPts = preview.redeemed_points || pts;
+      walletRedeemPoints.value = actualPts;
+      document.getElementById('discountInput').value = discount.toFixed(2);
+      document.getElementById('discountNote').value = actualPts + ' loyalty points redeemed';
+      recalcTotal();
+      loyaltyAppliedMsg.textContent = '✓ ' + actualPts + ' points applied — NPR ' + discount.toFixed(2) + ' discount';
+      loyaltyAppliedMsg.style.display = '';
+      applyLoyaltyBtn.style.display = 'none';
+      clearLoyaltyBtn.style.display = '';
+      redeemInput.disabled = true;
+    })
+    .catch(() => alert('Error applying points. Try again.'));
+  });
+
+  clearLoyaltyBtn.addEventListener('click', function() {
+    walletRedeemPoints.value = 0;
+    document.getElementById('discountInput').value = '0';
+    document.getElementById('discountNote').value = '';
+    recalcTotal();
+    loyaltyAppliedMsg.style.display = 'none';
+    applyLoyaltyBtn.style.display = '';
+    clearLoyaltyBtn.style.display = 'none';
+    redeemInput.disabled = false;
+    redeemInput.value = '';
+  });
+
+  // Load wallet when customer name changes
+  let walletTimer = null;
+  document.getElementById('customerName').addEventListener('input', function() {
+    clearTimeout(walletTimer);
+    walletTimer = setTimeout(() => {
+      const phone = document.getElementById('customerPhone')?.value?.trim() || '';
+      loadWallet(this.value.trim(), phone);
+    }, 600);
   });
   </script>
 </body>

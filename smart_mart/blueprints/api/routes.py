@@ -344,15 +344,23 @@ def loyalty_wallet():
 @login_required
 def loyalty_redeem_preview():
     from ...services import loyalty_wallet_service
+    from ...services.db_compat import _is_postgres
     data = request.get_json() or {}
     customer_name = (data.get("customer_name") or "").strip()
     customer_phone = (data.get("customer_phone") or "").strip() or None
-    requested_points = int(data.get("requested_points", 0) or 0)
+    # Accept both 'points' and 'requested_points'
+    requested_points = int(data.get("points", 0) or data.get("requested_points", 0) or 0)
     gross_total = float(data.get("gross_total", 0) or 0)
     wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
     preview = loyalty_wallet_service.preview_redeem(wallet, requested_points, gross_total)
     db.session.commit()
+    # Get rupee_per_point from settings
+    _, rpp = loyalty_wallet_service._get_loyalty_rates()
     return jsonify({
+        "redeemed_points": preview["redeemed_points"],
+        "discount": preview["discount"],
+        "payable_total": preview["payable_total"],
+        "rupee_per_point": float(rpp),
         "wallet": loyalty_wallet_service.wallet_snapshot(wallet),
         "preview": preview,
     })

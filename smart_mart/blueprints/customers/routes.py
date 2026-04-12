@@ -112,12 +112,30 @@ def customer_profile(customer_id):
         pm = s.payment_mode or "cash"
         pm_counts[pm] = pm_counts.get(pm, 0) + 1
 
+    # Loyalty wallet
+    wallet = None
+    wallet_transactions = []
+    try:
+        from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+        wallet = db.session.execute(
+            db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer.id)
+        ).scalar_one_or_none()
+        if wallet:
+            wallet_transactions = db.session.execute(
+                db.select(LoyaltyWalletTransaction)
+                .where(LoyaltyWalletTransaction.wallet_id == wallet.id)
+                .order_by(LoyaltyWalletTransaction.id.desc())
+                .limit(20)
+            ).scalars().all()
+    except Exception:
+        pass
+
     return render_template("customers/profile.html",
                            customer=customer, sales=sales,
                            total_spent=total_spent, total_discount=total_discount,
                            credit_outstanding=credit_outstanding, avg_order=avg_order,
-                           pm_counts=pm_counts)
-
+                           pm_counts=pm_counts,
+                           wallet=wallet, wallet_transactions=wallet_transactions)
 
 @customers_bp.route("/<int:customer_id>/edit", methods=["GET", "POST"])
 @login_required
