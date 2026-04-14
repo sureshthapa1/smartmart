@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if item else 'Add' }} Recurring Expense{% endblock %}
+{% block page_title %}{{ 'Edit' if item else 'Add' }} Recurring Expense{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('expenses.list_expenses') }}" class="text-decoration-none">Expenses</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('expenses.list_recurring') }}" class="text-decoration-none">Recurring</a></li>
+<li class="breadcrumb-item active">{{ 'Edit' if item else 'Add' }}</li>
+{% endblock %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-arrow-repeat me-2 text-primary"></i>{{ 'Edit' if item else 'New' }} Recurring Expense
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label fw-medium">Expense Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required
+                   value="{{ item.name if item else '' }}"
+                   placeholder="e.g. Shop Rent, Electricity Bill, Tax Clearance">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Category</label>
+              <select name="expense_type" class="form-select">
+                {% for t in expense_types %}
+                <option value="{{ t }}" {% if item and item.expense_type == t %}selected{% endif %}>
+                  {{ t | capitalize }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Amount (NPR) <span class="text-danger">*</span></label>
+              <input type="number" name="amount" class="form-control" required min="0.01" step="0.01"
+                     value="{{ item.amount|float if item else '' }}" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Frequency</label>
+              <select name="frequency" class="form-select" id="frequencySelect">
+                {% for val, label in frequencies %}
+                <option value="{{ val }}" {% if item and item.frequency == val %}selected{% elif not item and val == 'monthly' %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6" id="customDaysDiv" style="display:none;">
+              <label class="form-label fw-medium">Every N Days</label>
+              <input type="number" name="frequency_days" class="form-control" min="1"
+                     value="{{ item.frequency_days if item and item.frequency_days else '' }}"
+                     placeholder="e.g. 45">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Next Due Date <span class="text-danger">*</span></label>
+              <input type="date" name="next_due_date" class="form-control" required
+                     value="{{ today }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Remind Me (days before)</label>
+              <input type="number" name="reminder_days" class="form-control" min="1" max="30"
+                     value="{{ item.reminder_days if item else 7 }}">
+              <div class="form-text">Show reminder this many days before due date.</div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-medium">Notes (optional)</label>
+            <textarea name="notes" class="form-control" rows="2"
+                      placeholder="e.g. Pay to landlord by 1st of every month">{{ item.notes if item else '' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg me-1"></i>{{ 'Update' if item else 'Save' }}
+            </button>
+            <a href="{{ url_for('expenses.list_recurring') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Quick templates -->
+    <div class="card mt-3">
+      <div class="card-header fw-semibold small text-muted">
+        <i class="bi bi-lightning me-1"></i>Quick Templates
+      </div>
+      <div class="card-body py-2">
+        <div class="d-flex flex-wrap gap-2">
+          {% for tmpl in [
+            ('Shop Rent', 'rent', 'monthly'),
+            ('Electricity Bill', 'utilities', 'monthly'),
+            ('Internet Bill', 'utilities', 'monthly'),
+            ('Staff Salary', 'salary', 'monthly'),
+            ('Tax Clearance', 'tax', 'yearly'),
+            ('Water Bill', 'utilities', 'monthly'),
+            ('Insurance', 'other', 'yearly'),
+          ] %}
+          <button type="button" class="btn btn-sm btn-outline-secondary quick-tmpl"
+                  data-name="{{ tmpl[0] }}" data-type="{{ tmpl[1] }}" data-freq="{{ tmpl[2] }}">
+            {{ tmpl[0] }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const freqSel = document.getElementById('frequencySelect');
+const customDiv = document.getElementById('customDaysDiv');
+function toggleCustom() {
+  customDiv.style.display = freqSel.value === 'custom' ? '' : 'none';
+}
+freqSel.addEventListener('change', toggleCustom);
+toggleCustom();
+
+// Quick templates
+document.querySelectorAll('.quick-tmpl').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelector('[name=name]').value = btn.dataset.name;
+    document.querySelector('[name=expense_type]').value = btn.dataset.type;
+    document.querySelector('[name=frequency]').value = btn.dataset.freq;
+    toggleCustom();
+  });
+});
+</script>
+{% endblock %}

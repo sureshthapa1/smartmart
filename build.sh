@@ -74,6 +74,10 @@ with app.app_context():
 
     print("Migration complete.")
 
+    # Create recurring_expenses table if not exists (db.create_all handles it)
+    db.create_all()
+    print("All tables ensured.")
+
     from smart_mart.models.user import User
     from smart_mart.services.authenticator import hash_password
 

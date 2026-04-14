@@ -374,9 +374,15 @@
           <ul class="nav flex-column submenu">
             {% if current_user.role == 'admin' or (current_user.permissions and (current_user.permissions.can_view_expenses or current_user.permissions.can_manage_expenses)) %}
             <li class="nav-item">
-              <a class="nav-link {% if request.blueprint == 'expenses' %}active{% endif %}"
+              <a class="nav-link {% if request.blueprint == 'expenses' and request.endpoint != 'expenses.list_recurring' %}active{% endif %}"
                  href="{{ url_for('expenses.list_expenses') }}">
                 <i class="bi bi-receipt"></i>Expenses
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'expenses.list_recurring' %}active{% endif %}"
+                 href="{{ url_for('expenses.list_recurring') }}">
+                <i class="bi bi-arrow-repeat"></i>Recurring Bills
               </a>
             </li>
             {% endif %}

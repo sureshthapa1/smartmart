@@ -46,6 +46,7 @@ from .supplier_return import SupplierReturn, SupplierReturnItem
 from .stock_take import StockTake, StockTakeItem
 from .backup_log import BackupLog
 from .customer_risk_score import CustomerRiskScore
+from .recurring_expense import RecurringExpense
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
@@ -72,4 +73,5 @@ __all__ = [
     "StockTake", "StockTakeItem",
     "BackupLog",
     "CustomerRiskScore",
+    "RecurringExpense",
 ]

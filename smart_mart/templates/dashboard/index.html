@@ -438,5 +438,39 @@ fetch('/customers/birthdays-today')
       <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
     </div>`;
   }).catch(() => {});
+
+// Recurring expense reminders
+fetch('/expenses/recurring/due-reminders')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) return;
+    const box = document.getElementById('birthdayAlerts');
+    const overdue = data.filter(d => d.overdue);
+    const dueSoon = data.filter(d => !d.overdue);
+    let html = '';
+    if (overdue.length) {
+      const names = overdue.map(d => `<strong>${d.name}</strong> (NPR ${d.amount.toLocaleString()})`).join(', ');
+      html += `<div class="alert alert-danger alert-dismissible fade show d-flex gap-2 mb-2">
+        <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+        <div class="small"><strong>Overdue Bills:</strong> ${names}
+        <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-danger py-0 px-2">Pay Now</a></div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+      </div>`;
+    }
+    if (dueSoon.length) {
+      const names = dueSoon.map(d => `<strong>${d.name}</strong> in ${d.days_until} day${d.days_until!==1?'s':''}`).join(' &bull; ');
+      html += `<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-2">
+        <i class="bi bi-bell-fill flex-shrink-0 mt-1"></i>
+        <div class="small"><strong>Upcoming Bills:</strong> ${names}
+        <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-warning py-0 px-2 text-dark">View</a></div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+      </div>`;
+    }
+    if (html) {
+      const reminderBox = document.createElement('div');
+      reminderBox.innerHTML = html;
+      document.getElementById('birthdayAlerts').prepend(reminderBox);
+    }
+  }).catch(() => {});
 </script>
 {% endblock %}

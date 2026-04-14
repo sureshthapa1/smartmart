@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Recurring Expenses — Smart Mart{% endblock %}
+{% block page_title %}Recurring Expenses{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('expenses.list_expenses') }}" class="text-decoration-none">Expenses</a></li>
+<li class="breadcrumb-item active">Recurring</li>
+{% endblock %}
+{% block content %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Recurring Expenses</div>
+    <div class="page-header-sub">Manage regular bills — rent, electricity, tax, salary and more</div>
+  </div>
+  <a href="{{ url_for('expenses.create_recurring') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add Recurring Expense
+  </a>
+</div>
+
+<!-- Summary Cards -->
+{% set overdue = items | selectattr('days_until', 'lt', 0) | list %}
+{% set due_soon = items | selectattr('days_until', 'ge', 0) | selectattr('days_until', 'le', 7) | list %}
+{% set upcoming = items | selectattr('days_until', 'gt', 7) | list %}
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card h-100" style="border-left:4px solid #ef4444!important;">
+      <div class="card-body p-3 text-center">
+        <div class="fs-2 fw-bold text-danger">{{ overdue|length }}</div>
+        <div class="text-muted small">Overdue</div>
+        {% if overdue %}
+        <div class="text-danger small mt-1">NPR {{ "%.0f"|format(overdue | map(attribute='amount') | map('float') | sum) }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100" style="border-left:4px solid #f59e0b!important;">
+      <div class="card-body p-3 text-center">
+        <div class="fs-2 fw-bold text-warning">{{ due_soon|length }}</div>
+        <div class="text-muted small">Due This Week</div>
+        {% if due_soon %}
+        <div class="text-warning small mt-1">NPR {{ "%.0f"|format(due_soon | map(attribute='amount') | map('float') | sum) }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card h-100" style="border-left:4px solid #22c55e!important;">
+      <div class="card-body p-3 text-center">
+        <div class="fs-2 fw-bold text-success">{{ upcoming|length }}</div>
+        <div class="text-muted small">Upcoming</div>
+        {% if upcoming %}
+        <div class="text-success small mt-1">NPR {{ "%.0f"|format(upcoming | map(attribute='amount') | map('float') | sum) }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Expense</th>
+          <th>Type</th>
+          <th>Frequency</th>
+          <th class="text-end">Amount</th>
+          <th>Next Due</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="{% if item.days_until < 0 %}table-danger{% elif item.days_until <= 3 %}table-warning{% endif %}">
+          <td>
+            <div class="fw-semibold">{{ item.name }}</div>
+            {% if item.notes %}<div class="text-muted small">{{ item.notes }}</div>{% endif %}
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border">{{ item.expense_type | capitalize }}</span>
+          </td>
+          <td class="text-muted small">{{ item.frequency_label }}</td>
+          <td class="text-end fw-bold">NPR {{ "%.2f"|format(item.amount|float) }}</td>
+          <td>
+            <div class="fw-semibold">{{ item.next_due_date.strftime('%d %b %Y') }}</div>
+            <div class="small {% if item.days_until < 0 %}text-danger{% elif item.days_until <= 7 %}text-warning{% else %}text-muted{% endif %}">
+              {% if item.days_until < 0 %}
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ item.days_until|abs }} day{{ 's' if item.days_until|abs != 1 }} overdue
+              {% elif item.days_until == 0 %}
+                <i class="bi bi-alarm-fill me-1"></i>Due today!
+              {% elif item.days_until <= 7 %}
+                <i class="bi bi-clock me-1"></i>In {{ item.days_until }} day{{ 's' if item.days_until != 1 }}
+              {% else %}
+                In {{ item.days_until }} days
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if item.days_until < 0 %}
+              <span class="badge bg-danger">Overdue</span>
+            {% elif item.days_until == 0 %}
+              <span class="badge bg-warning text-dark">Due Today</span>
+            {% elif item.days_until <= 7 %}
+              <span class="badge bg-warning text-dark">Due Soon</span>
+            {% else %}
+              <span class="badge bg-success">Upcoming</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <form method="post" action="{{ url_for('expenses.pay_recurring', item_id=item.id) }}"
+                    onsubmit="return confirm('Mark {{ item.name }} as paid for NPR {{ item.amount }}?')">
+                <button type="submit" class="btn btn-sm btn-success" title="Mark as Paid">
+                  <i class="bi bi-check-circle me-1"></i>Pay
+                </button>
+              </form>
+              <a href="{{ url_for('expenses.edit_recurring', item_id=item.id) }}"
+                 class="btn btn-sm btn-outline-secondary" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{{ url_for('expenses.delete_recurring', item_id=item.id) }}"
+                    onsubmit="return confirm('Deactivate {{ item.name }}?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">
+            <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-25"></i>
+            No recurring expenses set up yet.
+            <a href="{{ url_for('expenses.create_recurring') }}">Add your first one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if items %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td colspan="3" class="text-end text-muted small">{{ items|length }} recurring expense{{ 's' if items|length != 1 }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(items | map(attribute='amount') | map('float') | sum) }}/cycle</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endblock %}
