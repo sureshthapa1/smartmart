@@ -3,6 +3,7 @@
 {% block page_title %}Customer Statement{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">Sales</a></li><li class="breadcrumb-item active">Customer Statement</li>{% endblock %}
 {% block content %}
+
 <div class="row g-3 mb-4">
   <div class="col-lg-4">
     <div class="card">
@@ -15,6 +16,10 @@
           </div>
           <div class="col-12"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-1"></i>Load Statement</button></div>
         </form>
+        <div class="text-muted small mt-2">
+          <i class="bi bi-info-circle me-1"></i>
+          This generates a printable statement you can give to the customer — showing all their purchases, discounts, credit balance and loyalty points.
+        </div>
       </div>
     </div>
   </div>
@@ -24,7 +29,7 @@
       <div class="col-6 col-md-3">
         <div class="card text-center p-3">
           <div style="font-size:1.6rem;font-weight:800;color:#6366f1">{{ statement.total_transactions }}</div>
-          <div class="text-muted small">Visits</div>
+          <div class="text-muted small">Total Purchases</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
@@ -36,7 +41,7 @@
       <div class="col-6 col-md-3">
         <div class="card text-center p-3">
           <div style="font-size:1.4rem;font-weight:800;color:{% if statement.outstanding_credit > 0 %}#ef4444{% else %}#22c55e{% endif %}">NPR {{ "%.0f"|format(statement.outstanding_credit) }}</div>
-          <div class="text-muted small">Outstanding Credit</div>
+          <div class="text-muted small">Credit Due</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
@@ -51,12 +56,31 @@
 </div>
 
 {% if statement %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
   <div style="font-size:1rem;font-weight:700">{{ statement.customer_name }}</div>
-  <button onclick="window.print()" class="btn btn-sm btn-outline-secondary"><i class="bi bi-printer me-1"></i>Print</button>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('customers.customer_profile', customer_id=customers|selectattr('name','equalto',statement.customer_name)|map(attribute='id')|first|default(0)) }}"
+       class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-person me-1"></i>Full Profile
+    </a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary">
+      <i class="bi bi-printer me-1"></i>Print Statement
+    </button>
+  </div>
 </div>
+
+<!-- Print header (only visible on print) -->
+<div class="print-only mb-3" style="display:none;">
+  <div style="font-size:1.2rem;font-weight:800">Customer Account Statement</div>
+  <div style="font-size:.9rem;color:#64748b">{{ statement.customer_name }} &bull; Generated {{ today.strftime('%d %B %Y') }}</div>
+  <hr>
+</div>
+
 <div class="card">
-  <div class="card-header fw-semibold">Purchase History</div>
+  <div class="card-header fw-semibold d-flex justify-content-between">
+    <span>Purchase History — {{ statement.customer_name }}</span>
+    <span class="text-muted small">{{ statement.total_transactions }} transaction{{ 's' if statement.total_transactions != 1 }}</span>
+  </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th class="text-end">Amount</th><th class="text-end">Discount</th><th>Status</th></tr></thead>
@@ -72,7 +96,7 @@
             </span>
           </td>
           <td class="text-end fw-semibold">NPR {{ "%.2f"|format(s.total_amount|float) }}</td>
-          <td class="text-end text-muted">{% if s.discount_amount and s.discount_amount|float > 0 %}NPR {{ "%.2f"|format(s.discount_amount|float) }}{% else %}—{% endif %}</td>
+          <td class="text-end text-muted">{% if s.discount_amount and s.discount_amount|float > 0 %}<span class="text-success">-NPR {{ "%.2f"|format(s.discount_amount|float) }}</span>{% else %}—{% endif %}</td>
           <td>
             {% if s.payment_mode == 'credit' %}
               {% if s.credit_collected %}<span class="badge bg-success">Collected</span>
@@ -86,12 +110,22 @@
         {% endfor %}
       </tbody>
       {% if statement.sales %}
-      <tfoot style="border-top:2px solid #e2e8f0">
+      <tfoot class="table-light fw-bold">
         <tr>
-          <td colspan="3" class="fw-bold text-end">Total</td>
-          <td class="text-end fw-bold">NPR {{ "%.2f"|format(statement.total_spent) }}</td>
-          <td class="text-end fw-bold text-muted">NPR {{ "%.2f"|format(statement.total_discounts) }}</td>
+          <td colspan="3" class="text-end">Total</td>
+          <td class="text-end text-success">NPR {{ "%.2f"|format(statement.total_spent) }}</td>
+          <td class="text-end text-success">-NPR {{ "%.2f"|format(statement.total_discounts) }}</td>
           <td></td>
+        </tr>
+        {% if statement.outstanding_credit > 0 %}
+        <tr>
+          <td colspan="5" class="text-end text-danger">Outstanding Credit Balance</td>
+          <td class="text-end text-danger fw-bold">NPR {{ "%.2f"|format(statement.outstanding_credit) }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td colspan="5" class="text-end text-warning">Loyalty Points Balance</td>
+          <td class="text-end text-warning fw-bold">{{ statement.loyalty_points }} pts</td>
         </tr>
       </tfoot>
       {% endif %}
@@ -101,6 +135,13 @@
 {% elif customer_name %}
 <div class="card"><div class="card-body text-center text-muted py-5">No records found for "{{ customer_name }}".</div></div>
 {% else %}
-<div class="card"><div class="card-body text-center text-muted py-5"><i class="bi bi-person-lines-fill fs-1 d-block mb-2 text-muted"></i>Select a customer to view their statement.</div></div>
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-person-lines-fill fs-1 d-block mb-2 text-muted"></i>
+    <div class="fw-semibold mb-1">Customer Account Statement</div>
+    <div class="small">Select a customer to generate their full purchase statement — printable and shareable.</div>
+  </div>
+</div>
 {% endif %}
+
 {% endblock %}
