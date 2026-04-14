@@ -1,53 +1,101 @@
 {% extends "base.html" %}
-{% block title %}Customer Statement — Smart Mart{% endblock %}
+{% block title %}Customer Statement{% if statement %} — {{ statement.customer_name }}{% endif %}{% endblock %}
 {% block page_title %}Customer Statement{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">Sales</a></li><li class="breadcrumb-item active">Customer Statement</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">Sales</a></li>
+<li class="breadcrumb-item active">Customer Statement</li>
+{% endblock %}
+
+{% block head %}
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+    body { font-size: 12px; }
+    .print-header { display: block !important; }
+  }
+  .print-header { display: none; }
+  #customerSearch { position: relative; }
+  #suggestionsList {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;
+    background: #fff; border: 1px solid #e2e8f0; border-top: none;
+    border-radius: 0 0 8px 8px; max-height: 220px; overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  }
+  .suggestion-item {
+    padding: .5rem .85rem; cursor: pointer; font-size: .875rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .suggestion-item:hover, .suggestion-item.active { background: #f1f5f9; }
+  .suggestion-item:last-child { border-bottom: none; }
+  .tier-badge-silver { background: #f1f5f9; color: #475569; }
+  .tier-badge-gold { background: #fef9c3; color: #854d0e; }
+  .tier-badge-platinum { background: #ede9fe; color: #5b21b6; }
+</style>
+{% endblock %}
+
 {% block content %}
 
-<div class="row g-3 mb-4">
-  <div class="col-lg-4">
+<!-- Search Card -->
+<div class="row g-3 mb-4 no-print">
+  <div class="col-lg-5">
     <div class="card">
-      <div class="card-header fw-semibold"><i class="bi bi-person-lines-fill me-2 text-primary"></i>Select Customer</div>
+      <div class="card-header fw-semibold">
+        <i class="bi bi-person-lines-fill me-2 text-primary"></i>Customer Account Statement
+      </div>
       <div class="card-body">
-        <form method="get" class="row g-2">
-          <div class="col-12">
-            <input type="text" name="name" class="form-control" placeholder="Customer name..." value="{{ customer_name }}" list="custList" autocomplete="off">
-            <datalist id="custList">{% for c in customers %}<option value="{{ c.name }}">{% endfor %}</datalist>
+        <form method="get" id="stmtForm">
+          <div id="customerSearch" class="mb-3">
+            <label class="form-label fw-medium small">Search Customer</label>
+            <input type="text" name="name" id="nameInput" class="form-control"
+                   placeholder="Type customer name…" value="{{ customer_name }}"
+                   autocomplete="off">
+            <div id="suggestionsList" style="display:none;"></div>
           </div>
-          <div class="col-12"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-1"></i>Load Statement</button></div>
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-file-text me-1"></i>Generate Statement
+          </button>
         </form>
         <div class="text-muted small mt-2">
-          <i class="bi bi-info-circle me-1"></i>
-          This generates a printable statement you can give to the customer — showing all their purchases, discounts, credit balance and loyalty points.
+          <i class="bi bi-printer me-1"></i>Printable statement with full purchase history, credit balance and loyalty points.
         </div>
       </div>
     </div>
   </div>
+
   {% if statement %}
-  <div class="col-lg-8">
-    <div class="row g-3">
+  <!-- Quick Stats -->
+  <div class="col-lg-7">
+    <div class="row g-2 h-100">
       <div class="col-6 col-md-3">
-        <div class="card text-center p-3">
-          <div style="font-size:1.6rem;font-weight:800;color:#6366f1">{{ statement.total_transactions }}</div>
-          <div class="text-muted small">Total Purchases</div>
+        <div class="card text-center p-3 h-100">
+          <div style="font-size:1.5rem;font-weight:800;color:#6366f1">{{ statement.total_transactions }}</div>
+          <div class="text-muted small">Purchases</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card text-center p-3">
-          <div style="font-size:1.4rem;font-weight:800;color:#22c55e">NPR {{ "%.0f"|format(statement.total_spent) }}</div>
+        <div class="card text-center p-3 h-100">
+          <div style="font-size:1.2rem;font-weight:800;color:#22c55e">NPR {{ "%.0f"|format(statement.total_spent) }}</div>
           <div class="text-muted small">Total Spent</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card text-center p-3">
-          <div style="font-size:1.4rem;font-weight:800;color:{% if statement.outstanding_credit > 0 %}#ef4444{% else %}#22c55e{% endif %}">NPR {{ "%.0f"|format(statement.outstanding_credit) }}</div>
+        <div class="card text-center p-3 h-100">
+          <div style="font-size:1.2rem;font-weight:800;color:{% if statement.outstanding_credit > 0 %}#ef4444{% else %}#22c55e{% endif %}">
+            NPR {{ "%.0f"|format(statement.outstanding_credit) }}
+          </div>
           <div class="text-muted small">Credit Due</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card text-center p-3">
-          <div style="font-size:1.6rem;font-weight:800;color:#f59e0b">{{ statement.loyalty_points }}</div>
-          <div class="text-muted small">Loyalty Points</div>
+        <div class="card text-center p-3 h-100">
+          <div style="font-size:1.5rem;font-weight:800;color:#f59e0b">{{ statement.loyalty_points }}</div>
+          <div class="text-muted small">
+            Loyalty Pts
+            <span class="badge tier-badge-{{ statement.loyalty_tier | lower }} ms-1" style="font-size:.6rem;">
+              {{ statement.loyalty_tier }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -56,39 +104,168 @@
 </div>
 
 {% if statement %}
+
+<!-- Print Header (only on print) -->
+<div class="print-header mb-3">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      {% if shop and (shop.logo_data or shop.logo_filename) %}
+      <img src="{{ shop.logo_data if shop.logo_data else url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
+           alt="Logo" style="max-height:50px;max-width:150px;object-fit:contain;margin-bottom:8px;">
+      {% endif %}
+      <div style="font-size:1.1rem;font-weight:800;">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+      {% if shop and shop.address %}<div style="font-size:.8rem;color:#64748b;">{{ shop.address }}</div>{% endif %}
+      {% if shop and shop.phone %}<div style="font-size:.8rem;color:#64748b;">Tel: {{ shop.phone }}</div>{% endif %}
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:1rem;font-weight:700;color:#6366f1;">CUSTOMER STATEMENT</div>
+      <div style="font-size:.8rem;color:#64748b;">Generated: {{ today.strftime('%d %B %Y') }}</div>
+    </div>
+  </div>
+  <hr style="border-color:#e2e8f0;margin:12px 0;">
+</div>
+
+<!-- Action Bar -->
 <div class="d-flex justify-content-between align-items-center mb-3 no-print">
-  <div style="font-size:1rem;font-weight:700">{{ statement.customer_name }}</div>
+  <div class="d-flex align-items-center gap-2">
+    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1rem;">
+      {{ statement.customer_name[0].upper() }}
+    </div>
+    <div>
+      <div class="fw-bold">{{ statement.customer_name }}</div>
+      {% if statement.customer %}
+      <div class="text-muted small">
+        {% if statement.customer.phone %}{{ statement.customer.phone }}{% endif %}
+        {% if statement.customer.address %} · {{ statement.customer.address }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
   <div class="d-flex gap-2">
-    <a href="{{ url_for('customers.customer_profile', customer_id=customers|selectattr('name','equalto',statement.customer_name)|map(attribute='id')|first|default(0)) }}"
+    {% if statement.customer %}
+    <a href="{{ url_for('customers.customer_profile', customer_id=statement.customer.id) }}"
        class="btn btn-sm btn-outline-primary">
       <i class="bi bi-person me-1"></i>Full Profile
     </a>
+    {% endif %}
     <button onclick="window.print()" class="btn btn-sm btn-primary">
-      <i class="bi bi-printer me-1"></i>Print Statement
+      <i class="bi bi-printer me-1"></i>Print
     </button>
   </div>
 </div>
 
-<!-- Print header (only visible on print) -->
-<div class="print-only mb-3" style="display:none;">
-  <div style="font-size:1.2rem;font-weight:800">Customer Account Statement</div>
-  <div style="font-size:.9rem;color:#64748b">{{ statement.customer_name }} &bull; Generated {{ today.strftime('%d %B %Y') }}</div>
-  <hr>
+<div class="row g-3 mb-3">
+  <!-- Summary -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-bar-chart me-2 text-primary"></i>Account Summary</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><td class="text-muted">Total Purchases</td><td class="text-end fw-semibold">{{ statement.total_transactions }}</td></tr>
+            <tr><td class="text-muted">Total Spent</td><td class="text-end fw-bold text-success">NPR {{ "%.2f"|format(statement.total_spent) }}</td></tr>
+            <tr><td class="text-muted">Total Discounts</td><td class="text-end text-success">-NPR {{ "%.2f"|format(statement.total_discounts) }}</td></tr>
+            <tr><td class="text-muted">Avg Order Value</td><td class="text-end">NPR {{ "%.0f"|format(statement.avg_order) }}</td></tr>
+            <tr><td class="text-muted">Credit Collected</td><td class="text-end text-success">NPR {{ "%.2f"|format(statement.collected_credit) }}</td></tr>
+            <tr class="{% if statement.outstanding_credit > 0 %}table-danger{% endif %}">
+              <td class="fw-semibold">Credit Outstanding</td>
+              <td class="text-end fw-bold {% if statement.outstanding_credit > 0 %}text-danger{% else %}text-success{% endif %}">
+                NPR {{ "%.2f"|format(statement.outstanding_credit) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loyalty + Payment -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-star-fill text-warning me-2"></i>Loyalty Points</div>
+      <div class="card-body text-center py-3">
+        <div style="font-size:2.5rem;font-weight:800;color:#f59e0b;">{{ statement.loyalty_points }}</div>
+        <div class="text-muted small mb-2">Current Balance</div>
+        <span class="badge px-3 py-2 tier-badge-{{ statement.loyalty_tier | lower }}" style="font-size:.8rem;">
+          {% if statement.loyalty_tier == 'Platinum' %}🏆{% elif statement.loyalty_tier == 'Gold' %}🥇{% else %}🥈{% endif %}
+          {{ statement.loyalty_tier }} Member
+        </span>
+        <div class="text-muted small mt-2">{{ statement.loyalty_lifetime }} pts earned lifetime</div>
+        {% set rpp = shop.loyalty_rupee_per_point|float if shop and shop.loyalty_rupee_per_point else 1.0 %}
+        <div class="mt-2 p-2 rounded-2" style="background:#fef9c3;font-size:.75rem;color:#854d0e;">
+          Worth NPR {{ "%.0f"|format(statement.loyalty_points * rpp) }} in discounts
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Products -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-trophy me-2 text-warning"></i>Favourite Products</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for p in statement.top_products %}
+            <tr>
+              <td class="small fw-medium">{{ p.name }}</td>
+              <td class="text-end text-muted small">{{ p.qty }} units</td>
+              <td class="text-end text-success small">NPR {{ "%.0f"|format(p.total|float) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3 small">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
+<!-- Payment Mode Breakdown -->
+{% if statement.pm_totals %}
+<div class="card mb-3">
+  <div class="card-header fw-semibold"><i class="bi bi-credit-card me-2 text-primary"></i>Payment Breakdown</div>
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-3">
+      {% for mode, total in statement.pm_totals.items() %}
+      <div class="text-center px-3 py-2 rounded-2" style="background:#f8fafc;min-width:100px;">
+        <div class="fw-bold">
+          {% if mode == 'cash' %}💵{% elif mode == 'qr' %}📱{% elif mode == 'card' %}💳{% elif mode == 'credit' %}📋{% else %}🔄{% endif %}
+          {{ mode | capitalize }}
+        </div>
+        <div class="text-success fw-semibold small">NPR {{ "%.0f"|format(total) }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Full Purchase History -->
 <div class="card">
   <div class="card-header fw-semibold d-flex justify-content-between">
-    <span>Purchase History — {{ statement.customer_name }}</span>
+    <span><i class="bi bi-clock-history me-2 text-primary"></i>Full Purchase History</span>
     <span class="text-muted small">{{ statement.total_transactions }} transaction{{ 's' if statement.total_transactions != 1 }}</span>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Invoice</th><th>Date</th><th>Payment</th><th class="text-end">Amount</th><th class="text-end">Discount</th><th>Status</th></tr></thead>
+      <thead class="table-light">
+        <tr>
+          <th>Invoice</th>
+          <th>Date & Time</th>
+          <th>Payment</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">Discount</th>
+          <th>Status</th>
+          <th class="no-print"></th>
+        </tr>
+      </thead>
       <tbody>
         {% for s in statement.sales %}
         <tr>
-          <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="text-decoration-none fw-semibold">{{ s.invoice_number or '#' ~ s.id }}</a></td>
-          <td class="text-muted small">{{ s.sale_date | nst('%Y-%m-%d %H:%M') }}</td>
+          <td class="fw-semibold">{{ s.invoice_number or '#' ~ s.id }}</td>
+          <td class="text-muted small">{{ s.sale_date | nst('%d %b %Y, %H:%M') }}</td>
           <td>
             <span class="badge bg-light text-dark border">
               {% if s.payment_mode == 'cash' %}💵{% elif s.payment_mode == 'qr' %}📱{% elif s.payment_mode == 'card' %}💳{% elif s.payment_mode == 'credit' %}📋{% else %}🔄{% endif %}
@@ -96,17 +273,27 @@
             </span>
           </td>
           <td class="text-end fw-semibold">NPR {{ "%.2f"|format(s.total_amount|float) }}</td>
-          <td class="text-end text-muted">{% if s.discount_amount and s.discount_amount|float > 0 %}<span class="text-success">-NPR {{ "%.2f"|format(s.discount_amount|float) }}</span>{% else %}—{% endif %}</td>
+          <td class="text-end">
+            {% if s.discount_amount and s.discount_amount|float > 0 %}
+            <span class="text-success small">-NPR {{ "%.2f"|format(s.discount_amount|float) }}</span>
+            {% else %}—{% endif %}
+          </td>
           <td>
             {% if s.payment_mode == 'credit' %}
-              {% if s.credit_collected %}<span class="badge bg-success">Collected</span>
+              {% if s.credit_collected %}<span class="badge bg-success">✓ Collected</span>
               {% elif s.credit_due_date and s.credit_due_date < today %}<span class="badge bg-danger">Overdue</span>
               {% else %}<span class="badge bg-warning text-dark">Pending</span>{% endif %}
-            {% else %}<span class="badge bg-success">Paid</span>{% endif %}
+            {% else %}<span class="badge bg-success">✓ Paid</span>{% endif %}
+          </td>
+          <td class="no-print">
+            <a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="View">
+              <i class="bi bi-eye"></i>
+            </a>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No purchases found.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No purchases found.</td></tr>
         {% endfor %}
       </tbody>
       {% if statement.sales %}
@@ -115,33 +302,105 @@
           <td colspan="3" class="text-end">Total</td>
           <td class="text-end text-success">NPR {{ "%.2f"|format(statement.total_spent) }}</td>
           <td class="text-end text-success">-NPR {{ "%.2f"|format(statement.total_discounts) }}</td>
-          <td></td>
+          <td colspan="2"></td>
         </tr>
         {% if statement.outstanding_credit > 0 %}
-        <tr>
-          <td colspan="5" class="text-end text-danger">Outstanding Credit Balance</td>
-          <td class="text-end text-danger fw-bold">NPR {{ "%.2f"|format(statement.outstanding_credit) }}</td>
+        <tr class="table-danger">
+          <td colspan="4" class="text-end text-danger">Outstanding Credit Balance</td>
+          <td class="text-end text-danger">NPR {{ "%.2f"|format(statement.outstanding_credit) }}</td>
+          <td colspan="2"></td>
         </tr>
         {% endif %}
         <tr>
-          <td colspan="5" class="text-end text-warning">Loyalty Points Balance</td>
-          <td class="text-end text-warning fw-bold">{{ statement.loyalty_points }} pts</td>
+          <td colspan="4" class="text-end text-warning">Loyalty Points Balance</td>
+          <td class="text-end text-warning">{{ statement.loyalty_points }} pts</td>
+          <td colspan="2"></td>
         </tr>
       </tfoot>
       {% endif %}
     </table>
   </div>
 </div>
+
 {% elif customer_name %}
-<div class="card"><div class="card-body text-center text-muted py-5">No records found for "{{ customer_name }}".</div></div>
+<div class="card"><div class="card-body text-center text-muted py-5">No records found for "<strong>{{ customer_name }}</strong>".</div></div>
 {% else %}
 <div class="card">
   <div class="card-body text-center text-muted py-5">
-    <i class="bi bi-person-lines-fill fs-1 d-block mb-2 text-muted"></i>
+    <i class="bi bi-person-lines-fill fs-1 d-block mb-2 opacity-25"></i>
     <div class="fw-semibold mb-1">Customer Account Statement</div>
-    <div class="small">Select a customer to generate their full purchase statement — printable and shareable.</div>
+    <div class="small">Search for a customer above to generate their full statement.</div>
   </div>
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live search with suggestions from first character
+const nameInput = document.getElementById('nameInput');
+const suggList = document.getElementById('suggestionsList');
+const customers = [
+  {% for c in customers %}
+  { name: {{ c.name | tojson }}, phone: {{ (c.phone or '') | tojson }} }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+
+let activeIdx = -1;
+
+nameInput.addEventListener('input', function() {
+  const q = this.value.trim().toLowerCase();
+  if (!q) { suggList.style.display = 'none'; return; }
+
+  const matches = customers.filter(c =>
+    c.name.toLowerCase().startsWith(q) ||
+    c.name.toLowerCase().includes(q)
+  ).slice(0, 8);
+
+  if (!matches.length) { suggList.style.display = 'none'; return; }
+
+  suggList.innerHTML = matches.map((c, i) => `
+    <div class="suggestion-item" data-name="${c.name}" data-idx="${i}">
+      <strong>${c.name.substring(0, q.length)}</strong>${c.name.substring(q.length)}
+      ${c.phone ? `<span class="text-muted ms-2" style="font-size:.75rem;">${c.phone}</span>` : ''}
+    </div>
+  `).join('');
+  suggList.style.display = 'block';
+  activeIdx = -1;
+
+  suggList.querySelectorAll('.suggestion-item').forEach(el => {
+    el.addEventListener('click', () => {
+      nameInput.value = el.dataset.name;
+      suggList.style.display = 'none';
+      document.getElementById('stmtForm').submit();
+    });
+  });
+});
+
+// Keyboard navigation
+nameInput.addEventListener('keydown', function(e) {
+  const items = suggList.querySelectorAll('.suggestion-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    activeIdx = Math.min(activeIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeIdx = Math.max(activeIdx - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+  } else if (e.key === 'Enter' && activeIdx >= 0) {
+    e.preventDefault();
+    nameInput.value = items[activeIdx].dataset.name;
+    suggList.style.display = 'none';
+    document.getElementById('stmtForm').submit();
+  } else if (e.key === 'Escape') {
+    suggList.style.display = 'none';
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#customerSearch')) suggList.style.display = 'none';
+});
+</script>
 {% endblock %}

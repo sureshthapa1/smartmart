@@ -148,8 +148,9 @@ def thermal_receipt(sale_id):
 def customer_statement():
     """Per-customer purchase history, credit, and loyalty statement."""
     from ...models.customer import Customer
-    from ...models.sale import Sale
-    from ...models.operations import CustomerLoyaltyTransaction, CustomerCreditPayment
+    from ...models.sale import Sale, SaleItem
+    from ...models.product import Product as _Product
+    from ...models.shop_settings import ShopSettings
     from sqlalchemy import func
 
     customer_name = request.args.get("name", "").strip()
@@ -158,6 +159,8 @@ def customer_statement():
     ).scalars().all()
 
     statement = None
+    shop = ShopSettings.get()
+
     if customer_name:
         sales = db.session.execute(
             db.select(Sale)
@@ -169,25 +172,76 @@ def customer_statement():
         total_discounts = sum(float(s.discount_amount or 0) for s in sales)
         credit_sales = [s for s in sales if s.payment_mode == "credit"]
         outstanding = sum(float(s.total_amount) for s in credit_sales if not s.credit_collected)
+        collected = sum(float(s.total_amount) for s in credit_sales if s.credit_collected)
 
-        loyalty_points = db.session.execute(
-            db.select(func.coalesce(func.sum(CustomerLoyaltyTransaction.points_change), 0))
-            .where(CustomerLoyaltyTransaction.customer_name == customer_name)
-        ).scalar() or 0
+        # Payment mode breakdown
+        pm_totals: dict = {}
+        for s in sales:
+            pm = s.payment_mode or "cash"
+            pm_totals[pm] = pm_totals.get(pm, 0) + float(s.total_amount)
+
+        # Top products bought
+        top_products = db.session.execute(
+            db.select(
+                _Product.name,
+                func.sum(SaleItem.quantity).label("qty"),
+                func.sum(SaleItem.subtotal).label("total"),
+            )
+            .join(SaleItem, SaleItem.product_id == _Product.id)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(func.lower(Sale.customer_name) == customer_name.lower())
+            .group_by(_Product.id, _Product.name)
+            .order_by(func.sum(SaleItem.quantity).desc())
+            .limit(5)
+        ).all()
+
+        # Loyalty points — use LoyaltyWallet (correct table)
+        loyalty_points = 0
+        loyalty_lifetime = 0
+        loyalty_tier = "Silver"
+        try:
+            from ...models.ai_enhancements import LoyaltyWallet
+            from ...models.customer import Customer as _Cust
+            cust_obj = db.session.execute(
+                db.select(_Cust).where(func.lower(_Cust.name) == customer_name.lower())
+            ).scalar_one_or_none()
+            if cust_obj:
+                wallet = db.session.execute(
+                    db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == cust_obj.id)
+                ).scalar_one_or_none()
+                if wallet:
+                    loyalty_points = int(wallet.points_balance)
+                    loyalty_lifetime = int(wallet.lifetime_points_earned)
+                    loyalty_tier = wallet.tier or "Silver"
+        except Exception:
+            pass
+
+        # Customer info
+        cust_info = db.session.execute(
+            db.select(Customer).where(func.lower(Customer.name) == customer_name.lower())
+        ).scalar_one_or_none()
 
         statement = {
             "customer_name": customer_name,
+            "customer": cust_info,
             "sales": sales,
             "total_spent": total_spent,
             "total_discounts": total_discounts,
             "total_transactions": len(sales),
             "outstanding_credit": outstanding,
-            "loyalty_points": int(loyalty_points),
+            "collected_credit": collected,
+            "pm_totals": pm_totals,
+            "top_products": top_products,
+            "loyalty_points": loyalty_points,
+            "loyalty_lifetime": loyalty_lifetime,
+            "loyalty_tier": loyalty_tier,
+            "avg_order": round(total_spent / len(sales), 2) if sales else 0,
         }
 
     return render_template("sales/customer_statement.html",
                            customers=customers, statement=statement,
                            customer_name=customer_name,
+                           shop=shop,
                            today=date.today())
 
 
