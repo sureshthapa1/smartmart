@@ -7,6 +7,92 @@ from .config import config
 from .extensions import db, login_manager, bcrypt
 
 
+def _run_startup_migrations(app):
+    """Add any missing columns to the database. Safe to run on every startup."""
+    from sqlalchemy import text, inspect
+
+    def _col_exists(conn, table, column):
+        try:
+            inspector = inspect(conn)
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            return column in cols
+        except Exception:
+            return True  # assume exists if we can't check
+
+    def safe_add(conn, table, column, col_type):
+        try:
+            if not _col_exists(conn, table, column):
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}"))
+                conn.commit()
+                app.logger.info(f"Migration: added {table}.{column}")
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+    migrations = [
+        # customers
+        ("customers", "birthday", "DATE"),
+        ("customers", "email", "VARCHAR(120)"),
+        # products
+        ("products", "reorder_point", "INTEGER DEFAULT 10"),
+        # shop_settings
+        ("shop_settings", "logo_filename", "VARCHAR(255)"),
+        ("shop_settings", "logo_data", "TEXT"),
+        ("shop_settings", "loyalty_points_per_rupee", "NUMERIC(8,4) DEFAULT 0.01"),
+        ("shop_settings", "loyalty_rupee_per_point", "NUMERIC(8,4) DEFAULT 1.00"),
+        # ai_retraining_log
+        ("ai_retraining_log", "model_name", "VARCHAR(80)"),
+        ("ai_retraining_log", "samples_used", "INTEGER"),
+        ("ai_retraining_log", "new_accuracy", "FLOAT"),
+        ("ai_retraining_log", "improvement", "FLOAT"),
+        ("ai_retraining_log", "error_message", "TEXT"),
+        # customer_risk_scores
+        ("customer_risk_scores", "risk_score", "INTEGER DEFAULT 0"),
+        ("customer_risk_scores", "risk_tier", "VARCHAR(20) DEFAULT 'safe'"),
+        ("customer_risk_scores", "override_tier", "VARCHAR(20)"),
+        ("customer_risk_scores", "override_by", "INTEGER"),
+        ("customer_risk_scores", "override_at", "TIMESTAMP"),
+        ("customer_risk_scores", "last_computed_at", "TIMESTAMP"),
+        # user_permissions — all new columns
+        ("user_permissions", "can_manage_categories", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_variants", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_print_labels", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_stock_take", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_stock_take", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_customer_statement", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_supplier_returns", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_supplier_returns", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_purchase_orders", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_purchase_orders", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_customers", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_customers", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_expenses", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_expenses", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_reports", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_sales_report", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_profit_report", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_stock_report", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_credit_report", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_promotions", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_promotions", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_transfers", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_transfers", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_ai_insights", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_view_advisor", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_credits", "BOOLEAN DEFAULT false"),
+        ("user_permissions", "can_manage_cash_session", "BOOLEAN DEFAULT false"),
+    ]
+
+    try:
+        with db.engine.connect() as conn:
+            for table, column, col_type in migrations:
+                safe_add(conn, table, column, col_type)
+    except Exception as e:
+        app.logger.warning(f"Migration connection failed: {e}")
+
+
 def create_app(config_name="development"):
     pkg_dir = os.path.dirname(__file__)
     app = Flask(
@@ -59,12 +145,17 @@ def create_app(config_name="development"):
         )
         return response
 
-    # ── Auto-create DB tables once at startup ────────────────────────────
+    # ── Auto-create DB tables + run column migrations at startup ─────────
     with app.app_context():
         try:
             db.create_all()
         except Exception as exc:
             app.logger.warning("db.create_all() failed: %s", exc)
+        # Run safe column migrations so new columns are always present
+        try:
+            _run_startup_migrations(app)
+        except Exception as exc:
+            app.logger.warning("Startup migrations failed: %s", exc)
 
     # ── Session permanent (8hr timeout from config) ───────────────────────
     @app.before_request
@@ -164,6 +255,14 @@ def create_app(config_name="development"):
     def db_error(e):
         app.logger.exception("Database error: %s", e)
         db.session.rollback()
+        # If it's a missing column error, try to run migrations and give helpful message
+        err_str = str(e).lower()
+        if "column" in err_str and ("does not exist" in err_str or "no such column" in err_str):
+            try:
+                _run_startup_migrations(app)
+                app.logger.info("Auto-migration triggered by missing column error")
+            except Exception:
+                pass
         return render_template("errors/500.html"), 500
 
     return app
