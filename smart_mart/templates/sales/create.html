@@ -369,48 +369,108 @@
   <script>
   // ── Promotions check ─────────────────────────────────────────────────
   let promoTimer;
+  let activePromos = [];
+
   async function checkPromotions(subtotal) {
     clearTimeout(promoTimer);
     promoTimer = setTimeout(async () => {
       if (subtotal <= 0) { removePromoBar(); return; }
       try {
+        // Collect current cart items
+        const cartItems = [];
+        let idx = 0;
+        while (true) {
+          const pid = document.querySelector(`[name="items[${idx}][product_id]"]`);
+          if (!pid) break;
+          if (pid.value) cartItems.push({ product_id: parseInt(pid.value) });
+          idx++;
+        }
         const res = await fetch('/promotions/api/check', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({subtotal, items: []}),
+          body: JSON.stringify({ subtotal, items: cartItems }),
         });
         const data = await res.json();
         if (data.promotions && data.promotions.length > 0) {
-          showPromoBar(data.promotions);
+          activePromos = data.promotions;
+          showPromoBar(data.promotions, subtotal);
         } else {
+          activePromos = [];
           removePromoBar();
         }
       } catch(e) { removePromoBar(); }
     }, 400);
   }
 
-  function showPromoBar(promos) {
+  function showPromoBar(promos, subtotal) {
     let bar = document.getElementById('promoBar');
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'promoBar';
-      bar.className = 'alert alert-success d-flex align-items-center gap-2 mt-2';
-      document.getElementById('saleForm').insertBefore(bar, document.getElementById('saleForm').firstChild);
+      // Insert just before the discount row
+      const discountRow = document.getElementById('discountInput')?.closest('.col-md-4');
+      if (discountRow && discountRow.parentElement) {
+        discountRow.parentElement.insertBefore(bar, discountRow);
+      } else {
+        document.querySelector('.total-bar')?.before(bar);
+      }
     }
-    bar.innerHTML = '<i class="bi bi-tag-fill"></i><div><strong>Active Promotions:</strong> ' +
-      promos.map(p => `<span class="badge bg-success ms-1">${p.name} — NPR ${p.discount.toFixed(2)} off</span>`).join('') +
-      ' <button type="button" class="btn btn-sm btn-success ms-2" onclick="applyBestPromo(' + JSON.stringify(promos) + ')">Apply Best</button></div>';
+
+    const promoButtons = promos.map((p, i) =>
+      `<button type="button" class="btn btn-sm btn-success py-0 px-2 apply-promo-btn"
+               data-idx="${i}" style="font-size:.75rem;">
+         Apply ${p.name} (−NPR ${p.discount.toFixed(0)})
+       </button>`
+    ).join(' ');
+
+    bar.className = 'alert alert-success py-2 px-3 mb-2 d-flex align-items-center gap-2 flex-wrap';
+    bar.innerHTML = `
+      <i class="bi bi-tag-fill text-success"></i>
+      <span class="fw-semibold small">Active Promotions:</span>
+      <div class="d-flex gap-1 flex-wrap">${promoButtons}</div>
+      <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" id="clearPromoBtn" style="font-size:.72rem;display:none;">✕ Clear</button>
+    `;
+
+    // Bind apply buttons
+    bar.querySelectorAll('.apply-promo-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const promo = activePromos[parseInt(this.dataset.idx)];
+        if (!promo) return;
+        document.getElementById('discountInput').value = promo.discount.toFixed(2);
+        document.getElementById('discountNote').value = promo.name;
+        recalcTotal();
+        // Mark applied
+        bar.querySelectorAll('.apply-promo-btn').forEach(b => {
+          b.classList.remove('btn-success');
+          b.classList.add('btn-outline-secondary');
+          b.disabled = true;
+        });
+        this.classList.remove('btn-outline-secondary');
+        this.classList.add('btn-success');
+        this.textContent = '✓ ' + promo.name + ' applied';
+        document.getElementById('clearPromoBtn').style.display = '';
+      });
+    });
+
+    // Clear button
+    document.getElementById('clearPromoBtn').addEventListener('click', function() {
+      document.getElementById('discountInput').value = '0';
+      document.getElementById('discountNote').value = '';
+      recalcTotal();
+      // Re-enable all buttons
+      bar.querySelectorAll('.apply-promo-btn').forEach(b => {
+        b.classList.remove('btn-outline-secondary');
+        b.classList.add('btn-success');
+        b.disabled = false;
+        const promo = activePromos[parseInt(b.dataset.idx)];
+        if (promo) b.textContent = `Apply ${promo.name} (−NPR ${promo.discount.toFixed(0)})`;
+      });
+      this.style.display = 'none';
+    });
   }
 
   function removePromoBar() {
     document.getElementById('promoBar')?.remove();
-  }
-
-  function applyBestPromo(promos) {
-    const best = promos.reduce((a, b) => a.discount > b.discount ? a : b);
-    document.getElementById('discountInput').value = best.discount.toFixed(2);
-    document.getElementById('discountNote').value = best.name;
-    recalcTotal();
   }
 
   // ── AI Invoice Validation before submit ──────────────────────────────
