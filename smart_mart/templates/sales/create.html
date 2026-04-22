@@ -79,6 +79,8 @@
     </div>
 
     <form method="post" action="{{ url_for('sales.create_sale') }}" id="saleForm">
+      {# Idempotency key — prevents double-post on network retry #}
+      <input type="hidden" name="idempotency_key" id="idempotencyKey">
 
       <!-- Customer Info -->
       <div class="card shadow-sm mb-3">
@@ -472,6 +474,12 @@
   function removePromoBar() {
     document.getElementById('promoBar')?.remove();
   }
+
+  // ── Idempotency key — generate once per page load ────────────────────
+  (function() {
+    const key = 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+    document.getElementById('idempotencyKey').value = key;
+  })();
 
   // ── AI Invoice Validation before submit ──────────────────────────────
   document.getElementById('saleForm').addEventListener('submit', async function(e) {

@@ -40,28 +40,50 @@ def create_sale(items: list[dict], user_id: int,
                 discount_amount: float = 0, discount_note: str = None,
                 wallet_redeem_points: int = 0,
                 promotion_id: int = None) -> Sale:
-    """Create a confirmed sale."""
-    products: dict[int, Product] = {}
-    for item in items:
-        pid = item["product_id"]
-        if pid not in products:
-            product = db.session.get(Product, pid)
-            if product is None:
-                raise ValueError(f"Product with id {pid} not found.")
-            products[pid] = product
-        product = products[pid]
-        if item["quantity"] > product.quantity:
-            raise InsufficientStockError(
-                f"Insufficient stock for '{product.name}': "
-                f"requested {item['quantity']}, available {product.quantity}."
-            )
-
+    """Create a confirmed sale with row-level locking to prevent overselling."""
     try:
+        # ── Period lock guard ─────────────────────────────────────────────
+        from datetime import date as _date
+        _today = _date.today()
+        try:
+            from ..models.financial_period import FinancialPeriod
+            if FinancialPeriod.is_locked(_today.year, _today.month):
+                raise ValueError(
+                    f"The current period ({_today.strftime('%B %Y')}) is locked. "
+                    "Contact an administrator to reopen it before posting new sales."
+                )
+        except ValueError:
+            raise
+        except Exception:
+            pass  # Don't block sales if period check fails
+
         invoice_number = None
         try:
             invoice_number = _generate_invoice_number()
         except Exception as exc:
             logger.warning("Invoice number generation failed; using fallback invoice id: %s", exc)
+
+        # ── Lock product rows to prevent concurrent oversell ──────────────
+        # SELECT ... FOR UPDATE acquires a row-level lock so two concurrent
+        # sales of the same product cannot both pass the stock check.
+        product_ids = list({item["product_id"] for item in items})
+        locked_products = db.session.execute(
+            db.select(Product)
+            .where(Product.id.in_(product_ids))
+            .with_for_update()
+        ).scalars().all()
+        products: dict[int, Product] = {p.id: p for p in locked_products}
+
+        for item in items:
+            pid = item["product_id"]
+            if pid not in products:
+                raise ValueError(f"Product with id {pid} not found.")
+            product = products[pid]
+            if item["quantity"] > product.quantity:
+                raise InsufficientStockError(
+                    f"Insufficient stock for '{product.name}': "
+                    f"requested {item['quantity']}, available {product.quantity}."
+                )
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
         total_amount = max(0, gross_total_amount - (discount_amount or 0))
@@ -128,7 +150,7 @@ def create_sale(items: list[dict], user_id: int,
             if customer_name and customer_name.strip().lower() != "walk-in customer":
                 Customer.upsert(customer_name, customer_phone, customer_address)
                 db.session.flush()
-                # Task 1: auto-populate customer_id FK
+                # Auto-populate customer_id FK
                 cust = db.session.execute(
                     db.select(Customer).where(
                         db.func.lower(Customer.name) == customer_name.strip().lower()
@@ -137,8 +159,7 @@ def create_sale(items: list[dict], user_id: int,
                 if cust:
                     sale.customer_id = cust.id
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("Customer upsert failed: %s", e)
+            logger.warning("Customer upsert failed: %s", e)
 
         if wallet is not None:
             loyalty_wallet_service.apply_sale_points(
@@ -164,8 +185,14 @@ def create_sale(items: list[dict], user_id: int,
     except Exception as exc:
         logger.warning("Sale audit logging failed for sale %s: %s", sale.id, exc)
 
-    return sale
+    # Invalidate BI dashboard cache so next load reflects the new sale
+    try:
+        from .cache_service import invalidate_prefix
+        invalidate_prefix("bi_dashboard")
+    except Exception:
+        pass
 
+    return sale
 
 def get_sale(sale_id: int) -> Sale:
     return db.get_or_404(Sale, sale_id)

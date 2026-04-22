@@ -100,10 +100,20 @@
       </table>
     </div>
   </div>
-  {% if logs | length == 50 %}
-  <div class="card-footer text-center">
-    <a href="?entity_type={{ selected_entity }}&user_id={{ selected_user }}&page={{ page + 1 }}"
-       class="btn btn-sm btn-outline-secondary">Load More</a>
+  {% if total_pages > 1 %}
+  <div class="card-footer d-flex justify-content-between align-items-center">
+    <span class="text-muted small">{{ total }} total entries</span>
+    <div class="d-flex gap-1">
+      {% if page > 1 %}
+      <a href="?entity_type={{ selected_entity }}&user_id={{ selected_user }}&page={{ page - 1 }}"
+         class="btn btn-sm btn-outline-secondary">← Prev</a>
+      {% endif %}
+      <span class="btn btn-sm btn-light disabled">{{ page }} / {{ total_pages }}</span>
+      {% if page < total_pages %}
+      <a href="?entity_type={{ selected_entity }}&user_id={{ selected_user }}&page={{ page + 1 }}"
+         class="btn btn-sm btn-outline-secondary">Next →</a>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 </div>

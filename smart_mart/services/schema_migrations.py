@@ -36,6 +36,14 @@ def _safe_add_column(conn, table_name: str, column_name: str, column_sql: str) -
     conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"))
 
 
+def _safe_exec(conn, sql: str) -> None:
+    """Execute a DDL statement, silently ignoring errors (e.g. already exists)."""
+    try:
+        conn.execute(text(sql))
+    except Exception:
+        pass
+
+
 def _migration_steps() -> list[MigrationStep]:
     return [
         (
@@ -184,6 +192,63 @@ def _migration_steps() -> list[MigrationStep]:
             "Add product_id to bi_operating_expenses for direct product allocation.",
             lambda conn: _safe_add_column(
                 conn, "bi_operating_expenses", "product_id", "INTEGER REFERENCES products(id)"
+            ),
+        ),
+        # ── High-priority upgrades ────────────────────────────────────────────
+        (
+            "2026_04_22_idempotency_keys_table",
+            "Create idempotency_keys table to prevent double-post on sales.",
+            lambda conn: conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS idempotency_keys ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "key VARCHAR(128) NOT NULL UNIQUE, "
+                "user_id INTEGER NOT NULL REFERENCES users(id), "
+                "endpoint VARCHAR(80) NOT NULL, "
+                "result_sale_id INTEGER REFERENCES sales(id), "
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )),
+        ),
+        (
+            "2026_04_22_financial_periods_table",
+            "Create financial_periods table for period close/lock.",
+            lambda conn: conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS financial_periods ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "year INTEGER NOT NULL, "
+                "month INTEGER NOT NULL, "
+                "status VARCHAR(20) NOT NULL DEFAULT 'open', "
+                "closed_by INTEGER REFERENCES users(id), "
+                "closed_at TIMESTAMP, "
+                "notes TEXT, "
+                "total_sales NUMERIC(14,2), "
+                "total_cogs NUMERIC(14,2), "
+                "total_opex NUMERIC(14,2), "
+                "net_profit NUMERIC(14,2), "
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                "UNIQUE(year, month)"
+                ")"
+            )),
+        ),
+        (
+            "2026_04_22_perf_indexes",
+            "Add performance indexes on report-heavy fields.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_sale_items_cost ON sale_items(cost_price)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_products_qty ON products(quantity)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_products_category ON products(category)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_expenses_date ON expenses(expense_date)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movements_type ON stock_movements(change_type)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_date ON purchases(purchase_date)"),
+            ),
+        ),
+        (
+            "2026_04_22_expense_bi_opex_id",
+            "Add bi_opex_id FK to expenses for automatic BI sync.",
+            lambda conn: _safe_add_column(
+                conn, "expenses", "bi_opex_id",
+                "INTEGER REFERENCES bi_operating_expenses(id)"
             ),
         ),
     ]

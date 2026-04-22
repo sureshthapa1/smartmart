@@ -46,6 +46,11 @@ def create_product(data: dict) -> Product:
 def update_product(product_id: int, data: dict) -> Product:
     """Update fields on an existing product."""
     product: Product = db.get_or_404(Product, product_id)
+
+    # Capture changes BEFORE updating for audit trail
+    price_fields = ("cost_price", "selling_price", "quantity", "name", "sku", "category")
+    old_values = {f: str(getattr(product, f, "")) for f in price_fields}
+
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
                  "quantity", "supplier_id", "expiry_date", "image_filename", "unit", "reorder_point")
     for field in updatable:
@@ -57,11 +62,18 @@ def update_product(product_id: int, data: dict) -> Product:
     except IntegrityError:
         db.session.rollback()
         raise ValueError(f"A product with SKU '{data.get('sku')}' already exists.")
-    # Audit log
+
+    # Audit log with field-level diff
     try:
         from . import audit_service
-        audit_service.log("update", "Product", product.id, product.name)
-        db.session.commit()
+        changes = {}
+        for f in price_fields:
+            new_val = str(getattr(product, f, ""))
+            if old_values[f] != new_val:
+                changes[f] = [old_values[f], new_val]
+        if changes:
+            audit_service.log("update", "Product", product.id, product.name, changes=changes)
+            db.session.commit()
     except Exception:
         pass
     return product

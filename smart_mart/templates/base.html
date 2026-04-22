@@ -775,6 +775,13 @@
           </ul>
         </div>
       </li>
+      {# Financial Periods #}
+      <li class="nav-item">
+        <a class="nav-link {% if request.blueprint == 'finance' %}active{% endif %}"
+           href="{{ url_for('finance.periods') }}">
+          <i class="bi bi-calendar-check"></i>Financial Periods
+        </a>
+      </li>
       {% endif %}
 
     </ul>

@@ -49,6 +49,8 @@ from .customer_risk_score import CustomerRiskScore
 from .recurring_expense import RecurringExpense
 from .schema_migration import SchemaMigrationRecord
 from .credit_note import CreditNote
+from .idempotency_key import IdempotencyKey
+from .financial_period import FinancialPeriod
 from ..bi.models import (
     PurchaseBatch,
     PurchaseBatchItem,
@@ -86,6 +88,8 @@ __all__ = [
     "RecurringExpense",
     "SchemaMigrationRecord",
     "CreditNote",
+    "IdempotencyKey",
+    "FinancialPeriod",
     "PurchaseBatch",
     "PurchaseBatchItem",
     "PurchaseBatchExpense",

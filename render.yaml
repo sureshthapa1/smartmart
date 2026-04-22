@@ -3,7 +3,7 @@ services:
     name: smart-mart
     runtime: python
     buildCommand: pip install -r requirements.txt && bash build.sh
-    startCommand: gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:$PORT --workers 2 --threads 2 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -
     envVars:
       - key: FLASK_ENV
         value: production
@@ -11,3 +11,5 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: LOG_LEVEL
+        value: INFO

@@ -1,6 +1,7 @@
 """Audit Log model — field-level change tracking (Feature #9)."""
 from datetime import datetime, timezone
 from ..extensions import db
+from sqlalchemy import event
 
 
 class AuditLog(db.Model):
@@ -28,3 +29,15 @@ class AuditLog(db.Model):
 
     def __repr__(self):
         return f"<AuditLog {self.action} {self.entity_type}#{self.entity_id} by {self.username}>"
+
+
+# ── Immutable ledger: block UPDATE and DELETE on audit_logs ──────────────────
+
+@event.listens_for(AuditLog, "before_update")
+def _block_audit_update(mapper, connection, target):
+    raise RuntimeError("AuditLog records are immutable and cannot be updated.")
+
+
+@event.listens_for(AuditLog, "before_delete")
+def _block_audit_delete(mapper, connection, target):
+    raise RuntimeError("AuditLog records are immutable and cannot be deleted.")

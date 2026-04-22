@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Financial Periods{% endblock %}
+{% block page_title %}Financial Periods{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Financial Periods</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Financial Periods</div>
+    <div class="page-header-sub">Close, lock, and export monthly accounting periods</div>
+  </div>
+</div>
+
+{# ── Close a period ── #}
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Close a Period</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('finance.close_period') }}" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <input type="number" name="year" class="form-control form-control-sm"
+               value="{{ now.year }}" min="2020" max="2099" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Month</label>
+        <select name="month" class="form-select form-select-sm" required>
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {{ 'selected' if m == now.month }}>
+            {{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Notes (optional)</label>
+        <input type="text" name="notes" class="form-control form-control-sm" placeholder="e.g. Year-end close">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-lock me-1"></i>Close Period
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Period list ── #}
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Status</th>
+            <th class="text-end">Sales (NPR)</th>
+            <th class="text-end">COGS (NPR)</th>
+            <th class="text-end">OpEx (NPR)</th>
+            <th class="text-end">Net Profit (NPR)</th>
+            <th>Closed By</th>
+            <th>Closed At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in periods %}
+          <tr>
+            <td class="fw-semibold">{{ p.label }}</td>
+            <td>
+              <span class="badge bg-{{ 'success' if p.status == 'open' else ('warning text-dark' if p.status == 'closed' else 'danger') }}">
+                {{ p.status }}
+              </span>
+            </td>
+            <td class="text-end">{{ '{:,.2f}'.format(p.total_sales | float) if p.total_sales else '—' }}</td>
+            <td class="text-end">{{ '{:,.2f}'.format(p.total_cogs | float) if p.total_cogs else '—' }}</td>
+            <td class="text-end">{{ '{:,.2f}'.format(p.total_opex | float) if p.total_opex else '—' }}</td>
+            <td class="text-end fw-semibold {{ 'text-success' if (p.net_profit or 0) >= 0 else 'text-danger' }}">
+              {{ '{:,.2f}'.format(p.net_profit | float) if p.net_profit else '—' }}
+            </td>
+            <td class="text-muted small">{{ p.closer.username if p.closer else '—' }}</td>
+            <td class="text-muted small">{{ p.closed_at.strftime('%d %b %Y') if p.closed_at else '—' }}</td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                {% if p.status == 'closed' %}
+                <form method="post" action="{{ url_for('finance.reopen_period', period_id=p.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-xs btn-outline-secondary" title="Reopen">
+                    <i class="bi bi-unlock"></i>
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('finance.lock_period', period_id=p.id) }}" class="d-inline"
+                      onsubmit="return confirm('Permanently lock this period? This cannot be undone.')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-xs btn-outline-danger" title="Lock permanently">
+                    <i class="bi bi-shield-lock"></i>
+                  </button>
+                </form>
+                {% endif %}
+                {% if p.status in ('closed', 'locked') %}
+                <a href="{{ url_for('finance.export_summary', period_id=p.id) }}"
+                   class="btn btn-xs btn-outline-primary" title="Export P&L summary">
+                  <i class="bi bi-file-earmark-spreadsheet"></i> P&L
+                </a>
+                <a href="{{ url_for('finance.export_sales', period_id=p.id) }}"
+                   class="btn btn-xs btn-outline-success" title="Export sales lines">
+                  <i class="bi bi-download"></i> Sales
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">No periods closed yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Pass current date to template
+</script>
+{% endblock %}

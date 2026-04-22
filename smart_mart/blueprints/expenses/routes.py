@@ -135,6 +135,9 @@ def create_expense():
             created_by=current_user.id,
         )
         db.session.add(expense)
+        db.session.flush()
+        from ...services.expense_sync import sync_create
+        sync_create(expense)
         db.session.commit()
         flash(f"Expense of NPR {amount:,.2f} ({expense_type}) recorded.", "success")
         return redirect(url_for("expenses.list_expenses"))
@@ -183,6 +186,8 @@ def edit_expense(expense_id):
         expense.amount = amount
         expense.expense_date = expense_date
         expense.note = note
+        from ...services.expense_sync import sync_update
+        sync_update(expense)
         db.session.commit()
         flash("Expense updated.", "success")
         return redirect(url_for("expenses.list_expenses"))
@@ -197,7 +202,10 @@ def edit_expense(expense_id):
 def delete_expense(expense_id):
     _require_perm("can_manage_expenses")
     expense = db.get_or_404(Expense, expense_id)
+    bi_opex_id = getattr(expense, "bi_opex_id", None)
     db.session.delete(expense)
+    from ...services.expense_sync import sync_delete
+    sync_delete(bi_opex_id)
     db.session.commit()
     flash("Expense deleted.", "success")
     return redirect(url_for("expenses.list_expenses"))
@@ -342,6 +350,9 @@ def pay_recurring(item_id):
         created_by=current_user.id,
     )
     db.session.add(expense)
+    db.session.flush()
+    from ...services.expense_sync import sync_create
+    sync_create(expense)
     # Advance next due date
     item.last_paid_at = date.today()
     item.next_due_date = item.next_due_after_payment()

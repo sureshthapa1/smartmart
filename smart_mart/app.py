@@ -161,6 +161,14 @@ def create_app(config_name="development"):
             _run_startup_migrations(app)
         except Exception as exc:
             app.logger.warning("Startup migrations failed: %s", exc)
+        # Backfill any existing expenses that have no BI mirror yet
+        try:
+            from .services.expense_sync import backfill as _expense_backfill
+            n = _expense_backfill()
+            if n:
+                app.logger.info("expense_sync backfill: %d rows created", n)
+        except Exception as exc:
+            app.logger.warning("expense_sync backfill failed (non-fatal): %s", exc)
 
     # ── Session permanent (8hr timeout from config) ───────────────────────
     @app.before_request
@@ -206,6 +214,13 @@ def create_app(config_name="development"):
             return _json.loads(value)
         except Exception:
             return {}
+
+    # ── Global context: inject `now` for templates ────────────────────────
+    from datetime import datetime as _dt, timezone as _tz
+
+    @app.context_processor
+    def inject_now():
+        return {"now": _dt.now(_tz.utc)}
 
     # ── Alert count context processor (sidebar badge) ────────────────────
     @app.context_processor
@@ -299,6 +314,7 @@ def _register_blueprints(app):
         (".blueprints.promotions", "promotions_bp"),
         (".blueprints.stock_take", "stock_take_bp"),
         (".blueprints.customers", "customers_bp"),
+        (".blueprints.finance", "finance_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
     ]

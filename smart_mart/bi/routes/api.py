@@ -669,9 +669,10 @@ def bi_ledger_page():
 @bi_bp.route("/products/<int:product_id>/apply-price", methods=["POST"])
 @login_required
 def apply_product_price(product_id: int):
-    """Update a product's selling_price directly."""
+    """Update a product's selling_price directly with audit trail."""
     _require_bi_perm("can_edit_product")
     from ...models.product import Product
+    from ...services import audit_service
     payload = request.get_json() or {}
     selling_price = payload.get("selling_price")
     if selling_price is None:
@@ -680,11 +681,22 @@ def apply_product_price(product_id: int):
     if product is None:
         return jsonify({"error": "product not found"}), 404
     from ..utils import money as _money, as_decimal
+    old_price = decimal_to_float(product.selling_price)
     product.selling_price = _money(as_decimal(selling_price))
     db.session.commit()
+    # Audit the price change
+    try:
+        audit_service.log(
+            "update", "Product", product.id, product.name,
+            changes={"selling_price": [str(old_price), str(decimal_to_float(product.selling_price))]},
+        )
+        db.session.commit()
+    except Exception:
+        pass
     return jsonify({
         "product_id": product.id,
         "product_name": product.name,
+        "old_selling_price": old_price,
         "selling_price": decimal_to_float(product.selling_price),
     })
 

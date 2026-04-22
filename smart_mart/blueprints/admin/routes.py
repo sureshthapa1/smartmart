@@ -426,15 +426,20 @@ def audit_log():
     user_id_raw = request.args.get("user_id", "").strip()
     user_id = int(user_id_raw) if user_id_raw.isdigit() else None
     page = request.args.get("page", 1, type=int)
+    per_page = 50
 
-    logs = audit_service.get_logs(entity_type=entity_type, user_id=user_id, page=page)
+    logs = audit_service.get_logs(entity_type=entity_type, user_id=user_id, page=page, per_page=per_page)
+    total = audit_service.count_logs(entity_type=entity_type, user_id=user_id)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
     users = _db.session.execute(_db.select(User).order_by(User.username)).scalars().all()
     entity_types = ["Product", "Sale", "Purchase", "User", "Expense", "StockTake",
                     "SupplierReturn", "Promotion"]
     return render_template("admin/audit_log.html",
                            logs=logs, users=users, entity_types=entity_types,
                            selected_entity=entity_type or "",
-                           selected_user=user_id_raw, page=page)
+                           selected_user=user_id_raw, page=page,
+                           total_pages=total_pages, total=total)
 
 
 @admin_bp.route("/sync-visit-counts", methods=["POST"])

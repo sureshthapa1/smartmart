@@ -18,6 +18,10 @@ class Config:
     HIGH_DEMAND_THRESHOLD = 50
     SMARTMART_PREVENT_NEGATIVE_STOCK = True
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
+    # Cache TTL in seconds for dashboard/BI endpoints
+    DASHBOARD_CACHE_TTL = int(os.environ.get("DASHBOARD_CACHE_TTL", 180))
+    # Log level
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 
 class DevelopmentConfig(Config):

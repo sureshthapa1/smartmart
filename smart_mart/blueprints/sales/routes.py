@@ -77,6 +77,19 @@ def create_sale():
             flash("Please add at least one item to the sale.", "danger")
             return render_template("sales/create.html", products=products)
 
+        # ── Idempotency: prevent double-post on network retry ──────────────
+        idem_key = request.form.get("idempotency_key", "").strip()
+        if idem_key:
+            from ...models.idempotency_key import IdempotencyKey
+            existing = IdempotencyKey.consume(idem_key, current_user.id, "sales.create_sale")
+            if existing is not None:
+                # Already processed — redirect to the original sale
+                if existing.result_sale_id:
+                    flash("Duplicate submission detected — showing original sale.", "info")
+                    return redirect(url_for("sales.sale_detail", sale_id=existing.result_sale_id))
+                flash("Duplicate submission detected.", "warning")
+                return redirect(url_for("sales.list_sales"))
+
         try:
             sale = sales_manager.create_sale(
                 items,
@@ -89,6 +102,15 @@ def create_sale():
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
             )
+            # Record the sale id against the idempotency key
+            if idem_key:
+                from ...models.idempotency_key import IdempotencyKey
+                record = db.session.execute(
+                    db.select(IdempotencyKey).where(IdempotencyKey.key == idem_key)
+                ).scalar_one_or_none()
+                if record:
+                    record.result_sale_id = sale.id
+                    db.session.commit()
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
         except InsufficientStockError as e:

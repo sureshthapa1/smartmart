@@ -12,6 +12,8 @@ class Expense(db.Model):
     note = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    # Mirror row in bi_operating_expenses (kept in sync automatically)
+    bi_opex_id = db.Column(db.Integer, db.ForeignKey("bi_operating_expenses.id"), nullable=True)
 
     # Relationships
     creator = db.relationship("User", back_populates="expenses")

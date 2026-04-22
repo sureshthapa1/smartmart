@@ -73,3 +73,12 @@ def get_logs(entity_type: str | None = None, entity_id: int | None = None,
         stmt = stmt.where(AuditLog.user_id == user_id)
     stmt = stmt.limit(per_page).offset((page - 1) * per_page)
     return db.session.execute(stmt).scalars().all()
+
+
+def count_logs(entity_type: str | None = None, user_id: int | None = None) -> int:
+    stmt = db.select(db.func.count(AuditLog.id))
+    if entity_type:
+        stmt = stmt.where(AuditLog.entity_type == entity_type)
+    if user_id:
+        stmt = stmt.where(AuditLog.user_id == user_id)
+    return db.session.execute(stmt).scalar() or 0

@@ -14,7 +14,12 @@
     <div class="page-header-title">Business Expenses (OPEX)</div>
     <div class="page-header-sub">Track operating expenses: rent, salary, utilities, transport, taxes and more</div>
   </div>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 align-items-start flex-column flex-md-row">
+    <div class="alert alert-info py-1 px-3 mb-0 small d-flex align-items-center gap-2" style="border-radius:8px">
+      <i class="bi bi-arrow-repeat"></i>
+      Expenses entered in <a href="{{ url_for('expenses.list_expenses') }}" class="alert-link">Expense Management</a>
+      are automatically synced here. You only need to enter data once.
+    </div>
     <input id="filterStart" type="date" class="form-control form-control-sm" style="max-width:160px" />
     <input id="filterEnd" type="date" class="form-control form-control-sm" style="max-width:160px" />
     <button class="btn btn-outline-secondary btn-sm" onclick="loadExpenses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>

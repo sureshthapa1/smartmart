@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from .ai_advisor_service import AIAdvisorService
 from .report_service import ReportService
+from ...services.cache_service import cached
 
 
 class DashboardService:
@@ -23,6 +24,7 @@ class DashboardService:
         return today, today  # default: today
 
     @staticmethod
+    @cached("bi_dashboard", ttl=180)
     def payload(filter_key: str, start: date | None = None, end: date | None = None) -> dict:
         if start is None or end is None:
             start, end = DashboardService.resolve_range(filter_key)
