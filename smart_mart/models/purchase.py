@@ -11,6 +11,9 @@ class Purchase(db.Model):
     total_cost = db.Column(db.Numeric(10, 2), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    # Task 5: tax fields
+    tax_rate = db.Column(db.Numeric(5, 2), nullable=False, default=0)
+    tax_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
 
     # Relationships
     supplier = db.relationship("Supplier", back_populates="purchases")

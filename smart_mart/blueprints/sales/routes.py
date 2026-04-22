@@ -245,6 +245,48 @@ def customer_statement():
                            today=date.today())
 
 
+@sales_bp.route("/credit-notes", methods=["GET", "POST"])
+@login_required
+def credit_notes():
+    """Task 7: Credit notes list and creation."""
+    from ...models.credit_note import CreditNote
+    from ...models.sale import Sale as _Sale
+    if request.method == "POST":
+        sale_id = request.form.get("sale_id", "").strip()
+        amount = request.form.get("amount", "").strip()
+        reason = request.form.get("reason", "").strip() or None
+        errors = []
+        if not sale_id:
+            errors.append("Sale ID is required.")
+        if not amount:
+            errors.append("Amount is required.")
+        if errors:
+            for msg in errors:
+                flash(msg, "danger")
+        else:
+            try:
+                cn = CreditNote(
+                    sale_id=int(sale_id),
+                    amount=float(amount),
+                    reason=reason,
+                    issued_by=current_user.id,
+                )
+                db.session.add(cn)
+                db.session.commit()
+                flash(f"Credit note #{cn.id} issued successfully.", "success")
+                return redirect(url_for("sales.credit_notes"))
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Error creating credit note: {e}", "danger")
+    notes = db.session.execute(
+        db.select(CreditNote).order_by(CreditNote.created_at.desc()).limit(100)
+    ).scalars().all()
+    sales = db.session.execute(
+        db.select(_Sale).order_by(_Sale.sale_date.desc()).limit(200)
+    ).scalars().all()
+    return render_template("sales/credit_notes.html", notes=notes, sales=sales)
+
+
 @sales_bp.route("/<int:sale_id>/delete", methods=["POST"])
 @admin_required
 def delete_sale(sale_id):

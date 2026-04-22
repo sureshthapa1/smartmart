@@ -24,11 +24,20 @@ class Sale(db.Model):
     discount_note = db.Column(db.String(120), nullable=True)
     credit_due_date = db.Column(db.Date, nullable=True)   # collection reminder for credit/udharo
     credit_collected = db.Column(db.Boolean, nullable=False, default=False)
+    # Task 1: customer FK
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True)
+    # Task 2: promotion FK
+    promotion_id = db.Column(db.Integer, db.ForeignKey("promotions.id"), nullable=True)
+    # Task 5: tax fields
+    tax_rate = db.Column(db.Numeric(5, 2), nullable=False, default=0)
+    tax_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
 
     # Relationships
     user = db.relationship("User", back_populates="sales")
     items = db.relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
     returns = db.relationship("SaleReturn", back_populates="sale", cascade="all, delete-orphan")
+    customer = db.relationship("Customer", foreign_keys=[customer_id])
+    promotion = db.relationship("Promotion", foreign_keys=[promotion_id])
 
     def __repr__(self):
         return f"<Sale #{self.id} total={self.total_amount}>"

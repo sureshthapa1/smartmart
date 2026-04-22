@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Purchase Batches — BI{% endblock %}
+{% block page_title %}Purchase Batches{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Batches</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Purchase Batches</div>
+    <div class="page-header-sub">Manage BI purchase batches with cost allocation</div>
+  </div>
+  <div class="d-flex gap-2">
+    <select id="statusFilter" class="form-select form-select-sm" style="width:auto">
+      <option value="">All Statuses</option>
+      <option value="draft">Draft</option>
+      <option value="finalized">Finalized</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="loadBatches()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+  </div>
+</div>
+
+<div id="batchStats" class="row g-3 mb-4"></div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle" id="batchTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Supplier</th><th>Date</th><th>Status</th>
+          <th class="text-end">Subtotal</th><th class="text-end">Expenses</th>
+          <th class="text-end">Grand Total</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="batchBody">
+        <tr><td colspan="8" class="text-center text-muted py-5">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading batches...
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer d-flex justify-content-between align-items-center" id="pagination"></div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 20;
+
+function statusBadge(status) {
+  const map = { draft: 'warning', finalized: 'success' };
+  return `<span class="badge bg-${map[status] || 'secondary'}">${status}</span>`;
+}
+
+function fmt(n) {
+  return 'NPR ' + parseFloat(n).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+async function loadBatches(page = 1) {
+  currentPage = page;
+  const status = document.getElementById('statusFilter').value;
+  let url = `/api/bi/batch?page=${page}&per_page=${perPage}`;
+  if (status) url += `&status=${status}`;
+  const tbody = document.getElementById('batchBody');
+  tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</td></tr>';
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.batches || data.batches.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>No batches found.</td></tr>';
+      document.getElementById('pagination').innerHTML = '';
+      document.getElementById('batchStats').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = data.batches.map(b => `
+      <tr>
+        <td class="fw-semibold">#${b.id}</td>
+        <td>${b.supplier_name || '<span class="text-muted">—</span>'}</td>
+        <td class="text-muted">${b.purchase_date}</td>
+        <td>${statusBadge(b.status)}</td>
+        <td class="text-end">${fmt(b.subtotal_amount)}</td>
+        <td class="text-end text-muted">${fmt(b.shared_expense_total)}</td>
+        <td class="text-end fw-semibold">${fmt(b.grand_total)}</td>
+        <td>
+          <div class="d-flex gap-1">
+            <a href="/api/bi/batch/${b.id}" class="btn btn-sm btn-outline-primary" title="View JSON" target="_blank"><i class="bi bi-eye"></i></a>
+            ${b.status === 'draft' ? `
+              <button class="btn btn-sm btn-outline-success" onclick="finalizeBatch(${b.id})" title="Finalize"><i class="bi bi-check-circle"></i></button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteBatch(${b.id})" title="Delete"><i class="bi bi-trash"></i></button>
+            ` : ''}
+            <a href="/api/bi/batch/${b.id}/export-csv" class="btn btn-sm btn-outline-secondary" title="Export CSV"><i class="bi bi-download"></i></a>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    // Stats
+    const total = data.total;
+    const pages = Math.ceil(total / perPage);
+    document.getElementById('batchStats').innerHTML = `
+      <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5">${total}</div><div class="text-muted small">Total Batches</div></div></div>
+      <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5">${data.batches.filter(b=>b.status==='draft').length}</div><div class="text-muted small">Draft (this page)</div></div></div>
+      <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5">${data.batches.filter(b=>b.status==='finalized').length}</div><div class="text-muted small">Finalized (this page)</div></div></div>
+    `;
+    // Pagination
+    let pag = `<span class="text-muted small">Page ${page} of ${pages} (${total} total)</span><div class="d-flex gap-1">`;
+    if (page > 1) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadBatches(${page-1})">Prev</button>`;
+    if (page < pages) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadBatches(${page+1})">Next</button>`;
+    pag += '</div>';
+    document.getElementById('pagination').innerHTML = pag;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error loading batches: ${e.message}</td></tr>`;
+  }
+}
+
+async function finalizeBatch(id) {
+  if (!confirm(`Finalize batch #${id}? This cannot be undone.`)) return;
+  const res = await fetch(`/api/bi/batch/${id}/finalize`, {method: 'POST'});
+  const data = await res.json();
+  if (res.ok) { loadBatches(currentPage); }
+  else { alert(data.error || 'Failed to finalize batch.'); }
+}
+
+async function deleteBatch(id) {
+  if (!confirm(`Delete batch #${id}?`)) return;
+  const res = await fetch(`/api/bi/batch/${id}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (res.ok) { loadBatches(currentPage); }
+  else { alert(data.error || 'Failed to delete batch.'); }
+}
+
+document.getElementById('statusFilter').addEventListener('change', () => loadBatches(1));
+loadBatches();
+</script>
+{% endblock %}

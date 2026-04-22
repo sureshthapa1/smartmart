@@ -84,6 +84,7 @@ def complete_stock_take(take_id: int, user_id: int, apply_adjustments: bool = Tr
                 note=f"Stock take #{take.reference} reconciliation",
                 created_by=user_id,
                 timestamp=datetime.now(timezone.utc),
+                stock_take_id=take.id,  # Task 3: set FK
             ))
 
     take.status = "completed"

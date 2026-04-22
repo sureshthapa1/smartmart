@@ -125,6 +125,60 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "user_permissions", "can_manage_bi_batches", "BOOLEAN DEFAULT false"),
             ),
         ),
+        # ── New migrations ────────────────────────────────────────────────────
+        (
+            "2026_04_22_sale_customer_id",
+            "Add customer_id FK to sales table.",
+            lambda conn: _safe_add_column(conn, "sales", "customer_id", "INTEGER REFERENCES customers(id)"),
+        ),
+        (
+            "2026_04_22_sale_promotion_id",
+            "Add promotion_id FK to sales table.",
+            lambda conn: _safe_add_column(conn, "sales", "promotion_id", "INTEGER REFERENCES promotions(id)"),
+        ),
+        (
+            "2026_04_22_stock_movement_stock_take_id",
+            "Add stock_take_id FK to stock_movements table.",
+            lambda conn: _safe_add_column(conn, "stock_movements", "stock_take_id", "INTEGER REFERENCES stock_takes(id)"),
+        ),
+        (
+            "2026_04_22_sale_tax_fields",
+            "Add tax_rate and tax_amount to sales table.",
+            lambda conn: (
+                _safe_add_column(conn, "sales", "tax_rate", "NUMERIC(5,2) DEFAULT 0"),
+                _safe_add_column(conn, "sales", "tax_amount", "NUMERIC(10,2) DEFAULT 0"),
+            ),
+        ),
+        (
+            "2026_04_22_purchase_tax_fields",
+            "Add tax_rate and tax_amount to purchases table.",
+            lambda conn: (
+                _safe_add_column(conn, "purchases", "tax_rate", "NUMERIC(5,2) DEFAULT 0"),
+                _safe_add_column(conn, "purchases", "tax_amount", "NUMERIC(10,2) DEFAULT 0"),
+            ),
+        ),
+        (
+            "2026_04_22_credit_notes_table",
+            "Create credit_notes table.",
+            lambda conn: conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS credit_notes ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "sale_id INTEGER NOT NULL REFERENCES sales(id), "
+                "amount NUMERIC(10,2) NOT NULL, "
+                "reason TEXT, "
+                "issued_by INTEGER NOT NULL REFERENCES users(id), "
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )),
+        ),
+        (
+            "2026_04_22_bi_batch_items_lot_tracking",
+            "Add lot_number and batch_expiry to bi_purchase_batch_items.",
+            lambda conn: (
+                _safe_add_column(conn, "bi_purchase_batch_items", "lot_number", "VARCHAR(80)"),
+                _safe_add_column(conn, "bi_purchase_batch_items", "batch_expiry", "DATE"),
+            ),
+        ),
     ]
 
 

@@ -27,6 +27,7 @@
           {% if current_user.role == 'admin' %}
           <td>
             <div class="d-flex gap-1">
+              <a href="{{ url_for('purchases.supplier_performance', supplier_id=s.id) }}" class="btn btn-sm btn-outline-info" title="Performance"><i class="bi bi-graph-up"></i></a>
               <a href="{{ url_for('purchases.edit_supplier', supplier_id=s.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
               <form method="post" action="{{ url_for('purchases.delete_supplier', supplier_id=s.id) }}" class="d-inline" onsubmit="return confirm('Delete {{ s.name }}?')">
                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

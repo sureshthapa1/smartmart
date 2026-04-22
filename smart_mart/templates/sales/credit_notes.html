@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Credit Notes — Smart Mart{% endblock %}
+{% block page_title %}Credit Notes{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">Sales</a></li>
+<li class="breadcrumb-item active">Credit Notes</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Credit Notes</div>
+    <div class="page-header-sub">Issue and manage credit notes for sales</div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Issue Credit Note</div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Sale</label>
+            <select name="sale_id" class="form-select" required>
+              <option value="">— Select Sale —</option>
+              {% for s in sales %}
+              <option value="{{ s.id }}">#{{ s.id }} — {{ s.customer_name or 'Walk-in' }} — NPR {{ s.total_amount }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Amount (NPR)</label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reason</label>
+            <textarea name="reason" class="form-control" rows="2" placeholder="Optional reason..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Issue Credit Note</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold">Credit Notes ({{ notes|length }})</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr><th>#</th><th>Sale</th><th>Amount</th><th>Reason</th><th>Issued By</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            {% for cn in notes %}
+            <tr>
+              <td class="fw-semibold">{{ cn.id }}</td>
+              <td><a href="{{ url_for('sales.sale_detail', sale_id=cn.sale_id) }}">#{{ cn.sale_id }}</a></td>
+              <td class="text-success fw-semibold">NPR {{ "{:,.2f}".format(cn.amount) }}</td>
+              <td class="text-muted small">{{ cn.reason or '—' }}</td>
+              <td class="text-muted small">{{ cn.issuer.username if cn.issuer else '—' }}</td>
+              <td class="text-muted small">{{ cn.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-receipt fs-1 d-block mb-2 opacity-25"></i>No credit notes yet.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

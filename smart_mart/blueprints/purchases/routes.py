@@ -184,6 +184,50 @@ def edit_supplier(supplier_id):
     return render_template("purchases/supplier_form.html", supplier=supplier)
 
 
+@purchases_bp.route("/suppliers/<int:supplier_id>/performance")
+@login_required
+def supplier_performance(supplier_id):
+    """Task 6: Supplier performance page."""
+    from ...models.supplier import Supplier
+    from ...models.purchase import Purchase, PurchaseItem
+    from ...models.product import Product
+    from sqlalchemy import func
+    supplier = db.get_or_404(Supplier, supplier_id)
+    purchases = db.session.execute(
+        db.select(Purchase).where(Purchase.supplier_id == supplier_id)
+        .order_by(Purchase.purchase_date.desc())
+    ).scalars().all()
+    total_purchases = len(purchases)
+    total_spend = sum(float(p.total_cost) for p in purchases)
+    avg_cost = round(total_spend / total_purchases, 2) if total_purchases else 0
+    last_purchase_date = purchases[0].purchase_date if purchases else None
+    # Top products
+    top_products = db.session.execute(
+        db.select(
+            Product.name,
+            Product.sku,
+            func.sum(PurchaseItem.quantity).label("total_qty"),
+            func.sum(PurchaseItem.subtotal).label("total_spend"),
+        )
+        .join(PurchaseItem, PurchaseItem.product_id == Product.id)
+        .join(Purchase, Purchase.id == PurchaseItem.purchase_id)
+        .where(Purchase.supplier_id == supplier_id)
+        .group_by(Product.id, Product.name, Product.sku)
+        .order_by(func.sum(PurchaseItem.subtotal).desc())
+        .limit(10)
+    ).all()
+    return render_template(
+        "purchases/supplier_performance.html",
+        supplier=supplier,
+        total_purchases=total_purchases,
+        total_spend=total_spend,
+        avg_cost=avg_cost,
+        last_purchase_date=last_purchase_date,
+        top_products=top_products,
+        purchases=purchases[:10],
+    )
+
+
 @purchases_bp.route("/suppliers/<int:supplier_id>/delete", methods=["POST"])
 @admin_required
 def delete_supplier(supplier_id):

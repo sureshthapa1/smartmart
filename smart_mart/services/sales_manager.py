@@ -16,6 +16,20 @@ from ..models.stock_movement import StockMovement
 logger = logging.getLogger(__name__)
 
 
+def _generate_invoice_number() -> str:
+    """Generate invoice number in format INV-YYYYMMDD-XXXX (Task 4)."""
+    from datetime import date as _date
+    today_str = _date.today().strftime("%Y%m%d")
+    prefix = f"INV-{today_str}-"
+    # Count existing invoices with today's prefix to get next sequence
+    count = db.session.execute(
+        db.select(db.func.count(Sale.id)).where(
+            Sale.invoice_number.like(f"{prefix}%")
+        )
+    ).scalar() or 0
+    return f"{prefix}{count + 1:04d}"
+
+
 class InsufficientStockError(ValueError):
     """Raised when a sale item quantity exceeds available product stock."""
 
@@ -24,7 +38,8 @@ def create_sale(items: list[dict], user_id: int,
                 customer_name: str = None, customer_address: str = None,
                 customer_phone: str = None, payment_mode: str = "cash",
                 discount_amount: float = 0, discount_note: str = None,
-                wallet_redeem_points: int = 0) -> Sale:
+                wallet_redeem_points: int = 0,
+                promotion_id: int = None) -> Sale:
     """Create a confirmed sale."""
     products: dict[int, Product] = {}
     for item in items:
@@ -44,9 +59,7 @@ def create_sale(items: list[dict], user_id: int,
     try:
         invoice_number = None
         try:
-            from ..models.shop_settings import ShopSettings
-            settings = ShopSettings.get()
-            invoice_number = settings.next_invoice_number()
+            invoice_number = _generate_invoice_number()
         except Exception as exc:
             logger.warning("Invoice number generation failed; using fallback invoice id: %s", exc)
 
@@ -81,6 +94,7 @@ def create_sale(items: list[dict], user_id: int,
             payment_mode=payment_mode or "cash",
             discount_amount=(discount_amount or 0) + loyalty_discount_amount,
             discount_note=discount_note,
+            promotion_id=promotion_id,
         )
         db.session.add(sale)
         db.session.flush()
@@ -114,6 +128,14 @@ def create_sale(items: list[dict], user_id: int,
             if customer_name and customer_name.strip().lower() != "walk-in customer":
                 Customer.upsert(customer_name, customer_phone, customer_address)
                 db.session.flush()
+                # Task 1: auto-populate customer_id FK
+                cust = db.session.execute(
+                    db.select(Customer).where(
+                        db.func.lower(Customer.name) == customer_name.strip().lower()
+                    )
+                ).scalar_one_or_none()
+                if cust:
+                    sale.customer_id = cust.id
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning("Customer upsert failed: %s", e)

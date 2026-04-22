@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Supplier Performance — {{ supplier.name }}{% endblock %}
+{% block page_title %}Supplier Performance{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('purchases.list_purchases') }}" class="text-decoration-none">Purchases</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('purchases.list_suppliers') }}" class="text-decoration-none">Suppliers</a></li>
+<li class="breadcrumb-item active">{{ supplier.name }}</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">{{ supplier.name }}</div>
+    <div class="page-header-sub">Supplier Performance Overview</div>
+  </div>
+  <a href="{{ url_for('purchases.list_suppliers') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-primary">{{ total_purchases }}</div>
+        <div class="text-muted small">Total Purchases</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-success">NPR {{ "{:,.2f}".format(total_spend) }}</div>
+        <div class="text-muted small">Total Spend</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-info">NPR {{ "{:,.2f}".format(avg_cost) }}</div>
+        <div class="text-muted small">Avg Cost / Purchase</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <div class="fs-2 fw-bold text-warning">{{ last_purchase_date or '—' }}</div>
+        <div class="text-muted small">Last Purchase Date</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header fw-semibold">Top Products Purchased</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>Product</th><th>SKU</th><th class="text-end">Qty</th><th class="text-end">Spend (NPR)</th></tr></thead>
+          <tbody>
+            {% for p in top_products %}
+            <tr>
+              <td class="fw-semibold">{{ p.name }}</td>
+              <td class="text-muted small">{{ p.sku or '—' }}</td>
+              <td class="text-end">{{ p.total_qty }}</td>
+              <td class="text-end">{{ "{:,.2f}".format(p.total_spend) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-4">No products yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header fw-semibold">Recent Purchases</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th>#</th><th>Date</th><th class="text-end">Total (NPR)</th></tr></thead>
+          <tbody>
+            {% for p in purchases %}
+            <tr>
+              <td><a href="{{ url_for('purchases.purchase_detail', purchase_id=p.id) }}">#{{ p.id }}</a></td>
+              <td class="text-muted">{{ p.purchase_date }}</td>
+              <td class="text-end fw-semibold">{{ "{:,.2f}".format(p.total_cost) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-4">No purchases yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -577,3 +577,15 @@ def customer_analysis():
     data = report_engine.customer_analysis(start, end)
     return render_template("reports/customer_analysis.html",
                            data=data, start_date=start_raw, end_date=end_raw)
+
+
+@reports_bp.route("/bi-profit-loss")
+@login_required
+def bi_profit_loss():
+    """Task 9: BI-powered P&L report."""
+    _require_perm("can_view_profit_report")
+    from ...bi.services.report_service import ReportService
+    start, end, start_raw, end_raw = _get_date_range()
+    data = ReportService.profit_and_loss(start, end)
+    return render_template("reports/bi_profit_loss.html",
+                           data=data, start_date=start_raw, end_date=end_raw)

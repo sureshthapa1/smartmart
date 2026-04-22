@@ -450,6 +450,14 @@ def bi_dashboard_page():
     return render_template("bi/dashboard.html")
 
 
+@bi_dashboard_bp.route("/batches", methods=["GET"])
+@login_required
+def bi_batches_page():
+    """Task 10: BI Batch UI page."""
+    _require_bi_perm("can_view_purchases")
+    return render_template("bi/batches.html")
+
+
 # ── Error handlers ────────────────────────────────────────────────────────────
 
 @bi_bp.errorhandler(ValueError)

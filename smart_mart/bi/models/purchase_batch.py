@@ -42,6 +42,9 @@ class PurchaseBatchItem(db.Model):
     allocated_cost_per_unit = db.Column(db.Numeric(14, 4), nullable=False, default=0)
     final_cost = db.Column(db.Numeric(14, 4), nullable=False, default=0)
     allocation_detail = db.Column(db.JSON, nullable=True)
+    # Task 8: lot/batch tracking
+    lot_number = db.Column(db.String(80), nullable=True)
+    batch_expiry = db.Column(db.Date, nullable=True)
 
     batch = db.relationship("PurchaseBatch", back_populates="items")
     product = db.relationship("Product")

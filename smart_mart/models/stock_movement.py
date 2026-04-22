@@ -13,6 +13,8 @@ class StockMovement(db.Model):
     note = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    # Task 3: stock_take FK
+    stock_take_id = db.Column(db.Integer, db.ForeignKey("stock_takes.id"), nullable=True)
 
     # Relationships
     product = db.relationship("Product", back_populates="stock_movements")
