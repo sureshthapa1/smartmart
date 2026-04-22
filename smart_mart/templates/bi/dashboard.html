@@ -57,12 +57,24 @@
   <a href="{{ url_for('bi_dashboard.bi_batches_page') }}" class="btn btn-outline-secondary btn-sm ms-auto">
     <i class="bi bi-box-seam me-1"></i>Purchase Batches
   </a>
+  <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-warning btn-sm">
+    <i class="bi bi-plus-circle me-1"></i>Add OPEX
+  </a>
 </div>
 
 <div id="loading" class="alert alert-info d-none">Loading BI dashboard…</div>
 <div id="error" class="alert alert-danger d-none"></div>
 
 <div class="kpi-grid" id="kpis"></div>
+
+<!-- OPEX Summary -->
+<div id="opexSummaryBar" class="alert alert-warning d-none mb-3 d-flex align-items-center gap-3">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div class="flex-grow-1" id="opexSummaryText"></div>
+  <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-warning btn-sm text-nowrap">
+    <i class="bi bi-plus-circle me-1"></i>Manage OPEX
+  </a>
+</div>
 
 <div class="bi-shell">
   <div>
@@ -136,8 +148,7 @@
 
     <!-- Profit Simulation -->
     <div class="panel">
-      <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2 text-primary"></i>Profit Simulator</h6>
-      <div class="mb-2">
+      <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2 text-primary"></i>Profit Simulator</h6>      <div class="mb-2">
         <label class="form-label small">Product</label>
         <select id="simProduct" class="form-select form-select-sm">
           <option value="">Select product…</option>
@@ -161,6 +172,15 @@
         <i class="bi bi-play-fill me-1"></i>Run Simulation
       </button>
       <div id="simResult" class="d-none"></div>
+    </div>
+
+    <!-- Smart Warnings -->
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Smart Warnings</h6>
+        <span id="warningCount" class="badge bg-danger">0</span>
+      </div>
+      <div id="smartWarnings"><div class="text-muted small">Loading…</div></div>
     </div>
   </div>
 </div>
@@ -311,6 +331,14 @@ async function loadDashboard(){
     lineChart('profitTrend', json.profit_trend.labels, json.profit_trend.data, 'Profit', '#219653');
     if(json.expense_breakdown.labels.length)
       pieChart('expensePie', json.expense_breakdown.labels, json.expense_breakdown.data);
+    else {
+      const wrap = document.getElementById('expensePie').parentElement;
+      wrap.innerHTML = `<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+        <i class="bi bi-pie-chart fs-1 opacity-25 mb-2"></i>
+        <div class="small">No OPEX data recorded yet.</div>
+        <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-sm btn-warning mt-2"><i class="bi bi-plus-circle me-1"></i>Add OPEX</a>
+      </div>`;
+    }
     if(json.product_performance.labels.length)
       barChart('productBar', json.product_performance.labels, json.product_performance.data);
 
@@ -332,12 +360,59 @@ async function loadDashboard(){
     const exportUrl = buildExportUrl();
     document.getElementById('exportCsv').href = exportUrl;
     document.getElementById('exportCsv2').href = exportUrl;
+
+    // OPEX summary bar
+    const opex = json.kpis?.opex || 0;
+    const opexBar = document.getElementById('opexSummaryBar');
+    if (opex === 0) {
+      document.getElementById('opexSummaryText').innerHTML = '<strong>No OPEX recorded</strong> for this period. Add operating expenses to get accurate net profit calculations.';
+      opexBar.classList.remove('d-none');
+    } else {
+      document.getElementById('opexSummaryText').innerHTML = `Total OPEX for period: <strong>NPR ${Number(opex).toLocaleString('en-IN', {minimumFractionDigits:2})}</strong>`;
+      opexBar.classList.remove('d-none');
+      opexBar.className = 'alert alert-info d-flex align-items-center gap-3 mb-3';
+    }
+
+    // Smart warnings
+    loadSmartWarnings();
   } catch(e){
     const el = document.getElementById('error');
     el.textContent = `Failed to load dashboard: ${e.message}`;
     el.classList.remove('d-none');
   } finally {
     document.getElementById('loading').classList.add('d-none');
+  }
+}
+
+async function loadSmartWarnings() {
+  const start = document.getElementById('start').value;
+  const end   = document.getElementById('end').value;
+  const params = new URLSearchParams();
+  if(start) params.set('start', start);
+  if(end)   params.set('end', end);
+  try {
+    const res = await fetch(`/api/bi/reports/smart-warnings?${params.toString()}`);
+    if(!res.ok) return;
+    const data = await res.json();
+    const warnings = (data.warnings || []).filter(w => w.severity === 'critical' || w.severity === 'high');
+    document.getElementById('warningCount').textContent = warnings.length;
+    if(!warnings.length) {
+      document.getElementById('smartWarnings').innerHTML = '<div class="text-success small"><i class="bi bi-check-circle me-1"></i>No critical warnings.</div>';
+      return;
+    }
+    const severityColor = {critical: 'danger', high: 'warning'};
+    document.getElementById('smartWarnings').innerHTML = warnings.map(w => `
+      <div class="d-flex align-items-start gap-2 mb-2 p-2 rounded border border-${severityColor[w.severity]||'secondary'} bg-${w.severity==='critical'?'danger':'warning'} bg-opacity-10">
+        <span class="badge bg-${severityColor[w.severity]||'secondary'} text-nowrap">${w.severity}</span>
+        <div class="small flex-grow-1">
+          <div class="fw-semibold">${w.message || w.title || ''}</div>
+          ${w.product_name ? `<div class="text-muted">${w.product_name}${w.sku ? ' · ' + w.sku : ''}</div>` : ''}
+          ${w.detail ? `<div class="text-muted">${w.detail}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('smartWarnings').innerHTML = '<div class="text-muted small">Could not load warnings.</div>';
   }
 }
 

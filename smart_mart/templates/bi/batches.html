@@ -17,11 +17,101 @@
       <option value="draft">Draft</option>
       <option value="finalized">Finalized</option>
     </select>
-    <button class="btn btn-primary btn-sm" onclick="loadBatches()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadBatches()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createBatchModal">
+      <i class="bi bi-plus-lg me-1"></i>Create Batch
+    </button>
   </div>
 </div>
 
 <div id="batchStats" class="row g-3 mb-4"></div>
+
+<!-- Batch Detail Panel (shown when a batch is selected) -->
+<div id="batchDetail" class="card mb-4 d-none">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-bold" id="detailTitle">Batch Detail</h6>
+    <button class="btn btn-sm btn-outline-secondary" onclick="closeDetail()"><i class="bi bi-x-lg"></i> Close</button>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3" id="detailMeta"></div>
+
+    <div class="row g-3">
+      <!-- Items -->
+      <div class="col-md-7">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 fw-semibold">Items</h6>
+          <button class="btn btn-sm btn-outline-primary" id="addItemBtn" onclick="showAddItemForm()"><i class="bi bi-plus-lg me-1"></i>Add Item</button>
+        </div>
+        <div id="addItemForm" class="card p-3 mb-2 d-none">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small">Product</label>
+              <select id="itemProduct" class="form-select form-select-sm">
+                <option value="">Loading products…</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Quantity</label>
+              <input type="number" id="itemQty" class="form-control form-control-sm" min="1" value="1" />
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Purchase Price (NPR)</label>
+              <input type="number" id="itemPrice" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-sm btn-primary" onclick="addItem()">Add</button>
+              <button class="btn btn-sm btn-secondary" onclick="document.getElementById('addItemForm').classList.add('d-none')">Cancel</button>
+            </div>
+            <div id="addItemError" class="col-12 text-danger small d-none"></div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead><tr><th>Product</th><th class="text-end">Qty</th><th class="text-end">Price</th><th class="text-end">Allocated</th><th class="text-end">Final Cost/u</th><th></th></tr></thead>
+            <tbody id="detailItems"><tr><td colspan="6" class="text-muted text-center py-3">No items yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Shared Expenses -->
+      <div class="col-md-5">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 fw-semibold">Shared Expenses</h6>
+          <button class="btn btn-sm btn-outline-primary" id="addExpBtn" onclick="showAddExpForm()"><i class="bi bi-plus-lg me-1"></i>Add</button>
+        </div>
+        <div id="addExpForm" class="card p-3 mb-2 d-none">
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label small">Type</label>
+              <select id="expType" class="form-select form-select-sm">
+                <option value="transport">Transport</option>
+                <option value="tax">Tax</option>
+                <option value="customs">Customs</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Amount (NPR)</label>
+              <input type="number" id="expAmt" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-sm btn-primary" onclick="addBatchExpense()">Add</button>
+              <button class="btn btn-sm btn-secondary" onclick="document.getElementById('addExpForm').classList.add('d-none')">Cancel</button>
+            </div>
+            <div id="addExpError" class="col-12 text-danger small d-none"></div>
+          </div>
+        </div>
+        <div id="detailExpenses" class="text-muted small">No shared expenses.</div>
+
+        <!-- Allocation Summary -->
+        <div class="mt-3 p-3 bg-light rounded" id="allocationSummary" style="font-size:13px"></div>
+
+        <!-- Actions -->
+        <div class="mt-3 d-flex gap-2" id="detailActions"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="card">
   <div class="table-responsive">
@@ -46,6 +136,8 @@
 <script>
 let currentPage = 1;
 const perPage = 20;
+let activeBatchId = null;
+let allProducts = [];
 
 function statusBadge(status) {
   const map = { draft: 'warning', finalized: 'success' };
@@ -83,6 +175,7 @@ async function loadBatches(page = 1) {
         <td class="text-end fw-semibold">${fmt(b.grand_total)}</td>
         <td>
           <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-info" onclick="openDetail(${b.id})" title="Manage"><i class="bi bi-pencil-square"></i></button>
             <a href="/api/bi/batch/${b.id}" class="btn btn-sm btn-outline-primary" title="View JSON" target="_blank"><i class="bi bi-eye"></i></a>
             ${b.status === 'draft' ? `
               <button class="btn btn-sm btn-outline-success" onclick="finalizeBatch(${b.id})" title="Finalize"><i class="bi bi-check-circle"></i></button>
@@ -116,7 +209,7 @@ async function finalizeBatch(id) {
   if (!confirm(`Finalize batch #${id}? This cannot be undone.`)) return;
   const res = await fetch(`/api/bi/batch/${id}/finalize`, {method: 'POST'});
   const data = await res.json();
-  if (res.ok) { loadBatches(currentPage); }
+  if (res.ok) { loadBatches(currentPage); if (activeBatchId === id) closeDetail(); }
   else { alert(data.error || 'Failed to finalize batch.'); }
 }
 
@@ -124,11 +217,233 @@ async function deleteBatch(id) {
   if (!confirm(`Delete batch #${id}?`)) return;
   const res = await fetch(`/api/bi/batch/${id}`, {method: 'DELETE'});
   const data = await res.json();
-  if (res.ok) { loadBatches(currentPage); }
+  if (res.ok) { loadBatches(currentPage); if (activeBatchId === id) closeDetail(); }
   else { alert(data.error || 'Failed to delete batch.'); }
+}
+
+// ── Create Batch ──────────────────────────────────────────────────────────────
+async function createBatch() {
+  const supplier = document.getElementById('newSupplier').value.trim();
+  const date = document.getElementById('newDate').value;
+  const method = document.getElementById('newMethod').value;
+  const errEl = document.getElementById('createBatchError');
+  if (!date) { errEl.textContent = 'Purchase date is required.'; errEl.classList.remove('d-none'); return; }
+  const btn = document.getElementById('createBatchBtn');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/bi/batch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({supplier_name: supplier || null, purchase_date: date, allocation_method: method}),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Failed to create batch.'; errEl.classList.remove('d-none'); return; }
+    bootstrap.Modal.getInstance(document.getElementById('createBatchModal')).hide();
+    loadBatches(1);
+    openDetail(data.id);
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message; errEl.classList.remove('d-none');
+  } finally { btn.disabled = false; }
+}
+
+// ── Batch Detail ──────────────────────────────────────────────────────────────
+async function openDetail(id) {
+  activeBatchId = id;
+  document.getElementById('batchDetail').classList.remove('d-none');
+  document.getElementById('batchDetail').scrollIntoView({behavior: 'smooth'});
+  await loadProducts();
+  await refreshDetail();
+}
+
+function closeDetail() {
+  activeBatchId = null;
+  document.getElementById('batchDetail').classList.add('d-none');
+}
+
+async function loadProducts() {
+  if (allProducts.length) return;
+  try {
+    const res = await fetch('/api/bi/products?per_page=200');
+    const data = await res.json();
+    allProducts = data.products || [];
+    const sel = document.getElementById('itemProduct');
+    sel.innerHTML = '<option value="">Select product…</option>' +
+      allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || ''})</option>`).join('');
+  } catch(e) { console.error('Failed to load products', e); }
+}
+
+async function refreshDetail() {
+  if (!activeBatchId) return;
+  try {
+    const res = await fetch(`/api/bi/batch/${activeBatchId}`);
+    const b = await res.json();
+    renderDetail(b);
+  } catch(e) { console.error('Failed to load batch detail', e); }
+}
+
+function renderDetail(b) {
+  document.getElementById('detailTitle').textContent = `Batch #${b.id} — ${b.supplier_name || 'No Supplier'} (${b.status})`;
+  document.getElementById('detailMeta').innerHTML = `
+    <div class="col-auto"><span class="text-muted small">Date:</span> <strong>${b.purchase_date}</strong></div>
+    <div class="col-auto"><span class="text-muted small">Method:</span> <strong>${b.allocation_method}</strong></div>
+    <div class="col-auto"><span class="text-muted small">Subtotal:</span> <strong>${fmt(b.subtotal_amount)}</strong></div>
+    <div class="col-auto"><span class="text-muted small">Expenses:</span> <strong>${fmt(b.shared_expense_total)}</strong></div>
+    <div class="col-auto"><span class="text-muted small">Grand Total:</span> <strong class="text-primary">${fmt(b.grand_total)}</strong></div>
+  `;
+
+  const isDraft = b.status === 'draft';
+  document.getElementById('addItemBtn').classList.toggle('d-none', !isDraft);
+  document.getElementById('addExpBtn').classList.toggle('d-none', !isDraft);
+
+  // Items
+  if (!b.items || !b.items.length) {
+    document.getElementById('detailItems').innerHTML = '<tr><td colspan="6" class="text-muted text-center py-3">No items yet.</td></tr>';
+  } else {
+    document.getElementById('detailItems').innerHTML = b.items.map(item => {
+      const pName = allProducts.find(p => p.id === item.product_id)?.name || `Product #${item.product_id}`;
+      return `<tr>
+        <td class="small">${pName}</td>
+        <td class="text-end small">${item.quantity}</td>
+        <td class="text-end small">${fmt(item.purchase_price)}</td>
+        <td class="text-end small">${fmt(item.allocated_total)}</td>
+        <td class="text-end small fw-semibold">${fmt(item.final_cost)}</td>
+        <td>${isDraft ? `<button class="btn btn-sm btn-outline-danger" onclick="removeItem(${item.id})"><i class="bi bi-trash"></i></button>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Expenses
+  if (!b.expenses || !b.expenses.length) {
+    document.getElementById('detailExpenses').innerHTML = '<div class="text-muted small">No shared expenses.</div>';
+  } else {
+    document.getElementById('detailExpenses').innerHTML = b.expenses.map(ex => `
+      <div class="d-flex justify-content-between align-items-center mb-1 small">
+        <span><span class="badge bg-secondary me-1">${ex.expense_type}</span></span>
+        <span class="fw-semibold">${fmt(ex.amount)}</span>
+        ${isDraft ? `<button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeBatchExpense(${ex.id})"><i class="bi bi-trash" style="font-size:11px"></i></button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Allocation summary
+  const snap = b.allocation_snapshot;
+  document.getElementById('allocationSummary').innerHTML = snap
+    ? `<div class="fw-semibold mb-1">Allocation Snapshot</div><pre class="mb-0" style="font-size:11px;white-space:pre-wrap">${JSON.stringify(snap, null, 2)}</pre>`
+    : '<div class="text-muted small">No allocation calculated yet.</div>';
+
+  // Actions
+  document.getElementById('detailActions').innerHTML = isDraft ? `
+    <button class="btn btn-sm btn-outline-primary" onclick="recalculate()"><i class="bi bi-calculator me-1"></i>Recalculate</button>
+    <button class="btn btn-sm btn-success" onclick="finalizeBatch(${b.id})"><i class="bi bi-check-circle me-1"></i>Finalize</button>
+    <button class="btn btn-sm btn-outline-danger" onclick="deleteBatch(${b.id})"><i class="bi bi-trash me-1"></i>Delete</button>
+  ` : `<span class="badge bg-success fs-6">Finalized</span>`;
+}
+
+function showAddItemForm() { document.getElementById('addItemForm').classList.remove('d-none'); }
+function showAddExpForm() { document.getElementById('addExpForm').classList.remove('d-none'); }
+
+async function addItem() {
+  const product_id = document.getElementById('itemProduct').value;
+  const quantity = document.getElementById('itemQty').value;
+  const purchase_price = document.getElementById('itemPrice').value;
+  const errEl = document.getElementById('addItemError');
+  if (!product_id || !quantity || !purchase_price) {
+    errEl.textContent = 'All fields required.'; errEl.classList.remove('d-none'); return;
+  }
+  errEl.classList.add('d-none');
+  try {
+    const res = await fetch(`/api/bi/batch/${activeBatchId}/items`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({items: [{product_id: parseInt(product_id), quantity: parseInt(quantity), purchase_price: parseFloat(purchase_price)}]}),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Failed.'; errEl.classList.remove('d-none'); return; }
+    document.getElementById('addItemForm').classList.add('d-none');
+    renderDetail(data);
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('d-none'); }
+}
+
+async function removeItem(itemId) {
+  if (!confirm('Remove this item?')) return;
+  const res = await fetch(`/api/bi/batch/${activeBatchId}/items/${itemId}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (res.ok) renderDetail(data);
+  else alert(data.error || 'Failed to remove item.');
+}
+
+async function addBatchExpense() {
+  const expense_type = document.getElementById('expType').value;
+  const amount = document.getElementById('expAmt').value;
+  const errEl = document.getElementById('addExpError');
+  if (!amount) { errEl.textContent = 'Amount required.'; errEl.classList.remove('d-none'); return; }
+  errEl.classList.add('d-none');
+  try {
+    const res = await fetch(`/api/bi/batch/${activeBatchId}/expenses`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({expenses: [{expense_type, amount: parseFloat(amount)}]}),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Failed.'; errEl.classList.remove('d-none'); return; }
+    document.getElementById('addExpForm').classList.add('d-none');
+    renderDetail(data);
+  } catch(e) { errEl.textContent = e.message; errEl.classList.remove('d-none'); }
+}
+
+async function removeBatchExpense(expId) {
+  if (!confirm('Remove this expense?')) return;
+  const res = await fetch(`/api/bi/batch/${activeBatchId}/expenses/${expId}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (res.ok) renderDetail(data);
+  else alert(data.error || 'Failed to remove expense.');
+}
+
+async function recalculate() {
+  const res = await fetch(`/api/bi/batch/${activeBatchId}/recalculate`, {method: 'POST'});
+  const data = await res.json();
+  if (res.ok) renderDetail(data);
+  else alert(data.error || 'Failed to recalculate.');
 }
 
 document.getElementById('statusFilter').addEventListener('change', () => loadBatches(1));
 loadBatches();
 </script>
+
+<!-- Create Batch Modal -->
+<div class="modal fade" id="createBatchModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Create Purchase Batch</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Supplier Name</label>
+          <input type="text" id="newSupplier" class="form-control" placeholder="Optional supplier name" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Purchase Date <span class="text-danger">*</span></label>
+          <input type="date" id="newDate" class="form-control" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Allocation Method</label>
+          <select id="newMethod" class="form-select">
+            <option value="value">By Value (proportional to purchase price)</option>
+            <option value="quantity">By Quantity (equal per unit)</option>
+          </select>
+          <div class="form-text">Determines how shared expenses are distributed across items.</div>
+        </div>
+        <div id="createBatchError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="createBatchBtn" onclick="createBatch()">
+          <i class="bi bi-plus-lg me-1"></i>Create Batch
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -641,6 +641,14 @@ def bi_batches_page():
     return render_template("bi/batches.html")
 
 
+@bi_dashboard_bp.route("/opex", methods=["GET"])
+@login_required
+def bi_opex_page():
+    """OPEX management UI page."""
+    _require_bi_perm("can_view_expenses")
+    return render_template("bi/opex.html")
+
+
 # ── Error handlers ────────────────────────────────────────────────────────────
 
 @bi_bp.errorhandler(ValueError)

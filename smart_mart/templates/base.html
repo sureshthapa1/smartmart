@@ -580,6 +580,12 @@
                 <i class="bi bi-boxes"></i>BI Batches
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_opex_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_opex_page') }}">
+                <i class="bi bi-receipt"></i>Business Expenses
+              </a>
+            </li>
             {% endif %}
             {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_ai_insights) %}
             <li class="nav-item">

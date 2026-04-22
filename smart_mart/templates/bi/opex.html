@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}Business Expenses (OPEX) — BI{% endblock %}
+{% block page_title %}Business Expenses{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">OPEX</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Business Expenses (OPEX)</div>
+    <div class="page-header-sub">Track operating expenses: rent, salary, utilities, transport, taxes and more</div>
+  </div>
+  <div class="d-flex gap-2">
+    <input id="filterStart" type="date" class="form-control form-control-sm" style="max-width:160px" />
+    <input id="filterEnd" type="date" class="form-control form-control-sm" style="max-width:160px" />
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadExpenses()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#expenseModal" onclick="openAddModal()">
+      <i class="bi bi-plus-lg me-1"></i>Add Expense
+    </button>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4" id="opexSummary">
+  <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumMonth">—</div><div class="text-muted small">This Month</div></div></div>
+  <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumYear">—</div><div class="text-muted small">This Year</div></div></div>
+  <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumTotal">—</div><div class="text-muted small">Filtered Total</div></div></div>
+</div>
+
+<!-- Category Breakdown -->
+<div class="row g-3 mb-4">
+  <div class="col-md-5">
+    <div class="card p-3">
+      <h6 class="fw-bold mb-3">By Category</h6>
+      <div id="categoryBreakdown" class="text-muted small">Loading…</div>
+    </div>
+  </div>
+  <div class="col-md-7">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle" id="expenseTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Date</th><th>Category</th><th class="text-end">Amount</th>
+              <th>Payment</th><th>Note</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="expenseBody">
+            <tr><td colspan="7" class="text-center text-muted py-5">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer d-flex justify-content-between align-items-center" id="expensePagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="expenseModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="expenseModalTitle">Add Expense</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editExpenseId" />
+        <div class="mb-3">
+          <label class="form-label">Category <span class="text-danger">*</span></label>
+          <select id="expCategory" class="form-select" required>
+            <option value="">Select category…</option>
+            <option value="rent">Rent</option>
+            <option value="salary">Salary</option>
+            <option value="electricity">Electricity</option>
+            <option value="transport">Transport</option>
+            <option value="tax">Tax</option>
+            <option value="customs">Customs</option>
+            <option value="insurance">Insurance</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="marketing">Marketing</option>
+            <option value="misc">Miscellaneous</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Amount (NPR) <span class="text-danger">*</span></label>
+          <input type="number" id="expAmount" class="form-control" step="0.01" min="0.01" placeholder="0.00" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date <span class="text-danger">*</span></label>
+          <input type="date" id="expDate" class="form-control" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Payment Method</label>
+          <select id="expPayment" class="form-select">
+            <option value="cash">Cash</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="cheque">Cheque</option>
+            <option value="card">Card</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Note</label>
+          <textarea id="expNote" class="form-control" rows="2" placeholder="Optional note…"></textarea>
+        </div>
+        <div id="expenseModalError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveExpenseBtn" onclick="saveExpense()">
+          <span id="saveExpenseBtnText">Save Expense</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let expPage = 1;
+const expPerPage = 20;
+
+function fmt(n) {
+  return 'NPR ' + parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+const CATEGORY_ICONS = {
+  rent: '🏠', salary: '👤', electricity: '⚡', transport: '🚚',
+  tax: '🏛️', customs: '📦', insurance: '🛡️', maintenance: '🔧',
+  marketing: '📣', misc: '📋'
+};
+
+function catBadge(cat) {
+  const colors = {
+    rent: 'primary', salary: 'success', electricity: 'warning', transport: 'info',
+    tax: 'danger', customs: 'secondary', insurance: 'dark', maintenance: 'warning',
+    marketing: 'primary', misc: 'secondary'
+  };
+  return `<span class="badge bg-${colors[cat] || 'secondary'}">${CATEGORY_ICONS[cat] || ''} ${cat}</span>`;
+}
+
+async function loadExpenses(page = 1) {
+  expPage = page;
+  const start = document.getElementById('filterStart').value;
+  const end = document.getElementById('filterEnd').value;
+  let url = `/api/bi/expenses?page=${page}&per_page=${expPerPage}`;
+  if (start) url += `&start=${start}`;
+  if (end) url += `&end=${end}`;
+
+  const tbody = document.getElementById('expenseBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</td></tr>';
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const expenses = data.expenses || [];
+
+    if (!expenses.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>No expenses found. <a href="#" data-bs-toggle="modal" data-bs-target="#expenseModal" onclick="openAddModal()">Add one now</a>.</td></tr>';
+      document.getElementById('expensePagination').innerHTML = '';
+      renderSummary([]);
+      renderBreakdown([]);
+      return;
+    }
+
+    tbody.innerHTML = expenses.map(e => `
+      <tr>
+        <td class="text-muted small">#${e.id}</td>
+        <td class="small">${e.date || e.expense_date || ''}</td>
+        <td>${catBadge(e.category)}</td>
+        <td class="text-end fw-semibold">${fmt(e.amount)}</td>
+        <td class="text-muted small">${e.payment_method || '—'}</td>
+        <td class="text-muted small" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.note||'').replace(/"/g,'&quot;')}">${e.note || '—'}</td>
+        <td>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary" onclick="openEditModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteExpense(${e.id})" title="Delete"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    // Pagination
+    const total = data.total || 0;
+    const pages = Math.ceil(total / expPerPage);
+    let pag = `<span class="text-muted small">Page ${page} of ${pages} (${total} total)</span><div class="d-flex gap-1">`;
+    if (page > 1) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadExpenses(${page-1})">Prev</button>`;
+    if (page < pages) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadExpenses(${page+1})">Next</button>`;
+    pag += '</div>';
+    document.getElementById('expensePagination').innerHTML = pag;
+
+    renderSummary(expenses);
+    renderBreakdown(expenses);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderSummary(expenses) {
+  const now = new Date();
+  const thisMonth = expenses.filter(e => {
+    const d = new Date(e.date || e.expense_date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisYear = expenses.filter(e => new Date(e.date || e.expense_date).getFullYear() === now.getFullYear());
+  const total = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const monthTotal = thisMonth.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const yearTotal = thisYear.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  document.getElementById('sumMonth').textContent = fmt(monthTotal);
+  document.getElementById('sumYear').textContent = fmt(yearTotal);
+  document.getElementById('sumTotal').textContent = fmt(total);
+}
+
+function renderBreakdown(expenses) {
+  const byCategory = {};
+  expenses.forEach(e => {
+    byCategory[e.category] = (byCategory[e.category] || 0) + parseFloat(e.amount || 0);
+  });
+  const total = Object.values(byCategory).reduce((s, v) => s + v, 0);
+  const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) {
+    document.getElementById('categoryBreakdown').innerHTML = '<div class="text-muted">No data for selected period.</div>';
+    return;
+  }
+  document.getElementById('categoryBreakdown').innerHTML = sorted.map(([cat, amt]) => {
+    const pct = total > 0 ? ((amt / total) * 100).toFixed(1) : 0;
+    return `
+      <div class="mb-2">
+        <div class="d-flex justify-content-between small mb-1">
+          <span>${CATEGORY_ICONS[cat] || ''} ${cat}</span>
+          <span class="fw-semibold">${fmt(amt)} <span class="text-muted">(${pct}%)</span></span>
+        </div>
+        <div class="progress" style="height:6px">
+          <div class="progress-bar" style="width:${pct}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openAddModal() {
+  document.getElementById('expenseModalTitle').textContent = 'Add Expense';
+  document.getElementById('editExpenseId').value = '';
+  document.getElementById('expCategory').value = '';
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('expPayment').value = 'cash';
+  document.getElementById('expNote').value = '';
+  document.getElementById('expenseModalError').classList.add('d-none');
+  document.getElementById('saveExpenseBtnText').textContent = 'Save Expense';
+}
+
+function openEditModal(expense) {
+  document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
+  document.getElementById('editExpenseId').value = expense.id;
+  document.getElementById('expCategory').value = expense.category || '';
+  document.getElementById('expAmount').value = expense.amount || '';
+  document.getElementById('expDate').value = expense.date || expense.expense_date || '';
+  document.getElementById('expPayment').value = expense.payment_method || 'cash';
+  document.getElementById('expNote').value = expense.note || '';
+  document.getElementById('expenseModalError').classList.add('d-none');
+  document.getElementById('saveExpenseBtnText').textContent = 'Update Expense';
+  const modal = new bootstrap.Modal(document.getElementById('expenseModal'));
+  modal.show();
+}
+
+async function saveExpense() {
+  const id = document.getElementById('editExpenseId').value;
+  const category = document.getElementById('expCategory').value;
+  const amount = document.getElementById('expAmount').value;
+  const date = document.getElementById('expDate').value;
+  const payment_method = document.getElementById('expPayment').value;
+  const note = document.getElementById('expNote').value;
+  const errEl = document.getElementById('expenseModalError');
+
+  if (!category || !amount || !date) {
+    errEl.textContent = 'Category, amount and date are required.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+
+  const btn = document.getElementById('saveExpenseBtn');
+  btn.disabled = true;
+
+  try {
+    const url = id ? `/api/bi/expenses/${id}` : '/api/bi/expenses';
+    const method = id ? 'PATCH' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({category, amount: parseFloat(amount), date, payment_method, note}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Failed to save expense.';
+      errEl.classList.remove('d-none');
+      return;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('expenseModal')).hide();
+    loadExpenses(expPage);
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.classList.remove('d-none');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteExpense(id) {
+  if (!confirm(`Delete expense #${id}?`)) return;
+  const res = await fetch(`/api/bi/expenses/${id}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (res.ok) { loadExpenses(expPage); }
+  else { alert(data.error || 'Failed to delete expense.'); }
+}
+
+document.getElementById('filterStart').addEventListener('change', () => loadExpenses(1));
+document.getElementById('filterEnd').addEventListener('change', () => loadExpenses(1));
+loadExpenses();
+</script>
+{% endblock %}
