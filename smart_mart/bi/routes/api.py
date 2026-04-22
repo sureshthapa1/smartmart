@@ -258,6 +258,22 @@ def delete_expense(expense_id: int):
     return jsonify({"deleted": expense_id})
 
 
+# FIX 4: expense update endpoint
+@bi_bp.route("/expenses/<int:expense_id>", methods=["PATCH"])
+@login_required
+def update_expense(expense_id: int):
+    _require_bi_perm("can_manage_expenses")
+    expense = ExpenseService.update_opex(expense_id, request.get_json() or {})
+    return jsonify({
+        "id": expense.id,
+        "amount": decimal_to_float(expense.amount),
+        "category": expense.category,
+        "date": expense.expense_date.isoformat(),
+        "payment_method": expense.payment_method,
+        "note": expense.note,
+    })
+
+
 # ── Report endpoints ──────────────────────────────────────────────────────────
 
 @bi_bp.route("/reports/profit-loss", methods=["GET"])
@@ -278,16 +294,20 @@ def export_profit_loss_csv():
     data = ReportService.profit_and_loss(start, end)
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Product ID", "Revenue", "COGS", "Gross Profit", "Allocated OpEx", "Net Profit"])
+    # FIX 1: include product name + sku in CSV
+    writer.writerow(["Product ID", "Product Name", "SKU", "Revenue", "COGS",
+                     "Gross Profit", "Gross Margin %", "Allocated OpEx", "Net Profit"])
     for row in data.get("products", []):
         writer.writerow([
-            row["product_id"], row["revenue"], row["cogs"],
-            row["gross_profit"], row["allocated_opex"], row["net_profit"],
+            row["product_id"], row.get("product_name", ""), row.get("sku", ""),
+            row["revenue"], row["cogs"], row["gross_profit"],
+            row.get("gross_margin_pct", ""), row["allocated_opex"], row["net_profit"],
         ])
     overall = data.get("overall", {})
     writer.writerow([])
-    writer.writerow(["TOTAL", overall.get("sales"), overall.get("cogs"),
-                     overall.get("gross_profit"), overall.get("opex"), overall.get("net_profit")])
+    writer.writerow(["TOTAL", "", "", overall.get("sales"), overall.get("cogs"),
+                     overall.get("gross_profit"), overall.get("gross_margin_pct", ""),
+                     overall.get("opex"), overall.get("net_profit")])
     filename = f"pnl_{(start or date.today()).isoformat()}_{(end or date.today()).isoformat()}.csv"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}"})
@@ -301,6 +321,23 @@ def dashboard_data():
     start = _parse_date(request.args.get("start"))
     end = _parse_date(request.args.get("end"))
     return jsonify(DashboardService.payload(filter_key, start, end))
+
+
+# FIX 5: inventory ledger read endpoint
+@bi_bp.route("/inventory/ledger", methods=["GET"])
+@login_required
+def inventory_ledger():
+    _require_bi_perm("can_view_reports")
+    limit = min(500, max(1, int(request.args.get("limit", 100))))
+    offset = max(0, int(request.args.get("offset", 0)))
+    product_id = request.args.get("product_id", type=int)
+    movement_type = request.args.get("movement_type")
+    return jsonify(ExpenseService.list_ledger(
+        product_id=product_id,
+        movement_type=movement_type,
+        limit=limit,
+        offset=offset,
+    ))
 
 
 # ── AI Advisor endpoint ───────────────────────────────────────────────────────

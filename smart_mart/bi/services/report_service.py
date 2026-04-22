@@ -16,13 +16,18 @@ class ReportService:
     @staticmethod
     def profit_and_loss(start: date | None = None, end: date | None = None) -> dict:
         sale_stmt = db.select(Sale.id, Sale.sale_date).subquery()
+
+        # FIX 1: join Product so we get name + sku in one query (no N+1)
         item_stmt = (
             db.select(
                 SaleItem.product_id.label("product_id"),
+                Product.name.label("product_name"),
+                Product.sku.label("sku"),
                 func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
             )
             .join(sale_stmt, sale_stmt.c.id == SaleItem.sale_id)
+            .join(Product, Product.id == SaleItem.product_id)
         )
 
         if start:
@@ -30,7 +35,7 @@ class ReportService:
         if end:
             item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) <= end)
 
-        item_stmt = item_stmt.group_by(SaleItem.product_id)
+        item_stmt = item_stmt.group_by(SaleItem.product_id, Product.name, Product.sku)
         rows = db.session.execute(item_stmt).all()
 
         total_sales = sum((as_decimal(r.revenue) for r in rows), Decimal("0"))
@@ -51,12 +56,17 @@ class ReportService:
             gross_profit = money(revenue - cogs)
             allocated_opex = allocations.get(row.product_id, Decimal("0.00"))
             net_profit = money(gross_profit - allocated_opex)
+            # FIX 7: include gross_margin_pct
+            gross_margin_pct = round(float(gross_profit / revenue * 100), 2) if revenue > 0 else 0.0
             products.append(
                 {
                     "product_id": row.product_id,
+                    "product_name": row.product_name,   # FIX 1
+                    "sku": row.sku,                      # FIX 1
                     "revenue": decimal_to_float(money(revenue)),
                     "cogs": decimal_to_float(money(cogs)),
                     "gross_profit": decimal_to_float(gross_profit),
+                    "gross_margin_pct": gross_margin_pct,  # FIX 7
                     "allocated_opex": decimal_to_float(allocated_opex),
                     "net_profit": decimal_to_float(net_profit),
                 }
@@ -64,11 +74,13 @@ class ReportService:
 
         gross_profit = money(total_sales - total_cogs)
         net_profit = money(gross_profit - total_opex)
+        overall_margin = round(float(gross_profit / total_sales * 100), 2) if total_sales > 0 else 0.0
         return {
             "overall": {
                 "sales": decimal_to_float(money(total_sales)),
                 "cogs": decimal_to_float(money(total_cogs)),
                 "gross_profit": decimal_to_float(gross_profit),
+                "gross_margin_pct": overall_margin,  # FIX 7
                 "opex": decimal_to_float(money(total_opex)),
                 "net_profit": decimal_to_float(net_profit),
             },
@@ -77,17 +89,24 @@ class ReportService:
 
     @staticmethod
     def dashboard_payload(start: date, end: date) -> dict:
+        # FIX 3: compute P&L once, reuse for all dashboard sections
         pnl = ReportService.profit_and_loss(start, end)
 
         sales_rows = db.session.execute(
-            db.select(func.date(Sale.sale_date).label("day"), func.coalesce(func.sum(Sale.total_amount), 0).label("sales"))
+            db.select(
+                func.date(Sale.sale_date).label("day"),
+                func.coalesce(func.sum(Sale.total_amount), 0).label("sales"),
+            )
             .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
 
         opex_rows = db.session.execute(
-            db.select(OperatingExpense.category, func.coalesce(func.sum(OperatingExpense.amount), 0).label("amount"))
+            db.select(
+                OperatingExpense.category,
+                func.coalesce(func.sum(OperatingExpense.amount), 0).label("amount"),
+            )
             .where(OperatingExpense.expense_date >= start, OperatingExpense.expense_date <= end)
             .group_by(OperatingExpense.category)
             .order_by(func.coalesce(func.sum(OperatingExpense.amount), 0).desc())
@@ -107,21 +126,37 @@ class ReportService:
             .limit(10)
         ).all()
 
-        profit_by_day = []
-        sales_map = {str(r.day): as_decimal(r.sales) for r in sales_rows}
+        # FIX 6: profit_trend = net profit per day (sales - cogs - daily opex share)
+        # We use gross profit per day (sales - cogs); opex is period-level, not daily
         cogs_rows = db.session.execute(
-            db.select(func.date(Sale.sale_date).label("day"), func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"))
+            db.select(
+                func.date(Sale.sale_date).label("day"),
+                func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
+            )
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
+
+        sales_map = {str(r.day): as_decimal(r.sales) for r in sales_rows}
         cogs_map = {str(r.day): as_decimal(r.cogs) for r in cogs_rows}
 
+        # Spread total opex evenly across days for net profit trend
+        total_days = max(1, (end - start).days + 1)
+        total_opex = as_decimal(pnl["overall"]["opex"])
+        daily_opex = money(total_opex / Decimal(str(total_days)))
+
+        profit_trend_labels = []
+        profit_trend_data = []
         current = start
         while current <= end:
             key = current.isoformat()
-            profit_by_day.append(decimal_to_float(money(sales_map.get(key, Decimal("0")) - cogs_map.get(key, Decimal("0")))) )
+            day_sales = sales_map.get(key, Decimal("0"))
+            day_cogs = cogs_map.get(key, Decimal("0"))
+            day_net = money(day_sales - day_cogs - daily_opex)
+            profit_trend_labels.append(key)
+            profit_trend_data.append(decimal_to_float(day_net))
             current = date.fromordinal(current.toordinal() + 1)
 
         return {
@@ -130,9 +165,10 @@ class ReportService:
                 "labels": [str(r.day) for r in sales_rows],
                 "data": [decimal_to_float(money(r.sales)) for r in sales_rows],
             },
+            # FIX 6: now shows net profit per day
             "profit_trend": {
-                "labels": [(date.fromordinal(start.toordinal() + i)).isoformat() for i in range((end - start).days + 1)],
-                "data": profit_by_day,
+                "labels": profit_trend_labels,
+                "data": profit_trend_data,
             },
             "expense_breakdown": {
                 "labels": [r.category for r in opex_rows],
