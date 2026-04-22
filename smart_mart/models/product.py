@@ -17,6 +17,7 @@ class Product(db.Model):
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
+    inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
     image_filename = db.Column(db.String(255), nullable=True)

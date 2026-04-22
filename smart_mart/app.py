@@ -5,10 +5,15 @@ from flask import Flask, redirect, url_for, render_template, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
 from .extensions import db, login_manager, bcrypt
+from .services.schema_migrations import run_pending_migrations
 
 
 def _run_startup_migrations(app):
-    """Add any missing columns to the database. Safe to run on every startup."""
+    """Apply versioned schema migrations and surface failures in logs."""
+    applied = run_pending_migrations(app)
+    if applied:
+        app.logger.info("Startup migrations applied: %s", ", ".join(applied))
+    return
     from sqlalchemy import text, inspect
 
     def _col_exists(conn, table, column):
@@ -261,8 +266,8 @@ def create_app(config_name="development"):
             try:
                 _run_startup_migrations(app)
                 app.logger.info("Auto-migration triggered by missing column error")
-            except Exception:
-                pass
+            except Exception as migration_exc:
+                app.logger.exception("Auto-migration retry failed: %s", migration_exc)
         return render_template("errors/500.html"), 500
 
     return app
@@ -294,6 +299,8 @@ def _register_blueprints(app):
         (".blueprints.promotions", "promotions_bp"),
         (".blueprints.stock_take", "stock_take_bp"),
         (".blueprints.customers", "customers_bp"),
+        (".bi.routes", "bi_bp"),
+        (".bi.routes", "bi_dashboard_bp"),
     ]
 
     for module_path, bp_name in blueprints:

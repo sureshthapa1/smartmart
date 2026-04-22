@@ -47,6 +47,15 @@ from .stock_take import StockTake, StockTakeItem
 from .backup_log import BackupLog
 from .customer_risk_score import CustomerRiskScore
 from .recurring_expense import RecurringExpense
+from .schema_migration import SchemaMigrationRecord
+from ..bi.models import (
+    PurchaseBatch,
+    PurchaseBatchItem,
+    PurchaseBatchExpense,
+    InventoryLedgerEntry,
+    OperatingExpense,
+    CategoryMarginRule,
+)
 
 __all__ = [
     "User", "Supplier", "Category", "Product",
@@ -74,4 +83,11 @@ __all__ = [
     "BackupLog",
     "CustomerRiskScore",
     "RecurringExpense",
+    "SchemaMigrationRecord",
+    "PurchaseBatch",
+    "PurchaseBatchItem",
+    "PurchaseBatchExpense",
+    "InventoryLedgerEntry",
+    "OperatingExpense",
+    "CategoryMarginRule",
 ]
