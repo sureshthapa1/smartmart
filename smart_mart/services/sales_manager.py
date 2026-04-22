@@ -237,6 +237,14 @@ def delete_sale(sale_id: int) -> None:
                     created_by=sale.user_id,
                     timestamp=datetime.now(timezone.utc),
                 ))
+
+        # Reverse loyalty points earned on this sale
+        try:
+            from .loyalty_wallet_service import reverse_sale_points
+            reverse_sale_points(sale.id)
+        except Exception as e:
+            logger.warning("Loyalty reversal failed for sale %s: %s", sale.id, e)
+
         db.session.delete(sale)
         db.session.commit()
     except Exception:

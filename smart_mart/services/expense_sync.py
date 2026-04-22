@@ -35,8 +35,15 @@ def _get_opex_model():
 
 
 def sync_create(expense: Expense) -> None:
-    """Create a matching bi_operating_expenses row and store its id back."""
+    """Create a matching bi_operating_expenses row and store its id back.
+    
+    Purchase-type expenses are excluded — their cost is already captured
+    in COGS via SaleItem.cost_price. Including them in OPEX would double-count.
+    """
     try:
+        # Purchase costs are already in COGS — don't double-count in OPEX
+        if expense.expense_type == "purchase":
+            return
         OperatingExpense = _get_opex_model()
         opex = OperatingExpense(
             category=_TYPE_TO_CATEGORY.get(expense.expense_type, expense.expense_type),

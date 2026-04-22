@@ -166,3 +166,52 @@ def redeem_points_manual(wallet_id: int, points: int, reason: str):
         )
     )
     db.session.commit()
+
+
+def reverse_sale_points(sale_id: int) -> None:
+    """Reverse all loyalty points earned/redeemed for a deleted sale. Non-fatal."""
+    try:
+        txns = db.session.execute(
+            db.select(LoyaltyWalletTransaction).where(
+                LoyaltyWalletTransaction.sale_id == sale_id
+            )
+        ).scalars().all()
+        if not txns:
+            return
+        for txn in txns:
+            wallet = db.session.get(LoyaltyWallet, txn.wallet_id)
+            if wallet is None:
+                continue
+            # Reverse the points change
+            wallet.points_balance -= txn.points_change
+            wallet.points_balance = max(0, wallet.points_balance)
+            if txn.points_change > 0:
+                wallet.lifetime_points_earned = max(0, wallet.lifetime_points_earned - txn.points_change)
+            else:
+                wallet.lifetime_points_redeemed = max(0, wallet.lifetime_points_redeemed + txn.points_change)
+            wallet.tier = _tier_for_lifetime_points(wallet.lifetime_points_earned)
+            wallet.updated_at = datetime.now(timezone.utc)
+            db.session.delete(txn)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("reverse_sale_points failed for sale %s: %s", sale_id, e)
+
+
+def get_loyalty_summary() -> list[dict]:
+    """Return top customers by loyalty points for the operations dashboard."""
+    rows = db.session.execute(
+        db.select(LoyaltyWallet, Customer.name, Customer.phone)
+        .join(Customer, Customer.id == LoyaltyWallet.customer_id)
+        .order_by(LoyaltyWallet.points_balance.desc())
+        .limit(50)
+    ).all()
+    return [
+        {
+            "customer_name": r.name,
+            "phone": r.phone,
+            "points_balance": int(r.LoyaltyWallet.points_balance or 0),
+            "lifetime_earned": int(r.LoyaltyWallet.lifetime_points_earned or 0),
+            "tier": r.LoyaltyWallet.tier or "Silver",
+        }
+        for r in rows
+    ]

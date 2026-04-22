@@ -54,6 +54,8 @@ class ReportService:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date >= start)
         if end:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date <= end)
+        # Exclude purchase-type expenses — their cost is already in COGS via SaleItem.cost_price
+        opex_stmt = opex_stmt.where(OperatingExpense.category != "purchase")
         total_opex = as_decimal(db.session.execute(opex_stmt).scalar() or 0)
 
         products = []
@@ -170,6 +172,7 @@ class ReportService:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date >= start)
         if end:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date <= end)
+        opex_stmt = opex_stmt.where(OperatingExpense.category != "purchase")
         total_opex = as_decimal(db.session.execute(opex_stmt).scalar() or 0)
 
         # Allocate OPEX proportionally to simulated revenue
@@ -310,7 +313,10 @@ class ReportService:
         direct_stmt = db.select(
             OperatingExpense.product_id,
             func.coalesce(func.sum(OperatingExpense.amount), 0).label("direct_amount"),
-        ).where(OperatingExpense.product_id.isnot(None)).group_by(OperatingExpense.product_id)
+        ).where(
+            OperatingExpense.product_id.isnot(None),
+            OperatingExpense.category != "purchase",  # exclude purchase costs (already in COGS)
+        ).group_by(OperatingExpense.product_id)
         direct_rows = db.session.execute(direct_stmt).all()
         direct_map: dict[int, Decimal] = {r.product_id: as_decimal(r.direct_amount) for r in direct_rows}
         total_direct = sum(direct_map.values(), Decimal("0"))
@@ -429,6 +435,7 @@ class ReportService:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date >= start)
         if end:
             opex_stmt = opex_stmt.where(OperatingExpense.expense_date <= end)
+        opex_stmt = opex_stmt.where(OperatingExpense.category != "purchase")
         total_opex = as_decimal(db.session.execute(opex_stmt).scalar() or 0)
 
         categories = []
