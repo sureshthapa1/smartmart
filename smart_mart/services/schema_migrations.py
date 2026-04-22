@@ -121,6 +121,8 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "user_permissions", "can_view_advisor", "BOOLEAN DEFAULT false"),
                 _safe_add_column(conn, "user_permissions", "can_manage_credits", "BOOLEAN DEFAULT false"),
                 _safe_add_column(conn, "user_permissions", "can_manage_cash_session", "BOOLEAN DEFAULT false"),
+                _safe_add_column(conn, "user_permissions", "can_view_bi_dashboard", "BOOLEAN DEFAULT false"),
+                _safe_add_column(conn, "user_permissions", "can_manage_bi_batches", "BOOLEAN DEFAULT false"),
             ),
         ),
     ]

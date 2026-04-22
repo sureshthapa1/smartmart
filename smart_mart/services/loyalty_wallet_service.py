@@ -107,7 +107,7 @@ def apply_sale_points(
                 wallet_id=wallet.id,
                 sale_id=sale_id,
                 points_change=-redeemed_points,
-                rupee_value=Decimal(redeemed_points) * REDEEM_VALUE_PER_POINT,
+                rupee_value=Decimal(redeemed_points) * rupee_per_point,
                 reason="billing_redeem",
             )
         )

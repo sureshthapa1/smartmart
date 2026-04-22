@@ -19,6 +19,12 @@ class Customer(db.Model):
     visit_count = db.Column(db.Integer, default=1)
     last_visit = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     @classmethod
     def upsert(cls, name: str, phone: str = None, address: str = None):
@@ -37,12 +43,14 @@ class Customer(db.Model):
                 # Increment visit count on every sale (each sale = one visit)
                 existing.visit_count = (existing.visit_count or 0) + 1
                 existing.last_visit = datetime.now(timezone.utc)
+                existing.updated_at = datetime.now(timezone.utc)
             else:
                 db.session.add(cls(
                     name=name.strip(),
                     phone=phone or None,
                     address=address or None,
                     visit_count=1,
+                    updated_at=datetime.now(timezone.utc),
                 ))
         except Exception:
             db.session.rollback()

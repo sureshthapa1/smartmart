@@ -23,7 +23,29 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _upsert_customer(payload: dict) -> tuple[str, int]:
+class SyncConflictError(ValueError):
+    def __init__(self, message: str, entity_id: int | None = None):
+        super().__init__(message)
+        self.entity_id = entity_id
+
+
+def _normalize_ts(ts: datetime | None) -> datetime | None:
+    if ts is None:
+        return None
+    if ts.tzinfo is None:
+        return ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc)
+
+
+def _customer_last_modified(customer: Customer) -> datetime:
+    return _normalize_ts(customer.updated_at or customer.last_visit or customer.created_at) or _utcnow()
+
+
+def _product_last_modified(product: Product) -> datetime:
+    return _normalize_ts(product.updated_at or product.created_at) or _utcnow()
+
+
+def _upsert_customer(payload: dict, client_ts: datetime | None = None, force_apply: bool = False) -> tuple[str, int]:
     name = (payload.get("name") or "").strip()
     if not name:
         raise ValueError("Customer name is required for sync.")
@@ -35,13 +57,19 @@ def _upsert_customer(payload: dict) -> tuple[str, int]:
         db.session.add(customer)
         db.session.flush()
         return ("created", customer.id)
+    if not force_apply and client_ts and client_ts < _customer_last_modified(customer):
+        raise SyncConflictError(
+            "Customer has newer server changes. Review conflict before syncing.",
+            entity_id=customer.id,
+        )
     customer.phone = payload.get("phone") or customer.phone
     customer.address = payload.get("address") or customer.address
     customer.last_visit = _utcnow()
+    customer.updated_at = _utcnow()
     return ("updated", customer.id)
 
 
-def _upsert_product(payload: dict) -> tuple[str, int]:
+def _upsert_product(payload: dict, client_ts: datetime | None = None, force_apply: bool = False) -> tuple[str, int]:
     sku = (payload.get("sku") or "").strip()
     if not sku:
         raise ValueError("Product SKU is required for sync.")
@@ -58,6 +86,11 @@ def _upsert_product(payload: dict) -> tuple[str, int]:
         db.session.add(product)
         db.session.flush()
         return ("created", product.id)
+    if not force_apply and client_ts and client_ts < _product_last_modified(product):
+        raise SyncConflictError(
+            "Product has newer server changes. Review conflict before syncing.",
+            entity_id=product.id,
+        )
     product.name = payload.get("name") or product.name
     product.category = payload.get("category") or product.category
     if "quantity" in payload:
@@ -66,6 +99,7 @@ def _upsert_product(payload: dict) -> tuple[str, int]:
         product.selling_price = payload["selling_price"]
     if "cost_price" in payload:
         product.cost_price = payload["cost_price"]
+    product.updated_at = _utcnow()
     return ("updated", product.id)
 
 
@@ -79,7 +113,7 @@ def push_events(device_id: str, events: list[dict]) -> dict:
         entity_type = event.get("entity_type")
         operation = event.get("operation", "upsert")
         payload = event.get("payload") or {}
-        client_ts = _parse_ts(event.get("client_timestamp"))
+        client_ts = _normalize_ts(_parse_ts(event.get("client_timestamp")))
         status = "applied"
         conflict_reason = None
         entity_id = None
@@ -89,16 +123,17 @@ def push_events(device_id: str, events: list[dict]) -> dict:
                 status = "ignored"
                 conflict_reason = "Only upsert operation supported for now."
             elif entity_type == "customer":
-                action, entity_id = _upsert_customer(payload)
-                if action == "updated" and client_ts and client_ts < (_utcnow().replace(microsecond=0)):
-                    pass
+                _, entity_id = _upsert_customer(payload, client_ts=client_ts)
             elif entity_type == "product":
-                action, entity_id = _upsert_product(payload)
-                if action == "updated" and client_ts and client_ts < (_utcnow().replace(microsecond=0)):
-                    pass
+                _, entity_id = _upsert_product(payload, client_ts=client_ts)
             else:
                 status = "ignored"
                 conflict_reason = f"Unsupported entity_type: {entity_type}"
+        except SyncConflictError as exc:
+            status = "conflict"
+            conflict_reason = str(exc)
+            entity_id = exc.entity_id
+            conflicts += 1
         except ValueError as exc:
             status = "conflict"
             conflict_reason = str(exc)
@@ -188,13 +223,15 @@ def resolve_conflict(sync_event_id: int, strategy: str) -> dict:
         event.conflict_reason = "Resolved with server_wins strategy."
     elif strategy == "client_wins":
         if event.entity_type == "customer":
-            _upsert_customer(payload)
+            _, entity_id = _upsert_customer(payload, client_ts=event.client_timestamp, force_apply=True)
             event.status = "applied"
             event.conflict_reason = None
+            event.entity_id = str(entity_id)
         elif event.entity_type == "product":
-            _upsert_product(payload)
+            _, entity_id = _upsert_product(payload, client_ts=event.client_timestamp, force_apply=True)
             event.status = "applied"
             event.conflict_reason = None
+            event.entity_id = str(entity_id)
         else:
             raise ValueError(f"Unsupported entity_type for client_wins: {event.entity_type}")
     else:

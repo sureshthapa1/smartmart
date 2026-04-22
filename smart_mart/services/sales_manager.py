@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -11,6 +12,8 @@ from ..extensions import db
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
 from ..models.stock_movement import StockMovement
+
+logger = logging.getLogger(__name__)
 
 
 class InsufficientStockError(ValueError):
@@ -44,25 +47,29 @@ def create_sale(items: list[dict], user_id: int,
             from ..models.shop_settings import ShopSettings
             settings = ShopSettings.get()
             invoice_number = settings.next_invoice_number()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Invoice number generation failed; using fallback invoice id: %s", exc)
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
         total_amount = max(0, gross_total_amount - (discount_amount or 0))
 
         redeemed_points = 0
-        try:
-            from . import loyalty_wallet_service
-            wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
+        loyalty_discount_amount = 0.0
+        wallet = None
+        from . import loyalty_wallet_service
+        wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
+        if wallet_redeem_points:
             redeem_preview = loyalty_wallet_service.preview_redeem(
                 wallet, int(wallet_redeem_points or 0), total_amount
             )
             redeemed_points = int(redeem_preview["redeemed_points"])
+            loyalty_discount_amount = float(redeem_preview["discount"])
             total_amount = redeem_preview["payable_total"]
-            if redeemed_points > 0 and not discount_note:
-                discount_note = "Loyalty points redeemed"
-        except Exception:
-            wallet = None
+            if redeemed_points > 0:
+                if discount_note:
+                    discount_note = f"{discount_note}; Loyalty points redeemed"
+                else:
+                    discount_note = "Loyalty points redeemed"
         sale = Sale(
             user_id=user_id,
             total_amount=total_amount,
@@ -72,7 +79,7 @@ def create_sale(items: list[dict], user_id: int,
             customer_address=customer_address,
             customer_phone=customer_phone,
             payment_mode=payment_mode or "cash",
-            discount_amount=discount_amount or 0,
+            discount_amount=(discount_amount or 0) + loyalty_discount_amount,
             discount_note=discount_note,
         )
         db.session.add(sale)
@@ -111,16 +118,13 @@ def create_sale(items: list[dict], user_id: int,
             import logging
             logging.getLogger(__name__).warning("Customer upsert failed: %s", e)
 
-        try:
-            from . import loyalty_wallet_service
+        if wallet is not None:
             loyalty_wallet_service.apply_sale_points(
                 wallet=wallet,
                 sale_id=sale.id,
                 final_amount_paid=total_amount,
                 redeemed_points=redeemed_points,
             )
-        except Exception:
-            pass
 
         db.session.commit()
     except Exception:
@@ -135,8 +139,8 @@ def create_sale(items: list[dict], user_id: int,
                           changes={"total_amount": [None, str(sale.total_amount)],
                                    "payment_mode": [None, sale.payment_mode]})
         db.session.commit()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Sale audit logging failed for sale %s: %s", sale.id, exc)
 
     return sale
 

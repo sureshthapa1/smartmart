@@ -7,11 +7,21 @@ from ...services.ai_trend_analyzer import (
     seasonal_demand_patterns, trend_dashboard
 )
 from ...services.ai_invoice_detector import validate_sale_items
-from ...services.ai_profit_leak import profit_leak_dashboard, low_margin_products, discount_loss_analysis
+from ...services.ai_profit_leak import (
+    profit_leak_dashboard,
+    low_margin_products,
+    discount_loss_analysis,
+    detect_fraud_signals,
+)
 from ...services.ai_supplier_scorer import supplier_scorecard_all, score_supplier
 from ...services.ai_simulation import (
     simulate_sales_change, simulate_price_change,
-    simulate_expense_change, simulate_stock_out
+    simulate_expense_change, simulate_stock_out, simulate_product_scenario
+)
+from ...services.ai_growth_ops import (
+    auto_replenishment_plan,
+    create_auto_draft_purchase_orders,
+    optimize_product_prices,
 )
 from ...services.decorators import admin_required, login_required
 from ...extensions import db
@@ -217,6 +227,14 @@ def api_discount_losses():
     return jsonify(discount_loss_analysis(days))
 
 
+@ai_bp.route("/api/profit-leak/fraud-signals")
+@admin_required
+def api_fraud_signals():
+    """GET /ai/api/profit-leak/fraud-signals?days=30"""
+    days = int(request.args.get("days", 30))
+    return jsonify(detect_fraud_signals(days))
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MODULE 4: SUPPLIER SCORING APIs
 # ═══════════════════════════════════════════════════════════════════════════
@@ -233,6 +251,44 @@ def api_supplier_scorecard():
 def api_supplier_score(supplier_id):
     """GET /ai/api/suppliers/1/score"""
     return jsonify(score_supplier(supplier_id))
+
+
+@ai_bp.route("/api/replenishment/plan")
+@admin_required
+def api_replenishment_plan():
+    """GET /ai/api/replenishment/plan?lookback=30&safety=4&coverage=14"""
+    lookback = int(request.args.get("lookback", 30))
+    safety = int(request.args.get("safety", 4))
+    coverage = int(request.args.get("coverage", 14))
+    return jsonify(auto_replenishment_plan(lookback, safety, coverage))
+
+
+@ai_bp.route("/api/replenishment/create-drafts", methods=["POST"])
+@admin_required
+def api_replenishment_create_drafts():
+    """POST /ai/api/replenishment/create-drafts"""
+    from flask_login import current_user
+    data = request.get_json() or {}
+    lookback = int(data.get("lookback", 30))
+    safety = int(data.get("safety", 4))
+    coverage = int(data.get("coverage", 14))
+    result = create_auto_draft_purchase_orders(
+        user_id=current_user.id,
+        lookback_days=lookback,
+        safety_days=safety,
+        coverage_days=coverage,
+    )
+    return jsonify(result)
+
+
+@ai_bp.route("/api/pricing/optimize")
+@admin_required
+def api_pricing_optimize():
+    """GET /ai/api/pricing/optimize?lookback=45&max_change=10&min_margin=8"""
+    lookback = int(request.args.get("lookback", 45))
+    max_change = float(request.args.get("max_change", 10))
+    min_margin = float(request.args.get("min_margin", 8))
+    return jsonify(optimize_product_prices(lookback, max_change, min_margin))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -282,6 +338,29 @@ def api_simulate_stockout(product_id):
     """GET /ai/api/simulate/stockout/1"""
     days = int(request.args.get("days", 30))
     return jsonify(simulate_stock_out(product_id, days))
+
+
+@ai_bp.route("/api/simulate/scenario", methods=["POST"])
+@admin_required
+def api_simulate_scenario():
+    """POST /ai/api/simulate/scenario"""
+    data = request.get_json() or {}
+    product_id = int(data.get("product_id", 0))
+    if product_id <= 0:
+        return jsonify({"error": "product_id is required"}), 400
+    price_change_pct = float(data.get("price_change_pct", 0))
+    demand_change_pct = float(data.get("demand_change_pct", 0))
+    extra_expense = float(data.get("extra_expense", 0))
+    days = int(data.get("days", 30))
+    return jsonify(
+        simulate_product_scenario(
+            product_id=product_id,
+            price_change_pct=price_change_pct,
+            demand_change_pct=demand_change_pct,
+            extra_expense=extra_expense,
+            days=days,
+        )
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

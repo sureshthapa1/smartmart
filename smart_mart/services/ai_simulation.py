@@ -212,6 +212,95 @@ def simulate_stock_out(product_id: int, days: int = 30) -> dict:
     }
 
 
+def simulate_product_scenario(
+    product_id: int,
+    price_change_pct: float = 0.0,
+    demand_change_pct: float = 0.0,
+    extra_expense: float = 0.0,
+    days: int = 30,
+) -> dict:
+    """Interactive what-if simulation combining price, demand, and expense changes."""
+    product = db.session.get(Product, product_id)
+    if not product:
+        return {"error": "Product not found"}
+
+    start = date.today() - timedelta(days=max(1, days - 1))
+    qty_sold = db.session.execute(
+        db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(SaleItem.product_id == product_id)
+        .where(func.date(Sale.sale_date) >= start)
+    ).scalar() or 0
+
+    current_price = float(product.selling_price)
+    cost_price = float(product.cost_price)
+    baseline_daily_qty = float(qty_sold) / max(1, days)
+    baseline_period_qty = baseline_daily_qty * days
+    baseline_revenue = baseline_period_qty * current_price
+    baseline_profit = baseline_period_qty * (current_price - cost_price)
+
+    new_price = current_price * (1 + (price_change_pct / 100))
+    elasticity = 1.2
+    qty_after_price = baseline_daily_qty * max(0.15, 1 - elasticity * (price_change_pct / 100))
+    qty_after_demand = qty_after_price * (1 + (demand_change_pct / 100))
+    unconstrained_qty = max(0.0, qty_after_demand * days)
+    constrained_qty = min(unconstrained_qty, float(product.quantity)) if product.quantity >= 0 else unconstrained_qty
+    stock_limited = constrained_qty < unconstrained_qty
+
+    simulated_revenue = constrained_qty * new_price
+    simulated_profit = constrained_qty * (new_price - cost_price) - max(0.0, float(extra_expense))
+    stockout_days = (
+        round(product.quantity / max(0.01, qty_after_demand), 1) if qty_after_demand > 0 else 999
+    )
+
+    recommendation_parts = []
+    if new_price < cost_price:
+        recommendation_parts.append("Warning: price falls below cost.")
+    if stock_limited or stockout_days < days:
+        recommendation_parts.append("Stockout risk is high; include replenishment to realize demand.")
+    if simulated_profit > baseline_profit:
+        recommendation_parts.append("Scenario improves product profit over baseline.")
+    elif simulated_profit < baseline_profit:
+        recommendation_parts.append("Scenario reduces product profit; review price or demand assumptions.")
+    if not recommendation_parts:
+        recommendation_parts.append("Scenario impact is near baseline.")
+
+    return {
+        "scenario": f"What-if simulation for '{product.name}'",
+        "inputs": {
+            "product_id": product.id,
+            "price_change_pct": round(price_change_pct, 2),
+            "demand_change_pct": round(demand_change_pct, 2),
+            "extra_expense": round(float(extra_expense), 2),
+            "days": days,
+        },
+        "baseline": {
+            "price": round(current_price, 2),
+            "period_qty": round(baseline_period_qty, 2),
+            "revenue": round(baseline_revenue, 2),
+            "profit": round(baseline_profit, 2),
+        },
+        "simulated": {
+            "new_price": round(new_price, 2),
+            "period_qty": round(constrained_qty, 2),
+            "revenue": round(simulated_revenue, 2),
+            "profit": round(simulated_profit, 2),
+            "stock_limited": stock_limited,
+            "days_to_stockout": stockout_days,
+        },
+        "impact": {
+            "revenue_change": round(simulated_revenue - baseline_revenue, 2),
+            "profit_change": round(simulated_profit - baseline_profit, 2),
+            "profit_change_pct": round(
+                ((simulated_profit - baseline_profit) / abs(baseline_profit) * 100)
+                if baseline_profit else 0,
+                1,
+            ),
+        },
+        "recommendation": " ".join(recommendation_parts),
+    }
+
+
 def _sales_change_recommendation(change_pct: float, new_profit: float) -> str:
     if new_profit < 0:
         return "Warning: Even with this change, business would be unprofitable."

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request
 
 from ...extensions import db
+from ...services.decorators import login_required, permission_required
 from ..models.purchase_batch import PurchaseBatch
 from ..services import (
     AIAdvisorService,
@@ -27,8 +30,23 @@ def _parse_date(raw: str | None) -> date | None:
     return date.fromisoformat(raw) if raw else None
 
 
+def _require_bi_perm(perm: str = "can_view_reports") -> None:
+    """Abort 403 if staff user lacks the given permission. Admins always pass."""
+    from flask import abort
+    from flask_login import current_user
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not getattr(p, perm, False):
+            abort(403)
+
+
+# ── Batch endpoints ───────────────────────────────────────────────────────────
+
 @bi_bp.route("/batch", methods=["POST"])
+@login_required
 def create_batch():
+    _require_bi_perm("can_view_purchases")
     data = request.get_json() or {}
     batch = BatchService.create_batch(
         purchase_date=_parse_date(data.get("purchase_date")) or date.today(),
@@ -40,52 +58,117 @@ def create_batch():
     return jsonify(_serialize_batch(batch)), 201
 
 
+@bi_bp.route("/batch", methods=["GET"])
+@login_required
+def list_batches():
+    _require_bi_perm("can_view_purchases")
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = min(100, max(1, int(request.args.get("per_page", 20))))
+    status = request.args.get("status")
+    stmt = db.select(PurchaseBatch).order_by(PurchaseBatch.purchase_date.desc(), PurchaseBatch.id.desc())
+    if status:
+        stmt = stmt.where(PurchaseBatch.status == status)
+    total = db.session.execute(db.select(db.func.count()).select_from(stmt.subquery())).scalar() or 0
+    batches = db.session.execute(stmt.offset((page - 1) * per_page).limit(per_page)).scalars().all()
+    return jsonify({
+        "batches": [_serialize_batch(b) for b in batches],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    })
+
+
 @bi_bp.route("/batch/<int:batch_id>", methods=["GET"])
+@login_required
 def get_batch(batch_id: int):
+    _require_bi_perm("can_view_purchases")
     batch = db.session.get(PurchaseBatch, batch_id)
     if batch is None:
         return jsonify({"error": "batch not found"}), 404
     return jsonify(_serialize_batch(batch))
 
 
+@bi_bp.route("/batch/<int:batch_id>", methods=["DELETE"])
+@login_required
+def delete_batch(batch_id: int):
+    _require_bi_perm("can_create_purchase")
+    batch = db.session.get(PurchaseBatch, batch_id)
+    if batch is None:
+        return jsonify({"error": "batch not found"}), 404
+    if batch.status != "draft":
+        return jsonify({"error": "Only draft batches can be deleted"}), 400
+    db.session.delete(batch)
+    db.session.commit()
+    return jsonify({"deleted": batch_id})
+
+
 @bi_bp.route("/batch/<int:batch_id>/items", methods=["POST"])
+@login_required
 def add_batch_items(batch_id: int):
+    _require_bi_perm("can_create_purchase")
     batch = BatchService.add_items(batch_id, (request.get_json() or {}).get("items") or [])
     return jsonify(_serialize_batch(batch))
 
 
 @bi_bp.route("/batch/<int:batch_id>/expenses", methods=["POST"])
+@login_required
 def add_batch_expenses(batch_id: int):
+    _require_bi_perm("can_create_purchase")
     batch = BatchService.add_expenses(batch_id, (request.get_json() or {}).get("expenses") or [])
     return jsonify(_serialize_batch(batch))
 
 
 @bi_bp.route("/batch/<int:batch_id>/recalculate", methods=["POST"])
+@login_required
 def recalculate_batch(batch_id: int):
+    _require_bi_perm("can_create_purchase")
     batch = BatchService.recalculate_allocation(batch_id)
     db.session.commit()
     return jsonify(_serialize_batch(batch))
 
 
 @bi_bp.route("/batch/<int:batch_id>/finalize", methods=["POST"])
+@login_required
 def finalize_batch(batch_id: int):
+    _require_bi_perm("can_create_purchase")
     batch = BatchService.finalize_batch(batch_id)
     return jsonify(_serialize_batch(batch))
 
 
+# ── Product endpoints ─────────────────────────────────────────────────────────
+
 @bi_bp.route("/products", methods=["POST"])
+@login_required
 def upsert_product():
+    _require_bi_perm("can_add_product")
     product = ProductService.upsert_product(request.get_json() or {})
     return jsonify({"id": product.id, "sku": product.sku}), 201
 
 
 @bi_bp.route("/products", methods=["GET"])
+@login_required
 def list_products():
-    return jsonify({"products": ProductService.list_products()})
+    _require_bi_perm("can_view_inventory")
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+    search = (request.args.get("q") or "").strip().lower()
+    all_products = ProductService.list_products()
+    if search:
+        all_products = [p for p in all_products if search in p["name"].lower() or search in (p["sku"] or "").lower()]
+    total = len(all_products)
+    start = (page - 1) * per_page
+    return jsonify({
+        "products": all_products[start: start + per_page],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    })
 
 
 @bi_bp.route("/products/pricing/rules", methods=["POST"])
+@login_required
 def upsert_margin_rule():
+    _require_bi_perm("can_edit_product")
     payload = request.get_json() or {}
     rule = PricingService.upsert_margin_rule(
         payload.get("category"),
@@ -100,7 +183,9 @@ def upsert_margin_rule():
 
 
 @bi_bp.route("/products/pricing/suggest", methods=["POST"])
+@login_required
 def suggest_price():
+    _require_bi_perm("can_view_inventory")
     payload = request.get_json() or {}
     return jsonify(
         PricingService.suggest_price(
@@ -113,15 +198,23 @@ def suggest_price():
     )
 
 
+# ── Sales endpoints ───────────────────────────────────────────────────────────
+
 @bi_bp.route("/sales", methods=["POST"])
+@login_required
 def create_sale():
+    _require_bi_perm("can_create_sale")
     payload = request.get_json() or {}
     sale = SalesService.create_sale(payload, user_id=payload.get("user_id"))
     return jsonify(SalesService.serialize_sale(sale)), 201
 
 
+# ── Expense endpoints ─────────────────────────────────────────────────────────
+
 @bi_bp.route("/expenses", methods=["POST"])
+@login_required
 def create_expense():
+    _require_bi_perm("can_manage_expenses")
     expense = ExpenseService.create_opex(request.get_json() or {})
     return jsonify({
         "id": expense.id,
@@ -133,34 +226,89 @@ def create_expense():
 
 
 @bi_bp.route("/expenses", methods=["GET"])
+@login_required
 def list_expenses():
-    return jsonify(
-        {
-            "expenses": ExpenseService.list_opex(
-                start=_parse_date(request.args.get("start")),
-                end=_parse_date(request.args.get("end")),
-            )
-        }
+    _require_bi_perm("can_view_expenses")
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+    all_expenses = ExpenseService.list_opex(
+        start=_parse_date(request.args.get("start")),
+        end=_parse_date(request.args.get("end")),
     )
+    total = len(all_expenses)
+    start_idx = (page - 1) * per_page
+    return jsonify({
+        "expenses": all_expenses[start_idx: start_idx + per_page],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    })
 
+
+@bi_bp.route("/expenses/<int:expense_id>", methods=["DELETE"])
+@login_required
+def delete_expense(expense_id: int):
+    _require_bi_perm("can_manage_expenses")
+    from ..models.operating_expense import OperatingExpense
+    expense = db.session.get(OperatingExpense, expense_id)
+    if expense is None:
+        return jsonify({"error": "expense not found"}), 404
+    db.session.delete(expense)
+    db.session.commit()
+    return jsonify({"deleted": expense_id})
+
+
+# ── Report endpoints ──────────────────────────────────────────────────────────
 
 @bi_bp.route("/reports/profit-loss", methods=["GET"])
+@login_required
 def report_profit_loss():
+    _require_bi_perm("can_view_profit_report")
     start = _parse_date(request.args.get("start"))
     end = _parse_date(request.args.get("end"))
     return jsonify(ReportService.profit_and_loss(start, end))
 
 
+@bi_bp.route("/reports/profit-loss/export-csv", methods=["GET"])
+@login_required
+def export_profit_loss_csv():
+    _require_bi_perm("can_view_profit_report")
+    start = _parse_date(request.args.get("start"))
+    end = _parse_date(request.args.get("end"))
+    data = ReportService.profit_and_loss(start, end)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Product ID", "Revenue", "COGS", "Gross Profit", "Allocated OpEx", "Net Profit"])
+    for row in data.get("products", []):
+        writer.writerow([
+            row["product_id"], row["revenue"], row["cogs"],
+            row["gross_profit"], row["allocated_opex"], row["net_profit"],
+        ])
+    overall = data.get("overall", {})
+    writer.writerow([])
+    writer.writerow(["TOTAL", overall.get("sales"), overall.get("cogs"),
+                     overall.get("gross_profit"), overall.get("opex"), overall.get("net_profit")])
+    filename = f"pnl_{(start or date.today()).isoformat()}_{(end or date.today()).isoformat()}.csv"
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
 @bi_bp.route("/reports/dashboard", methods=["GET"])
+@login_required
 def dashboard_data():
+    _require_bi_perm("can_view_reports")
     filter_key = (request.args.get("filter") or "today").lower()
     start = _parse_date(request.args.get("start"))
     end = _parse_date(request.args.get("end"))
     return jsonify(DashboardService.payload(filter_key, start, end))
 
 
+# ── AI Advisor endpoint ───────────────────────────────────────────────────────
+
 @bi_bp.route("/ai/advisor", methods=["GET"])
+@login_required
 def ai_advisor():
+    _require_bi_perm("can_view_ai_insights")
     return jsonify(
         AIAdvisorService.analyze(
             low_margin_threshold=float(request.args.get("low_margin_threshold", 0.10)),
@@ -172,10 +320,16 @@ def ai_advisor():
     )
 
 
+# ── Dashboard UI ──────────────────────────────────────────────────────────────
+
 @bi_dashboard_bp.route("/dashboard", methods=["GET"])
+@login_required
 def bi_dashboard_page():
+    _require_bi_perm("can_view_reports")
     return render_template("bi/dashboard.html")
 
+
+# ── Error handlers ────────────────────────────────────────────────────────────
 
 @bi_bp.errorhandler(ValueError)
 def handle_value_error(exc: ValueError):

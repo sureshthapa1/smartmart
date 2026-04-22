@@ -1,56 +1,91 @@
 {% extends "base.html" %}
-{% block title %}SmartMart BI Dashboard{% endblock %}
-{% block page_title %}SmartMart BI{% endblock %}
+{% block title %}BI Dashboard — Smart Mart{% endblock %}
+{% block page_title %}BI Dashboard{% endblock %}
 
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  .bi-shell { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-  .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; }
-  .kpi { border: 1px solid #dbe7f3; border-radius: 12px; padding: 12px; background: linear-gradient(180deg,#ffffff,#f6fbff); }
-  .kpi h6 { margin: 0; font-size: 12px; color: #4b5f73; }
-  .kpi .v { font-size: 22px; font-weight: 700; color: #0f2740; }
-  .panel { border: 1px solid #dbe7f3; border-radius: 12px; background: #fff; padding: 12px; }
-  .charts { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-  .insight { border:1px solid #e4ebf3; border-radius:10px; padding:10px; margin-bottom:8px; }
-  .insight small { color:#6b7f92; }
-  .status { display:none; margin-top:10px; }
-  @media (max-width: 1000px) {
-    .bi-shell { grid-template-columns: 1fr; }
-    .kpi-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
-    .charts { grid-template-columns: 1fr; }
-  }
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+  .kpi{border-radius:12px;padding:14px 16px;background:#fff;border:1px solid #e2e8f0}
+  .kpi h6{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b}
+  .kpi .v{font-size:20px;font-weight:700;color:#0f172a}
+  .kpi.profit .v{color:#16a34a}
+  .kpi.loss .v{color:#dc2626}
+  .bi-shell{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+  .panel{border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:14px}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .chart-wrap{position:relative;height:220px}
+  .insight{border:1px solid #e4ebf3;border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .badge-type{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
+  .badge-low_margin{background:#fef9c3;color:#854d0e}
+  .badge-loss_product{background:#fee2e2;color:#991b1b}
+  .badge-dead_stock{background:#f1f5f9;color:#475569}
+  .badge-overstock{background:#dbeafe;color:#1e40af}
+  @media(max-width:1000px){.bi-shell{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
+  [data-bs-theme="dark"] .kpi{background:#161d2e;border-color:#1e293b}
+  [data-bs-theme="dark"] .kpi h6{color:#94a3b8}
+  [data-bs-theme="dark"] .kpi .v{color:#e2e8f0}
+  [data-bs-theme="dark"] .panel{background:#161d2e;border-color:#1e293b}
+  [data-bs-theme="dark"] .insight{border-color:#1e293b}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-  <select id="filter" class="form-select" style="max-width:180px">
+  <select id="filter" class="form-select form-select-sm" style="max-width:160px">
     <option value="today">Today</option>
     <option value="week">This Week</option>
     <option value="month" selected>This Month</option>
   </select>
-  <input id="start" type="date" class="form-control" style="max-width:170px" />
-  <input id="end" type="date" class="form-control" style="max-width:170px" />
-  <button id="reload" class="btn btn-primary">Refresh</button>
+  <input id="start" type="date" class="form-control form-control-sm" style="max-width:160px" />
+  <input id="end" type="date" class="form-control form-control-sm" style="max-width:160px" />
+  <button id="reload" class="btn btn-primary btn-sm">
+    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+  </button>
+  <a id="exportCsv" href="#" class="btn btn-outline-secondary btn-sm ms-auto">
+    <i class="bi bi-download me-1"></i>Export P&amp;L CSV
+  </a>
 </div>
 
-<div id="loading" class="alert alert-info status">Loading BI dashboard...</div>
-<div id="error" class="alert alert-danger status"></div>
+<div id="loading" class="alert alert-info d-none">Loading BI dashboard…</div>
+<div id="error" class="alert alert-danger d-none"></div>
 
 <div class="kpi-grid" id="kpis"></div>
 
-<div class="bi-shell mt-3">
+<div class="bi-shell">
   <div>
     <div class="charts">
-      <div class="panel"><canvas id="salesTrend"></canvas></div>
-      <div class="panel"><canvas id="profitTrend"></canvas></div>
-      <div class="panel"><canvas id="expensePie"></canvas></div>
-      <div class="panel"><canvas id="productBar"></canvas></div>
+      <div class="panel">
+        <div class="fw-semibold mb-2 small text-muted">Sales Trend</div>
+        <div class="chart-wrap"><canvas id="salesTrend"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="fw-semibold mb-2 small text-muted">Gross Profit Trend</div>
+        <div class="chart-wrap"><canvas id="profitTrend"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="fw-semibold mb-2 small text-muted">Expense Breakdown</div>
+        <div class="chart-wrap"><canvas id="expensePie"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="fw-semibold mb-2 small text-muted">Top Products by Profit</div>
+        <div class="chart-wrap"><canvas id="productBar"></canvas></div>
+      </div>
     </div>
   </div>
-  <div class="panel">
-    <h5>AI Profit Advisor</h5>
+
+  <div class="panel" style="max-height:620px;overflow-y:auto">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0 fw-bold">AI Profit Advisor</h6>
+      <span id="insightCount" class="badge bg-secondary">0</span>
+    </div>
+    <select id="insightFilter" class="form-select form-select-sm mb-2">
+      <option value="">All types</option>
+      <option value="low_margin">Low Margin</option>
+      <option value="loss_product">Running at Loss</option>
+      <option value="dead_stock">Dead Stock</option>
+      <option value="overstock">Overstock</option>
+    </select>
     <div id="insights"></div>
   </div>
 </div>
@@ -59,103 +94,138 @@
 {% block scripts %}
 <script>
 let charts = {};
+let _allInsights = [];
 
-function money(v){ return `NPR ${Number(v || 0).toFixed(2)}`; }
-function show(el, text=''){ const x=document.getElementById(el); if(text) x.textContent=text; x.style.display='block'; }
-function hide(el){ document.getElementById(el).style.display='none'; }
+const INSIGHT_ICONS = {
+  low_margin: '📉',
+  loss_product: '🔴',
+  dead_stock: '📦',
+  overstock: '🏗️',
+};
+
+function money(v){ return `NPR ${Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
 
 function renderKpis(k){
+  const netClass = (k.net_profit||0) >= 0 ? 'profit' : 'loss';
+  const gpClass  = (k.gross_profit||0) >= 0 ? 'profit' : 'loss';
   const entries = [
-    ['Total Sales', money(k.sales)],
-    ['COGS', money(k.cogs)],
-    ['Gross Profit', money(k.gross_profit)],
-    ['OPEX', money(k.opex)],
-    ['Net Profit', money(k.net_profit)],
+    ['Total Sales', money(k.sales), ''],
+    ['COGS', money(k.cogs), ''],
+    ['Gross Profit', money(k.gross_profit), gpClass],
+    ['OPEX', money(k.opex), ''],
+    ['Net Profit', money(k.net_profit), netClass],
   ];
-  document.getElementById('kpis').innerHTML = entries.map(([n,v]) => `<div class="kpi"><h6>${n}</h6><div class="v">${v}</div></div>`).join('');
+  document.getElementById('kpis').innerHTML = entries.map(([n,v,cls]) =>
+    `<div class="kpi ${cls}"><h6>${n}</h6><div class="v">${v}</div></div>`
+  ).join('');
 }
 
-function destroyCharts(){ Object.values(charts).forEach(c => c.destroy()); charts = {}; }
+function destroyCharts(){ Object.values(charts).forEach(c=>c.destroy()); charts={}; }
 
-function lineChart(id, labels, data, label, color){
-  charts[id] = new Chart(document.getElementById(id), {
-    type: 'line',
-    data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: color + '22', fill: true, tension: .25 }] },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+function lineChart(id,labels,data,label,color){
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'line',
+    data:{labels,datasets:[{label,data,borderColor:color,backgroundColor:color+'22',fill:true,tension:.25,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'NPR '+Number(v).toLocaleString()}}}}
   });
 }
 
-function pieChart(id, labels, data){
-  charts[id] = new Chart(document.getElementById(id), {
-    type: 'pie',
-    data: { labels, datasets: [{ data, backgroundColor: ['#ff9f40','#36a2eb','#4bc0c0','#ff6384','#9966ff','#c9cbcf'] }] },
-    options: { responsive: true }
+function pieChart(id,labels,data){
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:['#ff9f40','#36a2eb','#4bc0c0','#ff6384','#9966ff','#c9cbcf','#ffcd56']}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}}}
   });
 }
 
-function barChart(id, labels, data){
-  charts[id] = new Chart(document.getElementById(id), {
-    type: 'bar',
-    data: { labels, datasets: [{ data, backgroundColor: '#1f77b4' }] },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+function barChart(id,labels,data){
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:'#6366f1',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'NPR '+Number(v).toLocaleString()}}}}
   });
 }
 
-function actionLabel(action){
-  const map = {
-    increase_price: 'Increase Price',
-    review_pricing_or_cost: 'Review Costing',
-    discount_or_bundle: 'Create Discount',
-    run_promotion: 'Launch Promotion',
-  };
-  return map[action] || 'Take Action';
-}
+const ACTION_LABELS = {
+  increase_price:'Increase Price',
+  review_pricing_or_cost:'Review Costing',
+  discount_or_bundle:'Create Discount',
+  run_promotion:'Launch Promotion',
+};
 
 function renderInsights(items){
-  if (!items.length){
-    document.getElementById('insights').innerHTML = '<div class="text-muted">No issues detected in selected range.</div>';
+  const filter = document.getElementById('insightFilter').value;
+  const filtered = filter ? items.filter(x=>x.type===filter) : items;
+  document.getElementById('insightCount').textContent = filtered.length;
+  if(!filtered.length){
+    document.getElementById('insights').innerHTML='<div class="text-muted small">No issues detected.</div>';
     return;
   }
-  document.getElementById('insights').innerHTML = items.map(x => `
+  document.getElementById('insights').innerHTML = filtered.map(x=>`
     <div class="insight">
-      <div class="fw-semibold">${x.message}</div>
-      <small>Type: ${x.type} | Product #${x.product_id}</small>
-      <div class="mt-2">
-        <button class="btn btn-sm btn-outline-primary" onclick="alert('Suggested action: ${x.action}')">${actionLabel(x.action)}</button>
+      <div class="d-flex align-items-start gap-2">
+        <span style="font-size:16px">${INSIGHT_ICONS[x.type]||'⚠️'}</span>
+        <div class="flex-grow-1">
+          <div class="fw-semibold small">${x.message}</div>
+          <div class="mt-1">
+            <span class="badge-type badge-${x.type}">${x.type.replace('_',' ')}</span>
+            ${x.sku ? `<span class="text-muted small ms-1">SKU: ${x.sku}</span>` : ''}
+          </div>
+          ${x.last_sale_date ? `<div class="text-muted" style="font-size:11px">Last sale: ${x.last_sale_date}</div>` : ''}
+          ${x.stock_qty != null ? `<div class="text-muted" style="font-size:11px">Stock: ${x.stock_qty} | Recent sales: ${x.recent_sales_qty}</div>` : ''}
+          ${x.current_margin_pct != null ? `<div class="text-muted" style="font-size:11px">Current margin: ${x.current_margin_pct}%</div>` : ''}
+        </div>
       </div>
     </div>
   `).join('');
 }
 
+function buildExportUrl(){
+  const start = document.getElementById('start').value;
+  const end   = document.getElementById('end').value;
+  const p = new URLSearchParams();
+  if(start) p.set('start',start);
+  if(end)   p.set('end',end);
+  return `/api/bi/reports/profit-loss/export-csv?${p.toString()}`;
+}
+
 async function loadDashboard(){
-  hide('error');
-  show('loading');
+  document.getElementById('loading').classList.remove('d-none');
+  document.getElementById('error').classList.add('d-none');
   try {
     const filter = document.getElementById('filter').value;
-    const start = document.getElementById('start').value;
-    const end = document.getElementById('end').value;
-    const params = new URLSearchParams({ filter });
-    if (start) params.set('start', start);
-    if (end) params.set('end', end);
+    const start  = document.getElementById('start').value;
+    const end    = document.getElementById('end').value;
+    const params = new URLSearchParams({filter});
+    if(start) params.set('start',start);
+    if(end)   params.set('end',end);
     const res = await fetch(`/api/bi/reports/dashboard?${params.toString()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
     renderKpis(json.kpis);
     destroyCharts();
-    lineChart('salesTrend', json.sales_trend.labels, json.sales_trend.data, 'Sales', '#2f80ed');
+    lineChart('salesTrend',  json.sales_trend.labels,  json.sales_trend.data,  'Sales',  '#2f80ed');
     lineChart('profitTrend', json.profit_trend.labels, json.profit_trend.data, 'Profit', '#219653');
-    pieChart('expensePie', json.expense_breakdown.labels, json.expense_breakdown.data);
-    barChart('productBar', json.product_performance.labels, json.product_performance.data);
-    renderInsights(json.insights || []);
-  } catch (e) {
-    show('error', `Failed to load dashboard: ${e.message}`);
+    if(json.expense_breakdown.labels.length)
+      pieChart('expensePie', json.expense_breakdown.labels, json.expense_breakdown.data);
+    if(json.product_performance.labels.length)
+      barChart('productBar', json.product_performance.labels, json.product_performance.data);
+
+    _allInsights = json.insights || [];
+    renderInsights(_allInsights);
+    document.getElementById('exportCsv').href = buildExportUrl();
+  } catch(e){
+    const el = document.getElementById('error');
+    el.textContent = `Failed to load dashboard: ${e.message}`;
+    el.classList.remove('d-none');
   } finally {
-    hide('loading');
+    document.getElementById('loading').classList.add('d-none');
   }
 }
 
 document.getElementById('reload').addEventListener('click', loadDashboard);
+document.getElementById('insightFilter').addEventListener('change', ()=>renderInsights(_allInsights));
 window.addEventListener('load', loadDashboard);
 </script>
 {% endblock %}

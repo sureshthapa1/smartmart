@@ -51,9 +51,12 @@ class AIAdvisorService:
                         {
                             "type": "low_margin",
                             "product_id": product.id,
-                            "message": "Low margin detected",
+                            "product_name": product.name,
+                            "sku": product.sku,
+                            "message": f"Low margin on '{product.name}'",
                             "action": "increase_price",
                             "suggested_change": round(float(as_decimal(low_margin_threshold) - margin), 4),
+                            "current_margin_pct": round(float(margin) * 100, 2),
                         }
                     )
 
@@ -66,7 +69,9 @@ class AIAdvisorService:
                         {
                             "type": "loss_product",
                             "product_id": product.id,
-                            "message": "Product is running at gross loss",
+                            "product_name": product.name,
+                            "sku": product.sku,
+                            "message": f"'{product.name}' is running at gross loss",
                             "action": "review_pricing_or_cost",
                             "suggested_change": round(float((cogs - revenue) / cogs), 4) if cogs > 0 else 0.0,
                         }
@@ -80,9 +85,12 @@ class AIAdvisorService:
                         {
                             "type": "dead_stock",
                             "product_id": product.id,
-                            "message": f"No sales in last {dead_stock_days} days",
+                            "product_name": product.name,
+                            "sku": product.sku,
+                            "message": f"'{product.name}' — no sales in {dead_stock_days}+ days",
                             "action": "discount_or_bundle",
                             "suggested_change": 0.15,
+                            "last_sale_date": last_sale.isoformat() if last_sale else None,
                         }
                     )
 
@@ -96,9 +104,13 @@ class AIAdvisorService:
                         {
                             "type": "overstock",
                             "product_id": product.id,
-                            "message": "High stock with low movement",
+                            "product_name": product.name,
+                            "sku": product.sku,
+                            "message": f"'{product.name}' — high stock ({product.quantity} units), low movement",
                             "action": "run_promotion",
                             "suggested_change": 0.1,
+                            "stock_qty": int(product.quantity or 0),
+                            "recent_sales_qty": int(recent_qty),
                         }
                     )
             else:
@@ -107,9 +119,12 @@ class AIAdvisorService:
                         {
                             "type": "dead_stock",
                             "product_id": product.id,
-                            "message": f"No sales history in last {dead_stock_days} days",
+                            "product_name": product.name,
+                            "sku": product.sku,
+                            "message": f"'{product.name}' — no sales history",
                             "action": "discount_or_bundle",
                             "suggested_change": 0.2,
+                            "last_sale_date": None,
                         }
                     )
 

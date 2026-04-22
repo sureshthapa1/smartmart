@@ -263,6 +263,10 @@ PERMISSION_GROUPS = {
         ("can_view_ai_insights", "View AI Insights & Analytics"),
         ("can_view_advisor", "View Business Advisor"),
     ],
+    "BI Module": [
+        ("can_view_bi_dashboard", "View BI Dashboard & Reports"),
+        ("can_manage_bi_batches", "Manage Purchase Batches"),
+    ],
     "General": [
         ("can_view_alerts", "View Alerts"),
         ("can_view_dashboard", "View Dashboard"),

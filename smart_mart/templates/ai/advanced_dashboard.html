@@ -21,12 +21,16 @@
 
 <!-- Module Navigation -->
 <div class="d-flex gap-2 mb-4 flex-wrap">
-  <a href="#trend" class="btn btn-outline-primary btn-sm">📈 Trend Analyzer</a>
-  <a href="#profit" class="btn btn-outline-danger btn-sm">💸 Profit Leak</a>
-  <a href="#supplier" class="btn btn-outline-warning btn-sm">🏭 Supplier Score</a>
-  <a href="#simulation" class="btn btn-outline-success btn-sm">🔬 Simulation</a>
-  <a href="#invoice" class="btn btn-outline-secondary btn-sm">🧾 Invoice Validator</a>
-  <a href="{{ url_for('ai.insights') }}" class="btn btn-outline-info btn-sm ms-auto">← Basic Insights</a>
+  <a href="#trend" class="btn btn-outline-primary btn-sm">Trend Analyzer</a>
+  <a href="#profit" class="btn btn-outline-danger btn-sm">Profit Leak</a>
+  <a href="#fraud" class="btn btn-outline-danger btn-sm">Leak/Fraud 2.0</a>
+  <a href="#supplier" class="btn btn-outline-warning btn-sm">Supplier Score</a>
+  <a href="#replenish" class="btn btn-outline-info btn-sm">Auto Replenishment</a>
+  <a href="#pricing-opt" class="btn btn-outline-dark btn-sm">Price Optimizer</a>
+  <a href="#simulation" class="btn btn-outline-success btn-sm">Simulation</a>
+  <a href="#scenario" class="btn btn-outline-success btn-sm">What-If Scenario</a>
+  <a href="#invoice" class="btn btn-outline-secondary btn-sm">Invoice Validator</a>
+  <a href="{{ url_for('ai.insights') }}" class="btn btn-outline-info btn-sm ms-auto">Basic Insights</a>
 </div>
 
 <!-- ── MODULE 1: TREND ANALYZER ─────────────────────────────────────────── -->
@@ -102,6 +106,78 @@
 </div>
 
 <!-- ── MODULE 5: SIMULATION ──────────────────────────────────────────────── -->
+<div id="replenish" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>Auto Replenishment AI</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <label class="form-label small">Lookback Days</label>
+        <input type="number" id="replenishLookback" class="form-control form-control-sm" value="30" min="7" max="120" style="width:110px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Safety Days</label>
+        <input type="number" id="replenishSafety" class="form-control form-control-sm" value="4" min="0" max="30" style="width:110px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Coverage Days</label>
+        <input type="number" id="replenishCoverage" class="form-control form-control-sm" value="14" min="1" max="60" style="width:120px;">
+      </div>
+      <div class="col-auto align-self-end">
+        <button class="btn btn-info btn-sm" onclick="loadReplenishmentPlan()">Generate Plan</button>
+      </div>
+      <div class="col-auto align-self-end">
+        <button class="btn btn-outline-info btn-sm" onclick="createReplenishmentDrafts()">Create Draft POs</button>
+      </div>
+    </div>
+    <div id="replenishmentResult" class="result-box">Generate a replenishment plan to see supplier-wise draft orders.</div>
+  </div>
+</div>
+
+<div id="pricing-opt" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>Price Optimization AI</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <label class="form-label small">Lookback Days</label>
+        <input type="number" id="priceLookback" class="form-control form-control-sm" value="45" min="14" max="120" style="width:110px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Max Change %</label>
+        <input type="number" id="priceMaxChange" class="form-control form-control-sm" value="10" min="1" max="30" style="width:110px;">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small">Min Margin %</label>
+        <input type="number" id="priceMinMargin" class="form-control form-control-sm" value="8" min="0" max="40" style="width:110px;">
+      </div>
+      <div class="col-auto align-self-end">
+        <button class="btn btn-dark btn-sm" onclick="loadPriceOptimizer()">Optimize Prices</button>
+      </div>
+    </div>
+    <div id="priceOptimizerResult" class="result-box">Run optimizer to get actionable price-change suggestions.</div>
+  </div>
+</div>
+
+<div id="fraud" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>Leak/Fraud Detector 2.0</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-auto">
+        <label class="form-label small">Window (days)</label>
+        <input type="number" id="fraudDays" class="form-control form-control-sm" value="30" min="7" max="120" style="width:110px;">
+      </div>
+      <div class="col-auto align-self-end">
+        <button class="btn btn-danger btn-sm" onclick="loadFraudSignals()">Scan Signals</button>
+      </div>
+    </div>
+    <div id="fraudResult" class="result-box">Run scan to detect suspicious discount, return, and adjustment patterns.</div>
+  </div>
+</div>
 <div id="simulation" class="card ai-card shadow-sm mb-4">
   <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
     <span>🔬</span>What-If Business Simulation
@@ -150,6 +226,43 @@
 </div>
 
 <!-- ── MODULE 2: INVOICE VALIDATOR ──────────────────────────────────────── -->
+<div id="scenario" class="card ai-card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <span>Interactive What-If Scenario</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <label class="form-label small">Product</label>
+        <select id="scenarioProduct" class="form-select form-select-sm">
+          {% for p in products %}
+          <option value="{{ p.id }}">{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Price Change %</label>
+        <input type="number" id="scenarioPriceChange" class="form-control form-control-sm" value="0">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Demand Change %</label>
+        <input type="number" id="scenarioDemandChange" class="form-control form-control-sm" value="0">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Extra Expense (NPR)</label>
+        <input type="number" id="scenarioExpense" class="form-control form-control-sm" value="0" step="0.01">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Days</label>
+        <input type="number" id="scenarioDays" class="form-control form-control-sm" value="30" min="7" max="120">
+      </div>
+      <div class="col-md-1 align-self-end">
+        <button class="btn btn-success btn-sm w-100" onclick="simulateScenario()">Run</button>
+      </div>
+    </div>
+    <div id="scenarioResult" class="result-box">Adjust inputs and run a scenario to compare revenue and profit impact.</div>
+  </div>
+</div>
 <div id="invoice" class="card ai-card shadow-sm mb-4">
   <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
     <span>🧾</span>AI Invoice Error Detector
@@ -206,12 +319,17 @@
           <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/invoice/validate</code></td><td>Validate sale items</td></tr>
           <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/profit-leak/dashboard</code></td><td>Profit leak analysis</td></tr>
           <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/profit-leak/low-margin</code></td><td>Low margin products</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/profit-leak/fraud-signals</code></td><td>Fraud and leak anomaly signals</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/replenishment/plan</code></td><td>Supplier-grouped replenishment plan</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/replenishment/create-drafts</code></td><td>Create draft purchase orders</td></tr>
+          <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/pricing/optimize</code></td><td>AI price optimization suggestions</td></tr>
           <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/suppliers/scorecard</code></td><td>All supplier scores</td></tr>
           <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/suppliers/{id}/score</code></td><td>Single supplier score</td></tr>
           <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/sales</code></td><td>Sales change simulation</td></tr>
           <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/price</code></td><td>Price change simulation</td></tr>
           <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/expenses</code></td><td>Expense change simulation</td></tr>
           <tr><td><span class="badge bg-success">GET</span></td><td><code>/ai/api/simulate/stockout/{id}</code></td><td>Stock-out impact</td></tr>
+          <tr><td><span class="badge bg-primary">POST</span></td><td><code>/ai/api/simulate/scenario</code></td><td>Interactive scenario simulation</td></tr>
         </tbody>
       </table>
     </div>
@@ -262,6 +380,17 @@ async function loadProfitLeak() {
   document.getElementById('profitLeakResult').innerHTML = html;
 }
 
+async function loadFraudSignals() {
+  const days = parseInt(document.getElementById('fraudDays').value || '30');
+  document.getElementById('fraudResult').innerHTML = '<div class="text-muted">Scanning...</div>';
+  const res = await fetch(`/ai/api/profit-leak/fraud-signals?days=${days}`);
+  const data = await res.json();
+  let html = `<div class="alert alert-${data.overall_risk_score >= 50 ? 'danger' : data.overall_risk_score > 0 ? 'warning' : 'success'} py-2 small mb-2">Risk Score: ${data.overall_risk_score}/100 - ${data.insight}</div>`;
+  html += `<div class="small text-muted">Discount baseline: ${data.discount_baseline_pct}%</div>`;
+  html += '<div class="small mt-2"><strong>Discount flags:</strong> ' + (data.suspicious_discount_patterns?.length || 0) + ' | <strong>Return flags:</strong> ' + (data.suspicious_return_patterns?.length || 0) + ' | <strong>Stock adjustment flags:</strong> ' + (data.suspicious_stock_adjustments?.length || 0) + '</div>';
+  document.getElementById('fraudResult').innerHTML = html;
+}
+
 async function loadSupplierScore() {
   const sid = document.getElementById('supplierSelect').value;
   const url = sid ? `/ai/api/suppliers/${sid}/score` : '/ai/api/suppliers/scorecard';
@@ -291,6 +420,66 @@ async function loadSupplierScore() {
     html += '</tbody></table></div>';
     document.getElementById('supplierResult').innerHTML = html;
   }
+}
+
+async function loadReplenishmentPlan() {
+  const lookback = parseInt(document.getElementById('replenishLookback').value || '30');
+  const safety = parseInt(document.getElementById('replenishSafety').value || '4');
+  const coverage = parseInt(document.getElementById('replenishCoverage').value || '14');
+  document.getElementById('replenishmentResult').innerHTML = '<div class="text-muted">Generating plan...</div>';
+  const res = await fetch(`/ai/api/replenishment/plan?lookback=${lookback}&safety=${safety}&coverage=${coverage}`);
+  const data = await res.json();
+  let html = `<div class="alert alert-info py-2 small mb-3">Products to restock: ${data.total_products_to_restock} | Supplier orders: ${data.total_supplier_orders} | Estimated total: NPR ${Number(data.total_estimated_cost || 0).toLocaleString()}</div>`;
+  if (data.supplier_groups?.length) {
+    html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>Supplier</th><th>Items</th><th>Estimated Cost</th></tr></thead><tbody>';
+    data.supplier_groups.forEach(g => {
+      html += `<tr><td>${g.supplier_name}</td><td>${g.items.length}</td><td>NPR ${Number(g.total_estimated_cost || 0).toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('replenishmentResult').innerHTML = html;
+}
+
+async function createReplenishmentDrafts() {
+  const payload = {
+    lookback: parseInt(document.getElementById('replenishLookback').value || '30'),
+    safety: parseInt(document.getElementById('replenishSafety').value || '4'),
+    coverage: parseInt(document.getElementById('replenishCoverage').value || '14'),
+  };
+  document.getElementById('replenishmentResult').innerHTML = '<div class="text-muted">Creating draft purchase orders...</div>';
+  const res = await fetch('/ai/api/replenishment/create-drafts', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  let html = `<div class="alert alert-${data.created_order_count > 0 ? 'success' : 'warning'} py-2 small mb-3">Draft POs created: ${data.created_order_count} | Skipped products without supplier: ${data.skipped_unassigned_products || 0}</div>`;
+  if (data.orders?.length) {
+    html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>PO</th><th>Supplier</th><th>Items</th><th>Estimated Total</th></tr></thead><tbody>';
+    data.orders.forEach(o => {
+      html += `<tr><td>${o.po_number}</td><td>${o.supplier_name}</td><td>${o.items_count}</td><td>NPR ${Number(o.estimated_total || 0).toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('replenishmentResult').innerHTML = html;
+}
+
+async function loadPriceOptimizer() {
+  const lookback = parseInt(document.getElementById('priceLookback').value || '45');
+  const maxChange = parseFloat(document.getElementById('priceMaxChange').value || '10');
+  const minMargin = parseFloat(document.getElementById('priceMinMargin').value || '8');
+  document.getElementById('priceOptimizerResult').innerHTML = '<div class="text-muted">Optimizing prices...</div>';
+  const res = await fetch(`/ai/api/pricing/optimize?lookback=${lookback}&max_change=${maxChange}&min_margin=${minMargin}`);
+  const data = await res.json();
+  let html = `<div class="alert alert-dark py-2 small mb-3">Analyzed: ${data.total_products_analyzed} | Actionable: ${data.actionable_count} | Estimated 30-day profit impact: NPR ${Number(data.estimated_total_30d_profit_impact || 0).toLocaleString()}</div>`;
+  if (data.suggestions?.length) {
+    html += '<div class="table-responsive"><table class="table table-sm mb-0"><thead class="table-dark"><tr><th>Product</th><th>Action</th><th>Current</th><th>Suggested</th><th>Change %</th><th>Profit Impact</th></tr></thead><tbody>';
+    data.suggestions.slice(0, 20).forEach(s => {
+      html += `<tr><td>${s.product_name}</td><td>${s.action}</td><td>NPR ${Number(s.current_price).toLocaleString()}</td><td>NPR ${Number(s.suggested_price).toLocaleString()}</td><td>${s.price_change_pct}%</td><td>NPR ${Number(s.estimated_30d_profit_impact || 0).toLocaleString()}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  document.getElementById('priceOptimizerResult').innerHTML = html;
 }
 
 async function simulateSales() {
@@ -344,6 +533,36 @@ async function simulateExpenses() {
     </div>`;
 }
 
+async function simulateScenario() {
+  const payload = {
+    product_id: parseInt(document.getElementById('scenarioProduct').value || '0'),
+    price_change_pct: parseFloat(document.getElementById('scenarioPriceChange').value || '0'),
+    demand_change_pct: parseFloat(document.getElementById('scenarioDemandChange').value || '0'),
+    extra_expense: parseFloat(document.getElementById('scenarioExpense').value || '0'),
+    days: parseInt(document.getElementById('scenarioDays').value || '30'),
+  };
+  document.getElementById('scenarioResult').innerHTML = '<div class="text-muted">Running scenario...</div>';
+  const res = await fetch('/ai/api/simulate/scenario', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  const d = await res.json();
+  if (d.error) {
+    document.getElementById('scenarioResult').innerHTML = `<div class="alert alert-danger py-2 small">${d.error}</div>`;
+    return;
+  }
+  const color = d.impact.profit_change >= 0 ? 'success' : 'danger';
+  document.getElementById('scenarioResult').innerHTML =
+    `<div class="alert alert-${color} py-2 small">
+      Baseline Profit: NPR ${Number(d.baseline.profit).toLocaleString()}<br>
+      Simulated Profit: NPR ${Number(d.simulated.profit).toLocaleString()} (${d.impact.profit_change >= 0 ? '+' : ''}${Number(d.impact.profit_change).toLocaleString()})<br>
+      Simulated Revenue: NPR ${Number(d.simulated.revenue).toLocaleString()} (${d.impact.revenue_change >= 0 ? '+' : ''}${Number(d.impact.revenue_change).toLocaleString()})<br>
+      Days to stockout: ${d.simulated.days_to_stockout}<br>
+      ${d.recommendation}
+    </div>`;
+}
+
 // Auto-fill new price from selected product
 document.getElementById('priceProduct')?.addEventListener('change', function() {
   const opt = this.options[this.selectedIndex];
@@ -351,3 +570,4 @@ document.getElementById('priceProduct')?.addEventListener('change', function() {
 });
 </script>
 {% endblock %}
+
