@@ -559,6 +559,14 @@
               </a>
             </li>
             {% endif %}
+            {% if current_user.role == 'admin' or (current_user.permissions and (current_user.permissions.can_view_reports or current_user.permissions.can_view_bi_dashboard)) %}
+            <li class="nav-item">
+              <a class="nav-link {% if request.blueprint == 'bi_dashboard' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_dashboard_page') }}">
+                <i class="bi bi-graph-up-arrow"></i>BI Dashboard
+              </a>
+            </li>
+            {% endif %}
             {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_ai_insights) %}
             <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'ai.insights' %}active{% endif %}"

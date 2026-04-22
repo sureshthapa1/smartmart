@@ -25,6 +25,11 @@ def _parse_filter():
         return today - timedelta(days=today.weekday()), today, "This Week"
     elif f == "month":
         return today.replace(day=1), today, "This Month"
+    elif f == "quarter":
+        quarter_start_month = ((today.month - 1) // 3) * 3 + 1
+        return today.replace(month=quarter_start_month, day=1), today, "This Quarter"
+    elif f == "year":
+        return today.replace(month=1, day=1), today, "This Year"
     elif f == "custom":
         try:
             start = date.fromisoformat(request.args.get("start", str(today)))
@@ -144,6 +149,29 @@ def index():
         .limit(5)
     ).scalars().all()
 
+    # ── Period sales (respects active filter) ────────────────────────────
+    period_sales_amount = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(func.date(Sale.sale_date) >= filter_start)
+        .where(func.date(Sale.sale_date) <= filter_end)
+    ).scalar() or 0
+    period_sales_count = db.session.execute(
+        db.select(func.count(Sale.id))
+        .where(func.date(Sale.sale_date) >= filter_start)
+        .where(func.date(Sale.sale_date) <= filter_end)
+    ).scalar() or 0
+    avg_transaction_value = (
+        float(period_sales_amount) / period_sales_count
+        if period_sales_count > 0 else 0.0
+    )
+
+    # ── Reorder alerts (products at or below reorder point) ──────────────
+    reorder_alerts_count = db.session.execute(
+        db.select(func.count(Product.id))
+        .where(Product.quantity <= Product.reorder_point)
+        .where(Product.quantity >= 0)
+    ).scalar() or 0
+
     # ── Smart insights ────────────────────────────────────────────────────
     insights = []
     # Sales trend vs last week
@@ -194,6 +222,10 @@ def index():
                            weekly_sales_count=weekly_sales_count,
                            monthly_sales=float(monthly_sales_amount),
                            monthly_sales_count=monthly_sales_count,
+                           # Period (active filter)
+                           period_sales=float(period_sales_amount),
+                           period_sales_count=period_sales_count,
+                           avg_transaction_value=avg_transaction_value,
                            # Other
                            total_products=total_products,
                            stock_value=float(stock_value),
@@ -205,10 +237,12 @@ def index():
                            insights=insights,
                            # Alerts
                            low_stock=low_stock,
+                           reorder_alerts_count=reorder_alerts_count,
                            alert_counts={
                                "low_stock": len(alerts["low_stock"]),
                                "expiry": len(alerts["expiry"]),
                                "high_demand": len(alerts["high_demand"]),
+                               "reorder": reorder_alerts_count,
                            },
                            # Filter
                            active_filter=active_filter,
