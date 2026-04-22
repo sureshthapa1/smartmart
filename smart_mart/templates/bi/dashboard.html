@@ -21,12 +21,19 @@
   .badge-loss_product{background:#fee2e2;color:#991b1b}
   .badge-dead_stock{background:#f1f5f9;color:#475569}
   .badge-overstock{background:#dbeafe;color:#1e40af}
+  .sim-result{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-top:10px}
+  .sim-result.loss{background:#fef2f2;border-color:#fecaca}
+  .be-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .be-ok{background:#dcfce7;color:#166534}
+  .be-warn{background:#fee2e2;color:#991b1b}
   @media(max-width:1000px){.bi-shell{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
   [data-bs-theme="dark"] .kpi{background:#161d2e;border-color:#1e293b}
   [data-bs-theme="dark"] .kpi h6{color:#94a3b8}
   [data-bs-theme="dark"] .kpi .v{color:#e2e8f0}
   [data-bs-theme="dark"] .panel{background:#161d2e;border-color:#1e293b}
   [data-bs-theme="dark"] .insight{border-color:#1e293b}
+  [data-bs-theme="dark"] .sim-result{background:#052e16;border-color:#166534}
+  [data-bs-theme="dark"] .sim-result.loss{background:#450a0a;border-color:#991b1b}
 </style>
 {% endblock %}
 
@@ -44,8 +51,11 @@
   <button id="reload" class="btn btn-primary btn-sm">
     <i class="bi bi-arrow-clockwise me-1"></i>Refresh
   </button>
-  <a id="exportCsv" href="#" class="btn btn-outline-secondary btn-sm ms-auto">
+  <a id="exportCsv" href="#" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-download me-1"></i>Export P&amp;L CSV
+  </a>
+  <a href="{{ url_for('bi_dashboard.bi_batches_page') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+    <i class="bi bi-box-seam me-1"></i>Purchase Batches
   </a>
 </div>
 
@@ -74,21 +84,84 @@
         <div class="chart-wrap"><canvas id="productBar"></canvas></div>
       </div>
     </div>
+
+    <!-- Product P&L Table with Break-Even -->
+    <div class="panel mt-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0 fw-bold">Product P&amp;L + Break-Even</h6>
+        <a id="exportCsv2" href="#" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-download me-1"></i>CSV
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" id="pnlTable">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th class="text-end">Cost</th>
+              <th class="text-end">Sell Price</th>
+              <th class="text-end">Qty Sold</th>
+              <th class="text-end">Revenue</th>
+              <th class="text-end">Gross Profit</th>
+              <th class="text-end">Net Profit</th>
+              <th class="text-end">Net Margin</th>
+              <th class="text-end">Break-Even</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="pnlBody">
+            <tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <div class="panel" style="max-height:620px;overflow-y:auto">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h6 class="mb-0 fw-bold">AI Profit Advisor</h6>
-      <span id="insightCount" class="badge bg-secondary">0</span>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <!-- AI Profit Advisor -->
+    <div class="panel" style="max-height:380px;overflow-y:auto">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0 fw-bold">AI Profit Advisor</h6>
+        <span id="insightCount" class="badge bg-secondary">0</span>
+      </div>
+      <select id="insightFilter" class="form-select form-select-sm mb-2">
+        <option value="">All types</option>
+        <option value="low_margin">Low Margin</option>
+        <option value="loss_product">Running at Loss</option>
+        <option value="dead_stock">Dead Stock</option>
+        <option value="overstock">Overstock</option>
+      </select>
+      <div id="insights"></div>
     </div>
-    <select id="insightFilter" class="form-select form-select-sm mb-2">
-      <option value="">All types</option>
-      <option value="low_margin">Low Margin</option>
-      <option value="loss_product">Running at Loss</option>
-      <option value="dead_stock">Dead Stock</option>
-      <option value="overstock">Overstock</option>
-    </select>
-    <div id="insights"></div>
+
+    <!-- Profit Simulation -->
+    <div class="panel">
+      <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2 text-primary"></i>Profit Simulator</h6>
+      <div class="mb-2">
+        <label class="form-label small">Product</label>
+        <select id="simProduct" class="form-select form-select-sm">
+          <option value="">Select product…</option>
+        </select>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label small">Margin %</label>
+          <input id="simMargin" type="number" step="0.1" min="0" max="500" class="form-control form-control-sm" placeholder="e.g. 25">
+        </div>
+        <div class="col-6">
+          <label class="form-label small">OR Selling Price</label>
+          <input id="simPrice" type="number" step="0.01" min="0" class="form-control form-control-sm" placeholder="e.g. 150">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Expected Qty to Sell</label>
+        <input id="simQty" type="number" min="1" value="10" class="form-control form-control-sm">
+      </div>
+      <button id="simRun" class="btn btn-primary btn-sm w-100">
+        <i class="bi bi-play-fill me-1"></i>Run Simulation
+      </button>
+      <div id="simResult" class="d-none"></div>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -97,6 +170,7 @@
 <script>
 let charts = {};
 let _allInsights = [];
+let _products = [];
 
 const INSIGHT_ICONS = {
   low_margin: '📉',
@@ -106,6 +180,7 @@ const INSIGHT_ICONS = {
 };
 
 function money(v){ return `NPR ${Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
+function pct(v){ return `${Number(v||0).toFixed(1)}%`; }
 
 function renderKpis(k){
   const netClass = (k.net_profit||0) >= 0 ? 'profit' : 'loss';
@@ -113,9 +188,9 @@ function renderKpis(k){
   const entries = [
     ['Total Sales', money(k.sales), ''],
     ['COGS', money(k.cogs), ''],
-    ['Gross Profit', money(k.gross_profit), gpClass],
+    ['Gross Profit', money(k.gross_profit) + ` (${pct(k.gross_margin_pct)})`, gpClass],
     ['OPEX', money(k.opex), ''],
-    ['Net Profit', money(k.net_profit), netClass],
+    ['Net Profit', money(k.net_profit) + ` (${pct(k.net_margin_pct||0)})`, netClass],
   ];
   document.getElementById('kpis').innerHTML = entries.map(([n,v,cls]) =>
     `<div class="kpi ${cls}"><h6>${n}</h6><div class="v">${v}</div></div>`
@@ -148,13 +223,6 @@ function barChart(id,labels,data){
   });
 }
 
-const ACTION_LABELS = {
-  increase_price:'Increase Price',
-  review_pricing_or_cost:'Review Costing',
-  discount_or_bundle:'Create Discount',
-  run_promotion:'Launch Promotion',
-};
-
 function renderInsights(items){
   const filter = document.getElementById('insightFilter').value;
   const filtered = filter ? items.filter(x=>x.type===filter) : items;
@@ -181,6 +249,37 @@ function renderInsights(items){
       </div>
     </div>
   `).join('');
+}
+
+function renderPnlTable(products){
+  if(!products.length){
+    document.getElementById('pnlBody').innerHTML='<tr><td colspan="10" class="text-center text-muted py-3">No sales data for this period.</td></tr>';
+    return;
+  }
+  document.getElementById('pnlBody').innerHTML = products.map(p => {
+    const aboveBE = p.selling_price >= p.break_even_price;
+    const netOk = p.net_profit >= 0;
+    return `<tr>
+      <td><div class="fw-medium small">${p.product_name}</div><div class="text-muted" style="font-size:10px">${p.sku||''}</div></td>
+      <td class="text-end small">${money(p.cost)}</td>
+      <td class="text-end small">${money(p.selling_price)}</td>
+      <td class="text-end small">${p.qty_sold}</td>
+      <td class="text-end small">${money(p.revenue)}</td>
+      <td class="text-end small ${p.gross_profit>=0?'text-success':'text-danger'}">${money(p.gross_profit)}</td>
+      <td class="text-end small ${netOk?'text-success':'text-danger'}">${money(p.net_profit)}</td>
+      <td class="text-end small">${pct(p.net_margin_pct)}</td>
+      <td class="text-end small">${money(p.break_even_price)}</td>
+      <td><span class="be-badge ${aboveBE?'be-ok':'be-warn'}">${aboveBE?'✓ Above':'✗ Below'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function populateSimProducts(products){
+  const sel = document.getElementById('simProduct');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select product…</option>' +
+    products.map(p=>`<option value="${p.product_id}">${p.product_name} (${p.sku||''})</option>`).join('');
+  if(current) sel.value = current;
 }
 
 function buildExportUrl(){
@@ -217,7 +316,22 @@ async function loadDashboard(){
 
     _allInsights = json.insights || [];
     renderInsights(_allInsights);
-    document.getElementById('exportCsv').href = buildExportUrl();
+
+    // Load full P&L with break-even data
+    const pnlParams = new URLSearchParams();
+    if(start) pnlParams.set('start',start);
+    if(end)   pnlParams.set('end',end);
+    const pnlRes = await fetch(`/api/bi/reports/profit-loss?${pnlParams.toString()}`);
+    if(pnlRes.ok){
+      const pnl = await pnlRes.json();
+      _products = pnl.products || [];
+      renderPnlTable(_products);
+      populateSimProducts(_products);
+    }
+
+    const exportUrl = buildExportUrl();
+    document.getElementById('exportCsv').href = exportUrl;
+    document.getElementById('exportCsv2').href = exportUrl;
   } catch(e){
     const el = document.getElementById('error');
     el.textContent = `Failed to load dashboard: ${e.message}`;
@@ -226,6 +340,60 @@ async function loadDashboard(){
     document.getElementById('loading').classList.add('d-none');
   }
 }
+
+// Profit simulation
+document.getElementById('simRun').addEventListener('click', async () => {
+  const productId = document.getElementById('simProduct').value;
+  const margin    = document.getElementById('simMargin').value;
+  const price     = document.getElementById('simPrice').value;
+  const qty       = document.getElementById('simQty').value || 1;
+  const start     = document.getElementById('start').value;
+  const end       = document.getElementById('end').value;
+
+  if(!productId){ alert('Select a product first'); return; }
+  if(!margin && !price){ alert('Enter margin % or selling price'); return; }
+
+  const body = { product_id: parseInt(productId), expected_qty: parseInt(qty) };
+  if(margin) body.margin_pct = parseFloat(margin);
+  else       body.selling_price = parseFloat(price);
+  if(start) body.start = start;
+  if(end)   body.end   = end;
+
+  try {
+    const res = await fetch('/api/bi/reports/simulate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const r = await res.json();
+    if(!res.ok){ alert(r.error || 'Simulation failed'); return; }
+
+    const isProfit = r.estimated_net_profit >= 0;
+    const aboveBE  = r.above_break_even;
+    document.getElementById('simResult').className = `sim-result ${isProfit?'':'loss'}`;
+    document.getElementById('simResult').innerHTML = `
+      <div class="fw-semibold mb-2">${r.product_name} — Simulation Result</div>
+      <div class="row g-1 small">
+        <div class="col-6">Cost/unit</div><div class="col-6 text-end fw-medium">${money(r.final_cost)}</div>
+        <div class="col-6">Selling price</div><div class="col-6 text-end fw-medium">${money(r.selling_price)}</div>
+        <div class="col-6">Margin</div><div class="col-6 text-end fw-medium">${pct(r.margin_pct)}</div>
+        <div class="col-6">Profit/unit</div><div class="col-6 text-end fw-medium ${r.profit_per_unit>=0?'text-success':'text-danger'}">${money(r.profit_per_unit)}</div>
+        <div class="col-6">Expected qty</div><div class="col-6 text-end fw-medium">${r.expected_qty}</div>
+        <div class="col-6">Est. Revenue</div><div class="col-6 text-end fw-medium">${money(r.estimated_revenue)}</div>
+        <div class="col-6">Est. Gross Profit</div><div class="col-6 text-end fw-medium">${money(r.estimated_gross_profit)}</div>
+        <div class="col-6">Est. OPEX share</div><div class="col-6 text-end fw-medium">${money(r.estimated_allocated_opex)}</div>
+        <div class="col-6 fw-bold">Est. Net Profit</div><div class="col-6 text-end fw-bold ${isProfit?'text-success':'text-danger'}">${money(r.estimated_net_profit)} (${pct(r.net_margin_pct)})</div>
+        <div class="col-12 mt-1 pt-1 border-top">
+          <span class="be-badge ${aboveBE?'be-ok':'be-warn'}">
+            ${aboveBE?'✓ Above break-even':'✗ Below break-even'}
+          </span>
+          <span class="text-muted small ms-2">Break-even: ${money(r.break_even_price)}</span>
+        </div>
+      </div>
+    `;
+    document.getElementById('simResult').classList.remove('d-none');
+  } catch(e){ alert('Simulation error: ' + e.message); }
+});
 
 document.getElementById('reload').addEventListener('click', loadDashboard);
 document.getElementById('insightFilter').addEventListener('change', ()=>renderInsights(_allInsights));

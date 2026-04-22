@@ -20,14 +20,16 @@ class ReportService:
     def profit_and_loss(start: date | None = None, end: date | None = None) -> dict:
         sale_stmt = db.select(Sale.id, Sale.sale_date).subquery()
 
-        # FIX 1: join Product so we get name + sku in one query (no N+1)
         item_stmt = (
             db.select(
                 SaleItem.product_id.label("product_id"),
                 Product.name.label("product_name"),
                 Product.sku.label("sku"),
+                Product.cost_price.label("current_cost"),
+                Product.selling_price.label("current_selling_price"),
                 func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
+                func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
             )
             .join(sale_stmt, sale_stmt.c.id == SaleItem.sale_id)
             .join(Product, Product.id == SaleItem.product_id)
@@ -38,7 +40,10 @@ class ReportService:
         if end:
             item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) <= end)
 
-        item_stmt = item_stmt.group_by(SaleItem.product_id, Product.name, Product.sku)
+        item_stmt = item_stmt.group_by(
+            SaleItem.product_id, Product.name, Product.sku,
+            Product.cost_price, Product.selling_price,
+        )
         rows = db.session.execute(item_stmt).all()
 
         total_sales = sum((as_decimal(r.revenue) for r in rows), Decimal("0"))
@@ -56,38 +61,150 @@ class ReportService:
         for row in rows:
             revenue = as_decimal(row.revenue)
             cogs = as_decimal(row.cogs)
+            qty_sold = int(row.qty_sold or 0)
             gross_profit = money(revenue - cogs)
             allocated_opex = allocations.get(row.product_id, Decimal("0.00"))
             net_profit = money(gross_profit - allocated_opex)
-            # FIX 7: include gross_margin_pct
             gross_margin_pct = round(float(gross_profit / revenue * 100), 2) if revenue > 0 else 0.0
+            net_margin_pct = round(float(net_profit / revenue * 100), 2) if revenue > 0 else 0.0
+
+            # Break-even price: minimum price to cover COGS + allocated OPEX
+            # break_even = (cogs + allocated_opex) / qty_sold
+            current_cost = as_decimal(row.current_cost or 0)
+            if qty_sold > 0:
+                break_even_price = decimal_to_float(
+                    money((cogs + allocated_opex) / Decimal(str(qty_sold)))
+                )
+            else:
+                # No sales yet — use current cost as floor
+                break_even_price = decimal_to_float(current_cost)
+
             products.append(
                 {
                     "product_id": row.product_id,
-                    "product_name": row.product_name,   # FIX 1
-                    "sku": row.sku,                      # FIX 1
+                    "product_name": row.product_name,
+                    "sku": row.sku,
+                    "cost": decimal_to_float(current_cost),
+                    "selling_price": decimal_to_float(as_decimal(row.current_selling_price or 0)),
+                    "qty_sold": qty_sold,
                     "revenue": decimal_to_float(money(revenue)),
                     "cogs": decimal_to_float(money(cogs)),
                     "gross_profit": decimal_to_float(gross_profit),
-                    "gross_margin_pct": gross_margin_pct,  # FIX 7
+                    "gross_margin_pct": gross_margin_pct,
                     "allocated_opex": decimal_to_float(allocated_opex),
                     "net_profit": decimal_to_float(net_profit),
+                    "net_margin_pct": net_margin_pct,
+                    "break_even_price": break_even_price,
                 }
             )
 
         gross_profit = money(total_sales - total_cogs)
         net_profit = money(gross_profit - total_opex)
         overall_margin = round(float(gross_profit / total_sales * 100), 2) if total_sales > 0 else 0.0
+        overall_net_margin = round(float(net_profit / total_sales * 100), 2) if total_sales > 0 else 0.0
         return {
             "overall": {
                 "sales": decimal_to_float(money(total_sales)),
                 "cogs": decimal_to_float(money(total_cogs)),
                 "gross_profit": decimal_to_float(gross_profit),
-                "gross_margin_pct": overall_margin,  # FIX 7
+                "gross_margin_pct": overall_margin,
                 "opex": decimal_to_float(money(total_opex)),
                 "net_profit": decimal_to_float(net_profit),
+                "net_margin_pct": overall_net_margin,
             },
             "products": products,
+        }
+
+    # ── Profit Simulation (What-If Analysis) ─────────────────────────────────
+    @staticmethod
+    def simulate_profit(
+        *,
+        product_id: int,
+        margin_pct: float | None = None,
+        selling_price: float | None = None,
+        expected_qty: int = 1,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> dict:
+        """
+        Simulate profit for a product given a margin % or selling price.
+        Returns gross profit, net profit (after OPEX allocation), and break-even.
+        """
+        product = db.session.get(Product, product_id)
+        if product is None:
+            raise ValueError(f"Product {product_id} not found")
+
+        final_cost = as_decimal(product.cost_price or 0)
+        if final_cost <= 0:
+            raise ValueError("Product has no cost price set")
+
+        # Resolve selling price from margin or direct input
+        if selling_price is not None:
+            sim_price = as_decimal(selling_price)
+            sim_margin = ((sim_price - final_cost) / sim_price * 100) if sim_price > 0 else Decimal("0")
+        elif margin_pct is not None:
+            sim_margin = as_decimal(margin_pct)
+            sim_price = final_cost * (Decimal("1") + sim_margin / Decimal("100"))
+        else:
+            raise ValueError("Provide either margin_pct or selling_price")
+
+        sim_price = money(sim_price)
+        profit_per_unit = money(sim_price - final_cost)
+        gross_profit = money(profit_per_unit * Decimal(str(expected_qty)))
+        estimated_revenue = money(sim_price * Decimal(str(expected_qty)))
+        estimated_cogs = money(final_cost * Decimal(str(expected_qty)))
+
+        # Estimate OPEX allocation based on revenue share
+        # Use total revenue from the period to compute share
+        total_revenue_stmt = db.select(
+            func.coalesce(func.sum(SaleItem.subtotal), 0)
+        ).join(Sale, Sale.id == SaleItem.sale_id)
+        if start:
+            total_revenue_stmt = total_revenue_stmt.where(func.date(Sale.sale_date) >= start)
+        if end:
+            total_revenue_stmt = total_revenue_stmt.where(func.date(Sale.sale_date) <= end)
+        total_revenue = as_decimal(db.session.execute(total_revenue_stmt).scalar() or 0)
+
+        opex_stmt = db.select(func.coalesce(func.sum(OperatingExpense.amount), 0))
+        if start:
+            opex_stmt = opex_stmt.where(OperatingExpense.expense_date >= start)
+        if end:
+            opex_stmt = opex_stmt.where(OperatingExpense.expense_date <= end)
+        total_opex = as_decimal(db.session.execute(opex_stmt).scalar() or 0)
+
+        # Allocate OPEX proportionally to simulated revenue
+        combined_revenue = total_revenue + estimated_revenue
+        if combined_revenue > 0 and total_opex > 0:
+            allocated_opex = money(total_opex * (estimated_revenue / combined_revenue))
+        else:
+            allocated_opex = Decimal("0.00")
+
+        net_profit = money(gross_profit - allocated_opex)
+        net_margin_pct = round(float(net_profit / estimated_revenue * 100), 2) if estimated_revenue > 0 else 0.0
+
+        # Break-even: minimum price to cover cost + allocated opex per unit
+        if expected_qty > 0 and allocated_opex > 0:
+            break_even = money(final_cost + (allocated_opex / Decimal(str(expected_qty))))
+        else:
+            break_even = money(final_cost)
+
+        return {
+            "product_id": product_id,
+            "product_name": product.name,
+            "sku": product.sku,
+            "final_cost": decimal_to_float(final_cost),
+            "margin_pct": decimal_to_float(money(sim_margin)),
+            "selling_price": decimal_to_float(sim_price),
+            "profit_per_unit": decimal_to_float(profit_per_unit),
+            "expected_qty": expected_qty,
+            "estimated_revenue": decimal_to_float(estimated_revenue),
+            "estimated_cogs": decimal_to_float(estimated_cogs),
+            "estimated_gross_profit": decimal_to_float(gross_profit),
+            "estimated_allocated_opex": decimal_to_float(allocated_opex),
+            "estimated_net_profit": decimal_to_float(net_profit),
+            "net_margin_pct": net_margin_pct,
+            "break_even_price": decimal_to_float(break_even),
+            "above_break_even": sim_price >= break_even,
         }
 
     @staticmethod

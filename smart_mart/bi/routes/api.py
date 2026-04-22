@@ -320,20 +320,29 @@ def export_profit_loss_csv():
     data = ReportService.profit_and_loss(start, end)
     output = io.StringIO()
     writer = csv.writer(output)
-    # FIX 1: include product name + sku in CSV
-    writer.writerow(["Product ID", "Product Name", "SKU", "Revenue", "COGS",
-                     "Gross Profit", "Gross Margin %", "Allocated OpEx", "Net Profit"])
+    writer.writerow([
+        "Product ID", "Product Name", "SKU", "Cost", "Selling Price",
+        "Qty Sold", "Revenue", "COGS", "Gross Profit", "Gross Margin %",
+        "Allocated OpEx", "Net Profit", "Net Margin %", "Break-Even Price",
+    ])
     for row in data.get("products", []):
         writer.writerow([
             row["product_id"], row.get("product_name", ""), row.get("sku", ""),
-            row["revenue"], row["cogs"], row["gross_profit"],
-            row.get("gross_margin_pct", ""), row["allocated_opex"], row["net_profit"],
+            row.get("cost", ""), row.get("selling_price", ""),
+            row.get("qty_sold", ""), row["revenue"], row["cogs"],
+            row["gross_profit"], row.get("gross_margin_pct", ""),
+            row["allocated_opex"], row["net_profit"],
+            row.get("net_margin_pct", ""), row.get("break_even_price", ""),
         ])
     overall = data.get("overall", {})
     writer.writerow([])
-    writer.writerow(["TOTAL", "", "", overall.get("sales"), overall.get("cogs"),
-                     overall.get("gross_profit"), overall.get("gross_margin_pct", ""),
-                     overall.get("opex"), overall.get("net_profit")])
+    writer.writerow([
+        "TOTAL", "", "", "", "", "",
+        overall.get("sales"), overall.get("cogs"),
+        overall.get("gross_profit"), overall.get("gross_margin_pct", ""),
+        overall.get("opex"), overall.get("net_profit"),
+        overall.get("net_margin_pct", ""), "",
+    ])
     filename = f"pnl_{(start or date.today()).isoformat()}_{(end or date.today()).isoformat()}.csv"
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename={filename}"})
@@ -391,6 +400,62 @@ def delete_margin_rule(category: str):
 def inventory_value_snapshot():
     _require_bi_perm("can_view_reports")
     return jsonify(ReportService.inventory_valuation_snapshot())
+
+
+# ── Break-even price endpoint ─────────────────────────────────────────────────
+@bi_bp.route("/reports/break-even", methods=["GET"])
+@login_required
+def break_even_report():
+    """
+    Returns break-even price for every product that has been sold.
+    break_even_price = (cogs + allocated_opex) / qty_sold
+    """
+    _require_bi_perm("can_view_profit_report")
+    start = _parse_date(request.args.get("start"))
+    end = _parse_date(request.args.get("end"))
+    data = ReportService.profit_and_loss(start, end)
+    result = [
+        {
+            "product_id": p["product_id"],
+            "product_name": p["product_name"],
+            "sku": p["sku"],
+            "cost": p["cost"],
+            "selling_price": p["selling_price"],
+            "qty_sold": p["qty_sold"],
+            "break_even_price": p["break_even_price"],
+            "current_vs_breakeven": round(p["selling_price"] - p["break_even_price"], 2),
+            "is_above_breakeven": p["selling_price"] >= p["break_even_price"],
+        }
+        for p in data["products"]
+    ]
+    # Sort: products below break-even first
+    result.sort(key=lambda x: x["current_vs_breakeven"])
+    return jsonify({"break_even": result, "overall": data["overall"]})
+
+
+# ── Profit simulation endpoint ────────────────────────────────────────────────
+@bi_bp.route("/reports/simulate", methods=["POST"])
+@login_required
+def simulate_profit():
+    """
+    What-if profit simulation.
+    POST body: { product_id, margin_pct OR selling_price, expected_qty, start?, end? }
+    """
+    _require_bi_perm("can_view_profit_report")
+    payload = request.get_json() or {}
+    product_id = payload.get("product_id")
+    if not product_id:
+        return jsonify({"error": "product_id is required"}), 400
+    return jsonify(
+        ReportService.simulate_profit(
+            product_id=int(product_id),
+            margin_pct=payload.get("margin_pct"),
+            selling_price=payload.get("selling_price"),
+            expected_qty=int(payload.get("expected_qty") or 1),
+            start=_parse_date(payload.get("start")),
+            end=_parse_date(payload.get("end")),
+        )
+    )
 
 
 # Feature 7: batch CSV export
