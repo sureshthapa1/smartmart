@@ -71,6 +71,15 @@
   <a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#0891b2;color:#0891b2">
     <i class="bi bi-graph-up-arrow me-1"></i>BI Dashboard
   </a>
+  <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#f59e0b;color:#d97706">
+    <i class="bi bi-receipt me-1"></i>Add Expense
+  </a>
+  <a href="{{ url_for('reports.sales_report') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#22c55e;color:#16a34a">
+    <i class="bi bi-bar-chart-line me-1"></i>View Reports
+  </a>
+  <a href="{{ url_for('operations.closing') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#8b5cf6;color:#7c3aed">
+    <i class="bi bi-safe2 me-1"></i>Cash Session
+  </a>
   {% endif %}
 </div>
 
@@ -260,7 +269,7 @@
     </a>
   </div>
   <div class="col-sm-3">
-    <a href="{{ url_for('api.bi_reorder_alerts') if false else url_for('inventory.list_products') }}" class="text-decoration-none">
+    <a href="{{ url_for('operations.reorders') }}" class="text-decoration-none">
       <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #8b5cf6!important;">
         <div class="card-body d-flex align-items-center gap-3">
           <div style="width:42px;height:42px;background:#f5f3ff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🔄</div>
