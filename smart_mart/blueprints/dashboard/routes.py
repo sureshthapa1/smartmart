@@ -211,6 +211,17 @@ def index():
         except Exception:
             pass
 
+    # ── AI Business Advisor — surface top critical actions on dashboard ───
+    advisor_actions = []
+    if cu.role == "admin":
+        try:
+            from ...services.ai_business_advisor import product_action_recommendations
+            all_actions = product_action_recommendations()
+            # Show top 3 critical/urgent actions only
+            advisor_actions = [a for a in all_actions if a.get("priority", 9) <= 2][:3]
+        except Exception:
+            pass
+
     return render_template("dashboard/index.html",
                            # Sales
                            total_sales_count=total_sales_count,
@@ -250,4 +261,5 @@ def index():
                            filter_start=str(filter_start),
                            filter_end=str(filter_end),
                            nlg_summary=nlg_summary,
+                           advisor_actions=advisor_actions,
                            )
