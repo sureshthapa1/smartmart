@@ -393,9 +393,15 @@ def api_customer_segments():
 @ai_bp.route("/api/customers/profile")
 @admin_required
 def api_customer_profile():
-    name = request.args.get("name", "")
-    from ...services.ai_customer_segmentation import get_customer_profile
-    return jsonify(get_customer_profile(name))
+    name = request.args.get("name", "").strip().lower()
+    from ...services.ai_customer_segmentation import segment_customers
+    try:
+        data = segment_customers()
+        customers = data.get("customers", []) if isinstance(data, dict) else data
+        match = next((c for c in customers if str(c.get("name", "")).lower() == name), None)
+        return jsonify(match or {"name": name, "message": "No profile data found"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
@@ -543,9 +549,8 @@ def api_expense_categorize():
 @ai_bp.route("/api/expense/patterns")
 @admin_required
 def api_expense_patterns():
-    days = int(request.args.get("days", 30))
-    from ...services.ai_expense_categorizer import analyze_expense_patterns
-    return jsonify(analyze_expense_patterns(days))
+    from ...services.ai_expense_categorizer import expense_category_summary
+    return jsonify(expense_category_summary())
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -235,6 +235,7 @@ def backup_export():
 
 
 @operations_bp.route("/eod", methods=["GET"])
+@login_required
 def eod_summary():
     from datetime import date
     from ...services.eod_summary import get_eod_summary
