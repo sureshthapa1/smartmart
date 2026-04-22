@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}SmartMart BI Dashboard{% endblock %}
+{% block page_title %}SmartMart BI{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  .bi-shell { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; }
+  .kpi { border: 1px solid #dbe7f3; border-radius: 12px; padding: 12px; background: linear-gradient(180deg,#ffffff,#f6fbff); }
+  .kpi h6 { margin: 0; font-size: 12px; color: #4b5f73; }
+  .kpi .v { font-size: 22px; font-weight: 700; color: #0f2740; }
+  .panel { border: 1px solid #dbe7f3; border-radius: 12px; background: #fff; padding: 12px; }
+  .charts { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .insight { border:1px solid #e4ebf3; border-radius:10px; padding:10px; margin-bottom:8px; }
+  .insight small { color:#6b7f92; }
+  .status { display:none; margin-top:10px; }
+  @media (max-width: 1000px) {
+    .bi-shell { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .charts { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <select id="filter" class="form-select" style="max-width:180px">
+    <option value="today">Today</option>
+    <option value="week">This Week</option>
+    <option value="month" selected>This Month</option>
+  </select>
+  <input id="start" type="date" class="form-control" style="max-width:170px" />
+  <input id="end" type="date" class="form-control" style="max-width:170px" />
+  <button id="reload" class="btn btn-primary">Refresh</button>
+</div>
+
+<div id="loading" class="alert alert-info status">Loading BI dashboard...</div>
+<div id="error" class="alert alert-danger status"></div>
+
+<div class="kpi-grid" id="kpis"></div>
+
+<div class="bi-shell mt-3">
+  <div>
+    <div class="charts">
+      <div class="panel"><canvas id="salesTrend"></canvas></div>
+      <div class="panel"><canvas id="profitTrend"></canvas></div>
+      <div class="panel"><canvas id="expensePie"></canvas></div>
+      <div class="panel"><canvas id="productBar"></canvas></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h5>AI Profit Advisor</h5>
+    <div id="insights"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let charts = {};
+
+function money(v){ return `NPR ${Number(v || 0).toFixed(2)}`; }
+function show(el, text=''){ const x=document.getElementById(el); if(text) x.textContent=text; x.style.display='block'; }
+function hide(el){ document.getElementById(el).style.display='none'; }
+
+function renderKpis(k){
+  const entries = [
+    ['Total Sales', money(k.sales)],
+    ['COGS', money(k.cogs)],
+    ['Gross Profit', money(k.gross_profit)],
+    ['OPEX', money(k.opex)],
+    ['Net Profit', money(k.net_profit)],
+  ];
+  document.getElementById('kpis').innerHTML = entries.map(([n,v]) => `<div class="kpi"><h6>${n}</h6><div class="v">${v}</div></div>`).join('');
+}
+
+function destroyCharts(){ Object.values(charts).forEach(c => c.destroy()); charts = {}; }
+
+function lineChart(id, labels, data, label, color){
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: color + '22', fill: true, tension: .25 }] },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+
+function pieChart(id, labels, data){
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'pie',
+    data: { labels, datasets: [{ data, backgroundColor: ['#ff9f40','#36a2eb','#4bc0c0','#ff6384','#9966ff','#c9cbcf'] }] },
+    options: { responsive: true }
+  });
+}
+
+function barChart(id, labels, data){
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: '#1f77b4' }] },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+
+function actionLabel(action){
+  const map = {
+    increase_price: 'Increase Price',
+    review_pricing_or_cost: 'Review Costing',
+    discount_or_bundle: 'Create Discount',
+    run_promotion: 'Launch Promotion',
+  };
+  return map[action] || 'Take Action';
+}
+
+function renderInsights(items){
+  if (!items.length){
+    document.getElementById('insights').innerHTML = '<div class="text-muted">No issues detected in selected range.</div>';
+    return;
+  }
+  document.getElementById('insights').innerHTML = items.map(x => `
+    <div class="insight">
+      <div class="fw-semibold">${x.message}</div>
+      <small>Type: ${x.type} | Product #${x.product_id}</small>
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-primary" onclick="alert('Suggested action: ${x.action}')">${actionLabel(x.action)}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadDashboard(){
+  hide('error');
+  show('loading');
+  try {
+    const filter = document.getElementById('filter').value;
+    const start = document.getElementById('start').value;
+    const end = document.getElementById('end').value;
+    const params = new URLSearchParams({ filter });
+    if (start) params.set('start', start);
+    if (end) params.set('end', end);
+    const res = await fetch(`/api/bi/reports/dashboard?${params.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    renderKpis(json.kpis);
+    destroyCharts();
+    lineChart('salesTrend', json.sales_trend.labels, json.sales_trend.data, 'Sales', '#2f80ed');
+    lineChart('profitTrend', json.profit_trend.labels, json.profit_trend.data, 'Profit', '#219653');
+    pieChart('expensePie', json.expense_breakdown.labels, json.expense_breakdown.data);
+    barChart('productBar', json.product_performance.labels, json.product_performance.data);
+    renderInsights(json.insights || []);
+  } catch (e) {
+    show('error', `Failed to load dashboard: ${e.message}`);
+  } finally {
+    hide('loading');
+  }
+}
+
+document.getElementById('reload').addEventListener('click', loadDashboard);
+window.addEventListener('load', loadDashboard);
+</script>
+{% endblock %}
