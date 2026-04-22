@@ -6,6 +6,7 @@ from .report_service import ReportService
 from .sales_service import SalesService
 from .ai_advisor_service import AIAdvisorService
 from .dashboard_service import DashboardService
+from .analytics_service import AnalyticsService
 
 __all__ = [
     "BatchService",
@@ -16,4 +17,5 @@ __all__ = [
     "SalesService",
     "AIAdvisorService",
     "DashboardService",
+    "AnalyticsService",
 ]

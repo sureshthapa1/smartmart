@@ -11,6 +11,7 @@ from ...services.decorators import login_required, permission_required
 from ..models.purchase_batch import PurchaseBatch
 from ..services import (
     AIAdvisorService,
+    AnalyticsService,
     BatchService,
     DashboardService,
     ExpenseService,
@@ -502,6 +503,123 @@ def ai_advisor():
             overstock_qty_threshold=int(request.args.get("overstock_qty_threshold", 100)),
             low_movement_days=int(request.args.get("low_movement_days", 30)),
             low_movement_sales_qty=int(request.args.get("low_movement_sales_qty", 5)),
+        )
+    )
+
+
+# ── Feature 15: Auto pricing for target profit ────────────────────────────────
+@bi_bp.route("/reports/auto-price", methods=["POST"])
+@login_required
+def auto_price_for_target():
+    _require_bi_perm("can_view_profit_report")
+    payload = request.get_json() or {}
+    target = payload.get("target_profit")
+    if target is None:
+        return jsonify({"error": "target_profit is required"}), 400
+    return jsonify(
+        AnalyticsService.auto_price_for_target(
+            target_profit=float(target),
+            start=_parse_date(payload.get("start")),
+            end=_parse_date(payload.get("end")),
+        )
+    )
+
+
+# ── Feature 16: AI margin recommendations ────────────────────────────────────
+@bi_bp.route("/ai/margin-recommendations", methods=["GET"])
+@login_required
+def margin_recommendations():
+    _require_bi_perm("can_view_ai_insights")
+    return jsonify(
+        AnalyticsService.margin_recommendations(
+            fast_sell_days=int(request.args.get("fast_sell_days", 7)),
+            fast_sell_qty=int(request.args.get("fast_sell_qty", 10)),
+            slow_sell_days=int(request.args.get("slow_sell_days", 30)),
+            slow_sell_qty=int(request.args.get("slow_sell_qty", 3)),
+            low_margin_threshold=float(request.args.get("low_margin_threshold", 0.15)),
+            high_margin_threshold=float(request.args.get("high_margin_threshold", 0.40)),
+        )
+    )
+
+
+# ── Feature 17: Contribution margin ──────────────────────────────────────────
+@bi_bp.route("/reports/contribution-margin", methods=["GET"])
+@login_required
+def contribution_margin():
+    _require_bi_perm("can_view_profit_report")
+    return jsonify(
+        AnalyticsService.contribution_margin(
+            start=_parse_date(request.args.get("start")),
+            end=_parse_date(request.args.get("end")),
+        )
+    )
+
+
+# ── Feature 18: Per-product inventory value ───────────────────────────────────
+@bi_bp.route("/reports/inventory-value/per-product", methods=["GET"])
+@login_required
+def inventory_value_per_product():
+    _require_bi_perm("can_view_reports")
+    return jsonify(AnalyticsService.inventory_value_per_product())
+
+
+# ── Feature 19: Stock turnover ────────────────────────────────────────────────
+@bi_bp.route("/reports/stock-turnover", methods=["GET"])
+@login_required
+def stock_turnover():
+    _require_bi_perm("can_view_reports")
+    return jsonify(
+        AnalyticsService.stock_turnover(
+            start=_parse_date(request.args.get("start")),
+            end=_parse_date(request.args.get("end")),
+        )
+    )
+
+
+# ── Feature 20: Safety stock alerts ──────────────────────────────────────────
+@bi_bp.route("/reports/safety-stock", methods=["GET"])
+@login_required
+def safety_stock_alerts():
+    _require_bi_perm("can_view_reports")
+    threshold = request.args.get("threshold", type=int)
+    return jsonify({"alerts": AnalyticsService.safety_stock_alerts(custom_threshold=threshold)})
+
+
+# ── Feature 21: Profit tracking ───────────────────────────────────────────────
+@bi_bp.route("/reports/profit-tracking", methods=["GET"])
+@login_required
+def profit_tracking():
+    _require_bi_perm("can_view_profit_report")
+    days = min(365, max(1, int(request.args.get("days", 30))))
+    return jsonify(AnalyticsService.profit_tracking(days=days))
+
+
+# ── Feature 22: Product performance analysis ──────────────────────────────────
+@bi_bp.route("/reports/product-performance", methods=["GET"])
+@login_required
+def product_performance():
+    _require_bi_perm("can_view_profit_report")
+    return jsonify(
+        AnalyticsService.product_performance(
+            start=_parse_date(request.args.get("start")),
+            end=_parse_date(request.args.get("end")),
+            top_n=int(request.args.get("top_n", 10)),
+        )
+    )
+
+
+# ── Feature 23: Smart warnings ────────────────────────────────────────────────
+@bi_bp.route("/reports/smart-warnings", methods=["GET"])
+@login_required
+def smart_warnings():
+    _require_bi_perm("can_view_reports")
+    return jsonify(
+        AnalyticsService.smart_warnings(
+            start=_parse_date(request.args.get("start")),
+            end=_parse_date(request.args.get("end")),
+            low_margin_threshold=float(request.args.get("low_margin_threshold", 0.10)),
+            dead_stock_days=int(request.args.get("dead_stock_days", 30)),
+            overstock_threshold=int(request.args.get("overstock_threshold", 100)),
         )
     )
 
