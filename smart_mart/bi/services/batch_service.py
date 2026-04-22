@@ -116,6 +116,47 @@ class BatchService:
         db.session.commit()
         return batch
 
+    # Feature 2: remove a single item from a draft batch
+    @classmethod
+    def remove_item(cls, batch_id: int, item_id: int) -> PurchaseBatch:
+        batch = cls._get_batch(batch_id)
+        cls._ensure_draft(batch)
+        item = db.session.get(PurchaseBatchItem, item_id)
+        if item is None or item.batch_id != batch_id:
+            raise ValueError(f"Item {item_id} not found in batch {batch_id}")
+        db.session.delete(item)
+        db.session.flush()
+        # Reload batch items after deletion
+        remaining = list(batch.items)
+        if remaining:
+            cls.recalculate_allocation(batch_id)
+        else:
+            # No items left — reset totals
+            batch.subtotal_amount = money(0)
+            batch.shared_expense_total = money(
+                sum(as_decimal(ex.amount) for ex in batch.expenses)
+            )
+            batch.grand_total = batch.shared_expense_total
+            batch.allocation_snapshot = None
+            db.session.flush()
+        db.session.commit()
+        return batch
+
+    # Feature 2: remove a batch expense
+    @classmethod
+    def remove_expense(cls, batch_id: int, expense_id: int) -> PurchaseBatch:
+        batch = cls._get_batch(batch_id)
+        cls._ensure_draft(batch)
+        expense = db.session.get(PurchaseBatchExpense, expense_id)
+        if expense is None or expense.batch_id != batch_id:
+            raise ValueError(f"Expense {expense_id} not found in batch {batch_id}")
+        db.session.delete(expense)
+        db.session.flush()
+        if list(batch.items):
+            cls.recalculate_allocation(batch_id)
+        db.session.commit()
+        return batch
+
     @classmethod
     def recalculate_allocation(cls, batch_id: int) -> PurchaseBatch:
         batch = cls._get_batch(batch_id)

@@ -36,6 +36,8 @@
     <option value="today">Today</option>
     <option value="week">This Week</option>
     <option value="month" selected>This Month</option>
+    <option value="quarter">This Quarter</option>
+    <option value="year">This Year</option>
   </select>
   <input id="start" type="date" class="form-control form-control-sm" style="max-width:160px" />
   <input id="end" type="date" class="form-control form-control-sm" style="max-width:160px" />
@@ -174,6 +176,7 @@ function renderInsights(items){
           ${x.last_sale_date ? `<div class="text-muted" style="font-size:11px">Last sale: ${x.last_sale_date}</div>` : ''}
           ${x.stock_qty != null ? `<div class="text-muted" style="font-size:11px">Stock: ${x.stock_qty} | Recent sales: ${x.recent_sales_qty}</div>` : ''}
           ${x.current_margin_pct != null ? `<div class="text-muted" style="font-size:11px">Current margin: ${x.current_margin_pct}%</div>` : ''}
+          ${x.suggested_price != null ? `<div class="text-muted" style="font-size:11px">Suggested price: <strong>NPR ${Number(x.suggested_price).toFixed(2)}</strong> (current: NPR ${Number(x.current_selling_price||0).toFixed(2)})</div>` : ''}
         </div>
       </div>
     </div>

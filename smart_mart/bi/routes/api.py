@@ -110,11 +110,29 @@ def add_batch_items(batch_id: int):
     return jsonify(_serialize_batch(batch))
 
 
+# Feature 2: remove a single item from a draft batch
+@bi_bp.route("/batch/<int:batch_id>/items/<int:item_id>", methods=["DELETE"])
+@login_required
+def remove_batch_item(batch_id: int, item_id: int):
+    _require_bi_perm("can_create_purchase")
+    batch = BatchService.remove_item(batch_id, item_id)
+    return jsonify(_serialize_batch(batch))
+
+
 @bi_bp.route("/batch/<int:batch_id>/expenses", methods=["POST"])
 @login_required
 def add_batch_expenses(batch_id: int):
     _require_bi_perm("can_create_purchase")
     batch = BatchService.add_expenses(batch_id, (request.get_json() or {}).get("expenses") or [])
+    return jsonify(_serialize_batch(batch))
+
+
+# Feature 2: remove a batch expense
+@bi_bp.route("/batch/<int:batch_id>/expenses/<int:expense_id>", methods=["DELETE"])
+@login_required
+def remove_batch_expense(batch_id: int, expense_id: int):
+    _require_bi_perm("can_create_purchase")
+    batch = BatchService.remove_expense(batch_id, expense_id)
     return jsonify(_serialize_batch(batch))
 
 
@@ -180,6 +198,14 @@ def upsert_margin_rule():
         "margin_pct": decimal_to_float(rule.margin_pct),
         "rounding_base": rule.rounding_base,
     })
+
+
+# Feature 3: list all margin rules
+@bi_bp.route("/products/pricing/rules", methods=["GET"])
+@login_required
+def list_margin_rules():
+    _require_bi_perm("can_view_inventory")
+    return jsonify({"rules": PricingService.list_margin_rules()})
 
 
 @bi_bp.route("/products/pricing/suggest", methods=["POST"])
@@ -323,7 +349,65 @@ def dashboard_data():
     return jsonify(DashboardService.payload(filter_key, start, end))
 
 
-# FIX 5: inventory ledger read endpoint
+# Feature 1: reorder alerts
+@bi_bp.route("/reports/reorder-alerts", methods=["GET"])
+@login_required
+def reorder_alerts():
+    _require_bi_perm("can_view_reports")
+    return jsonify({"alerts": ReportService.reorder_alerts()})
+
+
+# Feature 4: category-level P&L
+@bi_bp.route("/reports/profit-loss/by-category", methods=["GET"])
+@login_required
+def report_profit_loss_by_category():
+    _require_bi_perm("can_view_profit_report")
+    start = _parse_date(request.args.get("start"))
+    end = _parse_date(request.args.get("end"))
+    return jsonify(ReportService.profit_and_loss_by_category(start, end))
+
+
+# Feature 9: pricing rules delete
+@bi_bp.route("/products/pricing/rules/<category>", methods=["DELETE"])
+@login_required
+def delete_margin_rule(category: str):
+    _require_bi_perm("can_edit_product")
+    from ..models.pricing import CategoryMarginRule
+    rule = db.session.execute(
+        db.select(CategoryMarginRule).where(
+            CategoryMarginRule.category == category.strip().lower()
+        )
+    ).scalar_one_or_none()
+    if rule is None:
+        return jsonify({"error": "rule not found"}), 404
+    db.session.delete(rule)
+    db.session.commit()
+    return jsonify({"deleted": category})
+
+
+# Feature 10: inventory valuation snapshot
+@bi_bp.route("/reports/inventory-value", methods=["GET"])
+@login_required
+def inventory_value_snapshot():
+    _require_bi_perm("can_view_reports")
+    return jsonify(ReportService.inventory_valuation_snapshot())
+
+
+# Feature 7: batch CSV export
+@bi_bp.route("/batch/<int:batch_id>/export-csv", methods=["GET"])
+@login_required
+def export_batch_csv(batch_id: int):
+    _require_bi_perm("can_view_purchases")
+    batch = db.session.get(PurchaseBatch, batch_id)
+    if batch is None:
+        return jsonify({"error": "batch not found"}), 404
+    csv_data = ReportService.batch_to_csv(batch)
+    filename = f"batch_{batch_id}_{batch.purchase_date.isoformat()}.csv"
+    return Response(csv_data, mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# Inventory ledger read endpoint
 @bi_bp.route("/inventory/ledger", methods=["GET"])
 @login_required
 def inventory_ledger():

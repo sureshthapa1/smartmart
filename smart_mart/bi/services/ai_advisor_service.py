@@ -9,6 +9,7 @@ from ...extensions import db
 from ...models.product import Product
 from ...models.sale import Sale, SaleItem
 from ..utils import as_decimal, decimal_to_float
+from .pricing_service import PricingService
 
 
 class AIAdvisorService:
@@ -28,7 +29,6 @@ class AIAdvisorService:
         dead_stock_cutoff = today - timedelta(days=max(1, dead_stock_days))
         movement_cutoff = today - timedelta(days=max(1, low_movement_days))
 
-        # All-time sales stats per product (one query)
         sold_all = db.session.execute(
             db.select(
                 SaleItem.product_id,
@@ -42,7 +42,6 @@ class AIAdvisorService:
         ).all()
         by_product = {r.product_id: r for r in sold_all}
 
-        # FIX 2: recent movement per product — ONE query instead of N+1
         recent_rows = db.session.execute(
             db.select(
                 SaleItem.product_id,
@@ -60,6 +59,8 @@ class AIAdvisorService:
             if price > 0:
                 margin = (price - cost) / price
                 if margin < as_decimal(low_margin_threshold):
+                    # Feature 8: include suggested price from PricingService
+                    price_suggestion = PricingService.suggest_price_for_product(product.id)
                     insights.append({
                         "type": "low_margin",
                         "product_id": product.id,
@@ -69,6 +70,9 @@ class AIAdvisorService:
                         "action": "increase_price",
                         "suggested_change": round(float(as_decimal(low_margin_threshold) - margin), 4),
                         "current_margin_pct": round(float(margin) * 100, 2),
+                        "current_selling_price": decimal_to_float(price),
+                        "suggested_price": price_suggestion.get("suggested_price") if price_suggestion else None,
+                        "suggested_margin_pct": price_suggestion.get("margin_pct") if price_suggestion else None,
                     })
 
             stats = by_product.get(product.id)
@@ -101,7 +105,6 @@ class AIAdvisorService:
                         "last_sale_date": last_sale.isoformat() if last_sale else None,
                     })
 
-                # FIX 2: use pre-fetched map instead of per-product query
                 recent_qty = recent_qty_map.get(product.id, 0)
                 if int(product.quantity or 0) >= overstock_qty_threshold and recent_qty <= low_movement_sales_qty:
                     insights.append({

@@ -78,3 +78,33 @@ class PricingService:
         quotient = as_decimal(price) / as_decimal(base)
         nearest = quotient.to_integral_value(rounding=ROUND_HALF_UP)
         return money(nearest * as_decimal(base))
+
+    # Feature 3: list all margin rules
+    @staticmethod
+    def list_margin_rules() -> list[dict]:
+        rules = db.session.execute(
+            db.select(CategoryMarginRule).order_by(CategoryMarginRule.category.asc())
+        ).scalars().all()
+        return [
+            {
+                "id": r.id,
+                "category": r.category,
+                "margin_pct": decimal_to_float(r.margin_pct),
+                "rounding_base": r.rounding_base,
+                "created_at": r.created_at.isoformat(),
+                "updated_at": r.updated_at.isoformat(),
+            }
+            for r in rules
+        ]
+
+    # Feature 8: suggest price for a product and return it inline
+    @staticmethod
+    def suggest_price_for_product(product_id: int) -> dict | None:
+        """Returns suggested price dict or None if cost is 0."""
+        product = db.session.get(Product, product_id)
+        if product is None or not (product.cost_price and as_decimal(product.cost_price) > 0):
+            return None
+        try:
+            return PricingService.suggest_price(product_id=product_id)
+        except Exception:
+            return None
