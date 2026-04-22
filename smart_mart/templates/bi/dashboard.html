@@ -26,6 +26,10 @@
   .be-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
   .be-ok{background:#dcfce7;color:#166534}
   .be-warn{background:#fee2e2;color:#991b1b}
+  .pct-badge{font-size:10px;padding:1px 6px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:2px}
+  .pct-up{background:#dcfce7;color:#166534}
+  .pct-down{background:#fee2e2;color:#991b1b}
+  .pct-neutral{background:#f1f5f9;color:#64748b}
   @media(max-width:1000px){.bi-shell{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts{grid-template-columns:1fr}}
   [data-bs-theme="dark"] .kpi{background:#161d2e;border-color:#1e293b}
   [data-bs-theme="dark"] .kpi h6{color:#94a3b8}
@@ -191,6 +195,7 @@
 let charts = {};
 let _allInsights = [];
 let _products = [];
+let _periodChanges = {};
 
 const INSIGHT_ICONS = {
   low_margin: '📉',
@@ -202,18 +207,26 @@ const INSIGHT_ICONS = {
 function money(v){ return `NPR ${Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`; }
 function pct(v){ return `${Number(v||0).toFixed(1)}%`; }
 
+function pctBadge(val) {
+  if (val == null) return '';
+  const sign = val > 0 ? '▲' : val < 0 ? '▼' : '—';
+  const cls = val > 0 ? 'pct-up' : val < 0 ? 'pct-down' : 'pct-neutral';
+  return `<span class="pct-badge ${cls}">${sign} ${Math.abs(val).toFixed(1)}%</span>`;
+}
+
 function renderKpis(k){
   const netClass = (k.net_profit||0) >= 0 ? 'profit' : 'loss';
   const gpClass  = (k.gross_profit||0) >= 0 ? 'profit' : 'loss';
+  const c = _periodChanges;
   const entries = [
-    ['Total Sales', money(k.sales), ''],
-    ['COGS', money(k.cogs), ''],
-    ['Gross Profit', money(k.gross_profit) + ` (${pct(k.gross_margin_pct)})`, gpClass],
-    ['OPEX', money(k.opex), ''],
-    ['Net Profit', money(k.net_profit) + ` (${pct(k.net_margin_pct||0)})`, netClass],
+    ['Total Sales', money(k.sales), '', c.sales_pct],
+    ['COGS', money(k.cogs), '', null],
+    ['Gross Profit', money(k.gross_profit) + ` (${pct(k.gross_margin_pct)})`, gpClass, c.gross_profit_pct],
+    ['OPEX', money(k.opex), '', c.opex_pct],
+    ['Net Profit', money(k.net_profit) + ` (${pct(k.net_margin_pct||0)})`, netClass, c.net_profit_pct],
   ];
-  document.getElementById('kpis').innerHTML = entries.map(([n,v,cls]) =>
-    `<div class="kpi ${cls}"><h6>${n}</h6><div class="v">${v}</div></div>`
+  document.getElementById('kpis').innerHTML = entries.map(([n,v,cls,chg]) =>
+    `<div class="kpi ${cls}"><h6>${n} ${pctBadge(chg)}</h6><div class="v">${v}</div></div>`
   ).join('');
 }
 
@@ -318,12 +331,33 @@ async function loadDashboard(){
     const filter = document.getElementById('filter').value;
     const start  = document.getElementById('start').value;
     const end    = document.getElementById('end').value;
+
+    // Persist filters to localStorage
+    localStorage.setItem('bi_dashboard_filter', filter);
+    if (start) localStorage.setItem('bi_dashboard_start', start);
+    else localStorage.removeItem('bi_dashboard_start');
+    if (end) localStorage.setItem('bi_dashboard_end', end);
+    else localStorage.removeItem('bi_dashboard_end');
+
     const params = new URLSearchParams({filter});
     if(start) params.set('start',start);
     if(end)   params.set('end',end);
     const res = await fetch(`/api/bi/reports/dashboard?${params.toString()}`);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
+
+    // Fetch period comparison in parallel
+    const cmpParams = new URLSearchParams();
+    if(start) cmpParams.set('start', start);
+    if(end)   cmpParams.set('end', end);
+    fetch(`/api/bi/reports/period-comparison?${cmpParams.toString()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(cmp => {
+        if (cmp && cmp.changes) {
+          _periodChanges = cmp.changes;
+          renderKpis(json.kpis);
+        }
+      }).catch(() => {});
 
     renderKpis(json.kpis);
     destroyCharts();
@@ -465,13 +499,67 @@ document.getElementById('simRun').addEventListener('click', async () => {
           <span class="text-muted small ms-2">Break-even: ${money(r.break_even_price)}</span>
         </div>
       </div>
+      <div class="mt-2 pt-2 border-top">
+        <button class="btn btn-success btn-sm w-100" onclick="applySimPrice(${r.product_id}, ${r.selling_price})">
+          <i class="bi bi-check-circle me-1"></i>Apply This Price (${money(r.selling_price)})
+        </button>
+        <div id="applyPriceMsg" class="mt-1 d-none"></div>
+      </div>
     `;
     document.getElementById('simResult').classList.remove('d-none');
   } catch(e){ alert('Simulation error: ' + e.message); }
 });
 
+async function applySimPrice(productId, sellingPrice) {
+  const msgEl = document.getElementById('applyPriceMsg');
+  try {
+    const res = await fetch(`/api/bi/products/${productId}/apply-price`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({selling_price: sellingPrice}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      msgEl.className = 'mt-1 alert alert-danger py-1 small';
+      msgEl.textContent = data.error || 'Failed to apply price.';
+    } else {
+      msgEl.className = 'mt-1 alert alert-success py-1 small';
+      msgEl.textContent = `✓ Price updated to NPR ${Number(data.selling_price).toFixed(2)} for ${data.product_name}`;
+    }
+    msgEl.classList.remove('d-none');
+  } catch(e) {
+    msgEl.className = 'mt-1 alert alert-danger py-1 small';
+    msgEl.textContent = 'Error: ' + e.message;
+    msgEl.classList.remove('d-none');
+  }
+}
+
+// Save filter on change
+document.getElementById('filter').addEventListener('change', () => {
+  localStorage.setItem('bi_dashboard_filter', document.getElementById('filter').value);
+});
+document.getElementById('start').addEventListener('change', () => {
+  const v = document.getElementById('start').value;
+  if (v) localStorage.setItem('bi_dashboard_start', v);
+  else localStorage.removeItem('bi_dashboard_start');
+});
+document.getElementById('end').addEventListener('change', () => {
+  const v = document.getElementById('end').value;
+  if (v) localStorage.setItem('bi_dashboard_end', v);
+  else localStorage.removeItem('bi_dashboard_end');
+});
+
 document.getElementById('reload').addEventListener('click', loadDashboard);
 document.getElementById('insightFilter').addEventListener('change', ()=>renderInsights(_allInsights));
-window.addEventListener('load', loadDashboard);
+window.addEventListener('load', () => {
+  // Restore filters from localStorage
+  const savedFilter = localStorage.getItem('bi_dashboard_filter');
+  const savedStart  = localStorage.getItem('bi_dashboard_start');
+  const savedEnd    = localStorage.getItem('bi_dashboard_end');
+  if (savedFilter) document.getElementById('filter').value = savedFilter;
+  if (savedStart)  document.getElementById('start').value  = savedStart;
+  if (savedEnd)    document.getElementById('end').value    = savedEnd;
+  loadDashboard();
+});
 </script>
 {% endblock %}

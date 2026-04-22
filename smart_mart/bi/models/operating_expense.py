@@ -14,4 +14,5 @@ class OperatingExpense(db.Model):
     expense_date = db.Column(db.Date, nullable=False, default=date.today)
     payment_method = db.Column(db.String(30), nullable=False)
     note = db.Column(db.String(255), nullable=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))

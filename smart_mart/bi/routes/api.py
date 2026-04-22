@@ -649,6 +649,60 @@ def bi_opex_page():
     return render_template("bi/opex.html")
 
 
+@bi_dashboard_bp.route("/pricing-rules", methods=["GET"])
+@login_required
+def bi_pricing_rules_page():
+    """Pricing rules management UI page."""
+    _require_bi_perm("can_view_inventory")
+    return render_template("bi/pricing_rules.html")
+
+
+@bi_dashboard_bp.route("/ledger", methods=["GET"])
+@login_required
+def bi_ledger_page():
+    """Inventory ledger UI page."""
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/ledger.html")
+
+
+# ── Apply price endpoint ──────────────────────────────────────────────────────
+@bi_bp.route("/products/<int:product_id>/apply-price", methods=["POST"])
+@login_required
+def apply_product_price(product_id: int):
+    """Update a product's selling_price directly."""
+    _require_bi_perm("can_edit_product")
+    from ...models.product import Product
+    payload = request.get_json() or {}
+    selling_price = payload.get("selling_price")
+    if selling_price is None:
+        return jsonify({"error": "selling_price is required"}), 400
+    product = db.session.get(Product, product_id)
+    if product is None:
+        return jsonify({"error": "product not found"}), 404
+    from ..utils import money as _money, as_decimal
+    product.selling_price = _money(as_decimal(selling_price))
+    db.session.commit()
+    return jsonify({
+        "product_id": product.id,
+        "product_name": product.name,
+        "selling_price": decimal_to_float(product.selling_price),
+    })
+
+
+# ── Period comparison endpoint ────────────────────────────────────────────────
+@bi_bp.route("/reports/period-comparison", methods=["GET"])
+@login_required
+def period_comparison():
+    _require_bi_perm("can_view_profit_report")
+    start = _parse_date(request.args.get("start"))
+    end = _parse_date(request.args.get("end"))
+    if not start or not end:
+        from datetime import date as _date, timedelta
+        end = _date.today()
+        start = end.replace(day=1)
+    return jsonify(ReportService.period_comparison(start, end))
+
+
 # ── Error handlers ────────────────────────────────────────────────────────────
 
 @bi_bp.errorhandler(ValueError)

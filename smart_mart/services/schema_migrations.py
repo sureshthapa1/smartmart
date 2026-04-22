@@ -179,6 +179,13 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "bi_purchase_batch_items", "batch_expiry", "DATE"),
             ),
         ),
+        (
+            "2026_04_22_bi_opex_product_id",
+            "Add product_id to bi_operating_expenses for direct product allocation.",
+            lambda conn: _safe_add_column(
+                conn, "bi_operating_expenses", "product_id", "INTEGER REFERENCES products(id)"
+            ),
+        ),
     ]
 
 

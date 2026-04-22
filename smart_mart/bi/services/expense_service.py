@@ -16,6 +16,7 @@ def _serialize_expense(row: OperatingExpense) -> dict:
         "date": row.expense_date.isoformat(),
         "payment_method": row.payment_method,
         "note": row.note,
+        "product_id": row.product_id,
     }
 
 
@@ -28,6 +29,7 @@ class ExpenseService:
             expense_date=date.fromisoformat(data.get("date")) if data.get("date") else date.today(),
             payment_method=(data.get("payment_method") or "cash").strip().lower(),
             note=data.get("note"),
+            product_id=data.get("product_id") or None,
         )
         if expense.amount <= 0:
             raise ValueError("amount must be > 0")
@@ -54,6 +56,8 @@ class ExpenseService:
             expense.payment_method = data["payment_method"].strip().lower()
         if "note" in data:
             expense.note = data.get("note")
+        if "product_id" in data:
+            expense.product_id = data.get("product_id") or None
         db.session.commit()
         return expense
 

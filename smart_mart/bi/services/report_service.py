@@ -303,22 +303,70 @@ class ReportService:
 
     @staticmethod
     def _allocate_opex_by_revenue(total_opex: Decimal, rows: list, total_revenue: Decimal) -> dict[int, Decimal]:
-        if total_opex <= 0 or total_revenue <= 0:
+        if total_opex <= 0:
             return {row.product_id: Decimal("0.00") for row in rows}
 
-        allocations = {}
+        # Step 1: apply direct allocations (where product_id is set on the expense)
+        direct_stmt = db.select(
+            OperatingExpense.product_id,
+            func.coalesce(func.sum(OperatingExpense.amount), 0).label("direct_amount"),
+        ).where(OperatingExpense.product_id.isnot(None)).group_by(OperatingExpense.product_id)
+        direct_rows = db.session.execute(direct_stmt).all()
+        direct_map: dict[int, Decimal] = {r.product_id: as_decimal(r.direct_amount) for r in direct_rows}
+        total_direct = sum(direct_map.values(), Decimal("0"))
+
+        remaining_opex = money(total_opex - total_direct)
+        if remaining_opex < Decimal("0"):
+            remaining_opex = Decimal("0")
+
+        # Step 2: allocate remaining by revenue share
+        allocations: dict[int, Decimal] = {}
+        for pid in [row.product_id for row in rows]:
+            allocations[pid] = direct_map.get(pid, Decimal("0.00"))
+
+        if remaining_opex <= 0 or total_revenue <= 0:
+            return allocations
+
         running = Decimal("0")
         for row in rows[:-1]:
             ratio = as_decimal(row.revenue) / total_revenue
-            amount = money(total_opex * ratio)
-            allocations[row.product_id] = amount
+            amount = money(remaining_opex * ratio)
+            allocations[row.product_id] = allocations.get(row.product_id, Decimal("0")) + amount
             running += amount
 
         if rows:
             last_id = rows[-1].product_id
-            allocations[last_id] = money(total_opex - running)
+            allocations[last_id] = allocations.get(last_id, Decimal("0")) + money(remaining_opex - running)
 
         return allocations
+
+    # ── Period comparison ─────────────────────────────────────────────────────
+    @staticmethod
+    def period_comparison(start: date, end: date) -> dict:
+        from datetime import timedelta
+        current = ReportService.profit_and_loss(start, end)
+        delta = (end - start).days + 1
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=delta - 1)
+        previous = ReportService.profit_and_loss(prev_start, prev_end)
+
+        def pct_change(curr, prev):
+            if prev == 0:
+                return None
+            return round((curr - prev) / abs(prev) * 100, 1)
+
+        curr_o = current["overall"]
+        prev_o = previous["overall"]
+        return {
+            "current": {"start": start.isoformat(), "end": end.isoformat(), **curr_o},
+            "previous": {"start": prev_start.isoformat(), "end": prev_end.isoformat(), **prev_o},
+            "changes": {
+                "sales_pct": pct_change(curr_o["sales"], prev_o["sales"]),
+                "gross_profit_pct": pct_change(curr_o["gross_profit"], prev_o["gross_profit"]),
+                "net_profit_pct": pct_change(curr_o["net_profit"], prev_o["net_profit"]),
+                "opex_pct": pct_change(curr_o["opex"], prev_o["opex"]),
+            },
+        }
 
     # ── Feature 1: Reorder Alert Report ──────────────────────────────────────
     @staticmethod

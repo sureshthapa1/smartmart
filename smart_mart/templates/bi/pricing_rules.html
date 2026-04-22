@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Pricing Rules — BI{% endblock %}
+{% block page_title %}Pricing Rules{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Pricing Rules</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Pricing Rules</div>
+    <div class="page-header-sub">Manage category margin rules and calculate suggested prices</div>
+  </div>
+  <button class="btn btn-primary btn-sm" onclick="openAddModal()">
+    <i class="bi bi-plus-lg me-1"></i>Add Rule
+  </button>
+</div>
+
+<div class="row g-3">
+  <!-- Rules Table -->
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header fw-bold">Margin Rules</div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th class="text-end">Margin %</th>
+              <th class="text-end">Rounding Base</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rulesBody">
+            <tr><td colspan="4" class="text-center text-muted py-4">
+              <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggest Price Calculator -->
+  <div class="col-md-5">
+    <div class="card p-3">
+      <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-2 text-primary"></i>Suggest Price Calculator</h6>
+      <div class="mb-2">
+        <label class="form-label small">Category</label>
+        <select id="calcCategory" class="form-select form-select-sm">
+          <option value="">Select category…</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Cost Price (NPR)</label>
+        <input type="number" id="calcCost" class="form-control form-control-sm" step="0.01" min="0" placeholder="e.g. 100" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Override Margin % (optional)</label>
+        <input type="number" id="calcMargin" class="form-control form-control-sm" step="0.1" min="0" placeholder="Leave blank to use rule" />
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Override Rounding Base (optional)</label>
+        <input type="number" id="calcRounding" class="form-control form-control-sm" step="1" min="1" placeholder="e.g. 5" />
+      </div>
+      <button class="btn btn-primary btn-sm w-100" onclick="suggestPrice()">
+        <i class="bi bi-magic me-1"></i>Calculate Suggested Price
+      </button>
+      <div id="calcResult" class="mt-3 d-none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="ruleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ruleModalTitle">Add Pricing Rule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editCategory" />
+        <div class="mb-3">
+          <label class="form-label">Category <span class="text-danger">*</span></label>
+          <input type="text" id="ruleCategory" class="form-control" placeholder="e.g. beverages" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Margin % <span class="text-danger">*</span></label>
+          <input type="number" id="ruleMargin" class="form-control" step="0.1" min="0" placeholder="e.g. 25" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rounding Base</label>
+          <input type="number" id="ruleRounding" class="form-control" step="1" min="1" value="1" />
+          <div class="form-text">Suggested price will be rounded to nearest multiple of this value.</div>
+        </div>
+        <div id="ruleModalError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveRule()">
+          <span id="saveRuleBtnText">Save Rule</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _rules = [];
+
+function fmt(n) {
+  return 'NPR ' + parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+async function loadRules() {
+  const tbody = document.getElementById('rulesBody');
+  try {
+    const res = await fetch('/api/bi/products/pricing/rules');
+    const data = await res.json();
+    _rules = data.rules || [];
+    if (!_rules.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No rules yet. Add one to get started.</td></tr>';
+      populateCategorySelect([]);
+      return;
+    }
+    tbody.innerHTML = _rules.map(r => `
+      <tr>
+        <td class="fw-medium">${r.category}</td>
+        <td class="text-end">${parseFloat(r.margin_pct).toFixed(1)}%</td>
+        <td class="text-end">${r.rounding_base}</td>
+        <td>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary" onclick='openEditModal(${JSON.stringify(r).replace(/"/g,"&quot;")})' title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteRule('${r.category}')" title="Delete"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    populateCategorySelect(_rules);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function populateCategorySelect(rules) {
+  const sel = document.getElementById('calcCategory');
+  sel.innerHTML = '<option value="">Select category…</option>' +
+    rules.map(r => `<option value="${r.category}">${r.category} (${parseFloat(r.margin_pct).toFixed(1)}%)</option>`).join('');
+}
+
+function openAddModal() {
+  document.getElementById('ruleModalTitle').textContent = 'Add Pricing Rule';
+  document.getElementById('editCategory').value = '';
+  document.getElementById('ruleCategory').value = '';
+  document.getElementById('ruleCategory').disabled = false;
+  document.getElementById('ruleMargin').value = '';
+  document.getElementById('ruleRounding').value = '1';
+  document.getElementById('ruleModalError').classList.add('d-none');
+  document.getElementById('saveRuleBtnText').textContent = 'Save Rule';
+  new bootstrap.Modal(document.getElementById('ruleModal')).show();
+}
+
+function openEditModal(rule) {
+  document.getElementById('ruleModalTitle').textContent = 'Edit Pricing Rule';
+  document.getElementById('editCategory').value = rule.category;
+  document.getElementById('ruleCategory').value = rule.category;
+  document.getElementById('ruleCategory').disabled = true;
+  document.getElementById('ruleMargin').value = rule.margin_pct;
+  document.getElementById('ruleRounding').value = rule.rounding_base || 1;
+  document.getElementById('ruleModalError').classList.add('d-none');
+  document.getElementById('saveRuleBtnText').textContent = 'Update Rule';
+  new bootstrap.Modal(document.getElementById('ruleModal')).show();
+}
+
+async function saveRule() {
+  const category = document.getElementById('ruleCategory').value.trim();
+  const margin_pct = document.getElementById('ruleMargin').value;
+  const rounding_base = document.getElementById('ruleRounding').value || 1;
+  const errEl = document.getElementById('ruleModalError');
+  if (!category || !margin_pct) {
+    errEl.textContent = 'Category and margin % are required.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+  try {
+    const res = await fetch('/api/bi/products/pricing/rules', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({category, margin_pct: parseFloat(margin_pct), rounding_base: parseInt(rounding_base)}),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Failed to save rule.'; errEl.classList.remove('d-none'); return; }
+    bootstrap.Modal.getInstance(document.getElementById('ruleModal')).hide();
+    loadRules();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message; errEl.classList.remove('d-none');
+  }
+}
+
+async function deleteRule(category) {
+  if (!confirm(`Delete pricing rule for "${category}"?`)) return;
+  const res = await fetch(`/api/bi/products/pricing/rules/${encodeURIComponent(category)}`, {method: 'DELETE'});
+  const data = await res.json();
+  if (res.ok) loadRules();
+  else alert(data.error || 'Failed to delete rule.');
+}
+
+async function suggestPrice() {
+  const category = document.getElementById('calcCategory').value;
+  const cost = document.getElementById('calcCost').value;
+  const margin_pct = document.getElementById('calcMargin').value;
+  const rounding_base = document.getElementById('calcRounding').value;
+  const resultEl = document.getElementById('calcResult');
+
+  if (!cost) { alert('Enter a cost price.'); return; }
+
+  const body = {cost: parseFloat(cost)};
+  if (category) body.category = category;
+  if (margin_pct) body.margin_pct = parseFloat(margin_pct);
+  if (rounding_base) body.rounding_base = parseInt(rounding_base);
+
+  try {
+    const res = await fetch('/api/bi/products/pricing/suggest', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed to get suggestion.'); return; }
+    resultEl.className = 'mt-3 alert alert-success';
+    resultEl.innerHTML = `
+      <div class="fw-semibold mb-1">Suggested Price</div>
+      <div class="row g-1 small">
+        <div class="col-6">Cost</div><div class="col-6 text-end fw-medium">${fmt(data.cost)}</div>
+        <div class="col-6">Margin %</div><div class="col-6 text-end fw-medium">${parseFloat(data.margin_pct||0).toFixed(1)}%</div>
+        <div class="col-6">Rounding Base</div><div class="col-6 text-end fw-medium">${data.rounding_base || 1}</div>
+        <div class="col-6 fw-bold">Suggested Price</div><div class="col-6 text-end fw-bold text-success">${fmt(data.suggested_price)}</div>
+      </div>
+    `;
+    resultEl.classList.remove('d-none');
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+loadRules();
+</script>
+{% endblock %}

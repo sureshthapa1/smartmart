@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Inventory Ledger — BI{% endblock %}
+{% block page_title %}Inventory Ledger{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Inventory Ledger</li>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Inventory Ledger</div>
+    <div class="page-header-sub">Full audit trail of all inventory movements</div>
+  </div>
+  <button class="btn btn-outline-secondary btn-sm" onclick="loadLedger(1)">
+    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+  </button>
+</div>
+
+<!-- Filters -->
+<div class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small">Search Product</label>
+      <input type="text" id="searchProduct" class="form-control form-control-sm" placeholder="Product name or SKU…" />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">Movement Type</label>
+      <select id="filterType" class="form-select form-select-sm">
+        <option value="">All Types</option>
+        <option value="purchase_in">Purchase In</option>
+        <option value="sale_out">Sale Out</option>
+        <option value="adjustment_in">Adjustment In</option>
+        <option value="adjustment_out">Adjustment Out</option>
+        <option value="return_in">Return In</option>
+        <option value="transfer_in">Transfer In</option>
+        <option value="transfer_out">Transfer Out</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small">Per Page</label>
+      <select id="perPage" class="form-select form-select-sm">
+        <option value="50">50</option>
+        <option value="100" selected>100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-primary btn-sm w-100" onclick="loadLedger(1)">
+        <i class="bi bi-search me-1"></i>Filter
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Product</th>
+          <th>SKU</th>
+          <th>Type</th>
+          <th class="text-end">Qty</th>
+          <th class="text-end">Unit Cost</th>
+          <th>Reference</th>
+        </tr>
+      </thead>
+      <tbody id="ledgerBody">
+        <tr><td colspan="7" class="text-center text-muted py-5">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer d-flex justify-content-between align-items-center" id="ledgerPagination"></div>
+</div>
+
+<script>
+let _ledgerOffset = 0;
+let _ledgerTotal = 0;
+let _searchTimeout = null;
+let _productMap = {};
+
+const TYPE_COLORS = {
+  purchase_in: 'success',
+  sale_out: 'danger',
+  adjustment_in: 'info',
+  adjustment_out: 'warning',
+  return_in: 'primary',
+  transfer_in: 'info',
+  transfer_out: 'warning',
+};
+
+function typeBadge(t) {
+  const color = TYPE_COLORS[t] || 'secondary';
+  const label = (t || '').replace(/_/g, ' ');
+  return `<span class="badge bg-${color}">${label}</span>`;
+}
+
+function fmt(n) {
+  return 'NPR ' + parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+async function loadLedger(offsetOrPage) {
+  const perPage = parseInt(document.getElementById('perPage').value);
+  const offset = typeof offsetOrPage === 'number' && offsetOrPage > 100
+    ? offsetOrPage
+    : (offsetOrPage - 1) * perPage;
+  _ledgerOffset = offset;
+
+  const search = document.getElementById('searchProduct').value.trim().toLowerCase();
+  const movType = document.getElementById('filterType').value;
+
+  const tbody = document.getElementById('ledgerBody');
+  tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Loading…</td></tr>';
+
+  try {
+    // First resolve product_id from search if needed
+    let productId = '';
+    if (search) {
+      const pRes = await fetch(`/api/bi/products?q=${encodeURIComponent(search)}&per_page=1`);
+      const pData = await pRes.json();
+      if (pData.products && pData.products.length) {
+        productId = pData.products[0].id;
+      }
+    }
+
+    let url = `/api/bi/inventory/ledger?limit=${perPage}&offset=${offset}`;
+    if (productId) url += `&product_id=${productId}`;
+    if (movType) url += `&movement_type=${movType}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    _ledgerTotal = data.total || 0;
+    const entries = data.entries || [];
+
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>No ledger entries found.</td></tr>';
+      document.getElementById('ledgerPagination').innerHTML = '';
+      return;
+    }
+
+    tbody.innerHTML = entries.map(e => {
+      const isIn = e.qty > 0;
+      const qtyClass = isIn ? 'text-success fw-semibold' : 'text-danger fw-semibold';
+      const qtySign = isIn ? '+' : '';
+      const ref = e.reference_type ? `${e.reference_type}${e.reference_id ? ' #' + e.reference_id : ''}` : '—';
+      return `<tr>
+        <td class="text-muted small">${(e.movement_date || '').split('T')[0]}</td>
+        <td class="small fw-medium">${e.product_name || '—'}</td>
+        <td class="text-muted small">${e.sku || '—'}</td>
+        <td>${typeBadge(e.movement_type)}</td>
+        <td class="text-end ${qtyClass}">${qtySign}${e.qty}</td>
+        <td class="text-end small">${e.unit_cost != null ? fmt(e.unit_cost) : '—'}</td>
+        <td class="text-muted small">${ref}</td>
+      </tr>`;
+    }).join('');
+
+    // Pagination
+    const pages = Math.ceil(_ledgerTotal / perPage);
+    const currentPage = Math.floor(offset / perPage) + 1;
+    let pag = `<span class="text-muted small">Page ${currentPage} of ${pages} (${_ledgerTotal} total)</span><div class="d-flex gap-1">`;
+    if (currentPage > 1) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadLedger(${currentPage - 1})">Prev</button>`;
+    if (currentPage < pages) pag += `<button class="btn btn-sm btn-outline-secondary" onclick="loadLedger(${currentPage + 1})">Next</button>`;
+    pag += '</div>';
+    document.getElementById('ledgerPagination').innerHTML = pag;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error: ${e.message}</td></tr>`;
+  }
+}
+
+document.getElementById('searchProduct').addEventListener('input', () => {
+  clearTimeout(_searchTimeout);
+  _searchTimeout = setTimeout(() => loadLedger(1), 400);
+});
+document.getElementById('filterType').addEventListener('change', () => loadLedger(1));
+document.getElementById('perPage').addEventListener('change', () => loadLedger(1));
+
+loadLedger(1);
+</script>
+{% endblock %}

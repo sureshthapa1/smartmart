@@ -5,6 +5,9 @@
 <li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
 <li class="breadcrumb-item active">OPEX</li>
 {% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
 {% block content %}
 <div class="page-header">
   <div>
@@ -26,6 +29,14 @@
   <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumMonth">—</div><div class="text-muted small">This Month</div></div></div>
   <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumYear">—</div><div class="text-muted small">This Year</div></div></div>
   <div class="col-auto"><div class="card text-center px-4 py-2"><div class="fw-bold fs-5" id="sumTotal">—</div><div class="text-muted small">Filtered Total</div></div></div>
+</div>
+
+<!-- OPEX Trend Chart -->
+<div class="card p-3 mb-4">
+  <h6 class="fw-bold mb-2">OPEX Trend (Last 30 Days)</h6>
+  <div style="position:relative;height:160px">
+    <canvas id="opexTrendChart"></canvas>
+  </div>
 </div>
 
 <!-- Category Breakdown -->
@@ -106,6 +117,12 @@
           <label class="form-label">Note</label>
           <textarea id="expNote" class="form-control" rows="2" placeholder="Optional note…"></textarea>
         </div>
+        <div class="mb-3">
+          <label class="form-label">Assign to Product <span class="text-muted small">(optional — for direct allocation)</span></label>
+          <select id="expProduct" class="form-select">
+            <option value="">None (allocate by revenue share)</option>
+          </select>
+        </div>
         <div id="expenseModalError" class="alert alert-danger d-none"></div>
       </div>
       <div class="modal-footer">
@@ -121,6 +138,54 @@
 <script>
 let expPage = 1;
 const expPerPage = 20;
+let _opexTrendChart = null;
+let _allOpexProducts = [];
+
+async function loadOpexProducts() {
+  if (_allOpexProducts.length) return;
+  try {
+    const res = await fetch('/api/bi/products?per_page=200');
+    const data = await res.json();
+    _allOpexProducts = data.products || [];
+    const sel = document.getElementById('expProduct');
+    sel.innerHTML = '<option value="">None (allocate by revenue share)</option>' +
+      _allOpexProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || ''})</option>`).join('');
+  } catch(e) { console.error('Failed to load products for OPEX', e); }
+}
+
+async function loadOpexTrend() {
+  try {
+    const res = await fetch('/api/bi/reports/profit-tracking?days=30');
+    if (!res.ok) return;
+    const data = await res.json();
+    const daily = data.daily || [];
+    const labels = daily.map(d => d.date);
+    const opexData = daily.map(d => d.opex || 0);
+    const ctx = document.getElementById('opexTrendChart').getContext('2d');
+    if (_opexTrendChart) _opexTrendChart.destroy();
+    _opexTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'OPEX',
+          data: opexData,
+          borderColor: '#f97316',
+          backgroundColor: '#f9731622',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: false}},
+        scales: {y: {ticks: {callback: v => 'NPR ' + Number(v).toLocaleString()}}},
+      },
+    });
+  } catch(e) { console.error('Failed to load OPEX trend', e); }
+}
 
 function fmt(n) {
   return 'NPR ' + parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -248,8 +313,10 @@ function openAddModal() {
   document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('expPayment').value = 'cash';
   document.getElementById('expNote').value = '';
+  document.getElementById('expProduct').value = '';
   document.getElementById('expenseModalError').classList.add('d-none');
   document.getElementById('saveExpenseBtnText').textContent = 'Save Expense';
+  loadOpexProducts();
 }
 
 function openEditModal(expense) {
@@ -260,8 +327,10 @@ function openEditModal(expense) {
   document.getElementById('expDate').value = expense.date || expense.expense_date || '';
   document.getElementById('expPayment').value = expense.payment_method || 'cash';
   document.getElementById('expNote').value = expense.note || '';
+  document.getElementById('expProduct').value = expense.product_id || '';
   document.getElementById('expenseModalError').classList.add('d-none');
   document.getElementById('saveExpenseBtnText').textContent = 'Update Expense';
+  loadOpexProducts();
   const modal = new bootstrap.Modal(document.getElementById('expenseModal'));
   modal.show();
 }
@@ -273,6 +342,7 @@ async function saveExpense() {
   const date = document.getElementById('expDate').value;
   const payment_method = document.getElementById('expPayment').value;
   const note = document.getElementById('expNote').value;
+  const product_id = document.getElementById('expProduct').value || null;
   const errEl = document.getElementById('expenseModalError');
 
   if (!category || !amount || !date) {
@@ -290,7 +360,7 @@ async function saveExpense() {
     const res = await fetch(url, {
       method,
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({category, amount: parseFloat(amount), date, payment_method, note}),
+      body: JSON.stringify({category, amount: parseFloat(amount), date, payment_method, note, product_id: product_id ? parseInt(product_id) : null}),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -319,5 +389,6 @@ async function deleteExpense(id) {
 document.getElementById('filterStart').addEventListener('change', () => loadExpenses(1));
 document.getElementById('filterEnd').addEventListener('change', () => loadExpenses(1));
 loadExpenses();
+loadOpexTrend();
 </script>
 {% endblock %}

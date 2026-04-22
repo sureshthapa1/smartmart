@@ -209,7 +209,12 @@ async function finalizeBatch(id) {
   if (!confirm(`Finalize batch #${id}? This cannot be undone.`)) return;
   const res = await fetch(`/api/bi/batch/${id}/finalize`, {method: 'POST'});
   const data = await res.json();
-  if (res.ok) { loadBatches(currentPage); if (activeBatchId === id) closeDetail(); }
+  if (res.ok) {
+    loadBatches(currentPage);
+    if (activeBatchId === id) closeDetail();
+    // Show price suggestion modal for finalized batch
+    showPriceSuggestions(data);
+  }
   else { alert(data.error || 'Failed to finalize batch.'); }
 }
 
@@ -408,7 +413,119 @@ async function recalculate() {
 
 document.getElementById('statusFilter').addEventListener('change', () => loadBatches(1));
 loadBatches();
+
+// ── Post-finalize price suggestions ──────────────────────────────────────────
+async function showPriceSuggestions(batch) {
+  if (!batch.items || !batch.items.length) return;
+  const modal = new bootstrap.Modal(document.getElementById('priceSuggestModal'));
+  const tbody = document.getElementById('priceSuggestBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>Loading suggestions…</td></tr>';
+  modal.show();
+
+  try {
+    const products = batch.items.map(item => ({
+      product_id: item.product_id,
+      cost: item.final_cost,
+    }));
+    const res = await fetch('/api/bi/products/pricing/suggest', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({products}),
+    });
+    const data = await res.json();
+    // data may be a single suggestion or array; handle both
+    const suggestions = Array.isArray(data) ? data : (data.suggestions || [data]);
+
+    if (!suggestions.length || !suggestions[0]) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No suggestions available.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = suggestions.map((s, i) => {
+      const item = batch.items[i] || {};
+      const pName = allProducts.find(p => p.id === (s.product_id || item.product_id))?.name || `Product #${s.product_id || item.product_id}`;
+      return `<tr id="psr-${s.product_id || item.product_id}">
+        <td class="small fw-medium">${pName}</td>
+        <td class="text-end small">${fmt(s.cost || item.final_cost)}</td>
+        <td class="text-end small fw-semibold text-success">${fmt(s.suggested_price)}</td>
+        <td class="text-end small">${fmt(s.current_selling_price)}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-success" onclick="applyBatchPrice(${s.product_id || item.product_id}, ${s.suggested_price}, this)">
+            Apply
+          </button>
+          <span class="text-success small ms-1 d-none apply-ok-${s.product_id || item.product_id}">✓</span>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function applyBatchPrice(productId, price, btn) {
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/bi/products/${productId}/apply-price`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({selling_price: price}),
+    });
+    if (res.ok) {
+      btn.textContent = '✓ Applied';
+      btn.className = 'btn btn-sm btn-success';
+    } else {
+      const d = await res.json();
+      btn.disabled = false;
+      alert(d.error || 'Failed to apply price.');
+    }
+  } catch(e) { btn.disabled = false; alert('Error: ' + e.message); }
+}
+
+async function applyAllBatchPrices() {
+  const rows = document.querySelectorAll('#priceSuggestBody tr[id^="psr-"]');
+  for (const row of rows) {
+    const btn = row.querySelector('button');
+    if (btn && !btn.disabled) btn.click();
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
 </script>
+
+<!-- Price Suggestion Modal (post-finalize) -->
+<div class="modal fade" id="priceSuggestModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tags me-2 text-success"></i>Suggested Prices After Finalization</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th class="text-end">New Cost</th>
+                <th class="text-end">Suggested Price</th>
+                <th class="text-end">Current Price</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="priceSuggestBody">
+              <tr><td colspan="5" class="text-center text-muted py-3">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-success" onclick="applyAllBatchPrices()">
+          <i class="bi bi-check-all me-1"></i>Apply All
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Create Batch Modal -->
 <div class="modal fade" id="createBatchModal" tabindex="-1">

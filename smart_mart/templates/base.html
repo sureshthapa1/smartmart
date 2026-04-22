@@ -586,6 +586,18 @@
                 <i class="bi bi-receipt"></i>Business Expenses
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_pricing_rules_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_pricing_rules_page') }}">
+                <i class="bi bi-percent"></i>Pricing Rules
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_ledger_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_ledger_page') }}">
+                <i class="bi bi-journal-text"></i>Inventory Ledger
+              </a>
+            </li>
             {% endif %}
             {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_ai_insights) %}
             <li class="nav-item">
