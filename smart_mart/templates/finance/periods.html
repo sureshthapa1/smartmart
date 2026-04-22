@@ -17,7 +17,6 @@
   <div class="card-header fw-semibold">Close a Period</div>
   <div class="card-body">
     <form method="post" action="{{ url_for('finance.close_period') }}" class="row g-2 align-items-end">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="col-md-2">
         <label class="form-label">Year</label>
         <input type="number" name="year" class="form-control form-control-sm"
@@ -85,14 +84,12 @@
               <div class="d-flex gap-1 flex-wrap">
                 {% if p.status == 'closed' %}
                 <form method="post" action="{{ url_for('finance.reopen_period', period_id=p.id) }}" class="d-inline">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-xs btn-outline-secondary" title="Reopen">
                     <i class="bi bi-unlock"></i>
                   </button>
                 </form>
                 <form method="post" action="{{ url_for('finance.lock_period', period_id=p.id) }}" class="d-inline"
                       onsubmit="return confirm('Permanently lock this period? This cannot be undone.')">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-xs btn-outline-danger" title="Lock permanently">
                     <i class="bi bi-shield-lock"></i>
                   </button>
