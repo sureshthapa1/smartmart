@@ -72,6 +72,37 @@ with app.app_context():
         ]:
             safe_add(conn, "customer_risk_scores", col, typ)
 
+        # ── New columns from high-priority upgrades ───────────────────────
+        # BI / user permissions
+        for col in ["can_view_bi_dashboard", "can_manage_bi_batches"]:
+            safe_add(conn, "user_permissions", col, "BOOLEAN DEFAULT false")
+
+        # Sales
+        safe_add(conn, "sales", "customer_id", "INTEGER REFERENCES customers(id)")
+        safe_add(conn, "sales", "promotion_id", "INTEGER REFERENCES promotions(id)")
+        safe_add(conn, "sales", "tax_rate", "NUMERIC(5,2) DEFAULT 0")
+        safe_add(conn, "sales", "tax_amount", "NUMERIC(10,2) DEFAULT 0")
+
+        # Purchases
+        safe_add(conn, "purchases", "tax_rate", "NUMERIC(5,2) DEFAULT 0")
+        safe_add(conn, "purchases", "tax_amount", "NUMERIC(10,2) DEFAULT 0")
+
+        # Products
+        safe_add(conn, "products", "inventory_value", "NUMERIC(14,2) DEFAULT 0")
+
+        # Stock movements
+        safe_add(conn, "stock_movements", "stock_take_id", "INTEGER REFERENCES stock_takes(id)")
+
+        # BI batch items lot tracking
+        safe_add(conn, "bi_purchase_batch_items", "lot_number", "VARCHAR(80)")
+        safe_add(conn, "bi_purchase_batch_items", "batch_expiry", "DATE")
+
+        # BI operating expenses — product allocation
+        safe_add(conn, "bi_operating_expenses", "product_id", "INTEGER REFERENCES products(id)")
+
+        # Expense → BI sync link (must come AFTER bi_operating_expenses exists)
+        safe_add(conn, "expenses", "bi_opex_id", "INTEGER REFERENCES bi_operating_expenses(id)")
+
     print("Migration complete.")
 
     # Create recurring_expenses table if not exists (db.create_all handles it)
@@ -108,6 +139,15 @@ with app.app_context():
     ShopSettings.get()
     db.session.commit()
     print("Shop settings ready.")
+
+    # Expense → BI sync backfill (safe, non-fatal)
+    try:
+        from smart_mart.services.expense_sync import backfill as _expense_backfill
+        n = _expense_backfill()
+        if n:
+            print(f"expense_sync backfill: {n} rows created.")
+    except Exception as _e:
+        print(f"expense_sync backfill skipped: {_e}")
 
     # Sync customer visit counts from actual sales
     from smart_mart.models.customer import Customer

@@ -96,17 +96,30 @@ def sync_delete(bi_opex_id: int | None) -> None:
 def backfill() -> int:
     """One-time backfill: sync all existing Expense rows that have no mirror yet.
     Returns the number of rows created."""
-    OperatingExpense = _get_opex_model()
+    try:
+        OperatingExpense = _get_opex_model()
+    except Exception:
+        return 0
+
+    # Check the bi_opex_id column actually exists before querying it
+    from sqlalchemy import inspect as _inspect
+    try:
+        cols = [c["name"] for c in _inspect(db.engine).get_columns("expenses")]
+        if "bi_opex_id" not in cols:
+            return 0
+    except Exception:
+        return 0
+
     expenses = db.session.execute(db.select(Expense)).scalars().all()
     created = 0
     for expense in expenses:
         bi_opex_id = getattr(expense, "bi_opex_id", None)
         if bi_opex_id:
-            # Verify the mirror still exists
             if db.session.get(OperatingExpense, bi_opex_id):
                 continue
         sync_create(expense)
         created += 1
-    db.session.commit()
+    if created:
+        db.session.commit()
     logger.info("expense_sync.backfill: created %d mirror rows", created)
     return created
