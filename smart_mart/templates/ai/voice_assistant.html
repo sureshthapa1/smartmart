@@ -78,6 +78,26 @@
     recognition.maxAlternatives = 1;
     let lastReply = '';
 
+    // Check mic permission on load and show guidance if denied
+    if (navigator.permissions) {
+      navigator.permissions.query({name: 'microphone'}).then(result => {
+        if (result.state === 'denied') {
+          micStatus.textContent = '🔒 Microphone blocked. Click the 🔒 icon in your browser address bar → allow microphone → refresh this page.';
+          micBtn.disabled = true;
+          micBtn.classList.remove('btn-primary');
+          micBtn.classList.add('btn-secondary');
+        }
+        result.onchange = () => {
+          if (result.state === 'granted') {
+            micStatus.textContent = 'Click the mic and speak';
+            micBtn.disabled = false;
+            micBtn.classList.add('btn-primary');
+            micBtn.classList.remove('btn-secondary');
+          }
+        };
+      }).catch(() => {});
+    }
+
     micBtn.addEventListener('click', () => {
       micStatus.textContent = 'Listening…';
       micBtn.classList.add('btn-danger');
@@ -109,7 +129,15 @@
     };
 
     recognition.onerror = (e) => {
-      micStatus.textContent = `Error: ${e.error}. Try again.`;
+      const messages = {
+        'not-allowed':    '🔒 Microphone access denied. Click the 🔒 icon in your browser address bar and allow microphone, then refresh.',
+        'no-speech':      '🔇 No speech detected. Please speak clearly and try again.',
+        'audio-capture':  '🎙️ No microphone found. Please connect a microphone and try again.',
+        'network':        '🌐 Network error. Check your internet connection and try again.',
+        'aborted':        'Cancelled. Click the mic to try again.',
+        'service-not-allowed': '🔒 Microphone blocked. This feature requires HTTPS and microphone permission.',
+      };
+      micStatus.textContent = messages[e.error] || `Error: ${e.error}. Try again.`;
       micBtn.classList.remove('btn-danger');
       micBtn.classList.add('btn-primary');
     };
