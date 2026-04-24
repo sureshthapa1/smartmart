@@ -28,13 +28,15 @@ A full-featured, AI-powered retail management system built with Python/Flask. De
 
 ### AI & Intelligence
 - **AI Business Advisor** — KPI scorecard, revenue forecasting, business insights
-- **AI Chatbot** — Natural language queries about sales, stock, customers
 - **Trend Analysis** — Fast/slow movers, seasonal patterns, demand forecasting
 - **Anomaly Detection** — Unusual sales patterns and stock movements
 - **Customer Intelligence** — Segmentation, churn prediction, CLV, personalized offers
-- **Competitor Pricing** — Track competitor prices and get pricing suggestions
 - **NLG Reports** — Auto-generated daily/weekly business summaries
 - **Profit Leak Detection** — Identify discount losses and low-margin products
+- **AI Chatbot** *(coming soon)* — Natural language queries about sales, stock, customers
+- **Voice Assistant** *(coming soon)* — Voice-driven business queries via browser Web Speech API
+- **Competitor Pricing** *(coming soon)* — Track competitor prices and get pricing suggestions
+- **Cash Flow Prediction** *(coming soon)* — 30-day cash flow forecasting
 
 ### Admin & Security
 - **Role-Based Access** — Admin and Staff roles with 50+ granular permissions
@@ -140,6 +142,19 @@ pytest tests/ -q
 ```
 
 84 tests covering unit, integration, and property-based tests (Hypothesis).
+
+---
+
+## Known Limitations
+
+The following features are scaffolded but not yet active. Each shows a "coming soon" page:
+
+| Feature | Status | Notes |
+|---|---|---|
+| **AI Chatbot** | Coming soon | Will support plain-English queries about sales, stock, profit, and customers |
+| **Voice Assistant** | Coming soon | Will use the browser's Web Speech API — no extra software required |
+| **Competitor Pricing** | Coming soon | Manual price entry + AI-powered pricing suggestions |
+| **Cash Flow Prediction** | Coming soon | 30-day forecast using moving averages and day-of-week patterns |
 
 ---
 

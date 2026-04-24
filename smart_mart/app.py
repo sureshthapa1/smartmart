@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, redirect, url_for, render_template, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
-from .extensions import db, login_manager, bcrypt
+from .extensions import db, login_manager, bcrypt, csrf
 from .services.schema_migrations import run_pending_migrations
 
 
@@ -126,6 +126,7 @@ def create_app(config_name="development"):
     db.init_app(app)
     login_manager.init_app(app)
     bcrypt.init_app(app)
+    csrf.init_app(app)
 
     from . import models  # noqa: F401
 
@@ -207,6 +208,23 @@ def create_app(config_name="development"):
             return (dt + _NST_OFFSET).strftime(fmt)
         except Exception:
             return str(dt)
+
+    @app.template_filter("bs_date")
+    def bs_date_filter(dt, nepali: bool = True) -> str:
+        """Convert a date/datetime to Bikram Sambat string.
+        Usage in templates: {{ sale.sale_date | bs_date }}          → २०८१ बैशाख १
+                            {{ sale.sale_date | bs_date(nepali=False) }} → 2081 Baisakh 1
+        """
+        if dt is None:
+            return ""
+        try:
+            from .services.bs_date import bs_format
+            # Apply NST offset first if it's a datetime
+            if hasattr(dt, "hour"):
+                dt = dt + _NST_OFFSET
+            return bs_format(dt, nepali=nepali)
+        except Exception:
+            return ""
 
     @app.template_filter("from_json")
     def from_json_filter(value):
@@ -332,3 +350,11 @@ def _register_blueprints(app):
                 "Failed to register blueprint %s: %s\n%s",
                 bp_name, exc, traceback.format_exc()
             )
+
+    # CSRF exemptions — endpoints called by external services (cron, curl)
+    # that cannot include a CSRF token
+    try:
+        from .blueprints.api.routes import run_bots
+        csrf.exempt(run_bots)
+    except Exception:
+        pass

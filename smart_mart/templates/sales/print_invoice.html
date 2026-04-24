@@ -64,6 +64,11 @@
         <h2>TAX INVOICE</h2>
         <div class="inv-num">No: {{ sale.invoice_number or ('INV-%05d' % sale.id) }}</div>
         <div class="inv-date">{{ sale.sale_date | nst('%d %B %Y  %I:%M %p') if sale.sale_date else '' }}</div>
+        {% if sale.sale_date %}
+        <div class="inv-date" style="font-size:12px;color:#1e3a5f;font-weight:600;margin-top:2px;">
+          मिति: {{ sale.sale_date | bs_date }}
+        </div>
+        {% endif %}
       </div>
     </div>
 

@@ -9,7 +9,19 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        sync: false
+      - key: BOT_SECRET
+        generateValue: true
       - key: LOG_LEVEL
         value: INFO
+      # REQUIRED: Set this to your PostgreSQL connection string.
+      # On Render: create a PostgreSQL database, then copy its Internal Database URL here.
+      # Without this, the app will NOT start (SQLite is not used in production).
+      - key: DATABASE_URL
+        sync: false
+      # REQUIRED: Set a strong password for the admin account.
+      # The build will fail if this is not set.
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Optional: override the admin username (default: admin)
+      - key: ADMIN_USERNAME
+        value: admin

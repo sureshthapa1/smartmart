@@ -10,7 +10,6 @@
 <div class="row justify-content-center">
   <div class="col-lg-7">
 
-    <!-- Browser not supported -->
     <div id="notSupported" class="alert alert-warning d-flex gap-2 align-items-center" style="display:none!important;">
       <i class="bi bi-exclamation-triangle-fill fs-5"></i>
       <div>
@@ -24,7 +23,7 @@
       <div class="card shadow-sm mb-3">
         <div class="card-body text-center py-5">
           <button id="micBtn" class="btn btn-primary rounded-circle"
-                  style="width:80px;height:80px;font-size:2rem;" title="Hold to speak">
+                  style="width:80px;height:80px;font-size:2rem;" title="Click to speak">
             <i class="bi bi-mic-fill"></i>
           </button>
           <p class="text-muted small mt-3 mb-0" id="micStatus">Click the mic and speak</p>
@@ -68,7 +67,6 @@
   const replyText = document.getElementById('replyText');
   const speakBtn = document.getElementById('speakBtn');
 
-  // Check browser support
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     notSupported.style.display = 'flex';
@@ -78,7 +76,6 @@
     recognition.lang = 'en-US';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
-
     let lastReply = '';
 
     micBtn.addEventListener('click', () => {
@@ -93,7 +90,6 @@
       transcriptText.textContent = text;
       transcriptCard.style.display = '';
       micStatus.textContent = 'Processing…';
-
       try {
         const res = await fetch('/ai/api/voice/query', {
           method: 'POST',
@@ -102,7 +98,7 @@
         });
         const data = await res.json();
         lastReply = data.tts_text || data.reply || '';
-        replyText.innerHTML = data.reply || '';
+        replyText.innerHTML = (data.reply || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
         replyCard.style.display = '';
         micStatus.textContent = 'Click the mic and speak';
       } catch(e) {

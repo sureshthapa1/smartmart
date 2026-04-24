@@ -106,7 +106,7 @@
       <tbody>
         {% for e in expenses %}
         <tr>
-          <td class="text-muted small">{{ e.expense_date.strftime('%Y-%m-%d') }}</td>
+          <td class="text-muted small">{{ e.expense_date.strftime('%Y-%m-%d') }}<br><span style="font-size:.7rem;color:#94a3b8;">{{ e.expense_date | bs_date }}</span></td>
           <td><span class="badge bg-secondary">{{ e.expense_type | capitalize }}</span></td>
           <td class="text-end fw-semibold text-danger">{{ "%.2f"|format(e.amount | float) }}</td>
           <td class="text-muted small">{{ e.note or '—' }}</td>

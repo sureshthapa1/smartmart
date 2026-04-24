@@ -43,6 +43,12 @@ class ProductionConfig(Config):
         secret = os.environ.get("SECRET_KEY")
         if not secret:
             raise RuntimeError("SECRET_KEY must be set in production environment.")
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            raise RuntimeError(
+                "DATABASE_URL must be set in production. "
+                "SQLite is not supported in production — use PostgreSQL."
+            )
 
 
 class TestingConfig(Config):

@@ -326,38 +326,61 @@ def staff_activity():
         db.select(User).filter_by(role="staff").order_by(User.username)
     ).scalars().all()
 
+    if not users:
+        return render_template("admin/staff_activity.html", activity_data=[], recent=[])
+
+    user_ids = [u.id for u in users]
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # Single query: all sessions in last 30 days for all staff
+    all_sessions = db.session.execute(
+        db.select(UserActivity).filter(
+            UserActivity.user_id.in_(user_ids),
+            UserActivity.login_at >= cutoff,
+        )
+    ).scalars().all()
+
+    # Single query: latest session per user (for last login / online status)
+    from sqlalchemy import func as _func
+    latest_ids = db.session.execute(
+        db.select(_func.max(UserActivity.id)).filter(
+            UserActivity.user_id.in_(user_ids)
+        ).group_by(UserActivity.user_id)
+    ).scalars().all()
+    latest_sessions = {
+        s.user_id: s for s in db.session.execute(
+            db.select(UserActivity).filter(UserActivity.id.in_(latest_ids))
+        ).scalars().all()
+    } if latest_ids else {}
+
+    # Single query: total session count per user
+    total_counts = {
+        row.user_id: row.cnt
+        for row in db.session.execute(
+            db.select(UserActivity.user_id, _func.count(UserActivity.id).label("cnt"))
+            .filter(UserActivity.user_id.in_(user_ids))
+            .group_by(UserActivity.user_id)
+        ).all()
+    }
+
+    # Group 30d sessions by user in Python
+    sessions_by_user: dict[int, list] = {u.id: [] for u in users}
+    for s in all_sessions:
+        sessions_by_user[s.user_id].append(s)
+
     activity_data = []
     for u in users:
-        last_session = db.session.execute(
-            db.select(UserActivity).filter_by(user_id=u.id)
-            .order_by(UserActivity.login_at.desc()).limit(1)
-        ).scalar_one_or_none()
-
-        total_sessions = db.session.execute(
-            db.select(db.func.count(UserActivity.id)).filter_by(user_id=u.id)
-        ).scalar() or 0
-
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        sessions_30d = db.session.execute(
-            db.select(UserActivity).filter(
-                UserActivity.user_id == u.id,
-                UserActivity.login_at >= cutoff
-            )
-        ).scalars().all()
-
-        total_minutes = sum(s.duration_minutes for s in sessions_30d)
-        total_page_views = sum(s.page_views or 0 for s in sessions_30d)
-        is_online = last_session and last_session.logout_at is None
-
+        last_session = latest_sessions.get(u.id)
+        user_sessions = sessions_by_user[u.id]
         activity_data.append({
             "user": u,
-            "is_online": is_online,
+            "is_online": last_session and last_session.logout_at is None,
             "last_login": last_session.login_at if last_session else None,
             "last_logout": last_session.logout_at if last_session else None,
-            "total_sessions": total_sessions,
-            "total_minutes_30d": total_minutes,
-            "total_page_views_30d": total_page_views,
-            "sessions_30d": len(sessions_30d),
+            "total_sessions": total_counts.get(u.id, 0),
+            "total_minutes_30d": sum(s.duration_minutes for s in user_sessions),
+            "total_page_views_30d": sum(s.page_views or 0 for s in user_sessions),
+            "sessions_30d": len(user_sessions),
         })
 
     recent = db.session.execute(

@@ -7,6 +7,24 @@
 {% set total_credit = credit_records|sum(attribute='outstanding_amount') %}
 {% set total_supplier = supplier_rows|sum(attribute='outstanding') %}
 
+{# ── Daily Bot Runner ── #}
+<div class="card mb-4 border-0" style="background:linear-gradient(135deg,#1e293b,#0f172a);color:#e2e8f0">
+  <div class="card-body py-3 px-4 d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <div class="fw-semibold"><i class="bi bi-robot me-2 text-indigo-400" style="color:#a5b4fc"></i>Daily Bot Runner</div>
+      <div class="small" style="color:#94a3b8">Runs: low stock alerts · overdue credit reminders · reorder POs · bill reminders · daily summary</div>
+    </div>
+    <button class="btn btn-sm ms-auto" id="runBotsBtn"
+            style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none">
+      <i class="bi bi-play-fill me-1"></i>Run Now
+    </button>
+    <a href="{{ url_for('api.bot_status') }}" class="btn btn-sm btn-outline-light" style="font-size:.78rem">
+      <i class="bi bi-activity me-1"></i>Today's Status
+    </a>
+  </div>
+</div>
+<div id="botResult" class="mb-3" style="display:none"></div>
+
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
     <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e">
@@ -153,4 +171,39 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('runBotsBtn')?.addEventListener('click', async function() {
+  const btn = this;
+  const resultDiv = document.getElementById('botResult');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
+  resultDiv.style.display = 'none';
+  try {
+    const res = await fetch('/api/bot/run', {method: 'POST'});
+    const data = await res.json();
+    if (res.ok) {
+      const r = data.results || {};
+      const lines = Object.entries(r).map(([name, v]) => {
+        const notifs = v.notifications_created ?? v.pos_created ?? 0;
+        const err = v.error ? ` <span class="text-danger">(${v.error})</span>` : '';
+        return `<li><strong>${name}</strong>: ${notifs} action(s)${err}</li>`;
+      }).join('');
+      resultDiv.innerHTML = `<div class="alert alert-success py-2">
+        <i class="bi bi-check-circle me-2"></i><strong>Bots completed</strong> — ${data.total_notifications} total notifications
+        <ul class="mb-0 mt-1 small">${lines}</ul>
+      </div>`;
+    } else {
+      resultDiv.innerHTML = `<div class="alert alert-danger py-2"><i class="bi bi-x-circle me-2"></i>${data.error || 'Bot run failed'}</div>`;
+    }
+  } catch(e) {
+    resultDiv.innerHTML = `<div class="alert alert-danger py-2">Network error: ${e.message}</div>`;
+  }
+  resultDiv.style.display = 'block';
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Now';
+});
+</script>
 {% endblock %}

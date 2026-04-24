@@ -8,7 +8,6 @@
   <div class="col-lg-8">
     <div class="card shadow-sm border-0" style="height:75vh;display:flex;flex-direction:column;">
 
-      <!-- Header -->
       <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
         <div style="width:38px;height:38px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🤖</div>
         <div>
@@ -23,7 +22,6 @@
         </div>
       </div>
 
-      <!-- Messages -->
       <div id="chatMessages" class="flex-grow-1 p-3 overflow-auto" style="background:#f8fafc;">
         <div class="d-flex gap-2 mb-3">
           <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">🤖</div>
@@ -35,7 +33,6 @@
         </div>
       </div>
 
-      <!-- Quick questions -->
       <div class="px-3 pt-2 pb-1 border-top" style="background:#fff;">
         <div class="d-flex gap-1 flex-wrap">
           {% for q in ["Today's sales","This month profit","Low stock","Top product","Credit outstanding","Sales forecast","Dead stock","Top customers","Expenses","Loyalty points"] %}
@@ -44,7 +41,6 @@
         </div>
       </div>
 
-      <!-- Input -->
       <div class="p-3 border-top" style="background:#fff;">
         <div class="input-group">
           <input type="text" id="chatInput" class="form-control"
@@ -70,7 +66,6 @@ const input = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 
 function formatText(text) {
-  // Convert **bold** to <strong>
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
@@ -84,23 +79,17 @@ function timeStr() {
 function addMessage(text, isUser) {
   const div = document.createElement('div');
   div.className = 'd-flex gap-2 mb-3' + (isUser ? ' flex-row-reverse' : '');
-
   const avatar = isUser
     ? `<div style="width:32px;height:32px;background:#22c55e;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;color:#fff;font-weight:700;">U</div>`
     : `<div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">🤖</div>`;
-
   const bgColor = isUser ? '#6366f1' : '#fff';
   const textColor = isUser ? '#fff' : '#0f172a';
-
   div.innerHTML = `${isUser ? '' : avatar}
     <div style="max-width:85%;">
-      <div class="rounded-3 p-3 shadow-sm" style="background:${bgColor};color:${textColor};font-size:.875rem;line-height:1.6;">
-        ${formatText(text)}
-      </div>
+      <div class="rounded-3 p-3 shadow-sm" style="background:${bgColor};color:${textColor};font-size:.875rem;line-height:1.6;">${formatText(text)}</div>
       <div class="text-muted mt-1" style="font-size:.65rem;${isUser ? 'text-align:right;' : ''}">${timeStr()}</div>
     </div>
     ${isUser ? avatar : ''}`;
-
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }
@@ -112,13 +101,10 @@ function addTyping() {
   div.innerHTML = `
     <div style="width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">🤖</div>
     <div class="rounded-3 p-3 shadow-sm" style="background:#fff;font-size:.875rem;">
-      <span class="text-muted">Thinking</span>
-      <span id="typingDots">.</span>
+      <span class="text-muted">Thinking</span><span id="typingDots">.</span>
     </div>`;
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
-
-  // Animate dots
   let dots = 1;
   window._typingInterval = setInterval(() => {
     dots = (dots % 3) + 1;
@@ -138,12 +124,11 @@ async function sendMessage(text) {
   input.value = '';
   sendBtn.disabled = true;
   addTyping();
-
   try {
     const res = await fetch("{{ url_for('ai.chatbot_query') }}", {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text}),
     });
     const data = await res.json();
     removeTyping();
@@ -159,17 +144,10 @@ async function sendMessage(text) {
 
 sendBtn.addEventListener('click', () => sendMessage(input.value));
 input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(input.value); });
-
 document.querySelectorAll('.quick-q').forEach(btn => {
   btn.addEventListener('click', () => sendMessage(btn.dataset.q));
 });
-
 document.getElementById('clearBtn').addEventListener('click', () => {
-  fetch("{{ url_for('ai.chatbot_query') }}", {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({message: '__clear__'}),
-  }).catch(() => {});
   messages.innerHTML = '';
   addMessage('Chat cleared. How can I help you?', false);
 });

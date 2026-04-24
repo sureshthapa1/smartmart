@@ -568,3 +568,75 @@ def product_price_history(product_id):
         {"cost": float(r.unit_cost), "date": str(r.purchase_date), "supplier": r.supplier_name}
         for r in rows
     ])
+
+
+# ── Bot Runner endpoint ───────────────────────────────────────────────────────
+
+@api_bp.route("/bot/run", methods=["POST"])
+def run_bots():
+    """Run all daily bots. Protected by BOT_SECRET header or admin session.
+
+    Call from a cron job / Render scheduler:
+        curl -X POST https://your-app.onrender.com/api/bot/run \
+             -H "X-Bot-Secret: YOUR_BOT_SECRET"
+
+    Or trigger manually from the admin panel.
+    """
+    import os
+    from flask import current_app
+
+    # Auth: either valid admin session OR correct BOT_SECRET header
+    bot_secret = os.environ.get("BOT_SECRET", "")
+    header_secret = request.headers.get("X-Bot-Secret", "")
+
+    is_admin_session = (
+        current_user.is_authenticated and current_user.role == "admin"
+    )
+    is_valid_secret = bot_secret and header_secret == bot_secret
+
+    if not is_admin_session and not is_valid_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        from ...services.bot_runner import run_all_bots
+        user_id = current_user.id if current_user.is_authenticated else 1
+        result = run_all_bots(user_id=user_id)
+        current_app.logger.info("Bot runner completed: %s", result)
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.exception("Bot runner failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@api_bp.route("/bot/status", methods=["GET"])
+@login_required
+def bot_status():
+    """Return today's bot run results from notification log."""
+    from ...models.operations import AppNotification
+    from datetime import datetime, timezone
+
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    notifications = db.session.execute(
+        db.select(AppNotification)
+        .where(AppNotification.created_at >= today_start)
+        .order_by(AppNotification.created_at.desc())
+        .limit(50)
+    ).scalars().all()
+
+    by_type = {}
+    for n in notifications:
+        t = n.notification_type
+        by_type[t] = by_type.get(t, 0) + 1
+
+    return jsonify({
+        "today_notifications": len(notifications),
+        "by_type": by_type,
+        "latest": [
+            {
+                "type": n.notification_type,
+                "message": n.message[:100],
+                "created_at": n.created_at.isoformat(),
+            }
+            for n in notifications[:10]
+        ],
+    })

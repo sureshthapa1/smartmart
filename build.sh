@@ -112,7 +112,13 @@ with app.app_context():
     from smart_mart.models.user import User
     from smart_mart.services.authenticator import hash_password
 
-    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@1234")
+    # SECURITY: Admin password MUST be set via ADMIN_PASSWORD env var
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password:
+        print("ERROR: ADMIN_PASSWORD environment variable is not set.")
+        print("Set it in your deployment platform (Render, Heroku, etc.) before deploying.")
+        sys.exit(1)
+
     admin_username = os.environ.get("ADMIN_USERNAME", "admin")
 
     admin = db.session.execute(
@@ -129,11 +135,12 @@ with app.app_context():
         db.session.commit()
         print(f"Admin user created: {admin_username}")
     else:
+        # Update password on every deploy (allows password rotation)
         admin.password_hash = hash_password(admin_password)
         db.session.commit()
         print(f"Admin password updated: {admin_username}")
 
-    print(f"Login: username={admin_username}  password={admin_password}")
+    print(f"Login: username={admin_username}  password=<set via ADMIN_PASSWORD env var>")
 
     from smart_mart.models.shop_settings import ShopSettings
     ShopSettings.get()

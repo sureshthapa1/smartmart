@@ -94,8 +94,8 @@
                 {{ r.sale.invoice_number or 'Sale #' ~ r.sale_id }}
               </a>
             </td>
-            <td class="small">{{ r.sale.customer_name or '<span class="text-muted">Walk-in</span>'|safe }}</td>
-            <td class="text-muted small">{{ r.created_at.strftime('%d %b %Y %H:%M') }}</td>
+            <td class="small">{% if r.sale.customer_name %}{{ r.sale.customer_name }}{% else %}<span class="text-muted">Walk-in</span>{% endif %}</td>
+            <td class="text-muted small">{{ r.created_at.strftime('%d %b %Y %H:%M') }}<br><span style="font-size:.7rem;color:#94a3b8;">{{ r.created_at | bs_date }}</span></td>
             <td>
               <span class="badge {% if r.refund_mode == 'cash' %}bg-success{% elif r.refund_mode == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
                 {{ r.refund_mode | capitalize }}

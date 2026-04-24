@@ -51,12 +51,12 @@ def insights():
     forecasts = ai_engine.forecast_sales(days_ahead=7)
     dead_stock = ai_engine.detect_dead_stock(days=30)
 
-    # Restock recommendations for low-stock products
+    # Restock recommendations — load products once, compute recs in memory
     low_stock = db.session.execute(
-        db.select(Product).where(Product.quantity <= 10).order_by(Product.quantity)
+        db.select(Product).where(Product.quantity <= 10).order_by(Product.quantity).limit(10)
     ).scalars().all()
     restock_recs = []
-    for p in low_stock[:10]:
+    for p in low_stock:
         rec = ai_engine.restock_recommendation(p.id)
         rec["product"] = p
         restock_recs.append(rec)
@@ -101,8 +101,7 @@ def chatbot_query():
 
     history = flask_session.get("chatbot_history", [])
 
-    # Build context-aware message: if message is a follow-up (short/pronoun-heavy),
-    # prepend the last bot reply topic as context
+    # Build context-aware message for short follow-ups
     context_msg = message
     if history and len(message.split()) <= 4:
         last_bot = next((h["text"] for h in reversed(history) if h["role"] == "bot"), "")
@@ -111,7 +110,6 @@ def chatbot_query():
 
     reply = ai_engine.chatbot_query(context_msg)
 
-    # Store in session (keep last 10 exchanges = 20 messages)
     history.append({"role": "user", "text": message})
     history.append({"role": "bot", "text": reply})
     flask_session["chatbot_history"] = history[-20:]
@@ -498,7 +496,6 @@ def api_image_recognize():
 @ai_bp.route("/api/voice/query", methods=["POST"])
 @login_required
 def api_voice_query():
-    """Process voice transcript."""
     data = request.get_json() or {}
     transcript = data.get("transcript", "")
     from ...services.ai_voice import process_voice_command
@@ -752,32 +749,27 @@ def trigger_retrain():
 @login_required
 def competitor_pricing():
     _require_perm("can_view_ai_insights")
-    """Competitor price tracking dashboard."""
-    from ...models.ai_enhancements import CompetitorPriceEntry, CompetitorPriceSuggestion
-    from ...models.product import Product
-    from ...extensions import db as _db
-    from sqlalchemy import func
+    from ...models.ai_enhancements import CompetitorPriceEntry
+    from sqlalchemy import func as _func
 
-    products = _db.session.execute(
-        _db.select(Product).order_by(Product.name)
+    products = db.session.execute(
+        db.select(Product).order_by(Product.name)
     ).scalars().all()
 
-    # Recent entries grouped by product
-    entries = _db.session.execute(
-        _db.select(CompetitorPriceEntry).order_by(CompetitorPriceEntry.observed_at.desc()).limit(100)
+    entries = db.session.execute(
+        db.select(CompetitorPriceEntry).order_by(CompetitorPriceEntry.observed_at.desc()).limit(100)
     ).scalars().all()
 
-    # Products with competitor data
-    products_with_data = _db.session.execute(
-        _db.select(
+    products_with_data = db.session.execute(
+        db.select(
             Product,
-            func.count(CompetitorPriceEntry.id).label("entry_count"),
-            func.max(CompetitorPriceEntry.observed_at).label("last_updated"),
+            _func.count(CompetitorPriceEntry.id).label("entry_count"),
+            _func.max(CompetitorPriceEntry.observed_at).label("last_updated"),
         )
         .outerjoin(CompetitorPriceEntry, CompetitorPriceEntry.product_id == Product.id)
         .group_by(Product.id)
-        .having(func.count(CompetitorPriceEntry.id) > 0)
-        .order_by(func.max(CompetitorPriceEntry.observed_at).desc())
+        .having(_func.count(CompetitorPriceEntry.id) > 0)
+        .order_by(_func.max(CompetitorPriceEntry.observed_at).desc())
     ).all()
 
     return render_template("ai/competitor_pricing.html",
@@ -790,7 +782,6 @@ def competitor_pricing():
 @login_required
 def add_competitor_price():
     _require_perm("can_view_ai_insights")
-    """Add a competitor price entry."""
     from ...services.competitor_pricing_service import add_competitor_price as _add
     from flask_login import current_user
     from flask import redirect, url_for, flash
@@ -812,12 +803,15 @@ def add_competitor_price():
 @login_required
 def get_price_suggestion(product_id):
     _require_perm("can_view_ai_insights")
-    """Generate AI pricing suggestion for a product."""
     from ...services.competitor_pricing_service import generate_pricing_suggestion
     from flask import redirect, url_for, flash
     try:
         result = generate_pricing_suggestion(product_id)
-        flash(f"AI suggests NPR {result['suggested_price']:.2f} for {result['product_name']} — {result['rationale']}", "info")
+        flash(
+            f"AI suggests NPR {result['suggested_price']:.2f} for {result['product_name']} "
+            f"— {result['rationale']}",
+            "info",
+        )
     except ValueError as e:
         flash(str(e), "danger")
     return redirect(url_for("ai.competitor_pricing"))

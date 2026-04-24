@@ -76,8 +76,8 @@
               {{ sale.invoice_number or '#' ~ sale.id }}
             </a>
           </td>
-          <td class="text-muted small">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td>
-          <td class="small">{{ sale.customer_name or '<span class="text-muted">Walk-in</span>'|safe }}</td>
+          <td class="text-muted small">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}<br><span style="font-size:.7rem;color:#94a3b8;">{{ sale.sale_date | bs_date }}</span></td>
+          <td class="small">{% if sale.customer_name %}{{ sale.customer_name }}{% else %}<span class="text-muted">Walk-in</span>{% endif %}</td>
           <td class="text-muted small">{{ sale.user.username if sale.user else '—' }}</td>
           <td>
             {% set pm = sale.payment_mode or 'cash' %}

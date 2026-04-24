@@ -67,13 +67,15 @@ def list_orders():
 
     orders = db.session.execute(stmt).scalars().all()
 
-    # Status counts for tabs
-    status_counts = {}
-    for s in ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"]:
-        count = db.session.execute(
-            db.select(func.count(OnlineOrder.id)).where(OnlineOrder.status == s)
-        ).scalar() or 0
-        status_counts[s] = count
+    # Status counts — single grouped query instead of 6 separate queries
+    count_rows = db.session.execute(
+        db.select(OnlineOrder.status, func.count(OnlineOrder.id).label("cnt"))
+        .group_by(OnlineOrder.status)
+    ).all()
+    status_counts = {s: 0 for s in ["pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"]}
+    for row in count_rows:
+        if row.status in status_counts:
+            status_counts[row.status] = row.cnt
 
     return render_template("online_orders/list.html",
                            orders=orders, status_filter=status_filter,
