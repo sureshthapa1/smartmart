@@ -29,7 +29,16 @@ class Customer(db.Model):
     @classmethod
     def upsert(cls, name: str, phone: str = None, address: str = None):
         """Create or update a customer record. Caller is responsible for committing."""
-        if not name or name.strip().lower() in ("walk-in customer", ""):
+        if not name:
+            return
+        name = name.strip()
+        # Reject walk-in placeholders and garbage entries
+        _skip = {"walk-in customer", "walk-in", "walkin", "guest", "customer",
+                 "test", "n/a", "na", "none", "unknown", ""}
+        if name.lower() in _skip:
+            return
+        # Reject names that are too short (single char) or purely numeric (barcode scans etc.)
+        if len(name) < 2 or name.isdigit():
             return
         try:
             existing = db.session.execute(

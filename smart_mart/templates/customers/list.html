@@ -7,7 +7,7 @@
 <div class="page-header">
   <div>
     <div class="page-header-title">Customers</div>
-    <div class="page-header-sub">{{ total }} customer{{ 's' if total != 1 }} registered</div>
+    <div class="page-header-sub">{{ total }} customer{{ 's' if total != 1 }}</div>
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('customers.create_customer') }}" class="btn btn-primary btn-sm">
@@ -19,7 +19,7 @@
   </div>
 </div>
 
-<!-- Search & Sort bar -->
+<!-- Search & Filter bar -->
 <div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
@@ -32,45 +32,39 @@
       </div>
       <div>
         <select name="sort" class="form-select form-select-sm" style="width:auto">
-          <option value="visits"  {{ 'selected' if sort == 'visits'  }}>Most Visits</option>
-          <option value="recent"  {{ 'selected' if sort == 'recent'  }}>Recently Active</option>
-          <option value="name"    {{ 'selected' if sort == 'name'    }}>Name A–Z</option>
+          <option value="visits" {{ 'selected' if sort == 'visits' }}>Most Sales</option>
+          <option value="recent" {{ 'selected' if sort == 'recent' }}>Recently Active</option>
+          <option value="name"   {{ 'selected' if sort == 'name'   }}>Name A–Z</option>
         </select>
       </div>
+      <input type="hidden" name="show" value="{{ show }}">
       <button type="submit" class="btn btn-primary btn-sm">Search</button>
-      {% if q %}<a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+      {% if q %}<a href="{{ url_for('customers.list_customers', show=show) }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
     </form>
   </div>
 </div>
 
-<!-- Stats row -->
-<div class="row g-3 mb-3">
-  <div class="col-sm-4">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="text-muted small">Total Customers</div>
-        <div class="fs-4 fw-bold text-primary">{{ total }}</div>
-      </div>
-    </div>
+<!-- Real / All toggle -->
+<div class="d-flex align-items-center gap-3 mb-3">
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('customers.list_customers', q=q, sort=sort, show='real') }}"
+       class="btn btn-sm {% if show == 'real' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-person-check me-1"></i>Real Customers
+    </a>
+    <a href="{{ url_for('customers.list_customers', q=q, sort=sort, show='all') }}"
+       class="btn btn-sm {% if show == 'all' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+      <i class="bi bi-people me-1"></i>All
+      {% if zero_sale_count > 0 %}
+      <span class="badge bg-danger ms-1">{{ zero_sale_count }} no-sale</span>
+      {% endif %}
+    </a>
   </div>
-  <div class="col-sm-4">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="text-muted small">Repeat Customers</div>
-        <div class="fs-4 fw-bold text-success">
-          {{ customers | selectattr('visit_count', 'gt', 1) | list | length }}
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-4">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="text-muted small">Showing</div>
-        <div class="fs-4 fw-bold">{{ customers | length }}</div>
-      </div>
-    </div>
-  </div>
+  {% if show == 'all' and zero_sale_count > 0 %}
+  <span class="text-muted small">
+    <i class="bi bi-info-circle me-1"></i>
+    {{ zero_sale_count }} customer{{ 's' if zero_sale_count != 1 }} with no sales — likely typos or test entries. Delete them to keep data clean.
+  </span>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -82,31 +76,36 @@
             <th>Customer</th>
             <th>Phone</th>
             <th>Address</th>
-            <th class="text-center">Visits</th>
+            <th class="text-center">Sales</th>
             <th>Last Visit</th>
             <th>Since</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {% for c in customers %}
-          <tr>
+          {% for c, real_sales in customers %}
+          <tr {% if real_sales == 0 %}style="opacity:.65;"{% endif %}>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0">
+                <div style="width:34px;height:34px;border-radius:50%;background:{% if real_sales == 0 %}#94a3b8{% else %}linear-gradient(135deg,#6366f1,#8b5cf6){% endif %};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.85rem;flex-shrink:0">
                   {{ c.name[0].upper() }}
                 </div>
-                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}"
-                   class="fw-semibold text-decoration-none" style="color:var(--accent)">
-                  {{ c.name }}
-                </a>
+                <div>
+                  <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}"
+                     class="fw-semibold text-decoration-none" style="color:var(--accent)">
+                    {{ c.name }}
+                  </a>
+                  {% if real_sales == 0 %}
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:.6rem;">No Sales</span>
+                  {% endif %}
+                </div>
               </div>
             </td>
             <td class="text-muted small">{{ c.phone or '—' }}</td>
             <td class="text-muted small">{{ c.address or '—' }}</td>
             <td class="text-center">
-              <span class="badge {% if c.visit_count >= 10 %}bg-success{% elif c.visit_count >= 3 %}bg-primary{% else %}bg-secondary{% endif %}">
-                {{ c.visit_count }}
+              <span class="badge {% if real_sales >= 10 %}bg-success{% elif real_sales >= 3 %}bg-primary{% elif real_sales >= 1 %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
+                {{ real_sales }}
               </span>
             </td>
             <td class="text-muted small">
@@ -121,10 +120,12 @@
                    class="btn btn-sm btn-outline-primary" title="View Profile">
                   <i class="bi bi-eye"></i>
                 </a>
+                {% if real_sales > 0 %}
                 <a href="{{ url_for('customers.loyalty_card', customer_id=c.id) }}"
                    target="_blank" class="btn btn-sm btn-outline-info" title="Print Loyalty Card">
                   <i class="bi bi-credit-card"></i>
                 </a>
+                {% endif %}
                 {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}"
                    class="btn btn-sm btn-outline-secondary" title="Edit">
@@ -145,7 +146,8 @@
             <td colspan="7" class="text-center text-muted py-5">
               <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
               {% if q %}No customers matching "<strong>{{ q }}</strong>".
-              {% else %}No customers yet — they appear automatically after first sale.{% endif %}
+              {% elif show == 'real' %}No customers with actual sales yet.
+              {% else %}No customers yet.{% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -158,10 +160,10 @@
     <span class="text-muted small">Page {{ page }} of {{ ((total - 1) // per_page) + 1 }}</span>
     <div class="d-flex gap-2">
       {% if page > 1 %}
-      <a href="?page={{ page-1 }}&q={{ q }}&sort={{ sort }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
+      <a href="?page={{ page-1 }}&q={{ q }}&sort={{ sort }}&show={{ show }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
       {% endif %}
       {% if page * per_page < total %}
-      <a href="?page={{ page+1 }}&q={{ q }}&sort={{ sort }}" class="btn btn-sm btn-outline-secondary">Next →</a>
+      <a href="?page={{ page+1 }}&q={{ q }}&sort={{ sort }}&show={{ show }}" class="btn btn-sm btn-outline-secondary">Next →</a>
       {% endif %}
     </div>
   </div>

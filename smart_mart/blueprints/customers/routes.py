@@ -63,34 +63,66 @@ def create_customer():
 @login_required
 def list_customers():
     q = request.args.get("q", "").strip() or None
-    sort = request.args.get("sort", "visits")   # visits | name | recent
+    sort = request.args.get("sort", "visits")
     page = request.args.get("page", 1, type=int)
+    # Default: only show customers with at least 1 real sale
+    # "all" shows everyone including 0-sale / manually created
+    show = request.args.get("show", "real")
     per_page = 30
 
-    stmt = db.select(Customer)
+    # Join with actual sale count from the sales table (source of truth)
+    sale_count_sq = (
+        db.select(
+            db.func.lower(Sale.customer_name).label("cname"),
+            db.func.count(Sale.id).label("sale_count"),
+        )
+        .group_by(db.func.lower(Sale.customer_name))
+        .subquery()
+    )
+
+    stmt = (
+        db.select(Customer, db.func.coalesce(sale_count_sq.c.sale_count, 0).label("real_sales"))
+        .outerjoin(sale_count_sq, db.func.lower(Customer.name) == sale_count_sq.c.cname)
+    )
+
     if q:
         term = f"%{q.lower()}%"
         stmt = stmt.where(
             func.lower(Customer.name).like(term) |
             Customer.phone.like(term)
         )
+
+    if show == "real":
+        stmt = stmt.where(db.func.coalesce(sale_count_sq.c.sale_count, 0) >= 1)
+
     if sort == "name":
         stmt = stmt.order_by(Customer.name)
     elif sort == "recent":
         stmt = stmt.order_by(Customer.last_visit.desc())
     else:
-        stmt = stmt.order_by(Customer.visit_count.desc())
+        stmt = stmt.order_by(db.func.coalesce(sale_count_sq.c.sale_count, 0).desc())
 
     total = db.session.execute(
         db.select(func.count()).select_from(stmt.subquery())
     ).scalar() or 0
 
-    customers = db.session.execute(
+    rows = db.session.execute(
         stmt.limit(per_page).offset((page - 1) * per_page)
-    ).scalars().all()
+    ).all()
+
+    # Build list of (customer, real_sales) tuples
+    customers = [(row.Customer, row.real_sales) for row in rows]
+
+    # Count of 0-sale customers for the toggle badge
+    zero_sale_count = db.session.execute(
+        db.select(func.count(Customer.id))
+        .outerjoin(sale_count_sq, db.func.lower(Customer.name) == sale_count_sq.c.cname)
+        .where(db.func.coalesce(sale_count_sq.c.sale_count, 0) == 0)
+    ).scalar() or 0
 
     return render_template("customers/list.html",
                            customers=customers, q=q or "", sort=sort,
+                           show=show, zero_sale_count=zero_sale_count,
                            page=page, per_page=per_page, total=total)
 
 
