@@ -977,6 +977,15 @@
         }
         return _origFetch(url, opts);
       };
+      // Also inject into any POST forms without a csrf_token field
+      document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.method.toUpperCase() !== 'POST') return;
+        if (form.querySelector('[name="csrf_token"]')) return;
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'csrf_token'; input.value = _csrfToken;
+        form.appendChild(input);
+      });
     })();
   </script>
 </body>

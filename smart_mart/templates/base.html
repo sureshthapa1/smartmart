@@ -963,12 +963,30 @@
       if (!_csrfToken) return;
       const _origFetch = window.fetch;
       window.fetch = function(url, opts = {}) {
+        opts = opts || {};
         const method = (opts.method || 'GET').toUpperCase();
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
           opts.headers = Object.assign({'X-CSRFToken': _csrfToken}, opts.headers || {});
         }
         return _origFetch(url, opts);
       };
+    })();
+    // Automatically inject CSRF token into all POST forms on submit
+    (function() {
+      const _csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+      if (!_csrfToken) return;
+      document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.method.toUpperCase() !== 'POST') return;
+        // Check if form already has a csrf_token field
+        if (form.querySelector('[name="csrf_token"]')) return;
+        // Inject it
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrf_token';
+        input.value = _csrfToken;
+        form.appendChild(input);
+      });
     })();
   </script>
 </body>
