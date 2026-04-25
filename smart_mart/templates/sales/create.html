@@ -968,6 +968,16 @@
     (function() {
       const _csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
       if (!_csrfToken) return;
+      function _injectCsrf(form) {
+        if (!form || form.method.toUpperCase() !== 'POST') return;
+        if (form.querySelector('[name="csrf_token"]')) return;
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'csrf_token'; inp.value = _csrfToken;
+        form.appendChild(inp);
+      }
+      document.addEventListener('submit', function(e) { _injectCsrf(e.target); }, true);
+      const _origSubmit = HTMLFormElement.prototype.submit;
+      HTMLFormElement.prototype.submit = function() { _injectCsrf(this); _origSubmit.call(this); };
       const _origFetch = window.fetch;
       window.fetch = function(url, opts) {
         opts = opts || {};
@@ -977,15 +987,6 @@
         }
         return _origFetch(url, opts);
       };
-      // Also inject into any POST forms without a csrf_token field
-      document.addEventListener('submit', function(e) {
-        const form = e.target;
-        if (form.method.toUpperCase() !== 'POST') return;
-        if (form.querySelector('[name="csrf_token"]')) return;
-        const input = document.createElement('input');
-        input.type = 'hidden'; input.name = 'csrf_token'; input.value = _csrfToken;
-        form.appendChild(input);
-      });
     })();
   </script>
 </body>

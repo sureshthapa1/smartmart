@@ -955,14 +955,34 @@
     function updateClock(){const now=new Date(),h=now.getHours().toString().padStart(2,'0'),m=now.getMinutes().toString().padStart(2,'0'),s=now.getSeconds().toString().padStart(2,'0');document.getElementById('liveClock').textContent=`${h}:${m}:${s}`}
     updateClock();setInterval(updateClock,1000);
   </script>
-  {% block scripts %}{% endblock %}
   <script>
-    // Automatically attach CSRF token to all fetch() POST/PUT/PATCH/DELETE requests
+    // ── CSRF: inject token into ALL POST forms — covers both user clicks
+    // and programmatic form.submit() calls ────────────────────────────────
     (function() {
       const _csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
       if (!_csrfToken) return;
+
+      function _injectCsrf(form) {
+        if (!form || form.method.toUpperCase() !== 'POST') return;
+        if (form.querySelector('[name="csrf_token"]')) return;
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'csrf_token'; inp.value = _csrfToken;
+        form.appendChild(inp);
+      }
+
+      // 1. Catch user-initiated submits (button click, Enter key)
+      document.addEventListener('submit', function(e) { _injectCsrf(e.target); }, true);
+
+      // 2. Catch programmatic form.submit() calls
+      const _origSubmit = HTMLFormElement.prototype.submit;
+      HTMLFormElement.prototype.submit = function() {
+        _injectCsrf(this);
+        _origSubmit.call(this);
+      };
+
+      // 3. Patch fetch() for AJAX POST calls
       const _origFetch = window.fetch;
-      window.fetch = function(url, opts = {}) {
+      window.fetch = function(url, opts) {
         opts = opts || {};
         const method = (opts.method || 'GET').toUpperCase();
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
@@ -971,23 +991,7 @@
         return _origFetch(url, opts);
       };
     })();
-    // Automatically inject CSRF token into all POST forms on submit
-    (function() {
-      const _csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-      if (!_csrfToken) return;
-      document.addEventListener('submit', function(e) {
-        const form = e.target;
-        if (form.method.toUpperCase() !== 'POST') return;
-        // Check if form already has a csrf_token field
-        if (form.querySelector('[name="csrf_token"]')) return;
-        // Inject it
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'csrf_token';
-        input.value = _csrfToken;
-        form.appendChild(input);
-      });
-    })();
   </script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>
