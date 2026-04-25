@@ -331,8 +331,8 @@ class AnalyticsService:
         average_inventory = (opening + closing) / 2
         We approximate: average = current inventory value (no historical snapshots)
         """
-        # COGS per product in period
-        cogs_rows = db.session.execute(
+        # Build full statement before executing
+        cogs_stmt = (
             db.select(
                 SaleItem.product_id,
                 Product.name.label("product_name"),
@@ -345,13 +345,13 @@ class AnalyticsService:
             .join(Product, Product.id == SaleItem.product_id)
         )
         if start:
-            cogs_rows = cogs_rows.where(func.date(Sale.sale_date) >= start)
+            cogs_stmt = cogs_stmt.where(func.date(Sale.sale_date) >= start)
         if end:
-            cogs_rows = cogs_rows.where(func.date(Sale.sale_date) <= end)
-        cogs_rows = cogs_rows.group_by(
+            cogs_stmt = cogs_stmt.where(func.date(Sale.sale_date) <= end)
+        cogs_stmt = cogs_stmt.group_by(
             SaleItem.product_id, Product.name, Product.sku, Product.category
         )
-        cogs_data = db.session.execute(cogs_rows).all()
+        cogs_data = db.session.execute(cogs_stmt).all()
 
         # Current inventory value per product
         inv_rows = db.session.execute(db.select(Product)).scalars().all()
