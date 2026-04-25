@@ -14,13 +14,14 @@
       <div class="fw-semibold"><i class="bi bi-robot me-2 text-indigo-400" style="color:#a5b4fc"></i>Daily Bot Runner</div>
       <div class="small" style="color:#94a3b8">Runs: low stock alerts · overdue credit reminders · reorder POs · bill reminders · daily summary</div>
     </div>
-    <button class="btn btn-sm ms-auto" id="runBotsBtn"
-            style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none">
-      <i class="bi bi-play-fill me-1"></i>Run Now
+  <div class="d-flex gap-2">
+    <button id="runBotsBtn" class="btn btn-primary btn-sm">
+      <i class="bi bi-play-fill me-1"></i>Run Bots Now
     </button>
-    <a href="{{ url_for('api.bot_status') }}" class="btn btn-sm btn-outline-light" style="font-size:.78rem">
+    <a href="{{ url_for('operations.bot_status_page') }}" class="btn btn-sm btn-outline-light" style="font-size:.78rem">
       <i class="bi bi-activity me-1"></i>Today's Status
     </a>
+  </div>
   </div>
 </div>
 <div id="botResult" class="mb-3" style="display:none"></div>

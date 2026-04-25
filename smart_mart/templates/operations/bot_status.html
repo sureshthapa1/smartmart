@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Bot Status — Smart Mart{% endblock %}
+{% block page_title %}Daily Bot Status{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Bot Status</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Today's Bot Activity</div>
+    <div class="page-header-sub">{{ today.strftime('%d %B %Y') }} — {{ notifications|length }} notification{{ 's' if notifications|length != 1 }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <button id="runBotsBtn" class="btn btn-primary btn-sm">
+      <i class="bi bi-play-fill me-1"></i>Run Bots Now
+    </button>
+    <div id="botRunResult" class="ms-2 small align-self-center"></div>
+  </div>
+</div>
+
+{% if not notifications %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-robot fs-1 d-block mb-2 opacity-25"></i>
+    <div class="fw-semibold mb-1">No bot activity today yet</div>
+    <div class="small">Click "Run Bots Now" to trigger all bots manually, or wait for the scheduled 8 AM run.</div>
+  </div>
+</div>
+{% else %}
+
+<!-- Summary by type -->
+<div class="row g-3 mb-4">
+  {% set type_icons = {
+    'warning': ('bi-exclamation-triangle-fill', 'warning'),
+    'critical': ('bi-x-octagon-fill', 'danger'),
+    'credit_overdue': ('bi-credit-card-2-back', 'danger'),
+    'expiry_warning': ('bi-calendar-x', 'warning'),
+    'expired': ('bi-calendar-x-fill', 'danger'),
+    'expense_due': ('bi-cash-coin', 'warning'),
+    'expense_overdue': ('bi-cash-coin', 'danger'),
+    'daily_summary': ('bi-clipboard-data', 'info'),
+    'anomaly_discount': ('bi-percent', 'warning'),
+    'anomaly_price': ('bi-graph-up-arrow', 'warning'),
+    'order_stale': ('bi-clock-history', 'warning'),
+    'promotion_expiring': ('bi-tag-fill', 'info'),
+  } %}
+  {% for ntype, items in by_type.items() %}
+  {% set icon, color = type_icons.get(ntype, ('bi-bell-fill', 'secondary')) %}
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <i class="bi {{ icon }} text-{{ color }} fs-4 d-block mb-1"></i>
+        <div class="fs-4 fw-bold">{{ items|length }}</div>
+        <div class="text-muted small">{{ ntype.replace('_', ' ').title() }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Full notification list -->
+<div class="card">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-list-ul me-2 text-primary"></i>All Notifications Today
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Message</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for n in notifications %}
+        {% set _, color = type_icons.get(n.notification_type, ('bi-bell-fill', 'secondary')) %}
+        <tr>
+          <td>
+            <span class="badge bg-{{ color }} bg-opacity-10 text-{{ color }}" style="font-size:.72rem;">
+              {{ n.notification_type.replace('_', ' ').title() }}
+            </span>
+          </td>
+          <td class="small">{{ n.message }}</td>
+          <td class="text-muted small">{{ n.created_at | nst('%H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('runBotsBtn')?.addEventListener('click', async function() {
+  const btn = this;
+  const result = document.getElementById('botRunResult');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  try {
+    const res = await fetch('/api/bot/run', {method: 'POST'});
+    const data = await res.json();
+    if (res.ok) {
+      result.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.total_notifications} notifications created</span>`;
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      result.innerHTML = `<span class="text-danger">${data.error || 'Failed'}</span>`;
+    }
+  } catch(e) {
+    result.innerHTML = `<span class="text-danger">Network error</span>`;
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Bots Now';
+});
+</script>
+{% endblock %}

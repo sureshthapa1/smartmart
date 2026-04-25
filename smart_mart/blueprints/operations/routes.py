@@ -272,6 +272,33 @@ def shifts():
     return render_template("operations/shifts.html", open_shift=open_shift_obj, shifts=all_shifts)
 
 
+@operations_bp.route("/bot-status")
+@admin_required
+def bot_status_page():
+    """Today's bot run status — shows all notifications created today."""
+    from ...models.operations import AppNotification
+    from datetime import datetime, timezone
+
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    notifications = db.session.execute(
+        db.select(AppNotification)
+        .where(AppNotification.created_at >= today_start)
+        .order_by(AppNotification.created_at.desc())
+    ).scalars().all()
+
+    # Group by type for summary
+    by_type: dict[str, list] = {}
+    for n in notifications:
+        by_type.setdefault(n.notification_type, []).append(n)
+
+    return render_template(
+        "operations/bot_status.html",
+        notifications=notifications,
+        by_type=by_type,
+        today=date.today(),
+    )
+
+
 @operations_bp.route("/credit-risk")
 @admin_required
 def credit_risk():
