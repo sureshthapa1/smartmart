@@ -29,7 +29,7 @@ def list_sales():
     end_date   = request.args.get("end_date",   "").strip() or None
     search_q   = request.args.get("q",          "").strip() or None
     pay_filter = request.args.get("payment",     "").strip() or None
-    page       = int(request.args.get("page", 1))
+    page       = request.args.get("page", 1, type=int) or 1
 
     filters: dict = {}
     if start_date:

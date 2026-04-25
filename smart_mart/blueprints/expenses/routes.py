@@ -34,7 +34,7 @@ def list_expenses():
     start_raw = request.args.get("start_date", "")
     end_raw = request.args.get("end_date", "")
     type_filter = request.args.get("type", "")
-    page = int(request.args.get("page", 1))
+    page = request.args.get("page", 1, type=int) or 1
     per_page = 50
 
     stmt = db.select(Expense).order_by(Expense.expense_date.desc(), Expense.id.desc())

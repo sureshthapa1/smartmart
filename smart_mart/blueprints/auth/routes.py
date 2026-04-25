@@ -55,8 +55,8 @@ def change_password():
         if not bcrypt.check_password_hash(user.password_hash, current_pw):
             flash("Current password is incorrect.", "danger")
             return render_template("auth/change_password.html")
-        if len(new_pw) < 6:
-            flash("New password must be at least 6 characters.", "danger")
+        if len(new_pw) < 8:
+            flash("New password must be at least 8 characters.", "danger")
             return render_template("auth/change_password.html")
         if new_pw != confirm_pw:
             flash("New passwords do not match.", "danger")

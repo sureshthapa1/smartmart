@@ -74,7 +74,7 @@ def list_purchases():
             filters["end_date"] = date.fromisoformat(end_date_raw)
         except ValueError:
             flash("Invalid end date format.", "danger")
-    page = int(request.args.get("page", 1))
+    page = request.args.get("page", 1, type=int) or 1
     purchases = purchase_manager.list_purchases(filters, page=page)
     return render_template("purchases/list.html", purchases=purchases,
                            start_date=start_date_raw or "", end_date=end_date_raw or "")
