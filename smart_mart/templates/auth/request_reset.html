@@ -38,6 +38,7 @@
           ask your system administrator to retrieve it.
         </p>
         <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
             <label class="form-label fw-semibold" style="font-size:.82rem;color:#374151">Username</label>
             <input type="text" name="username" class="form-control" placeholder="Enter your username" required autofocus>
