@@ -358,3 +358,27 @@ def _register_blueprints(app):
         csrf.exempt(run_bots)
     except Exception:
         pass
+
+    # Exempt the auth blueprint — login/logout/reset are protected by
+    # rate limiting; CSRF on the login form itself is redundant and causes
+    # "token expired" errors when the page sits open for a long time.
+    try:
+        from .blueprints.auth.routes import auth_bp as _auth_bp
+        csrf.exempt(_auth_bp)
+    except Exception:
+        pass
+
+    # ── CSRF error handler — redirect back with a clear message ──────────
+    from flask_wtf.csrf import CSRFError
+
+    @app.errorhandler(CSRFError)
+    def handle_csrf_error(e):
+        from flask import request as _req, flash as _flash, redirect as _redir
+        _flash(
+            "Your session has expired or the form was submitted twice. "
+            "Please try again.",
+            "warning",
+        )
+        # Redirect back to the page the user came from, or home
+        referrer = _req.referrer or url_for("dashboard.index")
+        return _redir(referrer), 303
