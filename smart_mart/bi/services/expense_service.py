@@ -71,7 +71,9 @@ class ExpenseService:
         rows = db.session.execute(stmt).scalars().all()
         return [_serialize_expense(row) for row in rows]
 
-    # FIX 5: inventory ledger read
+    # FIX 5: inventory ledger read — reads from StockMovement (always populated)
+    # bi_inventory_ledger is only populated via BI batch finalization;
+    # StockMovement is the reliable source for all stock changes.
     @staticmethod
     def list_ledger(
         product_id: int | None = None,
@@ -80,34 +82,55 @@ class ExpenseService:
         offset: int = 0,
     ) -> dict:
         from ...models.product import Product
+        from ...models.stock_movement import StockMovement
+
+        # Map StockMovement.change_type to ledger-style movement_type labels
+        _TYPE_MAP = {
+            "sale":           "sale_out",
+            "purchase":       "purchase_in",
+            "adjustment_in":  "adjustment_in",
+            "adjustment_out": "adjustment_out",
+            "return":         "return_in",
+            "transfer_in":    "transfer_in",
+            "transfer_out":   "transfer_out",
+        }
+
         stmt = (
-            db.select(InventoryLedgerEntry, Product.name.label("product_name"), Product.sku.label("sku"))
-            .join(Product, Product.id == InventoryLedgerEntry.product_id)
-            .order_by(InventoryLedgerEntry.movement_date.desc(), InventoryLedgerEntry.id.desc())
+            db.select(StockMovement, Product.name.label("product_name"), Product.sku.label("sku"))
+            .join(Product, Product.id == StockMovement.product_id)
+            .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
         )
         if product_id:
-            stmt = stmt.where(InventoryLedgerEntry.product_id == product_id)
+            stmt = stmt.where(StockMovement.product_id == product_id)
         if movement_type:
-            stmt = stmt.where(InventoryLedgerEntry.movement_type == movement_type)
+            # reverse-map the ledger label back to StockMovement.change_type
+            _REV = {v: k for k, v in _TYPE_MAP.items()}
+            raw_type = _REV.get(movement_type, movement_type)
+            stmt = stmt.where(StockMovement.change_type == raw_type)
 
         total = db.session.execute(
             db.select(db.func.count()).select_from(stmt.subquery())
         ).scalar() or 0
 
         rows = db.session.execute(stmt.offset(offset).limit(limit)).all()
-        entries = [
-            {
-                "id": row.InventoryLedgerEntry.id,
-                "product_id": row.InventoryLedgerEntry.product_id,
+
+        entries = []
+        for row in rows:
+            sm = row.StockMovement
+            change_type = sm.change_type or ""
+            mv_type = _TYPE_MAP.get(change_type, change_type)
+            qty = int(sm.change_amount or 0)
+            entries.append({
+                "id": sm.id,
+                "product_id": sm.product_id,
                 "product_name": row.product_name,
                 "sku": row.sku,
-                "movement_type": row.InventoryLedgerEntry.movement_type,
-                "qty": row.InventoryLedgerEntry.qty,
-                "unit_cost": decimal_to_float(row.InventoryLedgerEntry.unit_cost),
-                "reference_type": row.InventoryLedgerEntry.reference_type,
-                "reference_id": row.InventoryLedgerEntry.reference_id,
-                "movement_date": row.InventoryLedgerEntry.movement_date.isoformat(),
-            }
-            for row in rows
-        ]
+                "movement_type": mv_type,
+                "qty": qty,
+                "unit_cost": None,   # StockMovement doesn't store unit cost
+                "reference_type": change_type,
+                "reference_id": sm.reference_id,
+                "movement_date": sm.timestamp.isoformat() if sm.timestamp else None,
+            })
+
         return {"entries": entries, "total": total, "limit": limit, "offset": offset}
