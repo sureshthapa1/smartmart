@@ -63,6 +63,18 @@ def run_low_stock_bot() -> dict:
     if created:
         db.session.commit()
     logger.info("low_stock_bot: %d notifications created", created)
+
+    # SMS admin if provider configured
+    try:
+        from ..models.shop_settings import ShopSettings
+        from .notification_service import notify_low_stock
+        admin_phone = ShopSettings.get().phone
+        if admin_phone and created > 0:
+            for p in products[:3]:  # cap at 3 SMS to avoid spam
+                notify_low_stock(p.name, p.quantity, admin_phone)
+    except Exception as e:
+        logger.warning("low_stock_bot SMS failed: %s", e)
+
     return {"task": "low_stock_bot", "notifications_created": created, "products_affected": len(products)}
 
 
@@ -114,6 +126,21 @@ def run_credit_bot() -> dict:
     if created:
         db.session.commit()
     logger.info("credit_bot: %d overdue reminders created", created)
+
+    # SMS customers with phone numbers if provider configured
+    try:
+        from .notification_service import notify_credit_overdue
+        for sale in overdue[:10]:  # cap at 10 SMS per run
+            if sale.customer_phone:
+                notify_credit_overdue(
+                    customer_name=sale.customer_name or "Customer",
+                    phone=sale.customer_phone,
+                    amount=float(sale.total_amount),
+                    sale_id=sale.id,
+                )
+    except Exception as e:
+        logger.warning("credit_bot SMS failed: %s", e)
+
     return {"task": "credit_bot", "overdue_count": len(overdue), "notifications_created": created}
 
 
@@ -220,7 +247,50 @@ def run_expense_bot() -> dict:
     return {"task": "expense_bot", "bills_checked": len(items), "notifications_created": created}
 
 
-# ── 5. Daily Summary Bot ──────────────────────────────────────────────────────
+# ── 5. Expiry Bot ────────────────────────────────────────────────────────────
+
+def run_expiry_bot() -> dict:
+    """Create notifications for products expiring within their warning window."""
+    from ..models.operations import AppNotification
+    from .alert_engine import get_expiry_alerts
+
+    expiring = get_expiry_alerts()
+    created = 0
+    for p in expiring:
+        days_left = (p.expiry_date - date.today()).days
+        msg = (
+            f"EXPIRED: {p.name} (SKU: {p.sku}) — expired {abs(days_left)} day(s) ago"
+            if days_left < 0 else
+            f"Expiring {'today' if days_left == 0 else f'in {days_left} day(s)'}: "
+            f"{p.name} (SKU: {p.sku}) — {p.quantity} {p.unit or 'pcs'} in stock"
+        )
+        existing = db.session.execute(
+            db.select(AppNotification).where(
+                AppNotification.entity_type == "Product",
+                AppNotification.entity_id == p.id,
+                AppNotification.notification_type.in_(["expiry_warning", "expired"]),
+                AppNotification.created_at >= datetime.now(timezone.utc).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ),
+            )
+        ).scalars().first()
+        if existing:
+            continue
+        db.session.add(AppNotification(
+            notification_type="expired" if days_left < 0 else "expiry_warning",
+            message=msg,
+            entity_type="Product",
+            entity_id=p.id,
+        ))
+        created += 1
+
+    if created:
+        db.session.commit()
+    logger.info("expiry_bot: %d expiry notifications created", created)
+    return {"task": "expiry_bot", "products_checked": len(expiring), "notifications_created": created}
+
+
+# ── 6. Daily Summary Bot ──────────────────────────────────────────────────────
 
 def run_daily_summary_bot() -> dict:
     """Generate and store today's NLG daily summary as a notification."""
@@ -255,6 +325,7 @@ def run_all_bots(user_id: int = 1) -> dict:
     for name, fn in [
         ("low_stock_bot", run_low_stock_bot),
         ("credit_bot", run_credit_bot),
+        ("expiry_bot", run_expiry_bot),
         ("expense_bot", run_expense_bot),
         ("daily_summary_bot", run_daily_summary_bot),
     ]:

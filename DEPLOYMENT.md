@@ -111,6 +111,36 @@ For most small retail shops, **Starter is sufficient for years**.
 
 ---
 
+## 7b. Daily Bot (Automated Alerts)
+
+The daily bot runs 5 tasks automatically:
+- Low stock alerts (+ SMS to admin if Sparrow/Twilio configured)
+- Overdue credit reminders (+ SMS to customers with phone numbers)
+- Expiry date warnings
+- Recurring expense reminders
+- Daily business summary
+
+**Setup on Render:**
+1. The `render.yaml` includes a `cron` service (`smart-mart-daily-bot`)
+2. After deploying, go to the cron service → **Environment** tab and set:
+   - `APP_URL` = your web service URL (e.g. `https://smart-mart.onrender.com`)
+   - `BOT_SECRET` = same value as the `BOT_SECRET` on your web service
+3. The bot runs daily at **8:00 AM Nepal time** (2:15 AM UTC)
+
+**To trigger manually:**
+```bash
+curl -X POST https://your-app.onrender.com/api/bot/run \
+     -H "X-Bot-Secret: YOUR_BOT_SECRET"
+```
+
+**To enable SMS (optional):**
+Add to your web service environment:
+- `NOTIFICATION_PROVIDER` = `sparrow` (Nepal) or `twilio`
+- For Sparrow: `SPARROW_TOKEN` = your token from sparrowsms.com
+- For Twilio: `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_FROM`
+
+---
+
 ## 8. Monitoring
 
 - **Logs**: Render dashboard → your service → **Logs** tab

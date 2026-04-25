@@ -223,6 +223,20 @@ def update_status(order_id):
 
     db.session.commit()
     flash(f"Order status updated to {new_status}.", "success")
+
+    # SMS customer if phone available and provider configured
+    try:
+        if order.customer_phone and new_status in ("confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"):
+            from ...services.notification_service import notify_order_status
+            notify_order_status(
+                customer_name=order.customer_name or "Customer",
+                phone=order.customer_phone,
+                order_number=order.order_number,
+                status=new_status,
+            )
+    except Exception:
+        pass  # SMS failure must never block the status update
+
     return redirect(url_for("online_orders.order_detail", order_id=order_id))
 
 
