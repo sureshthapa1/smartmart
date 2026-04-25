@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Break-even Analysis — BI{% endblock %}
+{% block page_title %}Break-even Analysis{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Break-even Analysis</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Break-even Analysis</div>
+    <div class="page-header-sub">Minimum price each product must sell at to cover all costs</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3 d-flex gap-2 flex-wrap align-items-end">
+    <div><label class="form-label small fw-semibold mb-1">From</label>
+      <input type="date" id="start" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">To</label>
+      <input type="date" id="end" class="form-control form-control-sm"></div>
+    <button class="btn btn-primary btn-sm align-self-end" onclick="load()">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4" id="kpis"></div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Price vs Break-even (Top 15 Products)</div>
+  <div class="card-body"><canvas id="chart" height="100"></canvas></div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    Break-even Detail
+    <div class="ms-auto d-flex gap-1">
+      <button class="btn btn-sm btn-outline-secondary" onclick="filterBE('')">All</button>
+      <button class="btn btn-sm btn-success" onclick="filterBE('above')">Above Break-even</button>
+      <button class="btn btn-sm btn-danger" onclick="filterBE('below')">Below Break-even</button>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead><tr>
+        <th>Product</th><th>SKU</th>
+        <th class="text-end">Cost Price</th>
+        <th class="text-end">Selling Price</th>
+        <th class="text-end">Break-even Price</th>
+        <th class="text-end">Gap</th>
+        <th>Status</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let _all=[], _chart;
+function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderTable(data){
+  document.getElementById('tbody').innerHTML=data.map(p=>{
+    const gap=Number(p.current_vs_breakeven||0);
+    return `<tr>
+      <td class="fw-medium small">${p.product_name}</td>
+      <td class="text-muted small">${p.sku||'—'}</td>
+      <td class="text-end small">${money(p.cost)}</td>
+      <td class="text-end small">${money(p.selling_price)}</td>
+      <td class="text-end small">${money(p.break_even_price)}</td>
+      <td class="text-end small fw-bold ${gap>=0?'text-success':'text-danger'}">${gap>=0?'+':''}${money(gap)}</td>
+      <td><span class="badge ${p.is_above_breakeven?'bg-success':'bg-danger'}">${p.is_above_breakeven?'✓ Above':'✗ Below'}</span></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="7" class="text-center text-muted py-4">No data.</td></tr>';
+}
+
+function filterBE(f){
+  if(!f)renderTable(_all);
+  else if(f==='above')renderTable(_all.filter(p=>p.is_above_breakeven));
+  else renderTable(_all.filter(p=>!p.is_above_breakeven));
+}
+
+async function load(){
+  const s=document.getElementById('start').value, e=document.getElementById('end').value;
+  const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
+  const res=await fetch('/api/bi/reports/break-even?'+p); const d=await res.json();
+  _all=d.break_even||[]; const o=d.overall||{};
+
+  const above=_all.filter(p=>p.is_above_breakeven).length;
+  const below=_all.length-above;
+  document.getElementById('kpis').innerHTML=`
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-primary">${_all.length}</div>
+      <div class="text-muted small">Products Analysed</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-success">${above}</div>
+      <div class="text-muted small">Above Break-even</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-danger">${below}</div>
+      <div class="text-muted small">Below Break-even</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold ${(o.net_profit||0)>=0?'text-success':'text-danger'}">${money(o.net_profit||0)}</div>
+      <div class="text-muted small">Net Profit (period)</div></div></div></div>`;
+
+  const top=_all.slice(0,15);
+  if(_chart)_chart.destroy();
+  _chart=new Chart(document.getElementById('chart'),{type:'bar',
+    data:{labels:top.map(p=>p.product_name.substring(0,14)),
+      datasets:[
+        {label:'Selling Price',data:top.map(p=>p.selling_price),backgroundColor:'#6366f1',borderRadius:3},
+        {label:'Break-even Price',data:top.map(p=>p.break_even_price),backgroundColor:'#ef4444',borderRadius:3},
+      ]},
+    options:{responsive:true,plugins:{legend:{position:'top'}},
+      scales:{y:{ticks:{callback:v=>'NPR '+Number(v).toLocaleString()}}}}});
+
+  renderTable(_all);
+}
+load();
+</script>
+{% endblock %}

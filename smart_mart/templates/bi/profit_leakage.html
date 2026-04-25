@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Profit Leakage — BI{% endblock %}
+{% block page_title %}Profit Leakage{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Profit Leakage</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Profit Leakage</div>
+    <div class="page-header-sub">Low margins, discount losses, shrinkage and fraud signals</div>
+  </div>
+</div>
+<div id="loading" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Analysing…</div>
+<div id="content" style="display:none">
+
+<div class="row g-3 mb-4" id="kpis"></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-danger"><i class="bi bi-graph-down me-2"></i>Low Margin Products</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Margin %</th><th class="text-end">Revenue Lost</th><th>Fix</th></tr></thead>
+          <tbody id="lowMarginBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-warning"><i class="bi bi-percent me-2"></i>Discount Losses by Staff</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Staff</th><th class="text-end">Discounts Given</th><th class="text-end">Total Lost</th><th class="text-end">% of Sales</th></tr></thead>
+          <tbody id="discountBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold text-danger"><i class="bi bi-shield-exclamation me-2"></i>Fraud / Abuse Signals</div>
+      <div id="fraudBody" class="card-body"></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-box-seam me-2"></i>Inventory Shrinkage</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Adj. Out</th><th class="text-end">Shrinkage Value</th></tr></thead>
+          <tbody id="shrinkBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+async function load(){
+  const res=await fetch('/ai/api/profit-leak/dashboard'); const d=await res.json();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('content').style.display='';
+
+  const lm=d.low_margin||{}, disc=d.discount_losses||{}, fraud=d.fraud_signals||{}, shrink=d.shrinkage||{};
+
+  document.getElementById('kpis').innerHTML=`
+    <div class="col-sm-6 col-lg-3"><div class="card text-center border-danger"><div class="card-body">
+      <div class="fs-4 fw-bold text-danger">${lm.total_products_affected||0}</div>
+      <div class="text-muted small">Low Margin Products</div>
+      <div class="text-danger small">${money(lm.total_estimated_revenue_lost||0)} lost</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center border-warning"><div class="card-body">
+      <div class="fs-4 fw-bold text-warning">${money(disc.total_discount_given||0)}</div>
+      <div class="text-muted small">Discount Losses (30d)</div>
+      <div class="text-muted small">${disc.discount_transactions||0} transactions</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-secondary">${money(shrink.total_shrinkage_value||0)}</div>
+      <div class="text-muted small">Inventory Shrinkage</div>
+      <div class="text-muted small">${shrink.total_products_affected||0} products</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center ${(fraud.overall_risk_score||0)>30?'border-danger':''}" ><div class="card-body">
+      <div class="fs-4 fw-bold ${(fraud.overall_risk_score||0)>30?'text-danger':'text-success'}">${fraud.overall_risk_score||0}/100</div>
+      <div class="text-muted small">Fraud Risk Score</div></div></div></div>`;
+
+  document.getElementById('lowMarginBody').innerHTML=(lm.low_margin_products||[]).slice(0,8).map(p=>`<tr>
+    <td class="small fw-medium">${p.name}</td>
+    <td class="text-end small"><span class="badge ${p.margin_pct<0?'bg-danger':p.margin_pct<10?'bg-warning text-dark':'bg-secondary'}">${Number(p.margin_pct).toFixed(1)}%</span></td>
+    <td class="text-end small text-danger">${money(p.estimated_revenue_lost)}</td>
+    <td class="small text-muted" style="font-size:.7rem">${p.recommendation||''}</td>
+  </tr>`).join('')||'<tr><td colspan="4" class="text-center text-muted py-3">No low-margin products.</td></tr>';
+
+  document.getElementById('discountBody').innerHTML=(disc.by_staff||[]).map(s=>`<tr>
+    <td class="small fw-medium">${s.username}</td>
+    <td class="text-end small">${s.count}</td>
+    <td class="text-end small text-warning fw-bold">${money(s.total_discount)}</td>
+    <td class="text-end small">${Number(disc.discount_as_pct_of_revenue||0).toFixed(1)}%</td>
+  </tr>`).join('')||'<tr><td colspan="4" class="text-center text-muted py-3">No discount data.</td></tr>';
+
+  const fraudItems=[
+    ...(fraud.suspicious_discount_patterns||[]).map(f=>({...f,type:'Discount Abuse'})),
+    ...(fraud.suspicious_return_patterns||[]).map(f=>({...f,type:'Return Abuse'})),
+    ...(fraud.suspicious_stock_adjustments||[]).map(f=>({...f,type:'Stock Adjustment'})),
+  ];
+  document.getElementById('fraudBody').innerHTML=fraudItems.length?fraudItems.map(f=>`
+    <div class="d-flex align-items-start gap-2 mb-2 p-2 rounded border border-${f.risk_level==='high'?'danger':'warning'} bg-${f.risk_level==='high'?'danger':'warning'} bg-opacity-10">
+      <span class="badge bg-${f.risk_level==='high'?'danger':'warning'} text-nowrap">${f.risk_level}</span>
+      <div class="small"><div class="fw-semibold">${f.username} — ${f.type}</div>
+      <div class="text-muted">${f.discount_count||f.return_count||f.adjustment_events||0} events · ${money(f.total_discount||f.refund_total||0)}</div></div>
+    </div>`).join(''):'<div class="text-success small"><i class="bi bi-check-circle me-1"></i>No fraud signals detected.</div>';
+
+  document.getElementById('shrinkBody').innerHTML=(shrink.shrinkage_items||[]).slice(0,8).map(s=>`<tr>
+    <td class="small fw-medium">${s.name}</td>
+    <td class="text-end small">${s.manual_adjustments_out}</td>
+    <td class="text-end small text-danger fw-bold">${money(s.shrinkage_value)}</td>
+  </tr>`).join('')||'<tr><td colspan="3" class="text-center text-muted py-3">No shrinkage detected.</td></tr>';
+}
+load();
+</script>
+{% endblock %}

@@ -665,6 +665,41 @@ def bi_ledger_page():
     return render_template("bi/ledger.html")
 
 
+@bi_dashboard_bp.route("/contribution", methods=["GET"])
+@login_required
+def bi_contribution_page():
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/contribution.html")
+
+
+@bi_dashboard_bp.route("/inventory-efficiency", methods=["GET"])
+@login_required
+def bi_inventory_efficiency_page():
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/inventory_efficiency.html")
+
+
+@bi_dashboard_bp.route("/break-even", methods=["GET"])
+@login_required
+def bi_break_even_page():
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/break_even.html")
+
+
+@bi_dashboard_bp.route("/profit-leakage", methods=["GET"])
+@login_required
+def bi_profit_leakage_page():
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/profit_leakage.html")
+
+
+@bi_dashboard_bp.route("/roi", methods=["GET"])
+@login_required
+def bi_roi_page():
+    _require_bi_perm("can_view_reports")
+    return render_template("bi/roi.html")
+
+
 # ── Apply price endpoint ──────────────────────────────────────────────────────
 @bi_bp.route("/products/<int:product_id>/apply-price", methods=["POST"])
 @login_required

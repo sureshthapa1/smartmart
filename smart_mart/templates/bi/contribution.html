@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Product Contribution — BI{% endblock %}
+{% block page_title %}Product Contribution{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Product Contribution</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Product Contribution Margin</div>
+    <div class="page-header-sub">How much each product contributes to covering fixed costs and profit</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3 d-flex gap-2 flex-wrap align-items-end">
+    <div><label class="form-label small fw-semibold mb-1">From</label>
+      <input type="date" id="start" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">To</label>
+      <input type="date" id="end" class="form-control form-control-sm"></div>
+    <button class="btn btn-primary btn-sm align-self-end" onclick="load()">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4" id="kpis"></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Top Products by Total Contribution</div>
+      <div class="card-body"><canvas id="chart" height="260"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Contribution Margin Ratio %</div>
+      <div class="card-body"><canvas id="cmChart" height="260"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold">Product Contribution Detail</div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead><tr>
+        <th>Product</th><th>SKU</th>
+        <th class="text-end">Sell Price</th>
+        <th class="text-end">Variable Cost</th>
+        <th class="text-end">Contribution/Unit</th>
+        <th class="text-end">CM Ratio %</th>
+        <th class="text-end">Qty Sold</th>
+        <th class="text-end">Total Contribution</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="8" class="text-center text-muted py-4">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let _chart, _cmChart;
+function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+async function load(){
+  const s=document.getElementById('start').value, e=document.getElementById('end').value;
+  const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
+  const res=await fetch('/api/bi/reports/contribution-margin?'+p); const d=await res.json();
+  const o=d.overall, prods=d.products||[];
+
+  document.getElementById('kpis').innerHTML=`
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-primary">${money(o.total_revenue)}</div>
+      <div class="text-muted small">Total Revenue</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-warning">${money(o.total_variable_cost)}</div>
+      <div class="text-muted small">Total Variable Cost</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-success">${money(o.total_contribution)}</div>
+      <div class="text-muted small">Total Contribution</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-info">${Number(o.contribution_margin_ratio_pct||0).toFixed(1)}%</div>
+      <div class="text-muted small">Overall CM Ratio</div></div></div></div>`;
+
+  const top=prods.slice(0,10);
+  if(_chart)_chart.destroy();
+  _chart=new Chart(document.getElementById('chart'),{type:'bar',
+    data:{labels:top.map(p=>p.product_name.substring(0,18)),
+      datasets:[{label:'Total Contribution',data:top.map(p=>p.total_contribution),
+        backgroundColor:'#6366f1',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>'NPR '+Number(v).toLocaleString()}}}}});
+
+  if(_cmChart)_cmChart.destroy();
+  const sorted=[...prods].sort((a,b)=>b.contribution_margin_ratio_pct-a.contribution_margin_ratio_pct).slice(0,10);
+  _cmChart=new Chart(document.getElementById('cmChart'),{type:'bar',
+    data:{labels:sorted.map(p=>p.product_name.substring(0,15)),
+      datasets:[{label:'CM Ratio %',data:sorted.map(p=>p.contribution_margin_ratio_pct),
+        backgroundColor:sorted.map(p=>p.contribution_margin_ratio_pct>=20?'#22c55e':p.contribution_margin_ratio_pct>=10?'#f59e0b':'#ef4444'),
+        borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+
+  document.getElementById('tbody').innerHTML=prods.map(p=>`<tr>
+    <td class="fw-medium small">${p.product_name}</td>
+    <td class="text-muted small">${p.sku||'—'}</td>
+    <td class="text-end small">${money(p.selling_price)}</td>
+    <td class="text-end small">${money(p.variable_cost_per_unit)}</td>
+    <td class="text-end small fw-semibold ${p.contribution_per_unit>=0?'text-success':'text-danger'}">${money(p.contribution_per_unit)}</td>
+    <td class="text-end small"><span class="badge ${p.contribution_margin_ratio_pct>=20?'bg-success':p.contribution_margin_ratio_pct>=10?'bg-warning text-dark':'bg-danger'}">${Number(p.contribution_margin_ratio_pct).toFixed(1)}%</span></td>
+    <td class="text-end small">${p.qty_sold}</td>
+    <td class="text-end small fw-bold ${p.total_contribution>=0?'text-success':'text-danger'}">${money(p.total_contribution)}</td>
+  </tr>`).join('')||'<tr><td colspan="8" class="text-center text-muted py-4">No data for selected period.</td></tr>';
+}
+load();
+</script>
+{% endblock %}

@@ -740,6 +740,36 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_contribution_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_contribution_page') }}">
+                <i class="bi bi-pie-chart"></i>Product Contribution
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_inventory_efficiency_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_inventory_efficiency_page') }}">
+                <i class="bi bi-arrow-repeat"></i>Inventory Efficiency
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_break_even_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_break_even_page') }}">
+                <i class="bi bi-intersect"></i>Break-even Analysis
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_profit_leakage_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_profit_leakage_page') }}">
+                <i class="bi bi-droplet-half"></i>Profit Leakage
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_roi_page' %}active{% endif %}"
+                 href="{{ url_for('bi_dashboard.bi_roi_page') }}">
+                <i class="bi bi-graph-up-arrow"></i>ROI Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_opex_page' %}active{% endif %}"
                  href="{{ url_for('bi_dashboard.bi_opex_page') }}">
                 <i class="bi bi-cash-stack"></i>Business Expenses (BI)

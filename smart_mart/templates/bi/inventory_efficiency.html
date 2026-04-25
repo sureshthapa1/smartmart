@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Inventory Efficiency — BI{% endblock %}
+{% block page_title %}Inventory Efficiency{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="text-decoration-none">BI</a></li>
+<li class="breadcrumb-item active">Inventory Efficiency</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Inventory Efficiency</div>
+    <div class="page-header-sub">Stock turnover ratio — how fast inventory converts to sales</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-3 d-flex gap-2 flex-wrap align-items-end">
+    <div><label class="form-label small fw-semibold mb-1">From</label>
+      <input type="date" id="start" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">To</label>
+      <input type="date" id="end" class="form-control form-control-sm"></div>
+    <button class="btn btn-primary btn-sm align-self-end" onclick="load()">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4" id="kpis"></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Movement Distribution</div>
+      <div class="card-body"><canvas id="pieChart" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Top 10 by Turnover Ratio</div>
+      <div class="card-body"><canvas id="barChart" height="220"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2">
+    Stock Turnover by Product
+    <div class="ms-auto d-flex gap-1">
+      <button class="btn btn-sm btn-outline-secondary" onclick="filterMovement('')">All</button>
+      <button class="btn btn-sm btn-success" onclick="filterMovement('fast')">Fast</button>
+      <button class="btn btn-sm btn-warning text-dark" onclick="filterMovement('normal')">Normal</button>
+      <button class="btn btn-sm btn-danger" onclick="filterMovement('slow')">Slow</button>
+      <button class="btn btn-sm btn-secondary" onclick="filterMovement('dead')">Dead</button>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0 align-middle">
+      <thead><tr>
+        <th>Product</th><th>Category</th>
+        <th class="text-end">COGS</th>
+        <th class="text-end">Inventory Value</th>
+        <th class="text-end">Qty Sold</th>
+        <th class="text-end">Turnover Ratio</th>
+        <th>Movement</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let _all=[], _pie, _bar;
+const COLORS={fast:'#22c55e',normal:'#6366f1',slow:'#f59e0b',dead:'#ef4444',no_inventory:'#94a3b8'};
+function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderTable(data){
+  document.getElementById('tbody').innerHTML=data.map(p=>`<tr>
+    <td class="fw-medium small">${p.product_name}<br><span class="text-muted" style="font-size:.7rem">${p.sku||''}</span></td>
+    <td class="text-muted small">${p.category||'—'}</td>
+    <td class="text-end small">${money(p.cogs)}</td>
+    <td class="text-end small">${money(p.inventory_value)}</td>
+    <td class="text-end small">${p.qty_sold}</td>
+    <td class="text-end small fw-bold">${p.turnover_ratio!=null?Number(p.turnover_ratio).toFixed(2):'—'}</td>
+    <td><span class="badge" style="background:${COLORS[p.movement]||'#94a3b8'}">${(p.movement||'').replace('_',' ')}</span></td>
+  </tr>`).join('')||'<tr><td colspan="7" class="text-center text-muted py-4">No data.</td></tr>';
+}
+
+function filterMovement(m){
+  renderTable(m?_all.filter(p=>p.movement===m):_all);
+}
+
+async function load(){
+  const s=document.getElementById('start').value, e=document.getElementById('end').value;
+  const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
+  const res=await fetch('/api/bi/reports/stock-turnover?'+p); const d=await res.json();
+  _all=d.products||[];
+
+  document.getElementById('kpis').innerHTML=`
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-primary">${d.overall_turnover_ratio!=null?Number(d.overall_turnover_ratio).toFixed(2):'—'}</div>
+      <div class="text-muted small">Overall Turnover Ratio</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-warning">${money(d.total_cogs)}</div>
+      <div class="text-muted small">Total COGS</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-info">${money(d.total_inventory_value)}</div>
+      <div class="text-muted small">Total Inventory Value</div></div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card text-center"><div class="card-body">
+      <div class="fs-4 fw-bold text-success">${_all.filter(p=>p.movement==='fast').length}</div>
+      <div class="text-muted small">Fast-Moving Products</div></div></div></div>`;
+
+  const counts={fast:0,normal:0,slow:0,dead:0,no_inventory:0};
+  _all.forEach(p=>counts[p.movement]=(counts[p.movement]||0)+1);
+  if(_pie)_pie.destroy();
+  _pie=new Chart(document.getElementById('pieChart'),{type:'doughnut',
+    data:{labels:Object.keys(counts).map(k=>k.replace('_',' ')),
+      datasets:[{data:Object.values(counts),backgroundColor:Object.keys(counts).map(k=>COLORS[k]||'#94a3b8'),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,cutout:'60%',plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}}}});
+
+  const top=_all.filter(p=>p.turnover_ratio!=null).slice(0,10);
+  if(_bar)_bar.destroy();
+  _bar=new Chart(document.getElementById('barChart'),{type:'bar',
+    data:{labels:top.map(p=>p.product_name.substring(0,15)),
+      datasets:[{label:'Turnover Ratio',data:top.map(p=>p.turnover_ratio),
+        backgroundColor:top.map(p=>COLORS[p.movement]||'#94a3b8'),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+  renderTable(_all);
+}
+load();
+</script>
+{% endblock %}
