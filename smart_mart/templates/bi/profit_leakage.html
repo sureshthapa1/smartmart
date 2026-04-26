@@ -71,7 +71,10 @@
 function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
 async function load(){
-  const res=await fetch('/ai/api/profit-leak/dashboard'); const d=await res.json();
+  try {
+    const res=await fetch('/ai/api/profit-leak/dashboard');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
   document.getElementById('loading').style.display='none';
   document.getElementById('content').style.display='';
 
@@ -125,6 +128,12 @@ async function load(){
     <td class="text-end small">${s.manual_adjustments_out}</td>
     <td class="text-end small text-danger fw-bold">${money(s.shrinkage_value)}</td>
   </tr>`).join('')||'<tr><td colspan="3" class="text-center text-muted py-3">No shrinkage detected.</td></tr>';
+  } catch(err) {
+    document.getElementById('loading').style.display='none';
+    document.getElementById('content').style.display='none';
+    document.getElementById('kpis').innerHTML = `<div class="col-12"><div class="alert alert-danger">Error loading data: ${err.message}</div></div>`;
+    document.getElementById('content').style.display='';
+  }
 }
 load();
 </script>

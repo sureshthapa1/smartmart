@@ -71,7 +71,10 @@ function money(v){return 'NPR '+Number(v||0).toLocaleString('en-IN',{minimumFrac
 async function load(){
   const s=document.getElementById('start').value, e=document.getElementById('end').value;
   const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
-  const res=await fetch('/api/bi/reports/contribution-margin?'+p); const d=await res.json();
+  try {
+    const res=await fetch('/api/bi/reports/contribution-margin?'+p);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
   const o=d.overall, prods=d.products||[];
 
   document.getElementById('kpis').innerHTML=`
@@ -117,6 +120,9 @@ async function load(){
     <td class="text-end small">${p.qty_sold}</td>
     <td class="text-end small fw-bold ${p.total_contribution>=0?'text-success':'text-danger'}">${money(p.total_contribution)}</td>
   </tr>`).join('')||'<tr><td colspan="8" class="text-center text-muted py-4">No data for selected period.</td></tr>';
+  } catch(err) {
+    document.getElementById('kpis').innerHTML = `<div class="col-12"><div class="alert alert-danger">Error loading data: ${err.message}</div></div>`;
+  }
 }
 load();
 </script>

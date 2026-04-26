@@ -88,7 +88,10 @@ function filterBE(f){
 async function load(){
   const s=document.getElementById('start').value, e=document.getElementById('end').value;
   const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
-  const res=await fetch('/api/bi/reports/break-even?'+p); const d=await res.json();
+  try {
+    const res=await fetch('/api/bi/reports/break-even?'+p);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
   _all=d.break_even||[]; const o=d.overall||{};
 
   const above=_all.filter(p=>p.is_above_breakeven).length;
@@ -119,6 +122,9 @@ async function load(){
       scales:{y:{ticks:{callback:v=>'NPR '+Number(v).toLocaleString()}}}}});
 
   renderTable(_all);
+  } catch(err) {
+    document.getElementById('kpis').innerHTML = `<div class="col-12"><div class="alert alert-danger">Error loading data: ${err.message}</div></div>`;
+  }
 }
 load();
 </script>

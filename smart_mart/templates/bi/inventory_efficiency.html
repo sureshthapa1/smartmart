@@ -96,7 +96,10 @@ function filterMovement(m){
 async function load(){
   const s=document.getElementById('start').value, e=document.getElementById('end').value;
   const p=new URLSearchParams(); if(s)p.set('start',s); if(e)p.set('end',e);
-  const res=await fetch('/api/bi/reports/stock-turnover?'+p); const d=await res.json();
+  try {
+    const res=await fetch('/api/bi/reports/stock-turnover?'+p);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
   _all=d.products||[];
 
   document.getElementById('kpis').innerHTML=`
@@ -130,6 +133,9 @@ async function load(){
     options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 
   renderTable(_all);
+  } catch(err) {
+    document.getElementById('kpis').innerHTML = `<div class="col-12"><div class="alert alert-danger">Error loading data: ${err.message}</div></div>`;
+  }
 }
 load();
 </script>
