@@ -820,42 +820,76 @@
   const suggestions = document.getElementById('customerSuggestions');
   let searchTimer, activeCustomerId = null;
 
-  customerName.addEventListener('input', function() {
+  // ── Customer name autocomplete ────────────────────────────────────────
+  // Triggers on every keystroke (≥1 char), searches by name AND phone.
+  // Also searches by phone field input so cashiers can type a number.
+  function triggerCustomerSearch(q) {
     clearTimeout(searchTimer);
-    const q = this.value.trim();
+    q = (q || '').trim();
     if (q.length < 1) { suggestions.style.display = 'none'; return; }
     searchTimer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/customer-search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) { suggestions.style.display = 'none'; return; }
         const data = await res.json();
         if (!data.length) { suggestions.style.display = 'none'; return; }
-        suggestions.innerHTML = data.map(c => `
-          <div class="px-3 py-2 customer-suggestion" style="cursor:pointer;font-size:.875rem;border-bottom:1px solid #f1f5f9;"
-               data-id="${c.id}" data-name="${c.name}" data-phone="${c.phone}" data-address="${c.address}">
-            <div class="fw-medium">${c.name}</div>
-            <div class="text-muted small">${c.phone || ''} ${c.address ? '· ' + c.address : ''} · ${c.visits} visit${c.visits !== 1 ? 's' : ''}</div>
-          </div>`).join('');
-        suggestions.style.display = 'block';
-        suggestions.querySelectorAll('.customer-suggestion').forEach(el => {
-          el.addEventListener('mouseenter', () => el.style.background = '#f8fafc');
-          el.addEventListener('mouseleave', () => el.style.background = '');
-          el.addEventListener('click', () => {
-            customerName.value = el.dataset.name;
-            customerPhone.value = el.dataset.phone;
-            customerAddress.value = el.dataset.address;
+        suggestions.innerHTML = '';
+        data.forEach(c => {
+          const div = document.createElement('div');
+          div.className = 'px-3 py-2 customer-suggestion';
+          div.style.cssText = 'cursor:pointer;font-size:.875rem;border-bottom:1px solid #f1f5f9;';
+          div.dataset.id = c.id;
+          div.dataset.name = c.name;
+          div.dataset.phone = c.phone || '';
+          div.dataset.address = c.address || '';
+          const nameEl = document.createElement('div');
+          nameEl.className = 'fw-medium';
+          nameEl.textContent = c.name;
+          const subEl = document.createElement('div');
+          subEl.className = 'text-muted small';
+          subEl.textContent = [c.phone, c.address ? '· ' + c.address : '', `· ${c.visits} visit${c.visits !== 1 ? 's' : ''}`].filter(Boolean).join(' ');
+          div.appendChild(nameEl);
+          div.appendChild(subEl);
+          div.addEventListener('mouseenter', () => div.style.background = '#f8fafc');
+          div.addEventListener('mouseleave', () => div.style.background = '');
+          div.addEventListener('click', () => {
+            customerName.value = c.name;
+            customerPhone.value = c.phone || '';
+            customerAddress.value = c.address || '';
             suggestions.style.display = 'none';
-            loadCustomerIntelligence(parseInt(el.dataset.id));
-            // Load loyalty wallet when customer selected from autofill
-            loadWallet(el.dataset.name, el.dataset.phone);
+            onCustomerSelected(c.id, c.name, c.phone || '');
           });
+          suggestions.appendChild(div);
         });
-      } catch(e) {}
-    }, 250);
+        suggestions.style.display = 'block';
+      } catch(e) {
+        // Log to console so developers can see errors — don't silently swallow
+        console.warn('Customer search error:', e);
+        suggestions.style.display = 'none';
+      }
+    }, 200);
+  }
+
+  customerName.addEventListener('input', function() { triggerCustomerSearch(this.value); });
+  // Also search when phone is typed (cashier may know phone number)
+  customerPhone.addEventListener('input', function() {
+    const q = this.value.trim();
+    if (q.length >= 5) triggerCustomerSearch(q);
   });
 
   document.addEventListener('click', e => {
-    if (!customerName.contains(e.target)) suggestions.style.display = 'none';
+    if (!customerName.contains(e.target) && !suggestions.contains(e.target)) {
+      suggestions.style.display = 'none';
+    }
   });
+
+  // ── Called when a customer is selected (from dropdown or phone lookup) ──
+  function onCustomerSelected(customerId, name, phone) {
+    activeCustomerId = customerId;
+    loadCustomerIntelligence(customerId);
+    loadWallet(name, phone);
+    // Offer banner is loaded inside loadCustomerIntelligence via the hook
+  }
 
   async function loadCustomerIntelligence(customerId) {
     activeCustomerId = customerId;
@@ -864,6 +898,7 @@
         fetch(`/api/customers/${customerId}/intelligence`),
         fetch(`/api/customers/${customerId}/recommendations`),
       ]);
+      if (!intelRes.ok || !recRes.ok) throw new Error('API error');
       const intel = await intelRes.json();
       const recs = await recRes.json();
 
@@ -888,31 +923,79 @@
         churnAlert.style.display = 'none';
       }
 
-      // Offers
+      // Offers — show AI suggestions AND assigned customer offers
       const offersList = document.getElementById('aiOffersList');
-      // Reset any previously applied offer state
       const prevClear = document.getElementById('clearOfferBtn');
       if (prevClear) prevClear.style.display = 'none';
-      if (recs.offers && recs.offers.length) {
-        offersList.innerHTML = recs.offers.slice(0, 3).map(o => `
-          <div class="d-flex align-items-center justify-content-between gap-2 mb-2 p-2 rounded-2"
-               style="background:#fff;border:1px solid #e2e8f0;">
-            <div>
-              <div class="small fw-medium">${o.offer}</div>
-              <div class="text-muted" style="font-size:.72rem;">${o.reason}</div>
-            </div>
-            <button type="button" class="btn btn-sm btn-outline-success flex-shrink-0 apply-offer-btn"
-                    data-offer="${o.offer}" data-type="${o.type}"
-                    style="font-size:.75rem;white-space:nowrap;">
-              Apply
-            </button>
-          </div>`).join('');
 
-        offersList.querySelectorAll('.apply-offer-btn').forEach(btn => {
-          btn.addEventListener('click', () => applyOffer(btn.dataset.offer, btn.dataset.type, btn));
+      // Build combined offer list: AI suggestions + assigned customer offers
+      let allDisplayOffers = [];
+
+      // 1. AI-generated suggestions (from loyalty_offers)
+      if (recs.offers && recs.offers.length) {
+        recs.offers.slice(0, 3).forEach(o => {
+          allDisplayOffers.push({
+            source: 'ai',
+            label: o.offer,
+            reason: o.reason,
+            type: o.type,
+          });
+        });
+      }
+
+      // 2. Assigned customer offers (from the offer system)
+      if (activeOffers && activeOffers.length) {
+        activeOffers.forEach(o => {
+          allDisplayOffers.push({
+            source: 'assigned',
+            label: o.title,
+            reason: o.type_label + (o.scope === 'product' && o.product_name ? ` · on ${o.product_name}` : '') + ` · expires ${o.expiry_date}`,
+            type: o.scope,
+            offerObj: o,
+          });
+        });
+      }
+
+      if (allDisplayOffers.length) {
+        offersList.innerHTML = '';
+        allDisplayOffers.forEach(o => {
+          const div = document.createElement('div');
+          div.className = 'd-flex align-items-center justify-content-between gap-2 mb-2 p-2 rounded-2';
+          div.style.cssText = 'background:#fff;border:1px solid #e2e8f0;';
+
+          const info = document.createElement('div');
+          const labelEl = document.createElement('div');
+          labelEl.className = 'small fw-medium';
+          labelEl.textContent = o.label;
+          const reasonEl = document.createElement('div');
+          reasonEl.className = 'text-muted';
+          reasonEl.style.fontSize = '.72rem';
+          reasonEl.textContent = o.reason;
+          info.appendChild(labelEl);
+          info.appendChild(reasonEl);
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn-sm btn-outline-success flex-shrink-0 apply-offer-btn';
+          btn.style.cssText = 'font-size:.75rem;white-space:nowrap;';
+          btn.textContent = 'Apply';
+
+          if (o.source === 'assigned') {
+            // Use the new stacking system directly
+            btn.addEventListener('click', () => applyCustomerOffer(o.offerObj));
+          } else {
+            // AI offer — use the AI apply path
+            btn.dataset.offer = o.label;
+            btn.dataset.type = o.type;
+            btn.addEventListener('click', () => applyOffer(o.label, o.type, btn));
+          }
+
+          div.appendChild(info);
+          div.appendChild(btn);
+          offersList.appendChild(div);
         });
       } else {
-        offersList.innerHTML = '<div class="text-muted small">No offers available.</div>';
+        offersList.innerHTML = '<div class="text-muted small">No offers available for this customer.</div>';
       }
 
       // Cross-sell
@@ -1257,24 +1340,26 @@
   // ── Load active offers when a customer is selected ───────────────────
   let _offerLoadTimer = null;
   async function loadCustomerOffers(customerId) {
-    clearTimeout(_offerLoadTimer);
     if (!customerId) { hideOfferBanner(); offerCustomerId = null; return; }
     offerCustomerId = customerId;
-    _offerLoadTimer = setTimeout(async () => {
-      try {
-        const cartTotal = getCartSubtotal();
-        const res = await fetch(`/offers/api/customer-offers?customer_id=${customerId}&cart_total=${cartTotal}`);
-        if (!res.ok) { hideOfferBanner(); return; }
-        const data = await res.json();
-        activeOffers = data.offers || [];
+    try {
+      const cartTotal = getCartSubtotal();
+      const res = await fetch(`/offers/api/customer-offers?customer_id=${customerId}&cart_total=${cartTotal}`);
+      if (!res.ok) { hideOfferBanner(); return; }
+      const data = await res.json();
+      activeOffers = data.offers || [];
+      if (activeOffers.length > 0) {
         renderOfferBanner();
-        const addBtn = document.getElementById('addOfferForNextVisitBtn');
-        if (addBtn) addBtn.style.display = '';
-        loadAvailableOffersForDropdown();
-      } catch(e) {
+      } else {
         hideOfferBanner();
       }
-    }, 300);
+      const addBtn = document.getElementById('addOfferForNextVisitBtn');
+      if (addBtn) addBtn.style.display = '';
+      _populateNextVisitDropdown();
+    } catch(e) {
+      console.warn('loadCustomerOffers error:', e);
+      hideOfferBanner();
+    }
   }
 
   // ── Render the offer banner with all available offers ────────────────
@@ -1507,10 +1592,14 @@
   });
 
   // ── Hook into customer autofill ───────────────────────────────────────
+  // loadCustomerOffers populates window.activeOffers, then calls
+  // loadCustomerIntelligence so the AI panel can include assigned offers.
   const _origLoadIntel = window.loadCustomerIntelligence;
   window.loadCustomerIntelligence = async function(customerId) {
+    // Load assigned offers first so AI panel can show them
+    await loadCustomerOffers(customerId);
+    // Then load AI intelligence (which now reads activeOffers)
     if (_origLoadIntel) await _origLoadIntel(customerId);
-    loadCustomerOffers(customerId);
   };
 
   // ── Patch recalcTotal to refresh offer eligibility on cart change ─────
@@ -1536,35 +1625,35 @@
     form.style.display = form.style.display === 'none' ? '' : 'none';
   });
 
-  async function loadAvailableOffersForDropdown() {
-    try {
-      const res = await fetch('/offers/');
-      // We can't parse HTML easily — use a dedicated API endpoint instead
-      // The dropdown is populated via the offers list page
-      // For now, fetch from the offers API
-      const r2 = await fetch('/offers/api/customer-offers?customer_id=0');
-      // This returns empty — we need a separate endpoint for all active offers
-      // Use the quick-create flow instead
-    } catch(e) {}
-  }
-
-  // Fetch active offers for the "next visit" dropdown
-  (async function() {
+  // ── Populate "next visit" offer dropdown ─────────────────────────────
+  // Called once when a customer is selected. Fetches all active offers
+  // from the API and fills the select element.
+  let _dropdownLoaded = false;
+  async function _populateNextVisitDropdown() {
+    if (_dropdownLoaded) return;  // only fetch once per page load
     try {
       const res = await fetch('/offers/api/all-active');
       if (!res.ok) return;
       const data = await res.json();
       const sel = document.getElementById('nextVisitOfferSelect');
-      if (sel && data.offers) {
+      if (sel && data.offers && data.offers.length) {
+        // Clear existing options except the placeholder
+        while (sel.options.length > 1) sel.remove(1);
         data.offers.forEach(o => {
           const opt = document.createElement('option');
           opt.value = o.id;
-          opt.textContent = `${o.title} (${o.offer_type})`;
+          opt.textContent = `${o.title} (${o.type_label || o.offer_type})`;
           sel.appendChild(opt);
         });
+        _dropdownLoaded = true;
       }
-    } catch(e) {}
-  })();
+    } catch(e) {
+      console.warn('_populateNextVisitDropdown error:', e);
+    }
+  }
+
+  // Pre-load dropdown on page load (so it's ready before customer is selected)
+  _populateNextVisitDropdown();
 
   // Assign existing offer to customer
   document.getElementById('assignExistingOfferBtn')?.addEventListener('click', async function() {
