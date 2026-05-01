@@ -483,12 +483,15 @@
 
       // Sum all offer discounts
       const totalOfferDiscount = window.offerDiscounts.reduce((s, d) => s + d.amount, 0);
-      // Total discount = manual + offers + loyalty
-      const totalDiscount = window.manualDiscount + totalOfferDiscount + window.loyaltyDiscount;
+      // Total visual discount = manual + offers + loyalty.
+      // The hidden form discount excludes loyalty because the backend
+      // recalculates wallet redemption from wallet_redeem_points.
+      const submittedDiscount = window.manualDiscount + totalOfferDiscount;
+      const totalDiscount = submittedDiscount + window.loyaltyDiscount;
 
       // Keep discountInput in sync (used by form submission)
       const discountInput = document.getElementById('discountInput');
-      if (discountInput) discountInput.value = totalDiscount.toFixed(2);
+      if (discountInput) discountInput.value = submittedDiscount.toFixed(2);
 
       const net = Math.max(0, subtotal - totalDiscount);
       document.getElementById('grandTotal').textContent = net.toFixed(2);

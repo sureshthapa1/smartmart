@@ -39,7 +39,8 @@ def create_sale(items: list[dict], user_id: int,
                 customer_phone: str = None, payment_mode: str = "cash",
                 discount_amount: float = 0, discount_note: str = None,
                 wallet_redeem_points: int = 0,
-                promotion_id: int = None) -> Sale:
+                promotion_id: int = None,
+                applied_customer_offer_ids: list[int] | None = None) -> Sale:
     """Create a confirmed sale with row-level locking to prevent overselling."""
     try:
         # ── Period lock guard ─────────────────────────────────────────────
@@ -161,6 +162,17 @@ def create_sale(items: list[dict], user_id: int,
         except Exception as e:
             logger.warning("Customer upsert failed: %s", e)
 
+        applied_offer_discount = _mark_customer_offers_used(
+            sale=sale,
+            items=items,
+            posted_discount=float(discount_amount or 0),
+            customer_offer_ids=applied_customer_offer_ids or [],
+        )
+        if applied_offer_discount > 0:
+            offer_note = f"Customer offer discount NPR {applied_offer_discount:.2f}"
+            sale.discount_note = f"{discount_note}; {offer_note}" if discount_note else offer_note
+            sale.discount_note = sale.discount_note[:120]
+
         if wallet is not None:
             loyalty_wallet_service.apply_sale_points(
                 wallet=wallet,
@@ -193,6 +205,81 @@ def create_sale(items: list[dict], user_id: int,
         pass
 
     return sale
+
+
+def _mark_customer_offers_used(
+    sale: Sale,
+    items: list[dict],
+    posted_discount: float,
+    customer_offer_ids: list[int],
+) -> float:
+    """Validate POS-submitted customer offers and mark them used in the sale transaction."""
+    clean_ids: list[int] = []
+    for raw_id in customer_offer_ids:
+        try:
+            customer_offer_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if customer_offer_id > 0 and customer_offer_id not in clean_ids:
+            clean_ids.append(customer_offer_id)
+
+    if not clean_ids:
+        return 0.0
+    if not sale.customer_id:
+        raise ValueError("Applied offers require a saved customer.")
+
+    from datetime import date
+    from ..models.offer import CustomerOffer
+
+    cart_total = sum(float(item["unit_price"]) * int(item["quantity"]) for item in items)
+    product_subtotals: dict[int, float] = {}
+    for item in items:
+        product_id = int(item["product_id"])
+        product_subtotals[product_id] = (
+            product_subtotals.get(product_id, 0.0)
+            + float(item["unit_price"]) * int(item["quantity"])
+        )
+
+    today = date.today()
+    total_offer_discount = 0.0
+    labels: list[str] = []
+
+    for customer_offer_id in clean_ids:
+        co = db.session.get(CustomerOffer, customer_offer_id)
+        if not co:
+            raise ValueError("Selected customer offer was not found.")
+        if co.customer_id != sale.customer_id:
+            raise ValueError("Selected offer does not belong to this customer.")
+        if co.status == CustomerOffer.STATUS_USED:
+            raise ValueError(f"Offer '{co.offer.title}' has already been used.")
+        if co.status == CustomerOffer.STATUS_EXPIRED or co.expiry_date < today:
+            co.status = CustomerOffer.STATUS_EXPIRED
+            raise ValueError(f"Offer '{co.offer.title}' has expired.")
+
+        offer = co.offer
+        if co.usage_count >= offer.usage_limit:
+            raise ValueError(f"Offer '{offer.title}' usage limit reached.")
+        if not offer.is_active:
+            raise ValueError(f"Offer '{offer.title}' is not active.")
+
+        product_subtotal = product_subtotals.get(offer.product_id, 0.0) if offer.product_id else 0.0
+        offer_discount = float(offer.calculate_discount(cart_total, product_subtotal))
+        if offer_discount <= 0:
+            raise ValueError(f"Offer '{offer.title}' is not applicable to this cart.")
+
+        total_offer_discount += offer_discount
+        labels.append(offer.title)
+        co.status = CustomerOffer.STATUS_USED
+        co.usage_count += 1
+        co.applied_sale_id = sale.id
+
+    if total_offer_discount > posted_discount + 0.01:
+        raise ValueError("Applied offer discount is larger than the submitted sale discount.")
+
+    if labels:
+        logger.info("Applied customer offers to sale #%d: %s", sale.id, ", ".join(labels))
+    return round(total_offer_discount, 2)
+
 
 def get_sale(sale_id: int) -> Sale:
     return db.get_or_404(Sale, sale_id)

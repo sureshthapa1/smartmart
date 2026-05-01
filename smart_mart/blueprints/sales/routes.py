@@ -101,6 +101,7 @@ def create_sale():
                 discount_amount=float(request.form.get("discount_amount", 0) or 0),
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
+                applied_customer_offer_ids=_parse_customer_offer_ids(request.form),
             )
             # Record the sale id against the idempotency key
             if idem_key:
@@ -111,35 +112,6 @@ def create_sale():
                 if record:
                     record.result_sale_id = sale.id
                     db.session.commit()
-
-            # ── Mark all applied customer offers as used ───────────────────
-            # The hidden field contains comma-separated customer_offer_ids
-            # (numeric IDs only — AI/promo offers use string keys and are skipped)
-            applied_co_ids_raw = request.form.get("applied_customer_offer_id", "").strip()
-            if applied_co_ids_raw:
-                from ...services.offer_service import apply_offer as _apply_offer
-                from ...models.customer import Customer as _Cust
-                # Resolve customer_id for ownership check
-                cust_id = None
-                if sale.customer_id:
-                    cust_id = sale.customer_id
-                for co_id_str in applied_co_ids_raw.split(","):
-                    co_id_str = co_id_str.strip()
-                    if not co_id_str.isdigit():
-                        continue  # skip AI/promo string keys
-                    try:
-                        _apply_offer(
-                            customer_offer_id=int(co_id_str),
-                            sale_id=sale.id,
-                            cart_total=float(sale.total_amount),
-                            customer_id=cust_id,
-                        )
-                    except Exception as _oe:
-                        import logging as _log
-                        _log.getLogger(__name__).warning(
-                            "Could not mark offer %s as used for sale %d: %s",
-                            co_id_str, sale.id, _oe
-                        )
 
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
@@ -374,3 +346,16 @@ def _parse_items(form) -> list[dict]:
             pass
         index += 1
     return items
+
+
+def _parse_customer_offer_ids(form) -> list[int]:
+    raw_value = form.get("applied_customer_offer_id", "") or ""
+    ids: list[int] = []
+    for part in raw_value.split(","):
+        try:
+            customer_offer_id = int(part.strip())
+        except (TypeError, ValueError):
+            continue
+        if customer_offer_id > 0 and customer_offer_id not in ids:
+            ids.append(customer_offer_id)
+    return ids

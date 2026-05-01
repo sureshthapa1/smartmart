@@ -43,6 +43,8 @@ In the web service → **Environment** tab, add these:
 | `DATABASE_URL` | *(paste Internal Database URL from step 1)* | Required — app won't start without it |
 | `ADMIN_PASSWORD` | *(your chosen password)* | Required — build fails without it |
 | `ADMIN_USERNAME` | `admin` | Optional, defaults to `admin` |
+| `BOT_SECRET` | *(generate a strong random value)* | Required for scheduled bot calls |
+| `APP_URL` | `https://your-app.onrender.com` | Required by the cron service |
 | `LOG_LEVEL` | `INFO` | |
 
 **Generate a SECRET_KEY:**
