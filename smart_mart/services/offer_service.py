@@ -51,6 +51,10 @@ def get_active_offers_for_customer(customer_id: int) -> list[dict]:
 
         result = []
         for co, offer in rows:
+            # Resolve product name for product_based offers
+            product_name = None
+            if offer.product_id and offer.product:
+                product_name = offer.product.name
             result.append({
                 "customer_offer_id": co.id,
                 "offer_id": offer.id,
@@ -61,10 +65,13 @@ def get_active_offers_for_customer(customer_id: int) -> list[dict]:
                 "discount_value": float(offer.discount_value),
                 "min_purchase_amount": float(offer.min_purchase_amount or 0),
                 "product_id": offer.product_id,
+                "product_name": product_name,  # used by billing UI for product-based calc
                 "expiry_date": co.expiry_date.isoformat(),
                 "days_until_expiry": co.days_until_expiry,
                 "usage_count": co.usage_count,
                 "usage_limit": offer.usage_limit,
+                # scope: 'product' for product_based, 'bill' for everything else
+                "scope": "product" if offer.offer_type == "product_based" else "bill",
             })
         return result
     except Exception as exc:
@@ -104,13 +111,21 @@ def apply_offer(
 ) -> dict:
     """Validate and apply a customer offer to a sale.
 
+    For product_based offers, pass product_subtotal = the line total of the
+    specific product in the cart. The discount is calculated only on that amount.
+
+    For bill-wide offers (percentage, fixed, conditional, combo), product_subtotal
+    is ignored and cart_total is used.
+
+    Multiple offers can be applied to the same sale — each CustomerOffer row
+    records its own applied_sale_id independently.
+
     Returns a dict with:
-      - discount_amount: float
+      - discount_amount: float  (the discount this specific offer gives)
+      - scope: 'product' | 'bill'
+      - product_id: int | None
       - message: str
     Raises ValueError on validation failure.
-
-    Pass customer_id to enforce ownership — prevents one customer using
-    another customer's offer.
     """
     co = db.session.get(CustomerOffer, customer_offer_id)
     if not co:
@@ -146,7 +161,9 @@ def apply_offer(
             f"(cart total: NPR {cart_total:,.2f})."
         )
 
-    # Calculate discount
+    # For product_based: discount is on product_subtotal only
+    # For all others: discount is on cart_total
+    scope = "product" if offer.offer_type == "product_based" else "bill"
     discount = offer.calculate_discount(cart_total, product_subtotal)
 
     # Mark as used
@@ -156,33 +173,37 @@ def apply_offer(
     db.session.commit()
 
     logger.info(
-        "Offer #%d applied to sale #%d for customer #%d — discount NPR %.2f",
-        offer.id, sale_id, co.customer_id, discount,
+        "Offer #%d (%s) applied to sale #%d for customer #%d — discount NPR %.2f",
+        offer.id, scope, sale_id, co.customer_id, discount,
     )
     return {
         "discount_amount": discount,
+        "scope": scope,
+        "product_id": offer.product_id,
         "message": f"✅ Offer '{offer.title}' applied — NPR {discount:,.2f} off",
     }
 
 
-def rollback_offer(sale_id: int) -> bool:
-    """Revert any offer applied to a sale (called when sale is cancelled/deleted).
+def rollback_offer(sale_id: int) -> int:
+    """Revert ALL offers applied to a sale (called when sale is cancelled/deleted).
 
-    Returns True if an offer was reverted, False if none was applied.
+    Returns count of offers reverted.
     """
-    co = db.session.execute(
+    cos = db.session.execute(
         db.select(CustomerOffer).where(CustomerOffer.applied_sale_id == sale_id)
-    ).scalar_one_or_none()
+    ).scalars().all()
 
-    if not co:
-        return False
+    if not cos:
+        return 0
 
-    co.status = CustomerOffer.STATUS_UNUSED
-    co.usage_count = max(0, co.usage_count - 1)
-    co.applied_sale_id = None
+    for co in cos:
+        co.status = CustomerOffer.STATUS_UNUSED
+        co.usage_count = max(0, co.usage_count - 1)
+        co.applied_sale_id = None
+        logger.info("Offer #%d reverted for sale #%d", co.offer_id, sale_id)
+
     db.session.commit()
-    logger.info("Offer #%d reverted for sale #%d", co.offer_id, sale_id)
-    return True
+    return len(cos)
 
 
 def assign_offer_to_customer(

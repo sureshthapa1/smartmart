@@ -213,9 +213,15 @@
             </div>
 
             <div class="col-md-4">
-              <label class="form-label fw-medium small">Discount (NPR)</label>
+              <label class="form-label fw-medium small">Manual Discount (NPR)</label>
               <input type="number" name="discount_amount" class="form-control form-control-sm"
-                     min="0" step="0.01" value="0" id="discountInput">
+                     min="0" step="0.01" value="0" id="discountInput" style="display:none;">
+              <!-- Visible display — read-only, shows total discount -->
+              <input type="number" class="form-control form-control-sm" id="discountDisplay"
+                     min="0" step="0.01" value="0"
+                     placeholder="0"
+                     title="Enter manual discount. Offer/loyalty discounts are added automatically.">
+              <div class="form-text" id="discountHelpText">Offer &amp; loyalty discounts are added automatically</div>
             </div>
             <div class="col-md-8">
               <label class="form-label fw-medium small">Discount Reason</label>
@@ -362,19 +368,24 @@
         </div>
       </div>
 
-      <div class="total-bar d-flex justify-content-between align-items-center">
-        <div class="d-flex flex-column gap-1">
-          <span class="text-white-50 small">Total Amount</span>
-          <button type="button" class="btn btn-sm" id="addOfferForNextVisitBtn"
-                  style="background:rgba(99,102,241,.25);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);font-size:.75rem;display:none;">
-            <i class="bi bi-gift me-1"></i>Add Offer for Next Visit
-          </button>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-          <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
-          <button type="submit" class="btn btn-success px-4 fw-semibold">
-            <i class="bi bi-check-circle me-1"></i>Confirm Sale
-          </button>
+      <div class="total-bar d-flex flex-column" style="gap:0;">
+        <!-- Discount breakdown (shown when offers/loyalty applied) -->
+        <div id="discountBreakdownPanel" style="display:none;"></div>
+        <!-- Main total row -->
+        <div class="d-flex justify-content-between align-items-center px-0 py-0" style="padding:1.1rem 1.5rem;">
+          <div class="d-flex flex-column gap-1">
+            <span class="text-white-50 small">Total Amount</span>
+            <button type="button" class="btn btn-sm" id="addOfferForNextVisitBtn"
+                    style="background:rgba(99,102,241,.25);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);font-size:.75rem;display:none;">
+              <i class="bi bi-gift me-1"></i>Add Offer for Next Visit
+            </button>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
+            <button type="submit" class="btn btn-success px-4 fw-semibold">
+              <i class="bi bi-check-circle me-1"></i>Confirm Sale
+            </button>
+          </div>
         </div>
       </div>
     </form>
@@ -454,14 +465,92 @@
       tr.querySelector('.subtotal-cell').textContent = (qty * price).toFixed(2);
     }
 
+    // ── Central total recalculation ───────────────────────────────────
+    // Discount sources (all independent, can stack):
+    //   1. manualDiscount   — typed in the discount field by cashier
+    //   2. offerDiscounts   — array of {label, amount} from applied offers
+    //   3. loyaltyDiscount  — from loyalty points redemption
+    // The discount field (discountInput) is kept in sync with the SUM
+    // so the existing form submission still works unchanged.
+
+    window.offerDiscounts = [];   // [{label, amount, coId, scope, productId}]
+    window.loyaltyDiscount = 0;   // NPR value from loyalty redemption
+    window.manualDiscount = 0;    // typed manually by cashier (not from offers/loyalty)
+
     function recalcTotal() {
-      let total = 0;
-      document.querySelectorAll('.subtotal-cell').forEach(cell => total += parseFloat(cell.textContent) || 0);
-      const discount = parseFloat(document.getElementById('discountInput')?.value || 0) || 0;
-      const net = Math.max(0, total - discount);
+      let subtotal = 0;
+      document.querySelectorAll('.subtotal-cell').forEach(cell => subtotal += parseFloat(cell.textContent) || 0);
+
+      // Sum all offer discounts
+      const totalOfferDiscount = window.offerDiscounts.reduce((s, d) => s + d.amount, 0);
+      // Total discount = manual + offers + loyalty
+      const totalDiscount = window.manualDiscount + totalOfferDiscount + window.loyaltyDiscount;
+
+      // Keep discountInput in sync (used by form submission)
+      const discountInput = document.getElementById('discountInput');
+      if (discountInput) discountInput.value = totalDiscount.toFixed(2);
+
+      const net = Math.max(0, subtotal - totalDiscount);
       document.getElementById('grandTotal').textContent = net.toFixed(2);
+
+      // Update the breakdown panel
+      renderDiscountBreakdown(subtotal, totalDiscount, net);
+
+      // Sync discount note
+      _syncDiscountNote();
+
       // Check active promotions
-      checkPromotions(total);
+      checkPromotions(subtotal);
+    }
+
+    function renderDiscountBreakdown(subtotal, totalDiscount, net) {
+      const panel = document.getElementById('discountBreakdownPanel');
+      if (!panel) return;
+
+      const rows = [];
+
+      // Manual discount (only show if > 0 and no offers applied)
+      if (window.manualDiscount > 0) {
+        rows.push(`<div class="d-flex justify-content-between small text-muted">
+          <span>Manual Discount</span><span>− NPR ${window.manualDiscount.toFixed(2)}</span></div>`);
+      }
+
+      // Offer discounts (one row per applied offer)
+      window.offerDiscounts.forEach(d => {
+        const scopeTag = d.scope === 'product'
+          ? `<span class="badge bg-info text-dark ms-1" style="font-size:.6rem;">on ${d.productName || 'product'}</span>`
+          : `<span class="badge bg-success ms-1" style="font-size:.6rem;">on bill</span>`;
+        rows.push(`<div class="d-flex justify-content-between align-items-center small">
+          <span class="text-success fw-semibold">🎁 ${d.label}${scopeTag}</span>
+          <span class="text-success fw-semibold">− NPR ${d.amount.toFixed(2)}</span>
+        </div>`);
+      });
+
+      // Loyalty discount
+      if (window.loyaltyDiscount > 0) {
+        rows.push(`<div class="d-flex justify-content-between small">
+          <span class="text-warning fw-semibold">⭐ Loyalty Points</span>
+          <span class="text-warning fw-semibold">− NPR ${window.loyaltyDiscount.toFixed(2)}</span>
+        </div>`);
+      }
+
+      if (rows.length === 0) {
+        panel.style.display = 'none';
+        return;
+      }
+
+      panel.style.display = '';
+      panel.innerHTML = `
+        <div class="px-3 py-2 border-top" style="background:rgba(255,255,255,.06);">
+          <div class="d-flex justify-content-between small text-white-50 mb-1">
+            <span>Subtotal</span><span>NPR ${subtotal.toFixed(2)}</span>
+          </div>
+          ${rows.join('')}
+          <div class="d-flex justify-content-between small fw-bold mt-1 pt-1 border-top border-secondary">
+            <span class="text-white-50">Total Savings</span>
+            <span class="text-success">− NPR ${totalDiscount.toFixed(2)}</span>
+          </div>
+        </div>`;
     }
 
     document.getElementById('addItemBtn').addEventListener('click', () => addRow());
@@ -539,9 +628,22 @@
       btn.addEventListener('click', function() {
         const promo = activePromos[parseInt(this.dataset.idx)];
         if (!promo) return;
-        document.getElementById('discountInput').value = promo.discount.toFixed(2);
-        document.getElementById('discountNote').value = promo.name;
+        // Route promo through the stacking system as a bill-wide offer
+        const existingIdx = window.offerDiscounts.findIndex(d => d.coId === 'promo_' + promo.id);
+        if (existingIdx >= 0) {
+          window.offerDiscounts[existingIdx].amount = promo.discount;
+        } else {
+          window.offerDiscounts.push({
+            coId: 'promo_' + promo.id,
+            label: promo.name,
+            amount: promo.discount,
+            scope: 'bill',
+            productId: null,
+            productName: null,
+          });
+        }
         recalcTotal();
+        _syncDiscountNote();
         // Mark applied
         bar.querySelectorAll('.apply-promo-btn').forEach(b => {
           b.classList.remove('btn-success');
@@ -557,9 +659,10 @@
 
     // Clear button
     document.getElementById('clearPromoBtn').addEventListener('click', function() {
-      document.getElementById('discountInput').value = '0';
-      document.getElementById('discountNote').value = '';
+      // Remove all promo discounts from the stacking system
+      window.offerDiscounts = window.offerDiscounts.filter(d => !String(d.coId).startsWith('promo_'));
       recalcTotal();
+      _syncDiscountNote();
       // Re-enable all buttons
       bar.querySelectorAll('.apply-promo-btn').forEach(b => {
         b.classList.remove('btn-outline-secondary');
@@ -581,6 +684,23 @@
     const key = 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
     document.getElementById('idempotencyKey').value = key;
   })();
+
+  // ── _syncDiscountNote: build discount_note from all active discounts ──
+  // Called whenever any discount source changes so the form always submits
+  // a human-readable note describing every discount that was applied.
+  function _syncDiscountNote() {
+    const parts = [];
+    if (window.manualDiscount > 0) parts.push(`Manual NPR ${window.manualDiscount.toFixed(2)}`);
+    window.offerDiscounts.forEach(d => {
+      const scopeLabel = d.scope === 'product' && d.productName
+        ? ` on ${d.productName}` : '';
+      parts.push(`${d.label}${scopeLabel} (−NPR ${d.amount.toFixed(2)})`);
+    });
+    if (window.loyaltyDiscount > 0) parts.push(`Loyalty pts (−NPR ${window.loyaltyDiscount.toFixed(2)})`);
+    const noteEl = document.getElementById('discountNote');
+    if (noteEl && parts.length > 0) noteEl.value = parts.join('; ');
+    else if (noteEl) noteEl.value = '';
+  }
 
   // ── AI Invoice Validation before submit ──────────────────────────────
   document.getElementById('saleForm').addEventListener('submit', async function(e) {
@@ -811,82 +931,101 @@
   }
 
   function applyOffer(offerText, offerType, btn) {
+    // AI panel offer — route through the new stacking system
     const match = offerText.match(/(\d+)%/);
-    if (match) {
-      const pct = parseInt(match[1]);
-      let discount = 0;
+    if (!match) return;
+    const pct = Math.min(parseInt(match[1]), 100);
+    let discount = 0;
+    let scope = 'bill';
+    let productName = null;
 
-      if (offerType === 'product') {
-        // Product-specific offer — only discount that product's line total
-        const productMatch = offerText.match(/off on (.+)$/i);
-        if (productMatch) {
-          const targetName = productMatch[1].trim().toLowerCase();
-          let productSubtotal = 0;
-          document.querySelectorAll('tr.sale-item-row').forEach(row => {
-            const sel = row.querySelector('.product-select');
-            const selectedText = sel ? sel.options[sel.selectedIndex]?.text?.trim().toLowerCase() : '';
-            if (selectedText && selectedText.includes(targetName)) {
-              productSubtotal += parseFloat(row.querySelector('.subtotal-cell')?.textContent) || 0;
-            }
-          });
-          // If product is in cart use its subtotal, else fall back to whole bill
+    if (offerType === 'product') {
+      // Product-specific: discount only on that product's line total
+      const productMatch = offerText.match(/off on (.+)$/i);
+      if (productMatch) {
+        const targetName = productMatch[1].trim().toLowerCase();
+        let productSubtotal = 0;
+        document.querySelectorAll('tr.sale-item-row').forEach(row => {
+          const sel = row.querySelector('.product-select');
+          const selectedText = sel ? sel.options[sel.selectedIndex]?.text?.trim().toLowerCase() : '';
+          if (selectedText && selectedText.includes(targetName)) {
+            productSubtotal += parseFloat(row.querySelector('.subtotal-cell')?.textContent) || 0;
+          }
+        });
+        if (productSubtotal > 0) {
+          discount = Math.round(productSubtotal * pct / 100 * 100) / 100;
+          scope = 'product';
+          productName = productMatch[1].trim();
+        } else {
+          // Product not in cart — fall back to whole bill
           let billTotal = 0;
           document.querySelectorAll('.subtotal-cell').forEach(c => billTotal += parseFloat(c.textContent) || 0);
-          discount = Math.round((productSubtotal > 0 ? productSubtotal : billTotal) * pct / 100 * 100) / 100;
+          discount = Math.round(billTotal * pct / 100 * 100) / 100;
         }
-      } else {
-        // Loyalty / retention / festival — whole bill
-        let subtotal = 0;
-        document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
-        discount = Math.round(subtotal * pct / 100 * 100) / 100;
       }
-
-      document.getElementById('discountInput').value = discount.toFixed(2);
-      document.getElementById('discountNote').value = offerText;
-      recalcTotal();
-
-      // Mark applied, disable others
-      document.querySelectorAll('.apply-offer-btn').forEach(b => {
-        if (b === btn) {
-          b.textContent = '✓ Applied';
-          b.classList.replace('btn-outline-success', 'btn-success');
-          b.disabled = true;
-        } else {
-          b.textContent = 'Apply';
-          b.classList.replace('btn-success', 'btn-outline-secondary');
-          b.disabled = true;
-          b.title = 'Only one offer can be applied at a time';
-        }
-      });
-
-      // Clear button
-      let clearBtn = document.getElementById('clearOfferBtn');
-      if (!clearBtn) {
-        clearBtn = document.createElement('button');
-        clearBtn.id = 'clearOfferBtn';
-        clearBtn.type = 'button';
-        clearBtn.className = 'btn btn-sm btn-outline-danger mt-2 w-100';
-        clearBtn.textContent = '✕ Clear applied offer';
-        document.getElementById('aiOffersSection').appendChild(clearBtn);
-      }
-      clearBtn.style.display = '';
-      clearBtn.onclick = function() {
-        document.getElementById('discountInput').value = '0';
-        document.getElementById('discountNote').value = '';
-        recalcTotal();
-        document.querySelectorAll('.apply-offer-btn').forEach(b => {
-          b.textContent = 'Apply';
-          b.classList.replace('btn-success', 'btn-outline-success');
-          b.classList.replace('btn-outline-secondary', 'btn-outline-success');
-          b.disabled = false;
-          b.title = '';
-        });
-        clearBtn.style.display = 'none';
-      };
+    } else {
+      // Bill-wide offer
+      let subtotal = 0;
+      document.querySelectorAll('.subtotal-cell').forEach(c => subtotal += parseFloat(c.textContent) || 0);
+      discount = Math.round(subtotal * pct / 100 * 100) / 100;
     }
-    // Track feedback
-    if (activeCustomerId) {
-      fetch(`/api/customers/${activeCustomerId}/offer-feedback`, {
+
+    // Add to the stacking system (use offerText as a unique key)
+    const existingIdx = window.offerDiscounts.findIndex(d => d.coId === 'ai_' + offerText);
+    if (existingIdx >= 0) {
+      window.offerDiscounts[existingIdx].amount = discount;
+    } else {
+      window.offerDiscounts.push({
+        coId: 'ai_' + offerText,
+        label: offerText,
+        amount: discount,
+        scope: scope,
+        productId: null,
+        productName: productName,
+      });
+    }
+    recalcTotal();
+    _syncDiscountNote();
+
+    // Mark applied, disable others
+    document.querySelectorAll('.apply-offer-btn').forEach(b => {
+      if (b === btn) {
+        b.textContent = '✓ Applied';
+        b.classList.replace('btn-outline-success', 'btn-success');
+        b.disabled = true;
+      } else {
+        b.textContent = 'Apply';
+        b.classList.replace('btn-success', 'btn-outline-secondary');
+        b.disabled = true;
+        b.title = 'Only one AI offer can be applied at a time';
+      }
+    });
+
+    // Clear button
+    let clearBtn = document.getElementById('clearOfferBtn');
+    if (!clearBtn) {
+      clearBtn = document.createElement('button');
+      clearBtn.id = 'clearOfferBtn';
+      clearBtn.type = 'button';
+      clearBtn.className = 'btn btn-sm btn-outline-danger mt-2 w-100';
+      document.getElementById('aiOffersSection').appendChild(clearBtn);
+    }
+    clearBtn.textContent = '✕ Clear AI offer';
+    clearBtn.style.display = '';
+    clearBtn.onclick = function() {
+      window.offerDiscounts = window.offerDiscounts.filter(d => d.coId !== 'ai_' + offerText);
+      recalcTotal();
+      _syncDiscountNote();
+      document.querySelectorAll('.apply-offer-btn').forEach(b => {
+        b.textContent = 'Apply';
+        b.classList.replace('btn-success', 'btn-outline-success');
+        b.classList.replace('btn-outline-secondary', 'btn-outline-success');
+        b.disabled = false;
+        b.title = '';
+      });
+      clearBtn.style.display = 'none';
+    };
+  }
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({applied: true, offer: offerText}),
@@ -1025,8 +1164,8 @@
       const discount = preview.discount || 0;
       const actualPts = preview.redeemed_points || pts;
       walletRedeemPoints.value = actualPts;
-      document.getElementById('discountInput').value = discount.toFixed(2);
-      document.getElementById('discountNote').value = actualPts + ' loyalty points redeemed';
+      // Use window.loyaltyDiscount so it stacks with offer discounts
+      window.loyaltyDiscount = discount;
       recalcTotal();
       loyaltyAppliedMsg.textContent = '✓ ' + actualPts + ' points applied — NPR ' + discount.toFixed(2) + ' discount';
       loyaltyAppliedMsg.style.display = '';
@@ -1039,8 +1178,8 @@
 
   clearLoyaltyBtn.addEventListener('click', function() {
     walletRedeemPoints.value = 0;
-    document.getElementById('discountInput').value = '0';
-    document.getElementById('discountNote').value = '';
+    // Clear loyalty discount from the stacking system
+    window.loyaltyDiscount = 0;
     recalcTotal();
     loyaltyAppliedMsg.style.display = 'none';
     applyLoyaltyBtn.style.display = '';
@@ -1063,22 +1202,56 @@
   document.getElementById('customerName').addEventListener('change', triggerWalletLoad);
   </script>
   <script>
-  // ── OFFER SYSTEM — Customer Retention ────────────────────────────────
-  // State
-  let activeOffers = [];
-  let selectedCustomerOfferId = null;
-  let offerApplied = false;
-  let offerCustomerId = null;  // track which customer's offers are loaded
+  // ══════════════════════════════════════════════════════════════════════
+  // OFFER SYSTEM — Multi-offer, product-aware, loyalty-stacking
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // Discount model:
+  //   window.offerDiscounts  = [{coId, label, amount, scope, productId, productName}]
+  //   window.loyaltyDiscount = NPR value from loyalty points
+  //   window.manualDiscount  = NPR typed manually by cashier
+  //
+  // All three stack independently. recalcTotal() sums them all.
+  // The hidden discountInput (submitted with the form) = sum of all three.
+  //
+  // Product-based offers: discount = offer% × that product's line total only.
+  // Bill-wide offers:     discount = offer% × entire cart total.
+  // Both can be active simultaneously.
+  // ══════════════════════════════════════════════════════════════════════
+
+  let activeOffers = [];          // all valid offers for current customer
+  let offerCustomerId = null;
   const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
-  // Escape HTML to prevent XSS when inserting user data into DOM
-  function _esc(str) {
-    const d = document.createElement('div');
-    d.textContent = String(str || '');
-    return d.innerHTML;
+  // ── Wire up the visible discount display to manualDiscount ───────────
+  const discountDisplay = document.getElementById('discountDisplay');
+  if (discountDisplay) {
+    discountDisplay.addEventListener('input', function() {
+      window.manualDiscount = Math.max(0, parseFloat(this.value) || 0);
+      recalcTotal();
+    });
+  }
+  // ── Helper: get product subtotal for a given product_id in the cart ──
+  function getProductSubtotal(productId) {
+    if (!productId) return 0;
+    let total = 0;
+    document.querySelectorAll('tr.sale-item-row').forEach(row => {
+      const sel = row.querySelector('.product-select');
+      if (sel && parseInt(sel.value) === productId) {
+        total += parseFloat(row.querySelector('.subtotal-cell')?.textContent || 0);
+      }
+    });
+    return total;
   }
 
-  // Load active offers when a customer is selected
+  // ── Helper: get current cart subtotal ────────────────────────────────
+  function getCartSubtotal() {
+    let total = 0;
+    document.querySelectorAll('.subtotal-cell').forEach(c => total += parseFloat(c.textContent) || 0);
+    return total;
+  }
+
+  // ── Load active offers when a customer is selected ───────────────────
   let _offerLoadTimer = null;
   async function loadCustomerOffers(customerId) {
     clearTimeout(_offerLoadTimer);
@@ -1086,114 +1259,159 @@
     offerCustomerId = customerId;
     _offerLoadTimer = setTimeout(async () => {
       try {
-        const cartTotal = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+        const cartTotal = getCartSubtotal();
         const res = await fetch(`/offers/api/customer-offers?customer_id=${customerId}&cart_total=${cartTotal}`);
         if (!res.ok) { hideOfferBanner(); return; }
         const data = await res.json();
         activeOffers = data.offers || [];
-        if (activeOffers.length > 0) {
-          showOfferBanner(activeOffers, data.best);
-        } else {
-          hideOfferBanner();
-        }
-        // Show "Add Offer for Next Visit" button when customer is selected
+        renderOfferBanner();
         const addBtn = document.getElementById('addOfferForNextVisitBtn');
         if (addBtn) addBtn.style.display = '';
-        // Load available offers for the "next visit" dropdown
         loadAvailableOffersForDropdown();
       } catch(e) {
-        // Fail silently — never block billing
         hideOfferBanner();
       }
     }, 300);
   }
 
-  function showOfferBanner(offers, best) {
+  // ── Render the offer banner with all available offers ────────────────
+  function renderOfferBanner() {
     const banner = document.getElementById('offerBanner');
-    const bannerText = document.getElementById('offerBannerText');
-    const bannerSub = document.getElementById('offerBannerSub');
-    const viewAllBtn = document.getElementById('viewAllOffersBtn');
     if (!banner) return;
 
-    // Use textContent (not innerHTML) to prevent XSS
-    if (best) {
-      bannerText.textContent = `🎁 ${best.title}`;
-      bannerSub.textContent = `${best.type_label} · Expires ${best.expiry_date} · ${best.days_until_expiry}d left`;
-    } else if (offers.length > 0) {
-      bannerText.textContent = `🎁 ${offers.length} offer${offers.length > 1 ? 's' : ''} available`;
-      bannerSub.textContent = offers.map(o => o.title).join(', ');
+    const unapplied = activeOffers.filter(o =>
+      !window.offerDiscounts.find(d => d.coId === o.customer_offer_id)
+    );
+
+    if (unapplied.length === 0) {
+      // All offers applied — hide the "apply" section but keep the banner visible
+      // if there are applied offers (so user can clear them)
+      if (window.offerDiscounts.length > 0) {
+        document.getElementById('offerBannerText').textContent = '🎁 Offers applied';
+        document.getElementById('offerBannerSub').textContent =
+          window.offerDiscounts.map(d => d.label).join(' + ');
+        document.getElementById('applyOfferBtn').style.display = 'none';
+        document.getElementById('viewAllOffersBtn').style.display = 'none';
+        banner.style.display = '';
+      } else {
+        banner.style.display = 'none';
+      }
+      return;
     }
 
-    if (offers.length > 1) {
-      viewAllBtn.style.display = '';
-    } else {
-      viewAllBtn.style.display = 'none';
+    // Show best unapplied offer in the banner headline
+    const best = _bestOffer(unapplied);
+    if (best) {
+      document.getElementById('offerBannerText').textContent = `🎁 ${best.title}`;
+      const scopeHint = best.scope === 'product' && best.product_name
+        ? ` · on ${best.product_name} only`
+        : '';
+      document.getElementById('offerBannerSub').textContent =
+        `${best.type_label}${scopeHint} · Expires ${best.expiry_date} · ${best.days_until_expiry}d left`;
     }
+
+    const applyBtn = document.getElementById('applyOfferBtn');
+    applyBtn.style.display = '';
+    applyBtn.textContent = unapplied.length === 1 ? 'Apply' : 'Choose Offer ▾';
+
+    document.getElementById('viewAllOffersBtn').style.display =
+      unapplied.length > 1 ? '' : 'none';
 
     banner.style.display = '';
+  }
+
+  function _bestOffer(offers) {
+    const cartTotal = getCartSubtotal();
+    let best = null, bestDisc = -1;
+    offers.forEach(o => {
+      if (cartTotal < o.min_purchase_amount) return;
+      let disc = 0;
+      if (o.scope === 'product') {
+        disc = getProductSubtotal(o.product_id) * Math.min(o.discount_value, 100) / 100;
+      } else if (o.offer_type === 'percentage' || o.offer_type === 'conditional') {
+        disc = cartTotal * Math.min(o.discount_value, 100) / 100;
+      } else {
+        disc = Math.min(o.discount_value, cartTotal);
+      }
+      if (disc > bestDisc) { bestDisc = disc; best = o; }
+    });
+    return best;
   }
 
   function hideOfferBanner() {
     const banner = document.getElementById('offerBanner');
     if (banner) banner.style.display = 'none';
     activeOffers = [];
-    selectedCustomerOfferId = null;
-    offerApplied = false;
+    window.offerDiscounts = [];
+    recalcTotal();
   }
 
-  // Refresh offer banner eligibility when cart total changes (debounced)
+  // ── Refresh offer eligibility when cart changes ───────────────────────
   let _offerRefreshTimer = null;
   function refreshOfferEligibility() {
-    if (!offerCustomerId || offerApplied) return;
+    if (!offerCustomerId) return;
     clearTimeout(_offerRefreshTimer);
     _offerRefreshTimer = setTimeout(() => {
-      loadCustomerOffers(offerCustomerId);
-    }, 600);
+      // Re-render banner with updated cart totals (no new fetch needed)
+      renderOfferBanner();
+    }, 400);
   }
 
-  // Apply best offer (or show selector if multiple)
-  document.getElementById('applyOfferBtn')?.addEventListener('click', async function() {
-    if (activeOffers.length === 0) return;
-    if (activeOffers.length === 1) {
-      await applyCustomerOffer(activeOffers[0]);
+  // ── Apply button click ────────────────────────────────────────────────
+  document.getElementById('applyOfferBtn')?.addEventListener('click', function() {
+    const unapplied = activeOffers.filter(o =>
+      !window.offerDiscounts.find(d => d.coId === o.customer_offer_id)
+    );
+    if (unapplied.length === 0) return;
+
+    if (unapplied.length === 1) {
+      applyCustomerOffer(unapplied[0]);
     } else {
-      // Show selector — use safe DOM construction
+      // Show selector
       const selector = document.getElementById('offerSelector');
       const list = document.getElementById('offerSelectorList');
       list.innerHTML = '';
-      activeOffers.forEach((o, i) => {
+      unapplied.forEach(o => {
+        const alreadyApplied = !!window.offerDiscounts.find(d => d.coId === o.customer_offer_id);
         const div = document.createElement('div');
         div.className = 'd-flex align-items-center justify-content-between gap-2 mb-2 p-2 rounded-2 border bg-white';
+
         const info = document.createElement('div');
-        const title = document.createElement('div');
-        title.className = 'small fw-semibold';
-        title.textContent = o.title;
-        const sub = document.createElement('div');
-        sub.className = 'text-muted';
-        sub.style.fontSize = '.72rem';
-        sub.textContent = `${o.type_label} · Expires ${o.expiry_date}`;
-        info.appendChild(title);
-        info.appendChild(sub);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'small fw-semibold';
+        titleEl.textContent = o.title;
+        const subEl = document.createElement('div');
+        subEl.className = 'text-muted';
+        subEl.style.fontSize = '.72rem';
+        const scopeHint = o.scope === 'product' && o.product_name
+          ? ` · on ${o.product_name} only` : '';
+        subEl.textContent = `${o.type_label}${scopeHint} · Expires ${o.expiry_date}`;
+        info.appendChild(titleEl);
+        info.appendChild(subEl);
+
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'btn btn-success btn-sm';
+        btn.className = alreadyApplied ? 'btn btn-secondary btn-sm' : 'btn btn-success btn-sm';
         btn.style.fontSize = '.75rem';
-        btn.textContent = 'Apply';
-        btn.addEventListener('click', async () => {
-          await applyCustomerOffer(activeOffers[i]);
-          selector.style.display = 'none';
-        });
+        btn.textContent = alreadyApplied ? '✓ Applied' : 'Apply';
+        btn.disabled = alreadyApplied;
+        if (!alreadyApplied) {
+          btn.addEventListener('click', () => {
+            applyCustomerOffer(o);
+            selector.style.display = 'none';
+          });
+        }
         div.appendChild(info);
         div.appendChild(btn);
         list.appendChild(div);
       });
-      selector.style.display = '';
-      this.textContent = 'Choose Offer ▾';
+      selector.style.display = selector.style.display === 'none' ? '' : 'none';
     }
   });
 
-  async function applyCustomerOffer(offer) {
-    const cartTotal = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+  // ── Core: apply a single offer ────────────────────────────────────────
+  function applyCustomerOffer(offer) {
+    const cartTotal = getCartSubtotal();
     if (cartTotal <= 0) {
       alert('Please add items to the cart first.');
       return;
@@ -1203,64 +1421,96 @@
       return;
     }
 
-    // Calculate discount client-side for instant feedback (server re-validates on submit)
+    // Already applied?
+    if (window.offerDiscounts.find(d => d.coId === offer.customer_offer_id)) {
+      alert('This offer is already applied.');
+      return;
+    }
+
+    // Calculate discount correctly based on scope
     let discount = 0;
-    if (offer.offer_type === 'percentage' || offer.offer_type === 'conditional') {
+    let productName = offer.product_name || null;
+
+    if (offer.scope === 'product') {
+      // Product-based: discount only on that product's line total
+      const productSubtotal = getProductSubtotal(offer.product_id);
+      if (productSubtotal <= 0) {
+        alert(`This offer is for "${offer.product_name || 'a specific product'}" — please add that product to the cart first.`);
+        return;
+      }
+      discount = Math.round(productSubtotal * Math.min(offer.discount_value, 100) / 100 * 100) / 100;
+    } else if (offer.offer_type === 'percentage' || offer.offer_type === 'conditional') {
       discount = Math.round(cartTotal * Math.min(offer.discount_value, 100) / 100 * 100) / 100;
     } else {
+      // fixed / combo
       discount = Math.min(offer.discount_value, cartTotal);
     }
 
-    // Apply to discount field
-    document.getElementById('discountInput').value = discount.toFixed(2);
-    document.getElementById('discountNote').value = offer.title;
-    document.getElementById('appliedCustomerOfferId').value = offer.customer_offer_id;
-    selectedCustomerOfferId = offer.customer_offer_id;
-    offerApplied = true;
-    recalcTotal();
+    // Add to offerDiscounts array
+    window.offerDiscounts.push({
+      coId: offer.customer_offer_id,
+      label: offer.title,
+      amount: discount,
+      scope: offer.scope,
+      productId: offer.product_id,
+      productName: productName,
+    });
 
-    // Update banner UI (use textContent for XSS safety)
-    document.getElementById('applyOfferBtn').style.display = 'none';
-    document.getElementById('skipOfferBtn').textContent = 'Clear Offer';
-    document.getElementById('offerAppliedText').textContent =
-      `${offer.title} applied — NPR ${discount.toFixed(2)} off`;
-    document.getElementById('offerAppliedMsg').style.display = '';
-    document.getElementById('offerSelector').style.display = 'none';
+    // Store applied offer IDs in hidden field (comma-separated)
+    const hiddenField = document.getElementById('appliedCustomerOfferId');
+    if (hiddenField) {
+      const existing = hiddenField.value ? hiddenField.value.split(',').filter(Boolean) : [];
+      existing.push(String(offer.customer_offer_id));
+      hiddenField.value = existing.join(',');
+    }
+
+    recalcTotal();
+    renderOfferBanner();
+    // Show applied confirmation
+    const appliedMsg = document.getElementById('offerAppliedMsg');
+    const appliedText = document.getElementById('offerAppliedText');
+    if (appliedMsg && appliedText) {
+      const scopeLabel = offer.scope === 'product' && productName
+        ? ` on ${productName}` : ' on total bill';
+      appliedText.textContent =
+        `${offer.title} applied${scopeLabel} — NPR ${discount.toFixed(2)} off`;
+      appliedMsg.style.display = '';
+    }
+
+    // Update skip button
+    const skipBtn = document.getElementById('skipOfferBtn');
+    if (skipBtn) skipBtn.textContent = 'Clear All Offers';
   }
 
-  // Skip / Clear offer
+  // ── Skip / Clear all offers ───────────────────────────────────────────
   document.getElementById('skipOfferBtn')?.addEventListener('click', function() {
-    if (offerApplied) {
-      document.getElementById('discountInput').value = '0';
-      document.getElementById('discountNote').value = '';
-      document.getElementById('appliedCustomerOfferId').value = '';
-      selectedCustomerOfferId = null;
-      offerApplied = false;
+    if (window.offerDiscounts.length > 0) {
+      window.offerDiscounts = [];
+      const hiddenField = document.getElementById('appliedCustomerOfferId');
+      if (hiddenField) hiddenField.value = '';
       recalcTotal();
-      const applyBtn = document.getElementById('applyOfferBtn');
-      if (applyBtn) { applyBtn.style.display = ''; applyBtn.textContent = 'Apply'; }
+      renderOfferBanner();
+      const appliedMsg = document.getElementById('offerAppliedMsg');
+      if (appliedMsg) appliedMsg.style.display = 'none';
       this.textContent = 'Skip';
-      document.getElementById('offerAppliedMsg').style.display = 'none';
     } else {
       hideOfferBanner();
     }
   });
 
-  // View all offers toggle
+  // ── View all offers toggle ────────────────────────────────────────────
   document.getElementById('viewAllOffersBtn')?.addEventListener('click', function() {
-    const selector = document.getElementById('offerSelector');
-    selector.style.display = selector.style.display === 'none' ? '' : 'none';
+    document.getElementById('applyOfferBtn')?.click();
   });
 
-  // Hook into existing customer autofill — load offers when customer selected
+  // ── Hook into customer autofill ───────────────────────────────────────
   const _origLoadIntel = window.loadCustomerIntelligence;
   window.loadCustomerIntelligence = async function(customerId) {
     if (_origLoadIntel) await _origLoadIntel(customerId);
     loadCustomerOffers(customerId);
   };
 
-  // Patch recalcTotal to also refresh offer eligibility when cart changes
-  const _origRecalcForOffers = window.recalcTotal;
+  // ── Patch recalcTotal to refresh offer eligibility on cart change ─────
   if (typeof recalcTotal === 'function') {
     const _baseRecalc = recalcTotal;
     window.recalcTotal = function() {

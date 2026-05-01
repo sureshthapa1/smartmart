@@ -111,6 +111,36 @@ def create_sale():
                 if record:
                     record.result_sale_id = sale.id
                     db.session.commit()
+
+            # ── Mark all applied customer offers as used ───────────────────
+            # The hidden field contains comma-separated customer_offer_ids
+            # (numeric IDs only — AI/promo offers use string keys and are skipped)
+            applied_co_ids_raw = request.form.get("applied_customer_offer_id", "").strip()
+            if applied_co_ids_raw:
+                from ...services.offer_service import apply_offer as _apply_offer
+                from ...models.customer import Customer as _Cust
+                # Resolve customer_id for ownership check
+                cust_id = None
+                if sale.customer_id:
+                    cust_id = sale.customer_id
+                for co_id_str in applied_co_ids_raw.split(","):
+                    co_id_str = co_id_str.strip()
+                    if not co_id_str.isdigit():
+                        continue  # skip AI/promo string keys
+                    try:
+                        _apply_offer(
+                            customer_offer_id=int(co_id_str),
+                            sale_id=sale.id,
+                            cart_total=float(sale.total_amount),
+                            customer_id=cust_id,
+                        )
+                    except Exception as _oe:
+                        import logging as _log
+                        _log.getLogger(__name__).warning(
+                            "Could not mark offer %s as used for sale %d: %s",
+                            co_id_str, sale.id, _oe
+                        )
+
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
         except InsufficientStockError as e:
