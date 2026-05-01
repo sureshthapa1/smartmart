@@ -217,6 +217,45 @@ def _migration_steps() -> list[MigrationStep]:
                 "INTEGER REFERENCES bi_operating_expenses(id)"
             ),
         ),
+        # ── Customer Retention & Offer System ────────────────────────────────
+        (
+            "2026_05_01_offers_tables",
+            "Ensure offers, customer_offers, offer_notifications tables exist (db.create_all handles).",
+            lambda conn: None,
+        ),
+        (
+            "2026_05_01_user_permissions_offers",
+            "Add offer permission columns to user_permissions.",
+            lambda conn: (
+                _safe_add_column(conn, "user_permissions", "can_view_offers", "BOOLEAN DEFAULT true"),
+                _safe_add_column(conn, "user_permissions", "can_manage_offers", "BOOLEAN DEFAULT false"),
+                _safe_add_column(conn, "user_permissions", "can_assign_offers", "BOOLEAN DEFAULT true"),
+                _safe_add_column(conn, "user_permissions", "can_apply_offers", "BOOLEAN DEFAULT true"),
+            ),
+        ),
+        (
+            "2026_05_01_customers_total_spent",
+            "Add total_spent column to customers for fast segmentation.",
+            lambda conn: _safe_add_column(conn, "customers", "total_spent", "NUMERIC(12,2) DEFAULT 0"),
+        ),
+        (
+            "2026_05_01_offer_indexes",
+            "Add performance indexes for offer queries.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_customer_offers_customer ON customer_offers(customer_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_customer_offers_status ON customer_offers(status)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_customer_offers_expiry ON customer_offers(expiry_date)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_offers_status ON offers(status)"),
+            ),
+        ),
+        (
+            "2026_05_01_offers_scheduling",
+            "Add start_date and end_date scheduling columns to offers.",
+            lambda conn: (
+                _safe_add_column(conn, "offers", "start_date", "DATE"),
+                _safe_add_column(conn, "offers", "end_date", "DATE"),
+            ),
+        ),
     ]
 
 

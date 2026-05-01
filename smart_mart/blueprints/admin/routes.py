@@ -259,6 +259,12 @@ PERMISSION_GROUPS = {
         ("can_view_transfers", "View Stock Transfers"),
         ("can_manage_transfers", "Create Stock Transfers"),
     ],
+    "Offers & Retention": [
+        ("can_view_offers", "View Offers & Retention"),
+        ("can_manage_offers", "Create & Edit Offers"),
+        ("can_assign_offers", "Assign Offers to Customers"),
+        ("can_apply_offers", "Apply Offers During Billing"),
+    ],
     "AI & Insights": [
         ("can_view_ai_insights", "View AI Insights & Analytics"),
         ("can_view_advisor", "View Business Advisor"),

@@ -245,6 +245,13 @@ def delete_sale(sale_id: int) -> None:
         except Exception as e:
             logger.warning("Loyalty reversal failed for sale %s: %s", sale.id, e)
 
+        # Rollback any offer applied to this sale
+        try:
+            from .offer_service import rollback_offer
+            rollback_offer(sale.id)
+        except Exception as e:
+            logger.warning("Offer rollback failed for sale %s: %s", sale.id, e)
+
         db.session.delete(sale)
         db.session.commit()
     except Exception:

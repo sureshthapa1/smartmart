@@ -333,6 +333,7 @@ def _register_blueprints(app):
         (".blueprints.stock_take", "stock_take_bp"),
         (".blueprints.customers", "customers_bp"),
         (".blueprints.finance", "finance_bp"),
+        (".blueprints.offers", "offers_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
     ]

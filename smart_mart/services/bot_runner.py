@@ -529,6 +529,14 @@ def run_all_bots(user_id: int = 1) -> dict:
     except Exception as e:
         results["reorder_bot"] = {"task": "reorder_bot", "error": str(e)}
 
+    # Offer cron jobs (expiry + reminders + AI auto-assign)
+    try:
+        from .offer_cron import _run_jobs as _offer_cron
+        results["offer_cron"] = _offer_cron()
+    except Exception as e:
+        logger.exception("Offer cron failed: %s", e)
+        results["offer_cron"] = {"error": str(e)}
+
     return {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "results": results,

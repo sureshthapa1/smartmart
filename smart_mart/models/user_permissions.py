@@ -80,6 +80,12 @@ class UserPermissions(db.Model):
     can_view_bi_dashboard = db.Column(db.Boolean, default=False)
     can_manage_bi_batches = db.Column(db.Boolean, default=False)
 
+    # ── Offers & Retention ────────────────────────────────────────────────
+    can_view_offers = db.Column(db.Boolean, default=True)
+    can_manage_offers = db.Column(db.Boolean, default=False)
+    can_assign_offers = db.Column(db.Boolean, default=True)
+    can_apply_offers = db.Column(db.Boolean, default=True)
+
     # ── Alerts & Dashboard ────────────────────────────────────────────────
     can_view_alerts = db.Column(db.Boolean, default=True)
     can_view_dashboard = db.Column(db.Boolean, default=True)

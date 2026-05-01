@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Offer Analytics — Smart Mart{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title"><i class="bi bi-bar-chart me-2 text-primary"></i>Offer Analytics</div>
+    <div class="page-header-sub">Track offer performance and conversion rates</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('offers.list_offers') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to Offers
+    </a>
+    {% if current_user.role == 'admin' %}
+    <button type="button" class="btn btn-outline-warning btn-sm" id="runCronBtn">
+      <i class="bi bi-arrow-clockwise me-1"></i>Run Cron Jobs
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Total Offers</div>
+      <div class="fs-3 fw-bold text-primary">{{ stats.total_offers }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Assigned</div>
+      <div class="fs-3 fw-bold text-info">{{ stats.total_assigned }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Used</div>
+      <div class="fs-3 fw-bold text-success">{{ stats.total_used }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Unused</div>
+      <div class="fs-3 fw-bold text-warning">{{ stats.total_unused }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Expired</div>
+      <div class="fs-3 fw-bold text-secondary">{{ stats.total_expired }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Conversion</div>
+      <div class="fs-3 fw-bold text-purple" style="color:#7c3aed">{{ stats.conversion_rate }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Conversion Rate Bar -->
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-graph-up me-2 text-success"></i>Overall Conversion Rate</div>
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-3">
+      <div class="flex-grow-1">
+        <div class="progress" style="height:20px;border-radius:10px;">
+          <div class="progress-bar bg-success" style="width:{{ stats.conversion_rate }}%;border-radius:10px;">
+            {{ stats.conversion_rate }}%
+          </div>
+        </div>
+      </div>
+      <div class="text-muted small">{{ stats.total_used }} used / {{ stats.total_assigned }} assigned</div>
+    </div>
+    <div class="text-muted small mt-2">
+      Conversion rate = offers used ÷ offers assigned × 100
+    </div>
+  </div>
+</div>
+
+<!-- Per-offer breakdown -->
+<div class="card">
+  <div class="card-header"><i class="bi bi-table me-2 text-primary"></i>Per-Offer Performance</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Offer</th>
+          <th>Type</th>
+          <th>Discount</th>
+          <th>Status</th>
+          <th>Assigned</th>
+          <th>Used</th>
+          <th>Conversion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in stats.offer_stats %}
+        <tr>
+          <td class="text-muted small">{{ row.id }}</td>
+          <td class="fw-semibold">{{ row.title }}</td>
+          <td><span class="badge bg-light text-dark">{{ row.offer_type }}</span></td>
+          <td>
+            {% if row.offer_type in ('percentage','conditional') %}{{ row.discount_value }}%
+            {% else %}NPR {{ "%.0f"|format(row.discount_value) }}{% endif %}
+          </td>
+          <td>
+            {% if row.status == 'active' %}<span class="badge bg-success">Active</span>
+            {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+          </td>
+          <td>{{ row.assigned }}</td>
+          <td class="text-success fw-semibold">{{ row.used }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:8px;border-radius:4px;min-width:60px;">
+                <div class="progress-bar bg-success" style="width:{{ row.conversion_rate }}%;border-radius:4px;"></div>
+              </div>
+              <span class="small fw-semibold">{{ row.conversion_rate }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No offer data yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.getElementById('runCronBtn')?.addEventListener('click', async function() {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  try {
+    const res = await fetch('/offers/api/run-cron', {
+      method: 'POST',
+      headers: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`✅ Cron complete:\n• Expired: ${data.expired} offers\n• Reminders sent: ${data.reminders['2d']} (2d) + ${data.reminders['1d']} (1d)\n• Retried: ${data.retried} notifications`);
+      location.reload();
+    }
+  } catch(e) {
+    alert('Error running cron: ' + e.message);
+  } finally {
+    this.disabled = false;
+    this.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run Cron Jobs';
+  }
+});
+</script>
+{% endblock %}

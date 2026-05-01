@@ -301,6 +301,39 @@
         </a>
       </li>
       {% endif %}
+      {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_offers) %}
+      <li class="nav-item">
+        <a class="nav-link submenu-toggle {% if request.blueprint == 'offers' %}active{% else %}collapsed{% endif %}"
+           data-bs-toggle="collapse" href="#offersMenu" role="button"
+           aria-expanded="{% if request.blueprint == 'offers' %}true{% else %}false{% endif %}">
+          <i class="bi bi-gift"></i>Offers & Retention
+        </a>
+        <div class="collapse {% if request.blueprint == 'offers' %}show{% endif %}" id="offersMenu">
+          <ul class="nav flex-column submenu">
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'offers.list_offers' %}active{% endif %}"
+                 href="{{ url_for('offers.list_offers') }}">
+                <i class="bi bi-list-ul"></i>All Offers
+              </a>
+            </li>
+            {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_manage_offers) %}
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'offers.create_offer' %}active{% endif %}"
+                 href="{{ url_for('offers.create_offer') }}">
+                <i class="bi bi-plus-circle"></i>New Offer
+              </a>
+            </li>
+            {% endif %}
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'offers.analytics' %}active{% endif %}"
+                 href="{{ url_for('offers.analytics') }}">
+                <i class="bi bi-bar-chart"></i>Analytics
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+      {% endif %}
       {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_online_orders) %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint == 'online_orders' %}active{% else %}collapsed{% endif %}"

@@ -51,6 +51,7 @@ from .schema_migration import SchemaMigrationRecord
 from .credit_note import CreditNote
 from .idempotency_key import IdempotencyKey
 from .financial_period import FinancialPeriod
+from .offer import Offer, CustomerOffer, OfferNotification
 from ..bi.models import (
     PurchaseBatch,
     PurchaseBatchItem,
@@ -90,6 +91,7 @@ __all__ = [
     "CreditNote",
     "IdempotencyKey",
     "FinancialPeriod",
+    "Offer", "CustomerOffer", "OfferNotification",
     "PurchaseBatch",
     "PurchaseBatchItem",
     "PurchaseBatchExpense",

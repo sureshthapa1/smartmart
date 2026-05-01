@@ -31,6 +31,12 @@
      class="btn btn-outline-primary btn-sm">
     <i class="bi bi-credit-card me-1"></i>Loyalty Card
   </a>
+  {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_offers) %}
+  <a href="{{ url_for('offers.customer_offers', customer_id=customer.id) }}"
+     class="btn btn-outline-success btn-sm">
+    <i class="bi bi-gift me-1"></i>Offers
+  </a>
+  {% endif %}
 </div>
 
 <!-- KPI cards -->

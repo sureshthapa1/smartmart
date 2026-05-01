@@ -100,6 +100,41 @@
             <span id="churnAlertText"></span>
           </div>
 
+          <!-- ── OFFER BANNER (non-blocking, shown when customer has active offers) ── -->
+          <div id="offerBanner" style="display:none;" class="mb-3">
+            <div class="rounded-3 px-3 py-2 d-flex align-items-center gap-2 flex-wrap"
+                 style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;">
+              <i class="bi bi-gift-fill text-success fs-5"></i>
+              <div class="flex-grow-1">
+                <span class="fw-semibold small text-success" id="offerBannerText">🎁 Offer available</span>
+                <span class="text-muted ms-2" style="font-size:.75rem;" id="offerBannerSub"></span>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-success btn-sm fw-semibold" id="applyOfferBtn" style="font-size:.8rem;">
+                  <i class="bi bi-check-circle me-1"></i>Apply
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="skipOfferBtn" style="font-size:.8rem;">
+                  Skip
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="viewAllOffersBtn" style="font-size:.8rem;display:none;">
+                  <i class="bi bi-list me-1"></i>All Offers
+                </button>
+              </div>
+            </div>
+            <!-- Multiple offers selector (shown when > 1 offer) -->
+            <div id="offerSelector" style="display:none;" class="mt-2 p-2 border rounded-3 bg-white">
+              <div class="text-muted small mb-2 fw-semibold">Select an offer to apply:</div>
+              <div id="offerSelectorList"></div>
+            </div>
+            <!-- Applied offer confirmation -->
+            <div id="offerAppliedMsg" style="display:none;" class="mt-1 small text-success fw-semibold">
+              <i class="bi bi-check-circle-fill me-1"></i><span id="offerAppliedText"></span>
+            </div>
+          </div>
+          <!-- Hidden fields for applied offer -->
+          <input type="hidden" id="appliedCustomerOfferId" name="applied_customer_offer_id" value="">
+          <!-- ── END OFFER BANNER ── -->
+
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label fw-medium small">Customer Name</label>
@@ -269,8 +304,72 @@
         </div>
       </div>
 
+      <!-- ── ADD OFFER FOR NEXT VISIT ── -->
+      <div id="addOfferSection" style="display:none;" class="card shadow-sm mb-3">
+        <div class="card-header d-flex align-items-center gap-2 py-3">
+          <i class="bi bi-gift text-success"></i>
+          <span class="fw-semibold">Add Offer for Next Visit</span>
+          <button type="button" class="btn-close ms-auto" style="font-size:.6rem;" onclick="document.getElementById('addOfferSection').style.display='none'"></button>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Select Existing Offer</label>
+              <select id="nextVisitOfferSelect" class="form-select form-select-sm">
+                <option value="">— Choose offer —</option>
+              </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <button type="button" class="btn btn-success btn-sm me-2" id="assignExistingOfferBtn">
+                <i class="bi bi-gift me-1"></i>Assign Offer
+              </button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="showQuickCreateBtn">
+                <i class="bi bi-plus me-1"></i>Quick Create
+              </button>
+            </div>
+          </div>
+          <!-- Quick Create Form -->
+          <div id="quickCreateForm" style="display:none;" class="mt-3 p-3 border rounded-3 bg-light">
+            <div class="fw-semibold small mb-2">Quick Create Offer</div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <input type="text" id="qcTitle" class="form-control form-control-sm" placeholder="Offer title *">
+              </div>
+              <div class="col-md-3">
+                <select id="qcType" class="form-select form-select-sm">
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed">Fixed (NPR)</option>
+                  <option value="conditional">Conditional</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <input type="number" id="qcValue" class="form-control form-control-sm" placeholder="Value *" min="0.01" step="0.01">
+              </div>
+              <div class="col-md-4">
+                <input type="number" id="qcMinPurchase" class="form-control form-control-sm" placeholder="Min purchase (NPR)" min="0">
+              </div>
+              <div class="col-md-4">
+                <input type="number" id="qcValidDays" class="form-control form-control-sm" placeholder="Valid days" value="30" min="1">
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <button type="button" class="btn btn-primary btn-sm w-100" id="quickCreateAssignBtn">
+                  <i class="bi bi-check me-1"></i>Create & Assign
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="offerAssignResult" class="mt-2 small"></div>
+        </div>
+      </div>
+
       <div class="total-bar d-flex justify-content-between align-items-center">
-        <span class="text-white-50">Total Amount</span>
+        <div class="d-flex flex-column gap-1">
+          <span class="text-white-50 small">Total Amount</span>
+          <button type="button" class="btn btn-sm" id="addOfferForNextVisitBtn"
+                  style="background:rgba(99,102,241,.25);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);font-size:.75rem;display:none;">
+            <i class="bi bi-gift me-1"></i>Add Offer for Next Visit
+          </button>
+        </div>
         <div class="d-flex align-items-center gap-3">
           <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
           <button type="submit" class="btn btn-success px-4 fw-semibold">
@@ -962,6 +1061,330 @@
   }
   document.getElementById('customerName').addEventListener('input', triggerWalletLoad);
   document.getElementById('customerName').addEventListener('change', triggerWalletLoad);
+  </script>
+  <script>
+  // ── OFFER SYSTEM — Customer Retention ────────────────────────────────
+  // State
+  let activeOffers = [];
+  let selectedCustomerOfferId = null;
+  let offerApplied = false;
+  let offerCustomerId = null;  // track which customer's offers are loaded
+  const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  // Escape HTML to prevent XSS when inserting user data into DOM
+  function _esc(str) {
+    const d = document.createElement('div');
+    d.textContent = String(str || '');
+    return d.innerHTML;
+  }
+
+  // Load active offers when a customer is selected
+  let _offerLoadTimer = null;
+  async function loadCustomerOffers(customerId) {
+    clearTimeout(_offerLoadTimer);
+    if (!customerId) { hideOfferBanner(); offerCustomerId = null; return; }
+    offerCustomerId = customerId;
+    _offerLoadTimer = setTimeout(async () => {
+      try {
+        const cartTotal = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+        const res = await fetch(`/offers/api/customer-offers?customer_id=${customerId}&cart_total=${cartTotal}`);
+        if (!res.ok) { hideOfferBanner(); return; }
+        const data = await res.json();
+        activeOffers = data.offers || [];
+        if (activeOffers.length > 0) {
+          showOfferBanner(activeOffers, data.best);
+        } else {
+          hideOfferBanner();
+        }
+        // Show "Add Offer for Next Visit" button when customer is selected
+        const addBtn = document.getElementById('addOfferForNextVisitBtn');
+        if (addBtn) addBtn.style.display = '';
+        // Load available offers for the "next visit" dropdown
+        loadAvailableOffersForDropdown();
+      } catch(e) {
+        // Fail silently — never block billing
+        hideOfferBanner();
+      }
+    }, 300);
+  }
+
+  function showOfferBanner(offers, best) {
+    const banner = document.getElementById('offerBanner');
+    const bannerText = document.getElementById('offerBannerText');
+    const bannerSub = document.getElementById('offerBannerSub');
+    const viewAllBtn = document.getElementById('viewAllOffersBtn');
+    if (!banner) return;
+
+    // Use textContent (not innerHTML) to prevent XSS
+    if (best) {
+      bannerText.textContent = `🎁 ${best.title}`;
+      bannerSub.textContent = `${best.type_label} · Expires ${best.expiry_date} · ${best.days_until_expiry}d left`;
+    } else if (offers.length > 0) {
+      bannerText.textContent = `🎁 ${offers.length} offer${offers.length > 1 ? 's' : ''} available`;
+      bannerSub.textContent = offers.map(o => o.title).join(', ');
+    }
+
+    if (offers.length > 1) {
+      viewAllBtn.style.display = '';
+    } else {
+      viewAllBtn.style.display = 'none';
+    }
+
+    banner.style.display = '';
+  }
+
+  function hideOfferBanner() {
+    const banner = document.getElementById('offerBanner');
+    if (banner) banner.style.display = 'none';
+    activeOffers = [];
+    selectedCustomerOfferId = null;
+    offerApplied = false;
+  }
+
+  // Refresh offer banner eligibility when cart total changes (debounced)
+  let _offerRefreshTimer = null;
+  function refreshOfferEligibility() {
+    if (!offerCustomerId || offerApplied) return;
+    clearTimeout(_offerRefreshTimer);
+    _offerRefreshTimer = setTimeout(() => {
+      loadCustomerOffers(offerCustomerId);
+    }, 600);
+  }
+
+  // Apply best offer (or show selector if multiple)
+  document.getElementById('applyOfferBtn')?.addEventListener('click', async function() {
+    if (activeOffers.length === 0) return;
+    if (activeOffers.length === 1) {
+      await applyCustomerOffer(activeOffers[0]);
+    } else {
+      // Show selector — use safe DOM construction
+      const selector = document.getElementById('offerSelector');
+      const list = document.getElementById('offerSelectorList');
+      list.innerHTML = '';
+      activeOffers.forEach((o, i) => {
+        const div = document.createElement('div');
+        div.className = 'd-flex align-items-center justify-content-between gap-2 mb-2 p-2 rounded-2 border bg-white';
+        const info = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'small fw-semibold';
+        title.textContent = o.title;
+        const sub = document.createElement('div');
+        sub.className = 'text-muted';
+        sub.style.fontSize = '.72rem';
+        sub.textContent = `${o.type_label} · Expires ${o.expiry_date}`;
+        info.appendChild(title);
+        info.appendChild(sub);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-success btn-sm';
+        btn.style.fontSize = '.75rem';
+        btn.textContent = 'Apply';
+        btn.addEventListener('click', async () => {
+          await applyCustomerOffer(activeOffers[i]);
+          selector.style.display = 'none';
+        });
+        div.appendChild(info);
+        div.appendChild(btn);
+        list.appendChild(div);
+      });
+      selector.style.display = '';
+      this.textContent = 'Choose Offer ▾';
+    }
+  });
+
+  async function applyCustomerOffer(offer) {
+    const cartTotal = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+    if (cartTotal <= 0) {
+      alert('Please add items to the cart first.');
+      return;
+    }
+    if (offer.min_purchase_amount && cartTotal < offer.min_purchase_amount) {
+      alert(`Minimum purchase of NPR ${offer.min_purchase_amount.toLocaleString()} required for this offer.`);
+      return;
+    }
+
+    // Calculate discount client-side for instant feedback (server re-validates on submit)
+    let discount = 0;
+    if (offer.offer_type === 'percentage' || offer.offer_type === 'conditional') {
+      discount = Math.round(cartTotal * Math.min(offer.discount_value, 100) / 100 * 100) / 100;
+    } else {
+      discount = Math.min(offer.discount_value, cartTotal);
+    }
+
+    // Apply to discount field
+    document.getElementById('discountInput').value = discount.toFixed(2);
+    document.getElementById('discountNote').value = offer.title;
+    document.getElementById('appliedCustomerOfferId').value = offer.customer_offer_id;
+    selectedCustomerOfferId = offer.customer_offer_id;
+    offerApplied = true;
+    recalcTotal();
+
+    // Update banner UI (use textContent for XSS safety)
+    document.getElementById('applyOfferBtn').style.display = 'none';
+    document.getElementById('skipOfferBtn').textContent = 'Clear Offer';
+    document.getElementById('offerAppliedText').textContent =
+      `${offer.title} applied — NPR ${discount.toFixed(2)} off`;
+    document.getElementById('offerAppliedMsg').style.display = '';
+    document.getElementById('offerSelector').style.display = 'none';
+  }
+
+  // Skip / Clear offer
+  document.getElementById('skipOfferBtn')?.addEventListener('click', function() {
+    if (offerApplied) {
+      document.getElementById('discountInput').value = '0';
+      document.getElementById('discountNote').value = '';
+      document.getElementById('appliedCustomerOfferId').value = '';
+      selectedCustomerOfferId = null;
+      offerApplied = false;
+      recalcTotal();
+      const applyBtn = document.getElementById('applyOfferBtn');
+      if (applyBtn) { applyBtn.style.display = ''; applyBtn.textContent = 'Apply'; }
+      this.textContent = 'Skip';
+      document.getElementById('offerAppliedMsg').style.display = 'none';
+    } else {
+      hideOfferBanner();
+    }
+  });
+
+  // View all offers toggle
+  document.getElementById('viewAllOffersBtn')?.addEventListener('click', function() {
+    const selector = document.getElementById('offerSelector');
+    selector.style.display = selector.style.display === 'none' ? '' : 'none';
+  });
+
+  // Hook into existing customer autofill — load offers when customer selected
+  const _origLoadIntel = window.loadCustomerIntelligence;
+  window.loadCustomerIntelligence = async function(customerId) {
+    if (_origLoadIntel) await _origLoadIntel(customerId);
+    loadCustomerOffers(customerId);
+  };
+
+  // Patch recalcTotal to also refresh offer eligibility when cart changes
+  const _origRecalcForOffers = window.recalcTotal;
+  if (typeof recalcTotal === 'function') {
+    const _baseRecalc = recalcTotal;
+    window.recalcTotal = function() {
+      _baseRecalc();
+      refreshOfferEligibility();
+    };
+  }
+
+  // ── Add Offer for Next Visit ──────────────────────────────────────────
+  document.getElementById('addOfferForNextVisitBtn')?.addEventListener('click', function() {
+    const section = document.getElementById('addOfferSection');
+    section.style.display = section.style.display === 'none' ? '' : 'none';
+    if (section.style.display !== 'none') {
+      section.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+  });
+
+  document.getElementById('showQuickCreateBtn')?.addEventListener('click', function() {
+    const form = document.getElementById('quickCreateForm');
+    form.style.display = form.style.display === 'none' ? '' : 'none';
+  });
+
+  async function loadAvailableOffersForDropdown() {
+    try {
+      const res = await fetch('/offers/');
+      // We can't parse HTML easily — use a dedicated API endpoint instead
+      // The dropdown is populated via the offers list page
+      // For now, fetch from the offers API
+      const r2 = await fetch('/offers/api/customer-offers?customer_id=0');
+      // This returns empty — we need a separate endpoint for all active offers
+      // Use the quick-create flow instead
+    } catch(e) {}
+  }
+
+  // Fetch active offers for the "next visit" dropdown
+  (async function() {
+    try {
+      const res = await fetch('/offers/api/all-active');
+      if (!res.ok) return;
+      const data = await res.json();
+      const sel = document.getElementById('nextVisitOfferSelect');
+      if (sel && data.offers) {
+        data.offers.forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = o.id;
+          opt.textContent = `${o.title} (${o.offer_type})`;
+          sel.appendChild(opt);
+        });
+      }
+    } catch(e) {}
+  })();
+
+  // Assign existing offer to customer
+  document.getElementById('assignExistingOfferBtn')?.addEventListener('click', async function() {
+    const offerId = document.getElementById('nextVisitOfferSelect').value;
+    if (!offerId) { alert('Please select an offer.'); return; }
+    if (!activeCustomerId) { alert('Please select a customer first.'); return; }
+
+    this.disabled = true;
+    const resultEl = document.getElementById('offerAssignResult');
+    try {
+      const res = await fetch('/offers/api/assign', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+        body: JSON.stringify({
+          customer_id: activeCustomerId,
+          offer_id: parseInt(offerId),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        resultEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.message}</span>`;
+      } else {
+        resultEl.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${data.error}</span>`;
+      }
+    } catch(e) {
+      resultEl.innerHTML = `<span class="text-danger">Error: ${e.message}</span>`;
+    } finally {
+      this.disabled = false;
+    }
+  });
+
+  // Quick create & assign offer
+  document.getElementById('quickCreateAssignBtn')?.addEventListener('click', async function() {
+    const title = document.getElementById('qcTitle').value.trim();
+    const offerType = document.getElementById('qcType').value;
+    const value = parseFloat(document.getElementById('qcValue').value || 0);
+    const minPurchase = parseFloat(document.getElementById('qcMinPurchase').value || 0);
+    const validDays = parseInt(document.getElementById('qcValidDays').value || 30);
+
+    if (!title) { alert('Please enter an offer title.'); return; }
+    if (!value || value <= 0) { alert('Please enter a valid discount value.'); return; }
+    if (!activeCustomerId) { alert('Please select a customer first.'); return; }
+
+    this.disabled = true;
+    const resultEl = document.getElementById('offerAssignResult');
+    try {
+      const res = await fetch('/offers/api/quick-create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+        body: JSON.stringify({
+          customer_id: activeCustomerId,
+          title, offer_type: offerType,
+          discount_value: value,
+          min_purchase_amount: minPurchase,
+          valid_days: validDays,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        resultEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.message}</span>`;
+        // Clear form
+        document.getElementById('qcTitle').value = '';
+        document.getElementById('qcValue').value = '';
+        document.getElementById('quickCreateForm').style.display = 'none';
+      } else {
+        resultEl.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${data.error}</span>`;
+      }
+    } catch(e) {
+      resultEl.innerHTML = `<span class="text-danger">Error: ${e.message}</span>`;
+    } finally {
+      this.disabled = false;
+    }
+  });
   </script>
   <script>
     // Attach CSRF token to all fetch() POST/PUT/PATCH/DELETE on this standalone page

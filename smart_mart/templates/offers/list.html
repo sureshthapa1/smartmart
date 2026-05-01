@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Offers — Smart Mart{% endblock %}
+{% block head %}
+<style>
+  .offer-type-badge{font-size:.68rem;padding:.25em .6em;border-radius:6px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .type-percentage{background:#eff6ff;color:#1d4ed8}
+  .type-fixed{background:#f0fdf4;color:#166534}
+  .type-conditional{background:#fffbeb;color:#92400e}
+  .type-product_based{background:#fdf4ff;color:#7e22ce}
+  .type-combo{background:#fff1f2;color:#be123c}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title"><i class="bi bi-gift me-2 text-primary"></i>Offer Management</div>
+    <div class="page-header-sub">Create and manage customer retention offers</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('offers.analytics') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-bar-chart me-1"></i>Analytics
+    </a>
+    {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_manage_offers) %}
+    <a href="{{ url_for('offers.create_offer') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>New Offer
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  {% set active_count = offers | selectattr('status','eq','active') | list | length %}
+  {% set inactive_count = offers | selectattr('status','eq','inactive') | list | length %}
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Total (this page)</div>
+      <div class="fs-4 fw-bold text-primary">{{ total }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Active (this page)</div>
+      <div class="fs-4 fw-bold text-success">{{ active_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Inactive (this page)</div>
+      <div class="fs-4 fw-bold text-secondary">{{ inactive_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Offer Types</div>
+      <div class="fs-4 fw-bold text-warning">5</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+      <label class="form-label mb-0 small fw-semibold">Filter:</label>
+      <select name="status" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+        <option value="" {% if not status_filter %}selected{% endif %}>All Statuses</option>
+        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
+      </select>
+      {% if status_filter %}
+      <a href="{{ url_for('offers.list_offers') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-list-ul text-primary"></i>
+    <span>All Offers</span>
+    <span class="badge bg-primary ms-1">{{ total }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Title</th>
+          <th>Type</th>
+          <th>Discount</th>
+          <th>Min Purchase</th>
+          <th>Valid Days</th>
+          <th>Usage Limit</th>
+          <th>Status</th>
+          <th>Created By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for offer in offers %}
+        <tr>
+          <td class="text-muted small">{{ offer.id }}</td>
+          <td>
+            <div class="fw-semibold">{{ offer.title }}</div>
+            {% if offer.description %}
+            <div class="text-muted" style="font-size:.75rem;">{{ offer.description[:60] }}{% if offer.description|length > 60 %}…{% endif %}</div>
+            {% endif %}
+            {% if offer.start_date or offer.end_date %}
+            <div class="text-muted" style="font-size:.7rem;">
+              <i class="bi bi-calendar3 me-1"></i>
+              {% if offer.start_date %}From {{ offer.start_date.strftime('%d %b') }}{% endif %}
+              {% if offer.end_date %} to {{ offer.end_date.strftime('%d %b %Y') }}{% endif %}
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="offer-type-badge type-{{ offer.offer_type }}">{{ offer.type_label }}</span>
+          </td>
+          <td class="fw-semibold">
+            {% if offer.offer_type in ('percentage', 'conditional') %}
+              {{ offer.discount_value }}%
+            {% else %}
+              NPR {{ "%.0f"|format(offer.discount_value) }}
+            {% endif %}
+          </td>
+          <td>
+            {% if offer.min_purchase_amount %}
+              NPR {{ "%.0f"|format(offer.min_purchase_amount) }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ offer.valid_days }}d</td>
+          <td>{{ offer.usage_limit }}×</td>
+          <td>
+            {% if offer.is_active %}
+              <span class="badge bg-success">Active</span>
+            {% elif offer.status == 'active' and (offer.start_date or offer.end_date) %}
+              <span class="badge bg-warning text-dark">Scheduled</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ offer.creator.username if offer.creator else '—' }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_manage_offers) %}
+              <a href="{{ url_for('offers.edit_offer', offer_id=offer.id) }}" class="btn btn-sm btn-outline-primary" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <a href="{{ url_for('offers.clone_offer', offer_id=offer.id) }}" class="btn btn-sm btn-outline-secondary" title="Clone">
+                <i class="bi bi-copy"></i>
+              </a>
+              <form method="post" action="{{ url_for('offers.toggle_offer', offer_id=offer.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm {% if offer.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                        title="{{ 'Deactivate' if offer.status == 'active' else 'Activate' }}">
+                  <i class="bi bi-{% if offer.status == 'active' %}pause{% else %}play{% endif %}"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="10" class="text-center text-muted py-4">
+            <i class="bi bi-gift fs-2 d-block mb-2 opacity-25"></i>
+            No offers found. <a href="{{ url_for('offers.create_offer') }}">Create your first offer</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total > per_page %}
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+    <div class="text-muted small">
+      Showing {{ (page-1)*per_page + 1 }}–{{ [page*per_page, total]|min }} of {{ total }}
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('offers.list_offers', page=page-1, status=status_filter) }}">‹</a>
+        </li>
+        {% endif %}
+        {% for p in range(1, (total // per_page) + 2) %}
+          {% if p <= (total // per_page) + 1 %}
+          <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('offers.list_offers', page=p, status=status_filter) }}">{{ p }}</a>
+          </li>
+          {% endif %}
+        {% endfor %}
+        {% if page * per_page < total %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('offers.list_offers', page=page+1, status=status_filter) }}">›</a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

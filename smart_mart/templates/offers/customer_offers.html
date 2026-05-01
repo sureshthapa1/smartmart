@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Offers for {{ customer.name }} — Smart Mart{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title"><i class="bi bi-person-heart me-2 text-primary"></i>Offers for {{ customer.name }}</div>
+    <div class="page-header-sub">{{ customer.phone or 'No phone' }} · Manage and assign offers</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('customers.customer_profile', customer_id=customer.id) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Back to Profile
+    </a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="row g-4">
+  <!-- Left: Assign Offer + AI Suggestions -->
+  <div class="col-lg-4">
+    <!-- Assign Offer -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-plus-circle me-2 text-success"></i>Assign Offer</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">Select Offer</label>
+          <select id="assignOfferSelect" class="form-select form-select-sm">
+            <option value="">— Choose offer —</option>
+            {% for o in offers %}
+            <option value="{{ o.id }}">{{ o.title }} ({{ o.offer_type }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="button" class="btn btn-success btn-sm w-100" id="assignOfferBtn">
+          <i class="bi bi-gift me-1"></i>Assign to {{ customer.name }}
+        </button>
+        <div id="assignResult" class="mt-2 small"></div>
+      </div>
+    </div>
+
+    <!-- AI Suggestions -->
+    {% if ai_suggestions %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-stars me-2 text-warning"></i>AI Suggestions</div>
+      <div class="card-body p-2">
+        {% for s in ai_suggestions %}
+        <div class="border rounded-3 p-2 mb-2" style="background:#fffbeb;">
+          <div class="fw-semibold small">{{ s.title }}</div>
+          <div class="text-muted" style="font-size:.75rem;">{{ s.description }}</div>
+          <div class="text-muted" style="font-size:.7rem;" class="mt-1">
+            <i class="bi bi-lightbulb text-warning"></i> {{ s.reason }}
+          </div>
+          <button type="button" class="btn btn-warning btn-sm mt-2 w-100 ai-create-assign-btn"
+                  data-title="{{ s.title }}"
+                  data-description="{{ s.description }}"
+                  data-offer-type="{{ s.offer_type }}"
+                  data-discount="{{ s.discount_value }}"
+                  data-min-purchase="{{ s.min_purchase_amount }}"
+                  data-valid-days="{{ s.valid_days }}">
+            <i class="bi bi-plus me-1"></i>Create & Assign
+          </button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Offer History -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history text-primary"></i>
+        <span>Offer History</span>
+        <span class="badge bg-primary ms-1">{{ cos | length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Offer</th>
+              <th>Assigned</th>
+              <th>Expires</th>
+              <th>Status</th>
+              <th>Used</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for co in cos %}
+            <tr>
+              <td>
+                <div class="fw-semibold small">{{ co.offer.title }}</div>
+                <div class="text-muted" style="font-size:.72rem;">{{ co.offer.type_label }}</div>
+              </td>
+              <td class="small text-muted">{{ co.assigned_date.strftime('%d %b %Y') }}</td>
+              <td class="small">
+                {{ co.expiry_date.strftime('%d %b %Y') }}
+                {% if co.status == 'unused' %}
+                  {% if co.days_until_expiry <= 2 %}
+                    <span class="badge bg-danger ms-1">{{ co.days_until_expiry }}d left</span>
+                  {% elif co.days_until_expiry <= 7 %}
+                    <span class="badge bg-warning text-dark ms-1">{{ co.days_until_expiry }}d left</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td>
+                {% if co.status == 'unused' %}
+                  <span class="badge bg-success">Unused</span>
+                {% elif co.status == 'used' %}
+                  <span class="badge bg-primary">Used</span>
+                {% else %}
+                  <span class="badge bg-secondary">Expired</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ co.usage_count }}/{{ co.offer.usage_limit }}</td>
+              <td>
+                {% if co.status == 'unused' and customer.phone %}
+                <button type="button" class="btn btn-sm btn-outline-primary send-notif-btn"
+                        data-co-id="{{ co.id }}" title="Send notification">
+                  <i class="bi bi-send"></i>
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">
+                <i class="bi bi-gift fs-2 d-block mb-2 opacity-25"></i>
+                No offers assigned yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CUSTOMER_ID = {{ customer.id }};
+const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+// Assign existing offer
+document.getElementById('assignOfferBtn').addEventListener('click', async function() {
+  const offerId = document.getElementById('assignOfferSelect').value;
+  if (!offerId) { alert('Please select an offer.'); return; }
+  this.disabled = true;
+  try {
+    const res = await fetch('/offers/api/assign', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({customer_id: CUSTOMER_ID, offer_id: parseInt(offerId)}),
+    });
+    const data = await res.json();
+    const el = document.getElementById('assignResult');
+    if (data.success) {
+      el.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.message}</span>`;
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      el.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${data.error}</span>`;
+    }
+  } finally {
+    this.disabled = false;
+  }
+});
+
+// AI create & assign
+document.querySelectorAll('.ai-create-assign-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    this.disabled = true;
+    const payload = {
+      customer_id: CUSTOMER_ID,
+      title: this.dataset.title,
+      description: this.dataset.description,
+      offer_type: this.dataset.offerType,
+      discount_value: parseFloat(this.dataset.discount),
+      min_purchase_amount: parseFloat(this.dataset.minPurchase || 0),
+      valid_days: parseInt(this.dataset.validDays),
+    };
+    try {
+      const res = await fetch('/offers/api/quick-create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ ' + data.message);
+        location.reload();
+      } else {
+        alert('❌ ' + data.error);
+      }
+    } finally {
+      this.disabled = false;
+    }
+  });
+});
+
+// Send notification
+document.querySelectorAll('.send-notif-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    this.disabled = true;
+    try {
+      const res = await fetch('/offers/api/send-notification', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({customer_offer_id: parseInt(this.dataset.coId)}),
+      });
+      const data = await res.json();
+      alert(data.success ? '✅ Notification sent!' : '❌ ' + data.error);
+    } finally {
+      this.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}

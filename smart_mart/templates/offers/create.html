@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if offer else 'New' }} Offer — Smart Mart{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">
+      <i class="bi bi-gift me-2 text-primary"></i>{{ 'Edit Offer' if offer else 'Create New Offer' }}
+    </div>
+    <div class="page-header-sub">{{ 'Update offer details' if offer else 'Define a new customer retention offer' }}</div>
+  </div>
+  <a href="{{ url_for('offers.list_offers') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-pencil-square me-2 text-primary"></i>Offer Details</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('offers.edit_offer', offer_id=offer.id) if (offer and offer.id) else url_for('offers.create_offer') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Offer Title <span class="text-danger">*</span></label>
+              <input type="text" name="title" class="form-control" required maxlength="120"
+                     value="{{ offer.title if offer else '' }}"
+                     placeholder="e.g. 10% Off Next Visit, NPR 50 Cashback…">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control" rows="2"
+                        placeholder="Optional details shown to customer in notification">{{ offer.description if offer else '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Offer Type <span class="text-danger">*</span></label>
+              <select name="offer_type" id="offerType" class="form-select" required>
+                <option value="percentage" {% if offer and offer.offer_type == 'percentage' %}selected{% endif %}>Percentage Discount (%)</option>
+                <option value="fixed" {% if offer and offer.offer_type == 'fixed' %}selected{% endif %}>Fixed Amount Off (NPR)</option>
+                <option value="conditional" {% if offer and offer.offer_type == 'conditional' %}selected{% endif %}>Conditional (min purchase)</option>
+                <option value="product_based" {% if offer and offer.offer_type == 'product_based' %}selected{% endif %}>Product-Based Discount</option>
+                <option value="combo" {% if offer and offer.offer_type == 'combo' %}selected{% endif %}>Combo / Bundle Deal</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" id="discountLabel">Discount Value <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="number" name="discount_value" class="form-control" required
+                       min="0.01" step="0.01" id="discountValueInput"
+                       value="{{ offer.discount_value | float if offer else '' }}"
+                       placeholder="e.g. 10">
+                <span class="input-group-text" id="discountUnit">%</span>
+              </div>
+              <div class="form-text" id="discountHint">Enter percentage (0–100)</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Minimum Purchase (NPR)</label>
+              <input type="number" name="min_purchase_amount" class="form-control"
+                     min="0" step="0.01"
+                     value="{{ offer.min_purchase_amount | float if offer and offer.min_purchase_amount else '' }}"
+                     placeholder="0 = no minimum">
+              <div class="form-text">Leave blank or 0 for no minimum</div>
+            </div>
+            <div class="col-md-6" id="productField">
+              <label class="form-label">Specific Product (optional)</label>
+              <select name="product_id" class="form-select">
+                <option value="">— All products —</option>
+                {% for p in products %}
+                <option value="{{ p.id }}" {% if offer and offer.product_id == p.id %}selected{% endif %}>
+                  {{ p.name }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">For product-based offers only</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Valid Days <span class="text-danger">*</span></label>
+              <input type="number" name="valid_days" class="form-control" required
+                     min="1" max="365"
+                     value="{{ offer.valid_days if offer else 30 }}">
+              <div class="form-text">Days until offer expires after assignment</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Usage Limit <span class="text-danger">*</span></label>
+              <input type="number" name="usage_limit" class="form-control" required
+                     min="1" max="100"
+                     value="{{ offer.usage_limit if offer else 1 }}">
+              <div class="form-text">Max times per customer (1–100)</div>
+            </div>
+            <!-- Optional scheduling -->
+            <div class="col-12">
+              <div class="border rounded-3 p-3 bg-light">
+                <div class="fw-semibold small mb-2"><i class="bi bi-calendar3 me-1 text-primary"></i>Optional Scheduling</div>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label small">Active From</label>
+                    <input type="date" name="start_date" class="form-control form-control-sm"
+                           value="{{ offer.start_date.isoformat() if offer and offer.start_date else '' }}">
+                    <div class="form-text">Leave blank to activate immediately</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small">Active Until</label>
+                    <input type="date" name="end_date" class="form-control form-control-sm"
+                           value="{{ offer.end_date.isoformat() if offer and offer.end_date else '' }}">
+                    <div class="form-text">Leave blank for no end date</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle me-1"></i>
+              {% if is_clone is defined and is_clone %}Save as New Offer
+              {% elif offer and offer.id %}Update Offer
+              {% else %}Create Offer{% endif %}
+            </button>
+            <a href="{{ url_for('offers.list_offers') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-2 text-primary"></i>Offer Types Guide</div>
+      <div class="card-body p-3">
+        <div class="mb-3">
+          <div class="fw-semibold small text-primary mb-1">Percentage (%)</div>
+          <div class="text-muted" style="font-size:.8rem;">e.g. 10% off total bill. Best for general retention.</div>
+        </div>
+        <div class="mb-3">
+          <div class="fw-semibold small text-success mb-1">Fixed Amount (NPR)</div>
+          <div class="text-muted" style="font-size:.8rem;">e.g. NPR 50 off. Clear value, easy to understand.</div>
+        </div>
+        <div class="mb-3">
+          <div class="fw-semibold small text-warning mb-1">Conditional</div>
+          <div class="text-muted" style="font-size:.8rem;">Discount only when min purchase is met. Drives higher spend.</div>
+        </div>
+        <div class="mb-3">
+          <div class="fw-semibold small text-purple mb-1">Product-Based</div>
+          <div class="text-muted" style="font-size:.8rem;">Discount on a specific product. Good for slow movers.</div>
+        </div>
+        <div>
+          <div class="fw-semibold small text-danger mb-1">Combo / Bundle</div>
+          <div class="text-muted" style="font-size:.8rem;">Fixed discount on combo purchases. Increases basket size.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const offerType = document.getElementById('offerType');
+const discountUnit = document.getElementById('discountUnit');
+const discountHint = document.getElementById('discountHint');
+const discountLabel = document.getElementById('discountLabel');
+const productField = document.getElementById('productField');
+
+function updateOfferTypeUI() {
+  const t = offerType.value;
+  if (t === 'percentage' || t === 'conditional') {
+    discountUnit.textContent = '%';
+    discountHint.textContent = 'Enter percentage (0–100)';
+  } else {
+    discountUnit.textContent = 'NPR';
+    discountHint.textContent = 'Enter fixed amount in NPR';
+  }
+  productField.style.display = t === 'product_based' ? '' : 'none';
+}
+
+offerType.addEventListener('change', updateOfferTypeUI);
+updateOfferTypeUI();
+</script>
+{% endblock %}
