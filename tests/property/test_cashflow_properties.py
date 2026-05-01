@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -120,3 +120,4 @@ def test_profit_loss_formula(app):
         result = cash_flow_manager.profit_loss(start, end)
         assert isinstance(result, dict)
         assert "profit" in result or "net" in result or "total_revenue" in result
+

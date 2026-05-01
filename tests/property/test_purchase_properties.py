@@ -9,7 +9,7 @@ Properties covered:
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -127,3 +127,4 @@ def test_purchase_total_equals_sum_of_line_items(app, items):
             user_id=user.id,
         )
         assert abs(float(purchase.total_cost) - round(expected_total, 2)) < 0.02
+

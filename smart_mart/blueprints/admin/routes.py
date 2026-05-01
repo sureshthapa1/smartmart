@@ -493,3 +493,46 @@ def sync_visit_counts():
     db.session.commit()
     flash(f"Visit counts synced — {updated} customer(s) updated.", "success")
     return redirect(url_for("admin.staff_activity"))
+
+
+# ── Notification Dashboard ────────────────────────────────────────────────
+
+@admin_bp.route("/notifications")
+@admin_required
+def notification_dashboard():
+    """Failed notification dashboard with retry visibility and provider config check."""
+    from ...services.notification_service import (
+        get_failed_notifications,
+        get_notification_stats,
+        validate_provider_config,
+    )
+    from ...models.notification_log import NotificationLog
+
+    failed = get_failed_notifications(limit=100)
+    stats = get_notification_stats()
+    provider_config = validate_provider_config()
+
+    # Recent 50 notifications (all statuses)
+    recent = db.session.execute(
+        db.select(NotificationLog)
+        .order_by(NotificationLog.created_at.desc())
+        .limit(50)
+    ).scalars().all()
+
+    return render_template(
+        "admin/notification_dashboard.html",
+        failed=failed,
+        stats=stats,
+        provider_config=provider_config,
+        recent=recent,
+    )
+
+
+@admin_bp.route("/notifications/retry", methods=["POST"])
+@admin_required
+def retry_notifications():
+    """Retry all failed notifications."""
+    from ...services.offer_service import retry_failed_notifications
+    retried = retry_failed_notifications(max_retries=3)
+    flash(f"Retried {retried} failed notification(s).", "success")
+    return redirect(url_for("admin.notification_dashboard"))

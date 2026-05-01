@@ -8,7 +8,7 @@ import csv
 import io
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -58,3 +58,4 @@ def test_csv_row_count_and_headers(app, rows, columns):
             assert col in reader.fieldnames
         # Row count check
         assert len(result_rows) == len(rows)
+

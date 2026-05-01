@@ -160,6 +160,98 @@ def analytics():
     return render_template("offers/analytics.html", stats=stats)
 
 
+@offers_bp.route("/retention")
+@login_required
+def retention_dashboard():
+    """Customer retention dashboard — inactive, birthday, VIP customers."""
+    _require_perm("can_view_offers")
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func as _func
+    from ...models.sale import Sale
+    from ...models.customer import Customer as _Cust
+
+    today = date.today()
+    now_utc = datetime.now(timezone.utc)
+    cutoff_inactive = now_utc - timedelta(days=14)
+
+    # ── Inactive customers (no visit in 14+ days, have phone) ────────────
+    inactive_raw = db.session.execute(
+        db.select(_Cust)
+        .where(
+            _Cust.last_visit < cutoff_inactive,
+            _Cust.phone.isnot(None),
+            _Cust.phone != "",
+        )
+        .order_by(_Cust.last_visit.asc())
+        .limit(50)
+    ).scalars().all()
+
+    # Enrich with total_spent and days_inactive
+    inactive_customers = []
+    for c in inactive_raw:
+        lv = c.last_visit
+        lv_date = lv.date() if hasattr(lv, "date") else lv
+        days_inactive = (today - lv_date).days if lv_date else 999
+        total_spent = db.session.execute(
+            db.select(_func.sum(Sale.total_amount))
+            .where(
+                (Sale.customer_id == c.id) |
+                (_func.lower(Sale.customer_name) == c.name.lower())
+            )
+        ).scalar() or 0
+        c.days_inactive = days_inactive
+        c.total_spent = float(total_spent)
+        inactive_customers.append(c)
+
+    # ── Birthday customers (next 7 days) ─────────────────────────────────
+    all_customers = db.session.execute(
+        db.select(_Cust).where(_Cust.birthday.isnot(None))
+    ).scalars().all()
+    birthday_customers = []
+    for c in all_customers:
+        bday = c.birthday.replace(year=today.year)
+        if bday < today:
+            bday = c.birthday.replace(year=today.year + 1)
+        days_to = (bday - today).days
+        if 0 <= days_to <= 7:
+            c.days_to_birthday = days_to
+            birthday_customers.append(c)
+    birthday_customers.sort(key=lambda c: c.days_to_birthday)
+
+    # ── VIP / High-value customers (top 20 by visit_count) ───────────────
+    vip_raw = db.session.execute(
+        db.select(_Cust)
+        .order_by(_Cust.visit_count.desc())
+        .limit(20)
+    ).scalars().all()
+    vip_customers = []
+    for c in vip_raw:
+        total_spent = db.session.execute(
+            db.select(_func.sum(Sale.total_amount))
+            .where(
+                (Sale.customer_id == c.id) |
+                (_func.lower(Sale.customer_name) == c.name.lower())
+            )
+        ).scalar() or 0
+        c.total_spent = float(total_spent)
+        vip_customers.append(c)
+    vip_customers.sort(key=lambda c: c.total_spent, reverse=True)
+
+    # ── Active offers for the dropdowns ──────────────────────────────────
+    active_offers = db.session.execute(
+        db.select(Offer).where(Offer.status == "active").order_by(Offer.title)
+    ).scalars().all()
+
+    return render_template(
+        "offers/retention_dashboard.html",
+        inactive_customers=inactive_customers,
+        birthday_customers=birthday_customers,
+        vip_customers=vip_customers,
+        active_offers=active_offers,
+        today=today,
+    )
+
+
 @offers_bp.route("/customer/<int:customer_id>")
 @login_required
 def customer_offers(customer_id):

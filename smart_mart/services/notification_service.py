@@ -19,6 +19,43 @@ def _get_provider() -> str:
     return os.environ.get("NOTIFICATION_PROVIDER", "none").lower()
 
 
+def validate_provider_config() -> dict:
+    """Check that the configured notification provider has all required env vars.
+
+    Returns a dict with:
+      - provider: str
+      - configured: bool
+      - missing: list[str]  — missing env var names
+      - warning: str | None — human-readable warning if misconfigured
+    """
+    provider = _get_provider()
+    missing = []
+    warning = None
+
+    if provider == "sparrow":
+        if not os.environ.get("SPARROW_TOKEN"):
+            missing.append("SPARROW_TOKEN")
+    elif provider == "twilio":
+        for var in ("TWILIO_SID", "TWILIO_TOKEN", "TWILIO_FROM"):
+            if not os.environ.get(var):
+                missing.append(var)
+    elif provider == "none":
+        warning = "NOTIFICATION_PROVIDER is 'none' — all messages are logged only, not sent."
+    else:
+        warning = f"Unknown NOTIFICATION_PROVIDER '{provider}'. Valid values: sparrow, twilio, none."
+        missing.append("NOTIFICATION_PROVIDER")
+
+    if missing:
+        warning = f"Provider '{provider}' is missing required env vars: {', '.join(missing)}"
+
+    return {
+        "provider": provider,
+        "configured": len(missing) == 0,
+        "missing": missing,
+        "warning": warning,
+    }
+
+
 def _send_sparrow(phone: str, message: str) -> tuple[bool, str]:
     """Sparrow SMS (Nepal) integration."""
     try:
@@ -75,7 +112,7 @@ def send_notification(phone: str, message: str, channel: str = "sms") -> Notific
         success, ref = _send_twilio(phone, message, whatsapp=(channel == "whatsapp"))
     else:
         # Log-only mode — useful for development
-        logger.info(f"[NOTIFICATION] {channel.upper()} to {phone}: {message}")
+        logger.info("[NOTIFICATION] %s to %s: %s", channel.upper(), phone, message)
         success, ref = True, "logged_only"
 
     log.status = "sent" if success else "failed"
@@ -83,7 +120,54 @@ def send_notification(phone: str, message: str, channel: str = "sms") -> Notific
     log.error = ref if not success else None
     log.sent_at = datetime.now(timezone.utc) if success else None
     db.session.commit()
+
+    if not success:
+        logger.warning(
+            "Notification FAILED to %s via %s (%s): %s",
+            phone, provider, channel, ref
+        )
+
     return log
+
+
+def get_failed_notifications(limit: int = 100) -> list[NotificationLog]:
+    """Return recent failed notifications for the dashboard."""
+    return db.session.execute(
+        db.select(NotificationLog)
+        .where(NotificationLog.status == "failed")
+        .order_by(NotificationLog.created_at.desc())
+        .limit(limit)
+    ).scalars().all()
+
+
+def get_notification_stats() -> dict:
+    """Return delivery stats for the notification dashboard."""
+    from sqlalchemy import func
+    rows = db.session.execute(
+        db.select(
+            NotificationLog.status,
+            NotificationLog.channel,
+            func.count(NotificationLog.id).label("count"),
+        )
+        .group_by(NotificationLog.status, NotificationLog.channel)
+    ).all()
+
+    stats: dict = {"total": 0, "sent": 0, "failed": 0, "by_channel": {}}
+    for row in rows:
+        stats["total"] += row.count
+        if row.status == "sent":
+            stats["sent"] += row.count
+        elif row.status == "failed":
+            stats["failed"] += row.count
+        ch = row.channel
+        if ch not in stats["by_channel"]:
+            stats["by_channel"][ch] = {"sent": 0, "failed": 0}
+        stats["by_channel"][ch][row.status] = stats["by_channel"][ch].get(row.status, 0) + row.count
+
+    stats["delivery_rate"] = (
+        round(stats["sent"] / stats["total"] * 100, 1) if stats["total"] else 0.0
+    )
+    return stats
 
 
 # ── Convenience helpers ───────────────────────────────────────────────────────

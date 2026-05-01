@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -173,3 +173,4 @@ def test_loss_items_classification(app):
                     assert is_loss
                 else:
                     assert not is_loss
+

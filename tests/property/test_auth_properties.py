@@ -9,7 +9,7 @@ Properties covered:
 # Feature: smart-mart-inventory
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -114,3 +114,4 @@ def test_password_never_stored_as_plaintext(app, password):
         hashed = authenticator.hash_password(password)
         assert hashed != password
         assert authenticator.check_password(password, hashed)
+

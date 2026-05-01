@@ -514,7 +514,9 @@ def ai_suggest_offers_for_customer(customer_id: int) -> list[dict]:
 
 
 def get_offer_analytics() -> dict:
-    """Return offer performance analytics."""
+    """Return offer performance analytics with revenue impact."""
+    from ..models.sale import Sale
+
     total_offers = db.session.execute(db.select(func.count(Offer.id))).scalar() or 0
     total_assigned = db.session.execute(db.select(func.count(CustomerOffer.id))).scalar() or 0
     total_used = db.session.execute(
@@ -532,7 +534,35 @@ def get_offer_analytics() -> dict:
 
     conversion_rate = round(total_used / total_assigned * 100, 1) if total_assigned else 0.0
 
-    # Per-offer breakdown
+    # ── Revenue impact: total discount given via offers ───────────────────
+    # Sum discount_amount from sales that had at least one offer applied
+    sales_with_offers = db.session.execute(
+        db.select(
+            func.count(func.distinct(CustomerOffer.applied_sale_id)).label("sale_count"),
+            func.sum(Sale.discount_amount).label("total_discount"),
+            func.sum(Sale.total_amount).label("total_revenue"),
+        )
+        .join(Sale, Sale.id == CustomerOffer.applied_sale_id)
+        .where(CustomerOffer.applied_sale_id.isnot(None))
+    ).one()
+
+    total_discount_given = float(sales_with_offers.total_discount or 0)
+    revenue_from_offer_sales = float(sales_with_offers.total_revenue or 0)
+    offer_sale_count = int(sales_with_offers.sale_count or 0)
+
+    # Expired-unused loss estimate: what discount was never redeemed
+    # (sum of discount_value for expired unused offers — approximate)
+    expired_loss_row = db.session.execute(
+        db.select(func.sum(Offer.discount_value))
+        .join(CustomerOffer, CustomerOffer.offer_id == Offer.id)
+        .where(
+            CustomerOffer.status == CustomerOffer.STATUS_EXPIRED,
+            Offer.offer_type == "fixed",
+        )
+    ).scalar() or 0
+    expired_loss = float(expired_loss_row)
+
+    # ── Per-offer breakdown with revenue impact ───────────────────────────
     offer_stats = db.session.execute(
         db.select(
             Offer.id,
@@ -544,10 +574,13 @@ def get_offer_analytics() -> dict:
             func.sum(
                 db.case((CustomerOffer.status == "used", 1), else_=0)
             ).label("used"),
+            func.sum(
+                db.case((CustomerOffer.status == "expired", 1), else_=0)
+            ).label("expired_count"),
         )
         .outerjoin(CustomerOffer, CustomerOffer.offer_id == Offer.id)
         .group_by(Offer.id, Offer.title, Offer.offer_type, Offer.discount_value, Offer.status)
-        .order_by(func.count(CustomerOffer.id).desc())
+        .order_by(func.sum(db.case((CustomerOffer.status == "used", 1), else_=0)).desc())
     ).all()
 
     return {
@@ -557,6 +590,11 @@ def get_offer_analytics() -> dict:
         "total_expired": total_expired,
         "total_unused": total_unused,
         "conversion_rate": conversion_rate,
+        # Revenue impact
+        "total_discount_given": round(total_discount_given, 2),
+        "revenue_from_offer_sales": round(revenue_from_offer_sales, 2),
+        "offer_sale_count": offer_sale_count,
+        "expired_unused_loss": round(expired_loss, 2),
         "offer_stats": [
             {
                 "id": row.id,
@@ -566,6 +604,7 @@ def get_offer_analytics() -> dict:
                 "status": row.status,
                 "assigned": row.assigned or 0,
                 "used": int(row.used or 0),
+                "expired_count": int(row.expired_count or 0),
                 "conversion_rate": round(int(row.used or 0) / (row.assigned or 1) * 100, 1),
             }
             for row in offer_stats

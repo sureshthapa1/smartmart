@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Notification Dashboard — Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title"><i class="bi bi-bell me-2 text-primary"></i>Notification Dashboard</div>
+    <div class="page-header-sub">SMS/WhatsApp delivery status, failed messages, and provider config</div>
+  </div>
+  {% if failed %}
+  <form method="post" action="{{ url_for('admin.retry_notifications') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-warning btn-sm">
+      <i class="bi bi-arrow-clockwise me-1"></i>Retry All Failed ({{ failed | length }})
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Provider Config Alert -->
+{% if not provider_config.configured %}
+<div class="alert alert-danger d-flex align-items-center gap-2">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div>
+    <strong>Notification provider misconfigured:</strong> {{ provider_config.warning }}
+    {% if provider_config.missing %}
+    <br><small>Missing env vars: <code>{{ provider_config.missing | join(', ') }}</code></small>
+    {% endif %}
+  </div>
+</div>
+{% elif provider_config.provider == 'none' %}
+<div class="alert alert-warning d-flex align-items-center gap-2">
+  <i class="bi bi-info-circle-fill"></i>
+  <span>{{ provider_config.warning }}</span>
+</div>
+{% else %}
+<div class="alert alert-success d-flex align-items-center gap-2">
+  <i class="bi bi-check-circle-fill"></i>
+  <span>Provider <strong>{{ provider_config.provider }}</strong> is configured and ready.</span>
+</div>
+{% endif %}
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Total Sent</div>
+      <div class="fs-3 fw-bold text-primary">{{ stats.total }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Delivered</div>
+      <div class="fs-3 fw-bold text-success">{{ stats.sent }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Failed</div>
+      <div class="fs-3 fw-bold text-danger">{{ stats.failed }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="text-muted small">Delivery Rate</div>
+      <div class="fs-3 fw-bold" style="color:#7c3aed">{{ stats.delivery_rate }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Failed Notifications -->
+{% if failed %}
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-x-circle text-danger"></i>
+    <span>Failed Notifications</span>
+    <span class="badge bg-danger ms-1">{{ failed | length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>Recipient</th><th>Channel</th><th>Message</th><th>Error</th><th>Retries</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        {% for n in failed %}
+        <tr>
+          <td class="fw-semibold">{{ n.recipient }}</td>
+          <td><span class="badge bg-secondary">{{ n.channel }}</span></td>
+          <td class="text-muted small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.message[:80] }}</td>
+          <td class="text-danger small">{{ n.error[:60] if n.error else '—' }}</td>
+          <td>{{ n.retry_count }}</td>
+          <td class="text-muted small">{{ n.created_at | nst }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent Notifications -->
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Notifications</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>Recipient</th><th>Channel</th><th>Status</th><th>Message</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        {% for n in recent %}
+        <tr>
+          <td>{{ n.recipient }}</td>
+          <td><span class="badge bg-secondary">{{ n.channel }}</span></td>
+          <td>
+            {% if n.status == 'sent' %}<span class="badge bg-success">Sent</span>
+            {% elif n.status == 'failed' %}<span class="badge bg-danger">Failed</span>
+            {% else %}<span class="badge bg-secondary">{{ n.status }}</span>{% endif %}
+          </td>
+          <td class="text-muted small" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ n.message[:80] }}</td>
+          <td class="text-muted small">{{ n.created_at | nst }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No notifications sent yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

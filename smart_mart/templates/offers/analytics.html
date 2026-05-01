@@ -4,7 +4,7 @@
 <div class="page-header">
   <div>
     <div class="page-header-title"><i class="bi bi-bar-chart me-2 text-primary"></i>Offer Analytics</div>
-    <div class="page-header-sub">Track offer performance and conversion rates</div>
+    <div class="page-header-sub">Track offer performance, revenue impact, and conversion rates</div>
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('offers.list_offers') }}" class="btn btn-outline-secondary btn-sm">
@@ -18,8 +18,8 @@
   </div>
 </div>
 
-<!-- KPI Cards -->
-<div class="row g-3 mb-4">
+<!-- KPI Cards — Volume -->
+<div class="row g-3 mb-3">
   <div class="col-6 col-md-2">
     <div class="card p-3 text-center">
       <div class="text-muted small">Total Offers</div>
@@ -53,7 +53,39 @@
   <div class="col-6 col-md-2">
     <div class="card p-3 text-center">
       <div class="text-muted small">Conversion</div>
-      <div class="fs-3 fw-bold text-purple" style="color:#7c3aed">{{ stats.conversion_rate }}%</div>
+      <div class="fs-3 fw-bold" style="color:#7c3aed">{{ stats.conversion_rate }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Revenue Impact Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 metric-card green">
+      <div class="text-muted small">Revenue from Offer Sales</div>
+      <div class="fs-5 fw-bold text-success">NPR {{ "{:,.0f}".format(stats.revenue_from_offer_sales) }}</div>
+      <div class="text-muted" style="font-size:.72rem;">{{ stats.offer_sale_count }} sales with offers</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 metric-card orange">
+      <div class="text-muted small">Total Discount Given</div>
+      <div class="fs-5 fw-bold text-warning">NPR {{ "{:,.0f}".format(stats.total_discount_given) }}</div>
+      <div class="text-muted" style="font-size:.72rem;">Across all offer-applied sales</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 metric-card blue">
+      <div class="text-muted small">Net Revenue (after discount)</div>
+      <div class="fs-5 fw-bold text-primary">NPR {{ "{:,.0f}".format(stats.revenue_from_offer_sales - stats.total_discount_given) }}</div>
+      <div class="text-muted" style="font-size:.72rem;">Revenue minus discounts</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 metric-card purple" style="border-left-color:#ef4444!important;">
+      <div class="text-muted small">Expired-Unused Loss</div>
+      <div class="fs-5 fw-bold text-danger">NPR {{ "{:,.0f}".format(stats.expired_unused_loss) }}</div>
+      <div class="text-muted" style="font-size:.72rem;">Fixed offers that expired unused</div>
     </div>
   </div>
 </div>
@@ -72,9 +104,7 @@
       </div>
       <div class="text-muted small">{{ stats.total_used }} used / {{ stats.total_assigned }} assigned</div>
     </div>
-    <div class="text-muted small mt-2">
-      Conversion rate = offers used ÷ offers assigned × 100
-    </div>
+    <div class="text-muted small mt-2">Conversion rate = offers used / offers assigned × 100</div>
   </div>
 </div>
 
@@ -92,6 +122,7 @@
           <th>Status</th>
           <th>Assigned</th>
           <th>Used</th>
+          <th>Expired</th>
           <th>Conversion</th>
         </tr>
       </thead>
@@ -111,6 +142,7 @@
           </td>
           <td>{{ row.assigned }}</td>
           <td class="text-success fw-semibold">{{ row.used }}</td>
+          <td class="text-secondary">{{ row.expired_count }}</td>
           <td>
             <div class="d-flex align-items-center gap-2">
               <div class="progress flex-grow-1" style="height:8px;border-radius:4px;min-width:60px;">
@@ -121,7 +153,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">No offer data yet.</td></tr>
+        <tr><td colspan="9" class="text-center text-muted py-4">No offer data yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -131,7 +163,7 @@
 <script>
 document.getElementById('runCronBtn')?.addEventListener('click', async function() {
   this.disabled = true;
-  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running…';
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running...';
   try {
     const res = await fetch('/offers/api/run-cron', {
       method: 'POST',
@@ -139,11 +171,11 @@ document.getElementById('runCronBtn')?.addEventListener('click', async function(
     });
     const data = await res.json();
     if (data.success) {
-      alert(`✅ Cron complete:\n• Expired: ${data.expired} offers\n• Reminders sent: ${data.reminders['2d']} (2d) + ${data.reminders['1d']} (1d)\n• Retried: ${data.retried} notifications`);
+      alert(`Cron complete:\n- Expired: ${data.expired} offers\n- Reminders: ${data.reminders['2d']} (2d) + ${data.reminders['1d']} (1d)\n- Retried: ${data.retried} notifications`);
       location.reload();
     }
   } catch(e) {
-    alert('Error running cron: ' + e.message);
+    alert('Error: ' + e.message);
   } finally {
     this.disabled = false;
     this.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Run Cron Jobs';

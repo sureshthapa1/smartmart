@@ -7,10 +7,32 @@
 <li class="breadcrumb-item active">{{ user.username }}</li>
 {% endblock %}
 
+{% block head %}
+<style>
+  .perm-group-card{border-radius:12px;border:1px solid #e2e8f0;margin-bottom:1rem}
+  .perm-group-header{border-radius:12px 12px 0 0;padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem;cursor:pointer;user-select:none}
+  .perm-group-header:hover{background:#f8fafc}
+  .perm-group-body{padding:1rem 1.25rem}
+  .perm-group-desc{font-size:.75rem;color:#64748b;margin-top:.1rem}
+  .group-badge{font-size:.65rem;padding:.2em .5em;border-radius:5px;font-weight:700}
+  /* Group color accents */
+  .grp-inventory .perm-group-header{background:linear-gradient(135deg,#eff6ff,#fff)}
+  .grp-sales .perm-group-header{background:linear-gradient(135deg,#f0fdf4,#fff)}
+  .grp-purchases .perm-group-header{background:linear-gradient(135deg,#fffbeb,#fff)}
+  .grp-customers .perm-group-header{background:linear-gradient(135deg,#fdf4ff,#fff)}
+  .grp-finance .perm-group-header{background:linear-gradient(135deg,#fff1f2,#fff)}
+  .grp-offers .perm-group-header{background:linear-gradient(135deg,#f0fdf4,#dcfce7)}
+  .grp-ai .perm-group-header{background:linear-gradient(135deg,#fefce8,#fff)}
+  .grp-bi .perm-group-header{background:linear-gradient(135deg,#eff6ff,#e0f2fe)}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-8">
-    <div class="card shadow-sm border-0 mb-3">
+  <div class="col-lg-9">
+
+    <!-- User header card -->
+    <div class="card shadow-sm border-0 mb-4">
       <div class="card-body d-flex align-items-center gap-3 py-3">
         <div style="width:48px;height:48px;background:#6366f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.2rem;flex-shrink:0;">
           {{ user.username[0].upper() }}
@@ -19,43 +41,89 @@
           <div class="fw-bold fs-6" style="color:#0f172a;">{{ user.username }}</div>
           <div class="text-muted small">Staff — configure what this user can access</div>
         </div>
-        <div class="ms-auto d-flex gap-2">
-          <button type="button" class="btn btn-outline-success btn-sm" id="enableAll">Enable All</button>
-          <button type="button" class="btn btn-outline-danger btn-sm" id="disableAll">Disable All</button>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-success btn-sm" id="enableAll">
+            <i class="bi bi-check-all me-1"></i>Enable All
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="disableAll">
+            <i class="bi bi-x-lg me-1"></i>Disable All
+          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="enableEssentials">
+            <i class="bi bi-lightning me-1"></i>Cashier Preset
+          </button>
         </div>
       </div>
     </div>
 
     <form method="post" action="{{ url_for('admin.edit_permissions', user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {% set group_meta = {
+        'Inventory':            ('bi-box-seam',        'primary',  'grp-inventory', 'Products, stock, categories, labels'),
+        'Sales':                ('bi-cart3',            'success',  'grp-sales',     'POS billing, invoices, discounts'),
+        'Returns':              ('bi-arrow-counterclockwise', 'warning', '', 'Sale returns and supplier returns'),
+        'Purchases':            ('bi-truck',            'warning',  'grp-purchases', 'Supplier purchases and purchase orders'),
+        'Customers':            ('bi-people',           'purple',   'grp-customers', 'Customer profiles and management'),
+        'Finance':              ('bi-cash-stack',       'danger',   'grp-finance',   'Credits, cash sessions, expenses'),
+        'Reports':              ('bi-bar-chart-line',   'info',     '',              'Sales, profit, stock, credit reports'),
+        'Online Orders':        ('bi-globe',            'primary',  '',              'Online order management'),
+        'Promotions & Transfers': ('bi-tag',            'warning',  '',              'Time-based promotions and stock transfers'),
+        'Offers & Retention':   ('bi-gift',             'success',  'grp-offers',    'Customer offers, retention, and billing discounts'),
+        'AI & Insights':        ('bi-stars',            'warning',  'grp-ai',        'AI analytics, advisor, and insights'),
+        'BI Module':            ('bi-graph-up-arrow',   'primary',  'grp-bi',        'Business intelligence dashboard and batches'),
+        'General':              ('bi-grid',             'secondary','',              'Dashboard and alert access'),
+      } %}
+
       {% for group_name, group_perms in permission_groups.items() %}
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white border-bottom py-3 px-4">
-          <h6 class="fw-bold mb-0">
-            {% if group_name == 'Inventory' %}<i class="bi bi-box-seam me-2 text-primary"></i>
-            {% elif group_name == 'Sales' %}<i class="bi bi-cart3 me-2 text-success"></i>
-            {% elif group_name == 'Purchases' %}<i class="bi bi-truck me-2 text-warning"></i>
-            {% else %}<i class="bi bi-grid me-2 text-info"></i>{% endif %}
-            {{ group_name }}
-          </h6>
-        </div>
-        <div class="card-body px-4 py-3">
-          <div class="row g-2">
-            {% for perm_key, perm_label in group_perms %}
-            <div class="col-md-6">
-              <div class="form-check form-switch">
-                <input class="form-check-input perm-toggle" type="checkbox"
-                       name="{{ perm_key }}" id="{{ perm_key }}"
-                       {% if perms[perm_key] %}checked{% endif %}>
-                <label class="form-check-label" for="{{ perm_key }}">{{ perm_label }}</label>
-              </div>
+        {% set meta = group_meta.get(group_name, ('bi-grid', 'secondary', '', '')) %}
+        {% set icon, color, grp_class, desc = meta[0], meta[1], meta[2], meta[3] %}
+        {% set enabled_count = namespace(n=0) %}
+        {% for perm_key, _ in group_perms %}
+          {% if perms[perm_key] %}{% set enabled_count.n = enabled_count.n + 1 %}{% endif %}
+        {% endfor %}
+
+        <div class="perm-group-card {{ grp_class }}">
+          <div class="perm-group-header" data-bs-toggle="collapse" data-bs-target="#grp-{{ loop.index }}">
+            <i class="bi {{ icon }} text-{{ color }} fs-5"></i>
+            <div class="flex-grow-1">
+              <div class="fw-semibold">{{ group_name }}</div>
+              {% if desc %}<div class="perm-group-desc">{{ desc }}</div>{% endif %}
             </div>
-            {% endfor %}
+            <span class="group-badge {% if enabled_count.n == group_perms|length %}bg-success text-white{% elif enabled_count.n > 0 %}bg-warning text-dark{% else %}bg-light text-muted{% endif %}">
+              {{ enabled_count.n }}/{{ group_perms|length }}
+            </span>
+            <i class="bi bi-chevron-down text-muted ms-2" style="font-size:.75rem;"></i>
+          </div>
+          <div class="collapse show perm-group-body" id="grp-{{ loop.index }}">
+            <div class="row g-2">
+              {% for perm_key, perm_label in group_perms %}
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input perm-toggle" type="checkbox"
+                         name="{{ perm_key }}" id="{{ perm_key }}"
+                         data-group="{{ group_name }}"
+                         {% if perms[perm_key] %}checked{% endif %}>
+                  <label class="form-check-label small" for="{{ perm_key }}">{{ perm_label }}</label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <!-- Group-level quick toggles -->
+            <div class="mt-2 pt-2 border-top d-flex gap-2">
+              <button type="button" class="btn btn-xs btn-outline-success group-enable-btn"
+                      data-group="{{ group_name }}" style="font-size:.72rem;padding:.2rem .5rem;">
+                Enable all in group
+              </button>
+              <button type="button" class="btn btn-xs btn-outline-secondary group-disable-btn"
+                      data-group="{{ group_name }}" style="font-size:.72rem;padding:.2rem .5rem;">
+                Disable all in group
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       {% endfor %}
 
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-primary px-4">
           <i class="bi bi-check-lg me-1"></i>Save Permissions
         </button>
@@ -68,11 +136,73 @@
 
 {% block scripts %}
 <script>
+// Enable / disable all
 document.getElementById('enableAll').addEventListener('click', () => {
   document.querySelectorAll('.perm-toggle').forEach(cb => cb.checked = true);
+  updateBadges();
 });
 document.getElementById('disableAll').addEventListener('click', () => {
   document.querySelectorAll('.perm-toggle').forEach(cb => cb.checked = false);
+  updateBadges();
 });
+
+// Cashier preset — only billing essentials
+document.getElementById('enableEssentials').addEventListener('click', () => {
+  document.querySelectorAll('.perm-toggle').forEach(cb => cb.checked = false);
+  const cashierPerms = [
+    'can_view_inventory', 'can_view_sales', 'can_create_sale',
+    'can_download_invoice', 'can_view_returns', 'can_view_dashboard',
+    'can_view_alerts', 'can_apply_offers', 'can_view_offers',
+  ];
+  cashierPerms.forEach(p => {
+    const el = document.getElementById(p);
+    if (el) el.checked = true;
+  });
+  updateBadges();
+});
+
+// Group-level enable/disable
+document.querySelectorAll('.group-enable-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.group;
+    document.querySelectorAll(`.perm-toggle[data-group="${group}"]`).forEach(cb => cb.checked = true);
+    updateBadges();
+  });
+});
+document.querySelectorAll('.group-disable-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.group;
+    document.querySelectorAll(`.perm-toggle[data-group="${group}"]`).forEach(cb => cb.checked = false);
+    updateBadges();
+  });
+});
+
+// Update group badges when toggles change
+document.querySelectorAll('.perm-toggle').forEach(cb => {
+  cb.addEventListener('change', updateBadges);
+});
+
+function updateBadges() {
+  const groups = {};
+  document.querySelectorAll('.perm-toggle').forEach(cb => {
+    const g = cb.dataset.group;
+    if (!groups[g]) groups[g] = {total: 0, enabled: 0};
+    groups[g].total++;
+    if (cb.checked) groups[g].enabled++;
+  });
+  document.querySelectorAll('.group-badge').forEach((badge, i) => {
+    const card = badge.closest('.perm-group-card');
+    const header = card.querySelector('.perm-group-header');
+    const firstToggle = card.querySelector('.perm-toggle');
+    if (!firstToggle) return;
+    const g = firstToggle.dataset.group;
+    const {total, enabled} = groups[g] || {total: 0, enabled: 0};
+    badge.textContent = `${enabled}/${total}`;
+    badge.className = 'group-badge ' + (
+      enabled === total ? 'bg-success text-white' :
+      enabled > 0 ? 'bg-warning text-dark' : 'bg-light text-muted'
+    );
+  });
+}
 </script>
 {% endblock %}

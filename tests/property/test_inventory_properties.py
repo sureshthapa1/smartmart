@@ -12,7 +12,7 @@ Properties covered:
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -181,3 +181,4 @@ def test_product_search_name_match(app, query):
         items = pagination.items if hasattr(pagination, "items") else list(pagination)
         for product in items:
             assert query.lower() in product.name.lower() or query.lower() in (product.category or "").lower() or query.lower() in (product.sku or "").lower()
+

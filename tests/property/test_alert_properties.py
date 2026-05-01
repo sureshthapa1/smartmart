@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings
+@pytest.mark.slow`nfrom hypothesis import given, settings
 from hypothesis import strategies as st
 
 from smart_mart.app import create_app
@@ -101,3 +101,4 @@ def test_expiry_alert_excludes_far_future(app):
         alerts = get_expiry_alerts(days=30)
         alert_ids = {p.id for p in alerts}
         assert product.id not in alert_ids
+

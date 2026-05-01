@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Customer Retention Dashboard — Smart Mart{% endblock %}
+{% block head %}
+<style>
+  .customer-card{border-radius:12px;border:1px solid #e2e8f0;transition:box-shadow .2s}
+  .customer-card:hover{box-shadow:0 4px 16px rgba(99,102,241,.12)}
+  .segment-badge{font-size:.68rem;padding:.25em .6em;border-radius:6px;font-weight:700}
+  .seg-inactive{background:#fef2f2;color:#991b1b}
+  .seg-birthday{background:#fdf4ff;color:#7e22ce}
+  .seg-vip{background:#fffbeb;color:#92400e}
+  .seg-new{background:#f0fdf4;color:#166534}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title"><i class="bi bi-people-fill me-2 text-primary"></i>Customer Retention Dashboard</div>
+    <div class="page-header-sub">Inactive customers, birthdays, high-value customers, and one-click offer assignment</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('offers.analytics') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-bar-chart me-1"></i>Offer Analytics
+    </a>
+    <a href="{{ url_for('offers.list_offers') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-gift me-1"></i>Manage Offers
+    </a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endwith %}
+
+<!-- Summary KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center metric-card orange">
+      <div class="text-muted small">Inactive (14+ days)</div>
+      <div class="fs-3 fw-bold text-warning">{{ inactive_customers | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center metric-card purple" style="border-left-color:#a855f7!important;">
+      <div class="text-muted small">Birthdays (7 days)</div>
+      <div class="fs-3 fw-bold" style="color:#7c3aed">{{ birthday_customers | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center metric-card green">
+      <div class="text-muted small">High-Value Customers</div>
+      <div class="fs-3 fw-bold text-success">{{ vip_customers | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center metric-card blue">
+      <div class="text-muted small">Active Offers</div>
+      <div class="fs-3 fw-bold text-primary">{{ active_offers | length }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="retentionTabs">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#tab-inactive">
+      <i class="bi bi-clock-history me-1 text-warning"></i>Inactive
+      <span class="badge bg-warning text-dark ms-1">{{ inactive_customers | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-birthday">
+      <i class="bi bi-cake2 me-1" style="color:#a855f7"></i>Birthdays
+      <span class="badge ms-1" style="background:#a855f7">{{ birthday_customers | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-vip">
+      <i class="bi bi-star-fill me-1 text-warning"></i>High-Value
+      <span class="badge bg-success ms-1">{{ vip_customers | length }}</span>
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- Inactive Customers -->
+  <div class="tab-pane fade show active" id="tab-inactive">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history text-warning"></i>
+        <span>Customers inactive for 14+ days</span>
+        <button type="button" class="btn btn-warning btn-sm ms-auto" id="bulkAssignInactiveBtn"
+                {% if not inactive_customers or not active_offers %}disabled{% endif %}>
+          <i class="bi bi-gift me-1"></i>Assign Comeback Offer to All
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Customer</th><th>Phone</th><th>Last Visit</th><th>Days Inactive</th><th>Total Spent</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {% for c in inactive_customers %}
+            <tr>
+              <td>
+                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+              </td>
+              <td class="text-muted small">{{ c.phone or '—' }}</td>
+              <td class="small">{{ c.last_visit.strftime('%d %b %Y') if c.last_visit else '—' }}</td>
+              <td>
+                <span class="badge seg-inactive">{{ c.days_inactive }}d</span>
+              </td>
+              <td class="small">NPR {{ "{:,.0f}".format(c.total_spent) }}</td>
+              <td>
+                <div class="d-flex gap-1 align-items-center">
+                  <select class="form-select form-select-sm offer-select" style="width:160px;" data-customer-id="{{ c.id }}">
+                    <option value="">— Select offer —</option>
+                    {% for o in active_offers %}
+                    <option value="{{ o.id }}">{{ o.title }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="button" class="btn btn-sm btn-success assign-offer-btn" data-customer-id="{{ c.id }}">
+                    <i class="bi bi-gift"></i>
+                  </button>
+                  <span class="assign-result small ms-1"></span>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No inactive customers. Great retention!</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Birthday Customers -->
+  <div class="tab-pane fade" id="tab-birthday">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-cake2" style="color:#a855f7"></i>
+        <span>Customers with birthdays in the next 7 days</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Customer</th><th>Phone</th><th>Birthday</th><th>Days Away</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {% for c in birthday_customers %}
+            <tr>
+              <td>
+                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+              </td>
+              <td class="text-muted small">{{ c.phone or '—' }}</td>
+              <td class="small">{{ c.birthday.strftime('%d %b') }}</td>
+              <td>
+                {% if c.days_to_birthday == 0 %}
+                  <span class="badge" style="background:#a855f7">Today!</span>
+                {% else %}
+                  <span class="badge seg-birthday">{{ c.days_to_birthday }}d</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex gap-1 align-items-center">
+                  <select class="form-select form-select-sm offer-select" style="width:160px;" data-customer-id="{{ c.id }}">
+                    <option value="">— Select offer —</option>
+                    {% for o in active_offers %}
+                    <option value="{{ o.id }}">{{ o.title }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="button" class="btn btn-sm btn-success assign-offer-btn" data-customer-id="{{ c.id }}">
+                    <i class="bi bi-gift"></i>
+                  </button>
+                  <span class="assign-result small ms-1"></span>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No upcoming birthdays in the next 7 days.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIP / High-Value Customers -->
+  <div class="tab-pane fade" id="tab-vip">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-star-fill text-warning"></i>
+        <span>Top customers by total spend</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr><th>Customer</th><th>Phone</th><th>Total Spent</th><th>Visits</th><th>Last Visit</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {% for c in vip_customers %}
+            <tr>
+              <td>
+                <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+              </td>
+              <td class="text-muted small">{{ c.phone or '—' }}</td>
+              <td class="fw-semibold text-success">NPR {{ "{:,.0f}".format(c.total_spent) }}</td>
+              <td>{{ c.visit_count }}</td>
+              <td class="small text-muted">{{ c.last_visit.strftime('%d %b %Y') if c.last_visit else '—' }}</td>
+              <td>
+                <div class="d-flex gap-1 align-items-center">
+                  <select class="form-select form-select-sm offer-select" style="width:160px;" data-customer-id="{{ c.id }}">
+                    <option value="">— Select offer —</option>
+                    {% for o in active_offers %}
+                    <option value="{{ o.id }}">{{ o.title }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="button" class="btn btn-sm btn-success assign-offer-btn" data-customer-id="{{ c.id }}">
+                    <i class="bi bi-gift"></i>
+                  </button>
+                  <span class="assign-result small ms-1"></span>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No customer data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+// Per-row assign button
+document.querySelectorAll('.assign-offer-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    const customerId = this.dataset.customerId;
+    const row = this.closest('tr');
+    const sel = row.querySelector('.offer-select');
+    const resultEl = row.querySelector('.assign-result');
+    if (!sel.value) { alert('Please select an offer first.'); return; }
+    this.disabled = true;
+    try {
+      const res = await fetch('/offers/api/assign', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({customer_id: parseInt(customerId), offer_id: parseInt(sel.value)}),
+      });
+      const data = await res.json();
+      if (data.success) {
+        resultEl.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${data.is_duplicate ? 'Already assigned' : 'Assigned!'}</span>`;
+        this.classList.replace('btn-success', 'btn-secondary');
+      } else {
+        resultEl.innerHTML = `<span class="text-danger">${data.error}</span>`;
+      }
+    } catch(e) {
+      resultEl.innerHTML = `<span class="text-danger">Error</span>`;
+    } finally {
+      this.disabled = false;
+    }
+  });
+});
+
+// Bulk assign comeback offer to all inactive customers
+document.getElementById('bulkAssignInactiveBtn')?.addEventListener('click', async function() {
+  const rows = document.querySelectorAll('#tab-inactive .assign-offer-btn');
+  if (!rows.length) return;
+  if (!confirm(`Assign comeback offer to all ${rows.length} inactive customers?`)) return;
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Assigning...';
+  let success = 0, failed = 0;
+  for (const btn of rows) {
+    const customerId = btn.dataset.customerId;
+    const row = btn.closest('tr');
+    const sel = row.querySelector('.offer-select');
+    // Auto-select first offer if none selected
+    if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1;
+    if (!sel.value) { failed++; continue; }
+    try {
+      const res = await fetch('/offers/api/assign', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({customer_id: parseInt(customerId), offer_id: parseInt(sel.value)}),
+      });
+      const data = await res.json();
+      if (data.success) success++; else failed++;
+    } catch(e) { failed++; }
+  }
+  alert(`Done! Assigned: ${success}, Failed: ${failed}`);
+  this.disabled = false;
+  this.innerHTML = '<i class="bi bi-gift me-1"></i>Assign Comeback Offer to All';
+  location.reload();
+});
+</script>
+{% endblock %}
