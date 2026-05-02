@@ -110,6 +110,9 @@
                 <span class="text-muted ms-2" style="font-size:.75rem;" id="offerBannerSub"></span>
               </div>
               <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-info btn-sm" id="previewOfferBtn" style="font-size:.8rem;">
+                  <i class="bi bi-eye me-1"></i>Preview
+                </button>
                 <button type="button" class="btn btn-success btn-sm fw-semibold" id="applyOfferBtn" style="font-size:.8rem;">
                   <i class="bi bi-check-circle me-1"></i>Apply
                 </button>
@@ -120,6 +123,14 @@
                   <i class="bi bi-list me-1"></i>All Offers
                 </button>
               </div>
+            </div>
+            <!-- Offer preview panel (inline, non-blocking — no modal popup) -->
+            <div id="offerPreviewPanel" style="display:none;" class="mt-2 p-3 border rounded-3 bg-white">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="fw-semibold small text-primary"><i class="bi bi-gift me-1"></i>Offer Details</span>
+                <button type="button" class="btn-close" style="font-size:.6rem;" onclick="document.getElementById('offerPreviewPanel').style.display='none'"></button>
+              </div>
+              <div id="offerPreviewContent"></div>
             </div>
             <!-- Multiple offers selector (shown when > 1 offer) -->
             <div id="offerSelector" style="display:none;" class="mt-2 p-2 border rounded-3 bg-white">
@@ -1444,6 +1455,66 @@
       renderOfferBanner();
     }, 400);
   }
+
+  // ── Preview button — shows offer details inline (no popup) ──────────
+  document.getElementById('previewOfferBtn')?.addEventListener('click', function() {
+    const panel = document.getElementById('offerPreviewPanel');
+    const content = document.getElementById('offerPreviewContent');
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+
+    const unapplied = activeOffers.filter(o =>
+      !window.offerDiscounts.find(d => d.coId === o.customer_offer_id)
+    );
+    const offers = unapplied.length > 0 ? unapplied : activeOffers;
+    if (!offers.length) return;
+
+    const cartTotal = getCartSubtotal();
+    content.innerHTML = '';
+    offers.forEach(o => {
+      // Calculate estimated discount for preview
+      let estDiscount = 0;
+      if (o.scope === 'product') {
+        const prodSub = getProductSubtotal(o.product_id);
+        estDiscount = prodSub > 0 ? Math.round(prodSub * Math.min(o.discount_value, 100) / 100 * 100) / 100 : 0;
+      } else if (o.offer_type === 'percentage' || o.offer_type === 'conditional') {
+        estDiscount = Math.round(cartTotal * Math.min(o.discount_value, 100) / 100 * 100) / 100;
+      } else {
+        estDiscount = Math.min(o.discount_value, cartTotal);
+      }
+
+      const alreadyApplied = !!window.offerDiscounts.find(d => d.coId === o.customer_offer_id);
+      const row = document.createElement('div');
+      row.className = 'border rounded-3 p-2 mb-2' + (alreadyApplied ? ' bg-light' : '');
+      row.style.fontSize = '.82rem';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'fw-semibold mb-1';
+      titleEl.textContent = (alreadyApplied ? '✓ ' : '') + o.title;
+
+      const details = document.createElement('div');
+      details.className = 'text-muted';
+      const scopeLabel = o.scope === 'product' && o.product_name ? ` on ${o.product_name}` : ' on total bill';
+      const discountLabel = o.offer_type === 'percentage' || o.offer_type === 'conditional'
+        ? `${o.discount_value}%${scopeLabel}`
+        : `NPR ${o.discount_value.toFixed(0)}${scopeLabel}`;
+      const minLabel = o.min_purchase_amount > 0 ? ` · Min purchase: NPR ${o.min_purchase_amount.toLocaleString()}` : '';
+      const expiryLabel = ` · Expires: ${o.expiry_date} (${o.days_until_expiry}d left)`;
+      details.textContent = `${o.type_label}: ${discountLabel}${minLabel}${expiryLabel}`;
+
+      const savingsEl = document.createElement('div');
+      savingsEl.className = 'mt-1 fw-semibold ' + (estDiscount > 0 ? 'text-success' : 'text-muted');
+      savingsEl.textContent = estDiscount > 0
+        ? `You save: NPR ${estDiscount.toFixed(2)}`
+        : (cartTotal <= 0 ? 'Add items to see savings' : 'Not applicable to current cart');
+
+      row.appendChild(titleEl);
+      row.appendChild(details);
+      row.appendChild(savingsEl);
+      content.appendChild(row);
+    });
+
+    panel.style.display = '';
+  });
 
   // ── Apply button click ────────────────────────────────────────────────
   document.getElementById('applyOfferBtn')?.addEventListener('click', function() {
