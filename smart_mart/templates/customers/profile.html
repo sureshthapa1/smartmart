@@ -83,7 +83,12 @@
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <span><i class="bi bi-clock-history me-2 text-primary"></i>Purchase History</span>
-        <span class="badge bg-light text-dark border">{{ sales|length }} transaction{{ 's' if sales|length != 1 }}</span>
+        <div class="d-flex align-items-center gap-2">
+          {% if total_sale_count > sales|length %}
+          <span class="text-muted small">Showing {{ sales|length }} of {{ total_sale_count }}</span>
+          {% endif %}
+          <span class="badge bg-light text-dark border">{{ total_sale_count }} transaction{{ 's' if total_sale_count != 1 }}</span>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">

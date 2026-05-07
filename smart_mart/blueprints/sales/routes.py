@@ -48,10 +48,13 @@ def list_sales():
         filters["payment_mode"] = pay_filter
 
     sales = sales_manager.list_sales(filters, page=page)
+    total = sales_manager.count_sales(filters)
     return render_template(
         "sales/list.html",
         sales=sales,
         page=page,
+        total=total,
+        per_page=20,
         start_date=start_date or "",
         end_date=end_date or "",
         search_q=search_q or "",

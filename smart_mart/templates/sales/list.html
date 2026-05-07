@@ -113,7 +113,10 @@
       {% if sales %}
       <tfoot class="table-light fw-bold">
         <tr>
-          <td colspan="6" class="text-end text-muted small">{{ sales|length }} record{{ 's' if sales|length != 1 }} shown</td>
+          <td colspan="6" class="text-end text-muted small">
+            Showing {{ (page-1)*per_page + 1 }}–{{ (page-1)*per_page + sales|length }}
+            of {{ total }} sale{{ 's' if total != 1 }}
+          </td>
           <td class="text-end text-success">NPR {{ "%.2f"|format(sales | map(attribute='total_amount') | map('float') | sum) }}</td>
           <td></td>
         </tr>
@@ -121,14 +124,14 @@
       {% endif %}
     </table>
   </div>
-  {% if sales|length == 20 or page > 1 %}
+  {% if total > per_page %}
   <div class="card-footer d-flex justify-content-between align-items-center">
-    <span class="text-muted small">Page {{ page }}</span>
+    <span class="text-muted small">Page {{ page }} of {{ ((total - 1) // per_page) + 1 }}</span>
     <div class="d-flex gap-2">
       {% if page > 1 %}
       <a href="?page={{ page-1 }}&start_date={{ start_date }}&end_date={{ end_date }}&q={{ search_q }}&payment={{ pay_filter }}" class="btn btn-sm btn-outline-secondary">← Prev</a>
       {% endif %}
-      {% if sales|length == 20 %}
+      {% if page * per_page < total %}
       <a href="?page={{ page+1 }}&start_date={{ start_date }}&end_date={{ end_date }}&q={{ search_q }}&payment={{ pay_filter }}" class="btn btn-sm btn-outline-secondary">Next →</a>
       {% endif %}
     </div>

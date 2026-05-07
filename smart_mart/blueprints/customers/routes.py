@@ -130,12 +130,25 @@ def list_customers():
 @login_required
 def customer_profile(customer_id):
     customer = db.get_or_404(Customer, customer_id)
-    sales = db.session.execute(
-        db.select(Sale)
-        .where(func.lower(Sale.customer_name) == customer.name.lower())
-        .order_by(Sale.sale_date.desc())
-        .limit(50)
-    ).scalars().all()
+
+    # Use customer_id FK when available (faster), fall back to name match
+    sale_stmt = db.select(Sale).order_by(Sale.sale_date.desc())
+    if customer.id:
+        sale_stmt = sale_stmt.where(
+            db.or_(
+                Sale.customer_id == customer.id,
+                func.lower(Sale.customer_name) == customer.name.lower()
+            )
+        )
+    else:
+        sale_stmt = sale_stmt.where(func.lower(Sale.customer_name) == customer.name.lower())
+
+    total_sale_count = db.session.execute(
+        db.select(func.count()).select_from(sale_stmt.subquery())
+    ).scalar() or 0
+
+    # Show up to 100 most recent; display a note if truncated
+    sales = db.session.execute(sale_stmt.limit(100)).scalars().all()
 
     total_spent = sum(float(s.total_amount) for s in sales)
     total_discount = sum(float(s.discount_amount or 0) for s in sales)
@@ -171,6 +184,7 @@ def customer_profile(customer_id):
 
     return render_template("customers/profile.html",
                            customer=customer, sales=sales,
+                           total_sale_count=total_sale_count,
                            total_spent=total_spent, total_discount=total_discount,
                            credit_outstanding=credit_outstanding, avg_order=avg_order,
                            pm_counts=pm_counts,

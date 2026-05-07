@@ -309,6 +309,29 @@ def get_sale(sale_id: int) -> Sale:
     return db.get_or_404(Sale, sale_id)
 
 
+def count_sales(filters: dict) -> int:
+    """Return total count of sales matching filters (for pagination)."""
+    from sqlalchemy import or_
+    stmt = db.select(db.func.count(Sale.id))
+    conditions = []
+    if filters.get("start_date"):
+        conditions.append(Sale.sale_date >= filters["start_date"])
+    if filters.get("end_date"):
+        conditions.append(Sale.sale_date <= filters["end_date"])
+    if filters.get("payment_mode"):
+        conditions.append(Sale.payment_mode == filters["payment_mode"])
+    if filters.get("search"):
+        term = f"%{filters['search'].lower()}%"
+        conditions.append(or_(
+            db.func.lower(Sale.customer_name).like(term),
+            db.func.lower(Sale.customer_phone).like(term),
+            db.func.lower(Sale.invoice_number).like(term),
+        ))
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+    return db.session.execute(stmt).scalar() or 0
+
+
 def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
     from sqlalchemy import or_
     stmt = db.select(Sale).order_by(Sale.sale_date.desc())
