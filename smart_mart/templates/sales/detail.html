@@ -68,11 +68,35 @@
             <span class="fw-bold fs-5">Smart Mart</span>
           </div>
           <p class="text-white-50 small mb-0">Inventory &amp; Sales Management</p>
+          {% if sale.customer_name %}
+          <div class="mt-2 d-flex align-items-center gap-2">
+            <i class="bi bi-person-circle" style="color:#a5b4fc;"></i>
+            <span class="fw-semibold" style="color:#e2e8f0;">{{ sale.customer_name }}</span>
+            {% if sale.customer_phone %}
+            <span class="text-white-50 small">· {{ sale.customer_phone }}</span>
+            {% endif %}
+            {% if sale.customer %}
+            <a href="{{ url_for('customers.customer_profile', customer_id=sale.customer.id) }}"
+               class="btn btn-sm" style="background:rgba(99,102,241,.3);color:#a5b4fc;border:none;font-size:.72rem;padding:.2rem .5rem;">
+              View Profile
+            </a>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="mt-2 text-white-50 small"><i class="bi bi-person me-1"></i>Walk-in Customer</div>
+          {% endif %}
         </div>
         <div class="text-end">
-          <div class="fs-4 fw-bold">Sale #{{ sale.id }}</div>
+          <div class="fs-4 fw-bold">{{ sale.invoice_number or 'Sale #' ~ sale.id }}</div>
           <div class="text-white-50 small">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</div>
           <div class="text-white-50 small" style="font-size:.7rem;">{{ sale.sale_date | bs_date }}</div>
+          {% set pm = sale.payment_mode or 'cash' %}
+          <div class="mt-1">
+            <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+              {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
+              {{ pm | capitalize }}
+            </span>
+          </div>
         </div>
       </div>
     </div>

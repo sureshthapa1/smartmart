@@ -71,7 +71,7 @@ def create_sale():
         if not p.can_create_sale:
             abort(403)
     products = db.session.execute(
-        db.select(Product).order_by(Product.name)
+        db.select(Product).where(Product.is_active == True).order_by(Product.name)
     ).scalars().all()
 
     if request.method == "POST":

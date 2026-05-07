@@ -256,6 +256,11 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "offers", "end_date", "DATE"),
             ),
         ),
+        (
+            "2026_06_01_product_is_active",
+            "Add is_active flag to products for discontinuing items.",
+            lambda conn: _safe_add_column(conn, "products", "is_active", "BOOLEAN DEFAULT true"),
+        ),
     ]
 
 

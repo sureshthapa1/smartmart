@@ -390,6 +390,17 @@
       <div class="total-bar d-flex flex-column" style="gap:0;">
         <!-- Discount breakdown (shown when offers/loyalty applied) -->
         <div id="discountBreakdownPanel" style="display:none;"></div>
+        <!-- Change calculator (shown for cash payments) -->
+        <div id="changeDuePanel" style="display:none;background:rgba(255,255,255,.06);border-top:1px solid rgba(255,255,255,.1);">
+          <div class="d-flex align-items-center gap-3 px-4 py-2 flex-wrap">
+            <span class="text-white-50 small">Cash Received</span>
+            <input type="number" id="cashReceivedInput" class="form-control form-control-sm"
+                   style="width:130px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff;"
+                   min="0" step="1" placeholder="Enter amount">
+            <span class="text-white-50 small">Change Due</span>
+            <span id="changeDueAmount" class="fw-bold fs-5" style="color:#4ade80;">NPR 0.00</span>
+          </div>
+        </div>
         <!-- Main total row -->
         <div class="d-flex justify-content-between align-items-center px-0 py-0" style="padding:1.1rem 1.5rem;">
           <div class="d-flex flex-column gap-1">
@@ -423,9 +434,40 @@
       let html = '<option value="">— Select product —</option>';
       PRODUCTS.forEach(p => {
         const sel = p.id === selectedId ? ' selected' : '';
-        html += `<option value="${p.id}"${sel} data-price="${p.price}" data-stock="${p.stock}">${p.name} (stock: ${p.stock})</option>`;
+        const outOfStock = p.stock <= 0;
+        const lowStock = p.stock > 0 && p.stock <= 5;
+        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (only ${p.stock} left)` : ` (stock: ${p.stock})`);
+        const disabled = outOfStock ? ' disabled' : '';
+        const style = outOfStock ? ' style="color:#ef4444"' : (lowStock ? ' style="color:#f97316"' : '');
+        html += `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}">${p.name}${stockLabel}</option>`;
       });
       return html;
+    }
+
+    // Client-side stock check — warn before submit if qty > available stock
+    function checkStockLevels() {
+      let hasWarning = false;
+      document.querySelectorAll('tr.sale-item-row').forEach(row => {
+        const sel = row.querySelector('.product-select');
+        const qtyInput = row.querySelector('.qty-input');
+        if (!sel || !qtyInput || !sel.value) return;
+        const opt = sel.options[sel.selectedIndex];
+        const stock = parseInt(opt?.dataset?.stock || '999');
+        const qty = parseInt(qtyInput.value) || 0;
+        const qtyCell = qtyInput.parentElement;
+        if (qty > stock) {
+          qtyInput.style.borderColor = '#ef4444';
+          qtyInput.title = `Only ${stock} in stock`;
+          hasWarning = true;
+        } else if (qty > stock * 0.8 && stock <= 10) {
+          qtyInput.style.borderColor = '#f97316';
+          qtyInput.title = `Low stock: ${stock} remaining`;
+        } else {
+          qtyInput.style.borderColor = '';
+          qtyInput.title = '';
+        }
+      });
+      return hasWarning;
     }
 
     function addRow(productId, qty, unitPrice) {
@@ -515,6 +557,18 @@
       const net = Math.max(0, subtotal - totalDiscount);
       document.getElementById('grandTotal').textContent = net.toFixed(2);
 
+      // Update change due calculator
+      const cashInput = document.getElementById('cashReceivedInput');
+      if (cashInput && cashInput.value) {
+        const received = parseFloat(cashInput.value) || 0;
+        const change = Math.max(0, received - net);
+        const el = document.getElementById('changeDueAmount');
+        if (el) {
+          el.textContent = `NPR ${change.toFixed(2)}`;
+          el.style.color = received >= net ? '#4ade80' : '#f87171';
+        }
+      }
+
       // Update the breakdown panel
       renderDiscountBreakdown(subtotal, totalDiscount, net);
 
@@ -523,6 +577,9 @@
 
       // Refresh offer banner eligibility (re-check min_purchase thresholds)
       if (typeof refreshOfferEligibility === 'function') refreshOfferEligibility();
+
+      // Check stock levels and highlight over-qty rows
+      checkStockLevels();
 
       // Check active promotions
       checkPromotions(subtotal);
@@ -730,6 +787,18 @@
   // ── AI Invoice Validation before submit ──────────────────────────────
   document.getElementById('saleForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    // Client-side stock check — block submit if any qty exceeds stock
+    if (checkStockLevels()) {
+      const div = document.createElement('div');
+      div.className = 'alert alert-danger ai-validation-alert';
+      div.innerHTML = '<strong>❌ Insufficient stock:</strong> One or more items exceed available stock. Reduce quantities (highlighted in red) before confirming.';
+      document.querySelectorAll('.ai-validation-alert').forEach(el => el.remove());
+      document.getElementById('saleForm').prepend(div);
+      window.scrollTo(0, 0);
+      return;
+    }
+
     const items = [];
     let idx = 0;
     while (true) {
@@ -1212,7 +1281,6 @@
       const dueDateBox = document.getElementById('creditDueDateBox');
       if (dueDateBox) {
         dueDateBox.style.display = isCredit ? '' : 'none';
-        // Default to 30 days from today if not already set
         const dueDateInput = document.getElementById('creditDueDateInput');
         if (isCredit && dueDateInput && !dueDateInput.value) {
           const d = new Date();
@@ -1220,7 +1288,23 @@
           dueDateInput.value = d.toISOString().split('T')[0];
         }
       }
+      // Show/hide change calculator for cash payments
+      const isCash = document.querySelector('input[name="payment_mode"]:checked')?.value === 'cash';
+      const changePanel = document.getElementById('changeDuePanel');
+      if (changePanel) changePanel.style.display = isCash ? '' : 'none';
     });
+  });
+
+  // Change due calculator
+  document.getElementById('cashReceivedInput')?.addEventListener('input', function() {
+    const received = parseFloat(this.value) || 0;
+    const total = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+    const change = Math.max(0, received - total);
+    const el = document.getElementById('changeDueAmount');
+    if (el) {
+      el.textContent = `NPR ${change.toFixed(2)}`;
+      el.style.color = received >= total ? '#4ade80' : '#f87171';
+    }
   });
 
   document.getElementById('customerName').addEventListener('change', () => {

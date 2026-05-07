@@ -23,6 +23,7 @@ class Product(db.Model):
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
     reorder_point = db.Column(db.Integer, nullable=True, default=10)  # MOQ alert threshold
+    is_active = db.Column(db.Boolean, nullable=False, default=True)  # False = discontinued
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False,
                            default=lambda: datetime.now(timezone.utc),

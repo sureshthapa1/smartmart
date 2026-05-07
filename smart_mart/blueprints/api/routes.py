@@ -335,8 +335,13 @@ def loyalty_wallet():
     from ...services import loyalty_wallet_service
     customer_name = request.args.get("customer_name", "").strip()
     customer_phone = request.args.get("customer_phone", "").strip() or None
+    # Use get_or_create_wallet only for real named customers — never commit
+    # on a GET request (prevents ghost wallet records for walk-in customers)
     wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
-    db.session.commit()
+    if wallet and wallet.id is None:
+        # New wallet not yet persisted — don't commit on a read-only request
+        db.session.rollback()
+        return jsonify({"available": False})
     return jsonify(loyalty_wallet_service.wallet_snapshot(wallet))
 
 
@@ -344,17 +349,16 @@ def loyalty_wallet():
 @login_required
 def loyalty_redeem_preview():
     from ...services import loyalty_wallet_service
-    from ...services.db_compat import _is_postgres
     data = request.get_json() or {}
     customer_name = (data.get("customer_name") or "").strip()
     customer_phone = (data.get("customer_phone") or "").strip() or None
-    # Accept both 'points' and 'requested_points'
     requested_points = int(data.get("points", 0) or data.get("requested_points", 0) or 0)
     gross_total = float(data.get("gross_total", 0) or 0)
     wallet = loyalty_wallet_service.get_or_create_wallet(customer_name, customer_phone)
     preview = loyalty_wallet_service.preview_redeem(wallet, requested_points, gross_total)
-    db.session.commit()
-    # Get rupee_per_point from settings
+    # Do NOT commit — this is a preview-only endpoint. Wallet creation (if any)
+    # is intentionally not persisted here; it happens during actual sale creation.
+    db.session.rollback()
     _, rpp = loyalty_wallet_service._get_loyalty_rates()
     return jsonify({
         "redeemed_points": preview["redeemed_points"],

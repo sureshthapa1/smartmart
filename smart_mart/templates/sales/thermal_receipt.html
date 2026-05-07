@@ -81,7 +81,9 @@
     {% if sale.discount_amount and sale.discount_amount|float > 0 %}
     <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note[:15] }}){% endif %}</td><td class="right">- NPR {{ "%.2f"|format(sale.discount_amount|float) }}</td></tr>
     {% endif %}
-    {% if shop and shop.vat_enabled %}
+    {% if sale.tax_amount and sale.tax_amount|float > 0 %}
+    <tr><td>VAT ({{ sale.tax_rate|int if sale.tax_rate else '' }}%)</td><td class="right">NPR {{ "%.2f"|format(sale.tax_amount|float) }}</td></tr>
+    {% elif shop and shop.vat_enabled %}
     {% set vat_rate = shop.vat_rate|float %}
     {% set vat_amount = sale.total_amount|float * vat_rate / (100 + vat_rate) %}
     <tr><td>VAT ({{ vat_rate|int }}%)</td><td class="right">NPR {{ "%.2f"|format(vat_amount) }}</td></tr>
