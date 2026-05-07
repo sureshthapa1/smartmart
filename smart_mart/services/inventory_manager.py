@@ -25,6 +25,11 @@ def create_product(data: dict) -> Product:
         expiry_date=data.get("expiry_date"),
         image_filename=data.get("image_filename"),
         unit=data.get("unit", "pcs"),
+        reorder_point=data.get("reorder_point", 10),
+        barcode=data.get("barcode"),
+        is_active=data.get("is_active", True),
+        max_discount_pct=data.get("max_discount_pct"),
+        tax_category=data.get("tax_category", "standard"),
     )
     db.session.add(product)
     try:
@@ -52,7 +57,9 @@ def update_product(product_id: int, data: dict) -> Product:
     old_values = {f: str(getattr(product, f, "")) for f in price_fields}
 
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
-                 "quantity", "supplier_id", "expiry_date", "image_filename", "unit", "reorder_point")
+                 "quantity", "supplier_id", "expiry_date", "image_filename",
+                 "unit", "reorder_point", "barcode", "is_active",
+                 "max_discount_pct", "tax_category")
     for field in updatable:
         if field in data:
             setattr(product, field, data[field])

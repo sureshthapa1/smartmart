@@ -820,7 +820,17 @@ def _form_to_data(form) -> dict:
         "expiry_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
         "reorder_point": int(form.get("reorder_point", 10) or 10),
+        "barcode": form.get("barcode", "").strip() or None,
+        "is_active": form.get("is_active") == "on",
+        "tax_category": form.get("tax_category", "standard").strip() or "standard",
+        "max_discount_pct": None,
     }
+    max_disc_raw = form.get("max_discount_pct", "").strip()
+    if max_disc_raw:
+        try:
+            data["max_discount_pct"] = float(max_disc_raw)
+        except ValueError:
+            pass
     expiry_raw = form.get("expiry_date", "").strip()
     if expiry_raw:
         try:
