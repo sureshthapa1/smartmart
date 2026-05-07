@@ -521,6 +521,9 @@
       // Sync discount note
       _syncDiscountNote();
 
+      // Refresh offer banner eligibility (re-check min_purchase thresholds)
+      if (typeof refreshOfferEligibility === 'function') refreshOfferEligibility();
+
       // Check active promotions
       checkPromotions(subtotal);
     }
@@ -903,11 +906,20 @@
   });
 
   // ── Called when a customer is selected (from dropdown or phone lookup) ──
-  function onCustomerSelected(customerId, name, phone) {
+  // This is the SINGLE entry point for all customer-selection side effects.
+  // It runs in sequence: offers first (so AI panel can show them), then
+  // intelligence panel, then loyalty wallet.
+  async function onCustomerSelected(customerId, name, phone) {
     activeCustomerId = customerId;
-    loadCustomerIntelligence(customerId);
+
+    // 1. Load assigned offers (populates activeOffers array)
+    await loadCustomerOffers(customerId);
+
+    // 2. Load AI intelligence panel (reads activeOffers populated above)
+    await loadCustomerIntelligence(customerId);
+
+    // 3. Load loyalty wallet
     loadWallet(name, phone);
-    // Offer banner is loaded inside loadCustomerIntelligence via the hook
   }
 
   async function loadCustomerIntelligence(customerId) {
@@ -1685,25 +1697,11 @@
     document.getElementById('applyOfferBtn')?.click();
   });
 
-  // ── Hook into customer autofill ───────────────────────────────────────
-  // loadCustomerOffers populates window.activeOffers, then calls
-  // loadCustomerIntelligence so the AI panel can include assigned offers.
-  const _origLoadIntel = window.loadCustomerIntelligence;
-  window.loadCustomerIntelligence = async function(customerId) {
-    // Load assigned offers first so AI panel can show them
-    await loadCustomerOffers(customerId);
-    // Then load AI intelligence (which now reads activeOffers)
-    if (_origLoadIntel) await _origLoadIntel(customerId);
-  };
-
-  // ── Patch recalcTotal to refresh offer eligibility on cart change ─────
-  if (typeof recalcTotal === 'function') {
-    const _baseRecalc = recalcTotal;
-    window.recalcTotal = function() {
-      _baseRecalc();
-      refreshOfferEligibility();
-    };
-  }
+  // ── Refresh offer eligibility when cart total changes ────────────────
+  // recalcTotal is defined in the first <script> block as a local function.
+  // We can't patch window.recalcTotal — instead refreshOfferEligibility()
+  // is called directly from within recalcTotal() via the discount breakdown.
+  // The renderDiscountBreakdown call inside recalcTotal handles this.
 
   // ── Add Offer for Next Visit ──────────────────────────────────────────
   document.getElementById('addOfferForNextVisitBtn')?.addEventListener('click', function() {
