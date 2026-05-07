@@ -166,13 +166,36 @@ def retention_dashboard():
     """Customer retention dashboard — inactive, birthday, VIP customers."""
     _require_perm("can_view_offers")
     from datetime import datetime, timezone, timedelta
-    from sqlalchemy import func as _func
+    from sqlalchemy import func as _func, case as _case
     from ...models.sale import Sale
     from ...models.customer import Customer as _Cust
 
     today = date.today()
     now_utc = datetime.now(timezone.utc)
     cutoff_inactive = now_utc - timedelta(days=14)
+
+    # ── Single aggregated query: total_spent per customer_id ─────────────
+    # Covers both customer_id FK and name-based matches for legacy sales
+    spent_by_id = dict(db.session.execute(
+        db.select(Sale.customer_id, _func.sum(Sale.total_amount).label("total"))
+        .where(Sale.customer_id.isnot(None))
+        .group_by(Sale.customer_id)
+    ).all())
+
+    # Name-based fallback for sales without customer_id
+    spent_by_name = dict(db.session.execute(
+        db.select(
+            _func.lower(Sale.customer_name).label("cname"),
+            _func.sum(Sale.total_amount).label("total"),
+        )
+        .where(Sale.customer_id.is_(None), Sale.customer_name.isnot(None))
+        .group_by(_func.lower(Sale.customer_name))
+    ).all())
+
+    def _total_spent(c: _Cust) -> float:
+        by_id = float(spent_by_id.get(c.id) or 0)
+        by_name = float(spent_by_name.get(c.name.lower()) or 0)
+        return by_id + by_name
 
     # ── Inactive customers (no visit in 14+ days, have phone) ────────────
     inactive_raw = db.session.execute(
@@ -186,21 +209,12 @@ def retention_dashboard():
         .limit(50)
     ).scalars().all()
 
-    # Enrich with total_spent and days_inactive
     inactive_customers = []
     for c in inactive_raw:
         lv = c.last_visit
         lv_date = lv.date() if hasattr(lv, "date") else lv
-        days_inactive = (today - lv_date).days if lv_date else 999
-        total_spent = db.session.execute(
-            db.select(_func.sum(Sale.total_amount))
-            .where(
-                (Sale.customer_id == c.id) |
-                (_func.lower(Sale.customer_name) == c.name.lower())
-            )
-        ).scalar() or 0
-        c.days_inactive = days_inactive
-        c.total_spent = float(total_spent)
+        c.days_inactive = (today - lv_date).days if lv_date else 999
+        c.total_spent = _total_spent(c)
         inactive_customers.append(c)
 
     # ── Birthday customers (next 7 days) ─────────────────────────────────
@@ -218,24 +232,14 @@ def retention_dashboard():
             birthday_customers.append(c)
     birthday_customers.sort(key=lambda c: c.days_to_birthday)
 
-    # ── VIP / High-value customers (top 20 by visit_count) ───────────────
+    # ── VIP / High-value customers (top 20 by total spend) ───────────────
+    # Use the pre-built spend maps — no extra queries
     vip_raw = db.session.execute(
-        db.select(_Cust)
-        .order_by(_Cust.visit_count.desc())
-        .limit(20)
+        db.select(_Cust).order_by(_Cust.visit_count.desc()).limit(40)
     ).scalars().all()
-    vip_customers = []
     for c in vip_raw:
-        total_spent = db.session.execute(
-            db.select(_func.sum(Sale.total_amount))
-            .where(
-                (Sale.customer_id == c.id) |
-                (_func.lower(Sale.customer_name) == c.name.lower())
-            )
-        ).scalar() or 0
-        c.total_spent = float(total_spent)
-        vip_customers.append(c)
-    vip_customers.sort(key=lambda c: c.total_spent, reverse=True)
+        c.total_spent = _total_spent(c)
+    vip_customers = sorted(vip_raw, key=lambda c: c.total_spent, reverse=True)[:20]
 
     # ── Active offers for the dropdowns ──────────────────────────────────
     active_offers = db.session.execute(
@@ -601,6 +605,12 @@ def _save_offer_from_form(form, creator_id: int) -> Offer:
             end_date = _date.fromisoformat(ed)
     except (ValueError, AttributeError):
         pass
+
+    # Validate scheduling dates
+    if end_date and end_date < _date.today():
+        raise ValueError("End date cannot be in the past.")
+    if start_date and end_date and end_date <= start_date:
+        raise ValueError("End date must be after start date.")
 
     return Offer(
         title=title,

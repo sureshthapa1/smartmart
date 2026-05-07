@@ -196,6 +196,14 @@
             <!-- Credit Risk Warning (shown when Credit payment mode + named customer) -->
             <div id="creditRiskWarning" class="col-12" style="display:none;"></div>
 
+            <!-- Credit Due Date (shown only when Credit / Udharo is selected) -->
+            <div id="creditDueDateBox" class="col-md-4" style="display:none;">
+              <label class="form-label fw-medium small">Credit Due Date</label>
+              <input type="date" name="credit_due_date" id="creditDueDateInput"
+                     class="form-control form-control-sm">
+              <div class="form-text">When should this credit be collected?</div>
+            </div>
+
             <!-- Loyalty Points Redemption (shown when named customer has points) -->
             <div id="loyaltyBox" class="col-12" style="display:none;">
               <div class="border rounded-3 p-3" style="background:linear-gradient(135deg,#fefce8,#fef9c3);border-color:#fbbf24!important;">
@@ -1187,6 +1195,19 @@
     radio.addEventListener('change', () => {
       clearTimeout(riskCheckTimer);
       riskCheckTimer = setTimeout(checkCreditRisk, 300);
+      // Show/hide credit due date field
+      const isCredit = document.querySelector('input[name="payment_mode"]:checked')?.value === 'credit';
+      const dueDateBox = document.getElementById('creditDueDateBox');
+      if (dueDateBox) {
+        dueDateBox.style.display = isCredit ? '' : 'none';
+        // Default to 30 days from today if not already set
+        const dueDateInput = document.getElementById('creditDueDateInput');
+        if (isCredit && dueDateInput && !dueDateInput.value) {
+          const d = new Date();
+          d.setDate(d.getDate() + 30);
+          dueDateInput.value = d.toISOString().split('T')[0];
+        }
+      }
     });
   });
 
@@ -1582,18 +1603,21 @@
 
     // Already applied?
     if (window.offerDiscounts.find(d => d.coId === offer.customer_offer_id)) {
-      alert('This offer is already applied.');
-      return;
+      return; // silently skip — already applied, no alert needed
     }
+
+    // Disable Apply button during processing to prevent double-click
+    const applyBtn = document.getElementById('applyOfferBtn');
+    if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = 'Applying...'; }
 
     // Calculate discount correctly based on scope
     let discount = 0;
     let productName = offer.product_name || null;
 
     if (offer.scope === 'product') {
-      // Product-based: discount only on that product's line total
       const productSubtotal = getProductSubtotal(offer.product_id);
       if (productSubtotal <= 0) {
+        if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = 'Apply'; }
         alert(`This offer is for "${offer.product_name || 'a specific product'}" — please add that product to the cart first.`);
         return;
       }
@@ -1601,7 +1625,6 @@
     } else if (offer.offer_type === 'percentage' || offer.offer_type === 'conditional') {
       discount = Math.round(cartTotal * Math.min(offer.discount_value, 100) / 100 * 100) / 100;
     } else {
-      // fixed / combo
       discount = Math.min(offer.discount_value, cartTotal);
     }
 

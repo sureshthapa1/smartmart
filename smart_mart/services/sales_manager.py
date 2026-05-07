@@ -40,7 +40,8 @@ def create_sale(items: list[dict], user_id: int,
                 discount_amount: float = 0, discount_note: str = None,
                 wallet_redeem_points: int = 0,
                 promotion_id: int = None,
-                applied_customer_offer_ids: list[int] | None = None) -> Sale:
+                applied_customer_offer_ids: list[int] | None = None,
+                credit_due_date=None) -> Sale:
     """Create a confirmed sale with row-level locking to prevent overselling."""
     try:
         # ── Period lock guard ─────────────────────────────────────────────
@@ -106,6 +107,19 @@ def create_sale(items: list[dict], user_id: int,
                     discount_note = f"{discount_note}; Loyalty points redeemed"
                 else:
                     discount_note = "Loyalty points redeemed"
+        # ── Fetch VAT settings for tax snapshot ──────────────────────────
+        _tax_rate = 0.0
+        _tax_amount = 0.0
+        try:
+            from ..models.shop_settings import ShopSettings
+            _ss = ShopSettings.get()
+            if _ss.vat_enabled and _ss.vat_rate:
+                _tax_rate = float(_ss.vat_rate)
+                # VAT is inclusive — extract from total
+                _tax_amount = round(total_amount * _tax_rate / (100 + _tax_rate), 2)
+        except Exception:
+            pass
+
         sale = Sale(
             user_id=user_id,
             total_amount=total_amount,
@@ -118,6 +132,9 @@ def create_sale(items: list[dict], user_id: int,
             discount_amount=(discount_amount or 0) + loyalty_discount_amount,
             discount_note=discount_note,
             promotion_id=promotion_id,
+            tax_rate=_tax_rate,
+            tax_amount=_tax_amount,
+            credit_due_date=credit_due_date,
         )
         db.session.add(sale)
         db.session.flush()
@@ -273,8 +290,15 @@ def _mark_customer_offers_used(
         co.usage_count += 1
         co.applied_sale_id = sale.id
 
+    # Note: we do NOT reject if total_offer_discount > posted_discount.
+    # The POS already applied the discount client-side; we just mark offers used.
+    # Mismatch is logged for audit but never blocks the sale.
     if total_offer_discount > posted_discount + 0.01:
-        raise ValueError("Applied offer discount is larger than the submitted sale discount.")
+        logger.warning(
+            "Sale #%d: offer discount NPR %.2f exceeds posted discount NPR %.2f — "
+            "accepting (client-side discount already applied to total).",
+            sale.id, total_offer_discount, posted_discount,
+        )
 
     if labels:
         logger.info("Applied customer offers to sale #%d: %s", sale.id, ", ".join(labels))

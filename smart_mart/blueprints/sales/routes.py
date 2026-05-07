@@ -91,6 +91,21 @@ def create_sale():
                 return redirect(url_for("sales.list_sales"))
 
         try:
+            # Parse credit_due_date for credit/udharo sales
+            _credit_due_date = None
+            if request.form.get("payment_mode") == "credit":
+                _raw_due = request.form.get("credit_due_date", "").strip()
+                if _raw_due:
+                    try:
+                        from datetime import date as _date
+                        _credit_due_date = _date.fromisoformat(_raw_due)
+                    except ValueError:
+                        pass
+                if not _credit_due_date:
+                    # Default: 30 days from today
+                    from datetime import date as _date, timedelta as _td
+                    _credit_due_date = _date.today() + _td(days=30)
+
             sale = sales_manager.create_sale(
                 items,
                 user_id=current_user.id,
@@ -102,6 +117,7 @@ def create_sale():
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
                 applied_customer_offer_ids=_parse_customer_offer_ids(request.form),
+                credit_due_date=_credit_due_date,
             )
             # Record the sale id against the idempotency key
             if idem_key:

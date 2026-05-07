@@ -67,7 +67,7 @@ def _send_sparrow(phone: str, message: str) -> tuple[bool, str]:
             "token": token, "from": "SmartMart",
             "to": phone, "text": message
         }).encode()
-        req = urllib.request.Request("http://api.sparrowsms.com/v2/sms/", data=data)
+        req = urllib.request.Request("https://api.sparrowsms.com/v2/sms/", data=data)
         with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read())
             if result.get("response_code") == 200:

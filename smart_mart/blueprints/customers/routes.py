@@ -217,9 +217,16 @@ def delete_customer(customer_id):
     _require_perm("can_manage_customers")
     customer = db.get_or_404(Customer, customer_id)
     try:
+        # Nullify Sale.customer_id FK so historical sales are preserved
+        from ...models.sale import Sale
+        db.session.execute(
+            db.update(Sale)
+            .where(Sale.customer_id == customer_id)
+            .values(customer_id=None)
+        )
+
         # Delete related records that have FK to customers (PostgreSQL requires this)
         from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction, CustomerDuplicateFlag
-        # Delete loyalty wallet transactions first, then wallet
         wallet = db.session.execute(
             db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer_id)
         ).scalar_one_or_none()
@@ -228,7 +235,6 @@ def delete_customer(customer_id):
                 db.delete(LoyaltyWalletTransaction).where(LoyaltyWalletTransaction.wallet_id == wallet.id)
             )
             db.session.delete(wallet)
-        # Delete duplicate flags
         db.session.execute(
             db.delete(CustomerDuplicateFlag).where(
                 db.or_(
@@ -236,6 +242,13 @@ def delete_customer(customer_id):
                     CustomerDuplicateFlag.duplicate_customer_id == customer_id,
                 )
             )
+        )
+        # Nullify CustomerOffer customer_id (offers history preserved, just unlinked)
+        from ...models.offer import CustomerOffer
+        db.session.execute(
+            db.update(CustomerOffer)
+            .where(CustomerOffer.customer_id == customer_id)
+            .values(customer_id=None)
         )
         db.session.flush()
         db.session.delete(customer)

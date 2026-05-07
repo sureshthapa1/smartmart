@@ -287,18 +287,23 @@ def send_expiry_reminders() -> dict:
             )
         ).scalars().all()
 
-        for co in cos:
-            # Skip if already sent this reminder type
-            already_sent = db.session.execute(
-                db.select(OfferNotification).where(
-                    OfferNotification.customer_offer_id == co.id,
-                    OfferNotification.notification_type == notif_type,
-                    OfferNotification.status.in_(["sent", "delivered"]),
-                )
-            ).scalar_one_or_none()
-            if already_sent:
-                continue
+        if not cos:
+            continue
 
+        # Batch check: fetch all already-sent reminder IDs in one query
+        co_ids = [co.id for co in cos]
+        already_sent_ids = set(db.session.execute(
+            db.select(OfferNotification.customer_offer_id)
+            .where(
+                OfferNotification.customer_offer_id.in_(co_ids),
+                OfferNotification.notification_type == notif_type,
+                OfferNotification.status.in_(["sent", "delivered"]),
+            )
+        ).scalars().all())
+
+        for co in cos:
+            if co.id in already_sent_ids:
+                continue
             try:
                 _send_offer_reminder_notification(co, notif_type, days_ahead)
                 counts["2d" if days_ahead == 2 else "1d"] += 1
@@ -310,9 +315,12 @@ def send_expiry_reminders() -> dict:
 
 
 def retry_failed_notifications(max_retries: int = 3) -> int:
-    """Retry failed offer notifications with exponential backoff. Returns count retried."""
-    import time as _time
+    """Retry failed offer notifications. Returns count retried.
 
+    Note: exponential backoff sleep is intentionally omitted here — this runs
+    in a web request context. Backoff is handled by the retry_count threshold
+    (notifications with retry_count >= max_retries are skipped permanently).
+    """
     failed = db.session.execute(
         db.select(OfferNotification).where(
             OfferNotification.status == "failed",
@@ -334,10 +342,6 @@ def retry_failed_notifications(max_retries: int = 3) -> int:
                 notif.retry_count = max_retries
                 db.session.commit()
                 continue
-
-            # Exponential backoff: wait 2^retry_count seconds (capped at 60s)
-            backoff = min(2 ** notif.retry_count, 60)
-            _time.sleep(backoff)
 
             msg = _build_offer_message(co, notif.notification_type)
             from .notification_service import send_notification
@@ -435,12 +439,12 @@ def ai_suggest_offers_for_customer(customer_id: int) -> list[dict]:
                 )
             ).scalar() or 0
 
-        # ── Birthday check (fixed: use <= for today's birthday) ───────────
+        # ── Birthday check (today counts as birthday) ─────────────────────
         birthday_soon = False
         days_to_bday = None
         if customer.birthday:
             bday_this_year = customer.birthday.replace(year=today.year)
-            if bday_this_year <= today:  # already passed this year (or today)
+            if bday_this_year < today:  # already passed this year (not today)
                 bday_this_year = customer.birthday.replace(year=today.year + 1)
             days_to_bday = (bday_this_year - today).days
             birthday_soon = 0 <= days_to_bday <= 7
@@ -550,9 +554,9 @@ def get_offer_analytics() -> dict:
     revenue_from_offer_sales = float(sales_with_offers.total_revenue or 0)
     offer_sale_count = int(sales_with_offers.sale_count or 0)
 
-    # Expired-unused loss estimate: what discount was never redeemed
-    # (sum of discount_value for expired unused offers — approximate)
-    expired_loss_row = db.session.execute(
+    # Expired-unused loss: count all expired-unused offers, estimate NPR value
+    # For percentage offers we can't know the cart total, so we count them separately
+    expired_fixed_loss_row = db.session.execute(
         db.select(func.sum(Offer.discount_value))
         .join(CustomerOffer, CustomerOffer.offer_id == Offer.id)
         .where(
@@ -560,7 +564,17 @@ def get_offer_analytics() -> dict:
             Offer.offer_type == "fixed",
         )
     ).scalar() or 0
-    expired_loss = float(expired_loss_row)
+    expired_loss = float(expired_fixed_loss_row)
+
+    # Count of expired percentage/conditional offers (can't estimate NPR without cart)
+    expired_pct_count = db.session.execute(
+        db.select(func.count(CustomerOffer.id))
+        .join(Offer, Offer.id == CustomerOffer.offer_id)
+        .where(
+            CustomerOffer.status == CustomerOffer.STATUS_EXPIRED,
+            Offer.offer_type.in_(["percentage", "conditional", "product_based", "combo"]),
+        )
+    ).scalar() or 0
 
     # ── Per-offer breakdown with revenue impact ───────────────────────────
     offer_stats = db.session.execute(
@@ -583,6 +597,22 @@ def get_offer_analytics() -> dict:
         .order_by(func.sum(db.case((CustomerOffer.status == "used", 1), else_=0)).desc())
     ).all()
 
+    stats_list = [
+        {
+            "id": row.id,
+            "title": row.title,
+            "offer_type": row.offer_type,
+            "discount_value": float(row.discount_value),
+            "status": row.status,
+            "assigned": row.assigned or 0,
+            "used": int(row.used or 0),
+            "expired_count": int(row.expired_count or 0),
+            "conversion_rate": round(int(row.used or 0) / (row.assigned or 1) * 100, 1),
+        }
+        for row in offer_stats
+    ]
+    top_converting = sorted(stats_list, key=lambda x: x["conversion_rate"], reverse=True)[:5]
+
     return {
         "total_offers": total_offers,
         "total_assigned": total_assigned,
@@ -593,22 +623,14 @@ def get_offer_analytics() -> dict:
         # Revenue impact
         "total_discount_given": round(total_discount_given, 2),
         "revenue_from_offer_sales": round(revenue_from_offer_sales, 2),
+        "revenue_generated_from_offers": round(revenue_from_offer_sales, 2),
         "offer_sale_count": offer_sale_count,
         "expired_unused_loss": round(expired_loss, 2),
-        "offer_stats": [
-            {
-                "id": row.id,
-                "title": row.title,
-                "offer_type": row.offer_type,
-                "discount_value": float(row.discount_value),
-                "status": row.status,
-                "assigned": row.assigned or 0,
-                "used": int(row.used or 0),
-                "expired_count": int(row.expired_count or 0),
-                "conversion_rate": round(int(row.used or 0) / (row.assigned or 1) * 100, 1),
-            }
-            for row in offer_stats
-        ],
+        "expired_unused_offers": total_expired,
+        "expired_pct_count": expired_pct_count,
+        "top_converting_offers": top_converting,
+        "repeat_visit_conversion_rate": conversion_rate,
+        "offer_stats": stats_list,
     }
 
 
