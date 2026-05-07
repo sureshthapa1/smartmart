@@ -22,7 +22,10 @@ def create_app(config_name="development"):
         template_folder=os.path.join(pkg_dir, "templates"),
         static_folder=os.path.join(pkg_dir, "static"),
     )
-    app.config.from_object(config[config_name])
+    config_object = config[config_name]
+    app.config.from_object(config_object)
+    if hasattr(config_object, "init_app"):
+        config_object.init_app(app)
 
     # ── Logging ───────────────────────────────────────────────────────────
     if not app.debug:

@@ -8,8 +8,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
-@pytest.mark.slow`nfrom hypothesis import given, settings
+from hypothesis import given, settings
 from hypothesis import strategies as st
+
+pytestmark = pytest.mark.slow
 
 from smart_mart.app import create_app
 from smart_mart.extensions import db as _db

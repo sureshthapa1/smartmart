@@ -22,6 +22,8 @@ def run_audit(app) -> dict:
 
     report: dict[str, Any] = {
         "total_routes": 0,
+        "blueprints": {},
+        "issues": [],
         "protected": [],
         "public": [],
         "static": [],
@@ -41,6 +43,8 @@ def run_audit(app) -> dict:
 
         report["total_routes"] += 1
         view_func = app.view_functions.get(endpoint)
+        blueprint = endpoint.split(".", 1)[0] if "." in endpoint else "app"
+        report["blueprints"][blueprint] = report["blueprints"].get(blueprint, 0) + 1
 
         # Check if protected (has login_required decorator)
         is_protected = False
@@ -84,10 +88,14 @@ def run_audit(app) -> dict:
                 for tmpl in templates:
                     tmpl_path = os.path.join(template_folder, tmpl)
                     if not os.path.exists(tmpl_path):
-                        report["missing_templates"].append({
+                        issue = {
                             "route": rule.rule,
                             "template": tmpl,
-                        })
+                        }
+                        report["missing_templates"].append(issue)
+                        report["issues"].append(
+                            f"Missing template for {rule.rule}: {tmpl}"
+                        )
             except (OSError, TypeError):
                 pass
 
@@ -105,6 +113,11 @@ def run_audit(app) -> dict:
         report["notes"].append(f"Public routes: {', '.join(public_rules[:10])}")
 
     return report
+
+
+def audit_routes(app) -> dict:
+    """Backward-compatible route audit entry point used by tests and docs."""
+    return run_audit(app)
 
 
 def print_audit(app) -> None:
