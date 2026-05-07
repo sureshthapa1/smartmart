@@ -274,6 +274,19 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "products", "tax_category", "VARCHAR(20) DEFAULT 'standard'"),
             ),
         ),
+        (
+            "2026_06_15_loyalty_points_expiry",
+            "Add expires_at and is_expired to loyalty_wallet_transactions.",
+            lambda conn: (
+                _safe_add_column(conn, "loyalty_wallet_transactions", "expires_at", "TIMESTAMP"),
+                _safe_add_column(conn, "loyalty_wallet_transactions", "is_expired", "BOOLEAN DEFAULT false"),
+            ),
+        ),
+        (
+            "2026_06_15_user_permissions_void_sale",
+            "Add can_void_sale permission for cashier void workflow.",
+            lambda conn: _safe_add_column(conn, "user_permissions", "can_void_sale", "BOOLEAN DEFAULT false"),
+        ),
     ]
 
 

@@ -3,49 +3,131 @@
 {% block page_title %}Credit Ledger{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Credit Ledger</li>{% endblock %}
 {% block content %}
-<div class="card shadow-sm">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span class="fw-semibold">Outstanding Credit Sales</span>
-    <small class="text-muted">{{ data.total }} record{{ 's' if data.total != 1 }}</small>
+
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Credit / Udharo Ledger</div>
+    <div class="page-header-sub">Outstanding credit sales with per-sale balance tracking</div>
   </div>
+</div>
+
+<!-- Search filter -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex gap-2 align-items-center flex-wrap">
+      <div class="input-group" style="max-width:280px">
+        <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" class="form-control border-start-0 ps-0" name="q"
+               value="{{ search_q }}" placeholder="Customer name or phone…">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+      {% if search_q %}
+      <a href="{{ url_for('operations.credits') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+      {% endif %}
+      <span class="ms-auto text-muted small">{{ data.total }} record{{ 's' if data.total != 1 }}</span>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>Sale</th><th>Customer</th><th>Due Date</th><th class="text-end">Total</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th><th>Receive Payment</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Sale</th>
+          <th>Customer</th>
+          <th>Due Date</th>
+          <th class="text-end">Total</th>
+          <th class="text-end">Paid</th>
+          <th class="text-end">Outstanding</th>
+          <th>Receive Payment</th>
+        </tr>
+      </thead>
       <tbody>
         {% for row in data.records %}
-        <tr>
-          <td><a href="{{ url_for('sales.sale_detail', sale_id=row.sale.id) }}" class="text-decoration-none">#{{ row.sale.id }}</a></td>
-          <td>{{ row.sale.customer_name or 'Walk-in' }}</td>
+        <tr class="{% if row.outstanding_amount <= 0 %}table-success{% elif row.sale.credit_due_date and row.sale.credit_due_date < today and row.outstanding_amount > 0 %}table-danger{% endif %}">
+          <td>
+            <a href="{{ url_for('sales.sale_detail', sale_id=row.sale.id) }}" class="fw-semibold text-decoration-none">
+              {{ row.sale.invoice_number or '#' ~ row.sale.id }}
+            </a>
+            <div class="text-muted" style="font-size:.72rem;">{{ row.sale.sale_date | nst('%d %b %Y') }}</div>
+          </td>
+          <td>
+            <div class="fw-semibold">{{ row.sale.customer_name or 'Walk-in' }}</div>
+            {% if row.sale.customer_phone %}
+            <div class="text-muted small">{{ row.sale.customer_phone }}</div>
+            {% endif %}
+          </td>
           <td>
             {% if row.sale.credit_due_date %}
               {% set overdue = row.outstanding_amount > 0 and row.sale.credit_due_date < today %}
-              <span class="{{ 'text-danger fw-semibold' if overdue else '' }}">
-                {{ row.sale.credit_due_date.strftime('%Y-%m-%d') }}{% if overdue %} ⚠{% endif %}
+              <span class="{{ 'text-danger fw-semibold' if overdue else 'text-muted small' }}">
+                {{ row.sale.credit_due_date.strftime('%d %b %Y') }}
+                {% if overdue %}<br><span class="badge bg-danger" style="font-size:.65rem;">Overdue</span>{% endif %}
               </span>
-            {% else %}-{% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
           </td>
           <td class="text-end">NPR {{ "%.2f"|format(row.sale.total_amount|float) }}</td>
-          <td class="text-end">NPR {{ "%.2f"|format(row.paid_amount) }}</td>
-          <td class="text-end fw-semibold {% if row.outstanding_amount > 0 %}text-warning{% else %}text-success{% endif %}">NPR {{ "%.2f"|format(row.outstanding_amount) }}</td>
+          <td class="text-end text-success">NPR {{ "%.2f"|format(row.paid_amount) }}</td>
+          <td class="text-end fw-bold {% if row.outstanding_amount > 0 %}text-warning{% else %}text-success{% endif %}">
+            NPR {{ "%.2f"|format(row.outstanding_amount) }}
+            {% if row.outstanding_amount <= 0 %}
+            <div><span class="badge bg-success" style="font-size:.65rem;">Collected</span></div>
+            {% endif %}
+          </td>
           <td>
             {% if row.outstanding_amount > 0 %}
-            <form method="post" class="d-flex gap-2">
+            <form method="post" class="d-flex gap-1 align-items-center flex-wrap">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="sale_id" value="{{ row.sale.id }}">
-              <input type="number" name="amount" step="0.01" min="0.01" max="{{ row.outstanding_amount }}" class="form-control form-control-sm" placeholder="Amount" style="width:110px">
-              <select name="payment_mode" class="form-select form-select-sm" style="width:90px">
-                <option value="cash">Cash</option>
-                <option value="qr">QR</option>
-                <option value="card">Card</option>
+              <input type="number" name="amount" step="0.01" min="0.01"
+                     max="{{ row.outstanding_amount }}"
+                     class="form-control form-control-sm"
+                     placeholder="Amount" style="width:100px"
+                     value="{{ row.outstanding_amount | round(2) }}">
+              <select name="payment_mode" class="form-select form-select-sm" style="width:80px">
+                <option value="cash">💵 Cash</option>
+                <option value="qr">📱 QR</option>
+                <option value="card">💳 Card</option>
               </select>
-              <button class="btn btn-sm btn-primary" type="submit">Save</button>
+              <button class="btn btn-sm btn-success" type="submit">
+                <i class="bi bi-check-lg"></i>
+              </button>
             </form>
             {% else %}
-            <span class="badge bg-success">Collected</span>
+            <span class="text-muted small">—</span>
+            {% endif %}
+            {# Payment history accordion #}
+            {% if row.payments %}
+            <div class="mt-1">
+              <button class="btn btn-xs btn-outline-secondary" style="font-size:.7rem;padding:.15rem .4rem;"
+                      type="button" data-bs-toggle="collapse"
+                      data-bs-target="#payments-{{ row.sale.id }}">
+                {{ row.payments|length }} payment{{ 's' if row.payments|length != 1 }}
+              </button>
+              <div class="collapse mt-1" id="payments-{{ row.sale.id }}">
+                {% for p in row.payments %}
+                <div class="text-muted" style="font-size:.72rem;">
+                  {{ p.paid_at.strftime('%d %b %Y') if p.paid_at else '—' }}
+                  · NPR {{ "%.2f"|format(p.amount|float) }}
+                  · {{ p.payment_mode | upper }}
+                </div>
+                {% endfor %}
+              </div>
+            </div>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No credit sales yet.</td></tr>
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">
+            <i class="bi bi-check-circle fs-2 d-block mb-2 text-success opacity-50"></i>
+            {% if search_q %}No credit records matching "{{ search_q }}".
+            {% else %}No outstanding credit sales.{% endif %}
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -55,7 +137,7 @@
     <nav><ul class="pagination pagination-sm mb-0">
       {% for p in range(1, data.pages + 1) %}
       <li class="page-item {% if p == data.page %}active{% endif %}">
-        <a class="page-link" href="{{ url_for('operations.credits', page=p) }}">{{ p }}</a>
+        <a class="page-link" href="{{ url_for('operations.credits', page=p, q=search_q) }}">{{ p }}</a>
       </li>
       {% endfor %}
     </ul></nav>

@@ -31,6 +31,9 @@ class LoyaltyWalletTransaction(db.Model):
     points_change = db.Column(db.Integer, nullable=False)
     rupee_value = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     reason = db.Column(db.String(60), nullable=False)
+    # Points expiry: earned points expire after this date (NULL = never expire)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    is_expired = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     wallet = db.relationship("LoyaltyWallet", back_populates="transactions")

@@ -25,6 +25,7 @@ class UserPermissions(db.Model):
     can_view_sales = db.Column(db.Boolean, default=True)
     can_create_sale = db.Column(db.Boolean, default=True)
     can_delete_sale = db.Column(db.Boolean, default=False)
+    can_void_sale = db.Column(db.Boolean, default=False)   # cashier void (same-day only)
     can_give_discount = db.Column(db.Boolean, default=False)
     can_download_invoice = db.Column(db.Boolean, default=True)
     can_view_customer_statement = db.Column(db.Boolean, default=False)

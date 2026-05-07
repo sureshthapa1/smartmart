@@ -537,6 +537,14 @@ def run_all_bots(user_id: int = 1) -> dict:
         logger.exception("Offer cron failed: %s", e)
         results["offer_cron"] = {"error": str(e)}
 
+    # Loyalty points expiry
+    try:
+        from .loyalty_wallet_service import expire_loyalty_points
+        results["loyalty_expiry"] = {"expired_txns": expire_loyalty_points()}
+    except Exception as e:
+        logger.exception("Loyalty expiry cron failed: %s", e)
+        results["loyalty_expiry"] = {"error": str(e)}
+
     return {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "results": results,

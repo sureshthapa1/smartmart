@@ -214,6 +214,7 @@ PERMISSION_GROUPS = {
         ("can_view_sales", "View Sales List"),
         ("can_create_sale", "Create New Sales (POS)"),
         ("can_delete_sale", "Delete / Reverse Sales"),
+        ("can_void_sale", "Void Same-Day Own Sales"),
         ("can_give_discount", "Apply Discounts"),
         ("can_download_invoice", "Download & Print Invoices"),
         ("can_view_customer_statement", "View Customer Statements"),

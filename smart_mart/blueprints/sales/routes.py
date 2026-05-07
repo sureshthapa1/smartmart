@@ -361,6 +361,40 @@ def delete_sale(sale_id):
     return redirect(url_for("sales.list_sales"))
 
 
+@sales_bp.route("/<int:sale_id>/void", methods=["POST"])
+@login_required
+def void_sale(sale_id):
+    """Cashier void — same-day sales only, requires can_void_sale permission."""
+    # Admins can always void; staff need can_void_sale
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        p = UserPermissions.get_or_create(current_user.id)
+        if not p.can_void_sale:
+            abort(403)
+
+    sale = sales_manager.get_sale(sale_id)
+
+    # Cashiers can only void same-day sales
+    if current_user.role != "admin":
+        from datetime import date as _date
+        if sale.sale_date.date() != _date.today():
+            flash("You can only void sales made today. Contact an admin to reverse older sales.", "danger")
+            return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+
+    # Cashiers can only void their own sales
+    if current_user.role != "admin" and sale.user_id != current_user.id:
+        flash("You can only void your own sales.", "danger")
+        return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+
+    try:
+        sales_manager.delete_sale(sale_id)
+        flash(f"Sale #{sale_id} voided — stock has been restored.", "success")
+        return redirect(url_for("sales.list_sales"))
+    except Exception as e:
+        flash(f"Error voiding sale: {e}", "danger")
+        return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

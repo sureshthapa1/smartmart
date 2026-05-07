@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_DOWN
 
 from ..extensions import db
@@ -130,6 +130,8 @@ def apply_sale_points(
     if earned_points > 0:
         wallet.points_balance += earned_points
         wallet.lifetime_points_earned += earned_points
+        # Points expire 1 year from earning date
+        _expiry = datetime.now(timezone.utc) + timedelta(days=365)
         db.session.add(
             LoyaltyWalletTransaction(
                 wallet_id=wallet.id,
@@ -137,6 +139,7 @@ def apply_sale_points(
                 points_change=earned_points,
                 rupee_value=0,
                 reason="purchase_earn",
+                expires_at=_expiry,
             )
         )
 
@@ -230,3 +233,51 @@ def get_loyalty_summary() -> list[dict]:
         }
         for r in rows
     ]
+
+
+def expire_loyalty_points() -> int:
+    """Expire earned points past their expiry date.
+
+    Marks transactions as expired and deducts the points from wallet balances.
+    Called by the daily bot cron. Returns count of transactions expired.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    now = datetime.now(timezone.utc)
+
+    expired_txns = db.session.execute(
+        db.select(LoyaltyWalletTransaction).where(
+            LoyaltyWalletTransaction.expires_at <= now,
+            LoyaltyWalletTransaction.is_expired == False,
+            LoyaltyWalletTransaction.points_change > 0,  # only earned points expire
+        )
+    ).scalars().all()
+
+    count = 0
+    for txn in expired_txns:
+        try:
+            wallet = db.session.get(LoyaltyWallet, txn.wallet_id)
+            if wallet is None:
+                continue
+            # Deduct the expired points from balance (floor at 0)
+            deduct = min(txn.points_change, wallet.points_balance)
+            wallet.points_balance = max(0, wallet.points_balance - deduct)
+            wallet.updated_at = now
+            txn.is_expired = True
+            # Record the expiry as a negative transaction for audit trail
+            db.session.add(LoyaltyWalletTransaction(
+                wallet_id=wallet.id,
+                sale_id=None,
+                points_change=-deduct,
+                rupee_value=0,
+                reason="points_expired",
+            ))
+            count += 1
+        except Exception as e:
+            logger.warning("expire_loyalty_points: failed for txn #%d: %s", txn.id, e)
+            continue
+
+    if count:
+        db.session.commit()
+        logger.info("Expired loyalty points: %d transactions processed", count)
+    return count

@@ -87,7 +87,7 @@ def create_batches_for_purchase(purchase: Purchase) -> None:
 # Credit records — single aggregated query (fix #2: N+1)
 # ---------------------------------------------------------------------------
 
-def get_credit_records(page: int = 1, per_page: int = 50) -> dict:
+def get_credit_records(page: int = 1, per_page: int = 50, search: str | None = None) -> dict:
     """Return paginated credit records with aggregated payment totals in 2 queries."""
     # Aggregate paid amounts per sale in one query
     paid_subq = (
@@ -99,14 +99,23 @@ def get_credit_records(page: int = 1, per_page: int = 50) -> dict:
         .subquery()
     )
 
+    base_filter = [Sale.payment_mode == "credit"]
+    if search:
+        term = f"%{search.lower()}%"
+        from sqlalchemy import or_
+        base_filter.append(or_(
+            func.lower(Sale.customer_name).like(term),
+            Sale.customer_phone.like(term),
+        ))
+
     total_count = db.session.execute(
-        db.select(func.count(Sale.id)).where(Sale.payment_mode == "credit")
+        db.select(func.count(Sale.id)).where(*base_filter)
     ).scalar() or 0
 
     sales = db.session.execute(
         db.select(Sale, func.coalesce(paid_subq.c.paid, 0).label("paid"))
         .outerjoin(paid_subq, paid_subq.c.sale_id == Sale.id)
-        .where(Sale.payment_mode == "credit")
+        .where(*base_filter)
         .order_by(Sale.sale_date.desc())
         .limit(per_page)
         .offset((page - 1) * per_page)

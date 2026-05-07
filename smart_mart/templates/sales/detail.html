@@ -238,6 +238,24 @@
         <i class="bi bi-whatsapp me-1"></i>WhatsApp
       </a>
       {% endif %}
+      {# Void button — admin always, cashier only for same-day own sales #}
+      {% if current_user.role == 'admin' %}
+      <form method="post" action="{{ url_for('sales.delete_sale', sale_id=sale.id) }}"
+            class="d-inline" onsubmit="return confirm('Delete Sale #{{ sale.id }}? This is permanent and stock will be reversed.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">
+          <i class="bi bi-trash me-1"></i>Delete
+        </button>
+      </form>
+      {% elif current_user.permissions and current_user.permissions.can_void_sale %}
+      <form method="post" action="{{ url_for('sales.void_sale', sale_id=sale.id) }}"
+            class="d-inline" onsubmit="return confirm('Void Sale #{{ sale.id }}? Stock will be restored.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger">
+          <i class="bi bi-x-circle me-1"></i>Void Sale
+        </button>
+      </form>
+      {% endif %}
       <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary ms-auto">
         <i class="bi bi-arrow-left me-1"></i>Back
       </a>
