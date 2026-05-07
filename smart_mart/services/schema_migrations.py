@@ -261,6 +261,19 @@ def _migration_steps() -> list[MigrationStep]:
             "Add is_active flag to products for discontinuing items.",
             lambda conn: _safe_add_column(conn, "products", "is_active", "BOOLEAN DEFAULT true"),
         ),
+        (
+            "2026_06_01_product_barcode",
+            "Add barcode column to products for EAN-13/UPC scanner support.",
+            lambda conn: _safe_add_column(conn, "products", "barcode", "VARCHAR(80)"),
+        ),
+        (
+            "2026_06_01_product_discount_tax",
+            "Add max_discount_pct and tax_category to products.",
+            lambda conn: (
+                _safe_add_column(conn, "products", "max_discount_pct", "NUMERIC(5,2)"),
+                _safe_add_column(conn, "products", "tax_category", "VARCHAR(20) DEFAULT 'standard'"),
+            ),
+        ),
     ]
 
 

@@ -132,6 +132,25 @@
             <dt>Total Returns</dt>
             <dd>{{ sale.returns | length }}</dd>
           </div>
+          {% if sale.discount_amount and sale.discount_amount|float > 0 %}
+          <div class="col-sm-4 mb-2">
+            <dt>Discount Applied</dt>
+            <dd class="text-danger">
+              - NPR {{ "%.2f"|format(sale.discount_amount|float) }}
+              {% if sale.discount_note %}<br><small class="text-muted fw-normal">{{ sale.discount_note }}</small>{% endif %}
+            </dd>
+          </div>
+          {% endif %}
+          {% if sale.credit_due_date %}
+          <div class="col-sm-4 mb-2">
+            <dt>Credit Due Date</dt>
+            <dd class="{% if sale.credit_collected %}text-success{% else %}text-danger{% endif %}">
+              {{ sale.credit_due_date.strftime('%d %b %Y') }}
+              {% if sale.credit_collected %}<span class="badge bg-success ms-1">Collected</span>
+              {% else %}<span class="badge bg-danger ms-1">Outstanding</span>{% endif %}
+            </dd>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -186,26 +205,41 @@
       </div>
     </div>
 
+    <!-- Loyalty Points Summary -->
+    {% set loyalty_txns_detail = [] %}
+    {% if sale.id %}
+    {% set _txns = namespace(items=[]) %}
+    {% for item in [] %}{% endfor %}{# placeholder — populated below #}
+    {% endif %}
+    {% set _wallet_info = namespace(txns=[], balance=none) %}
+    {% try %}{% except %}{% endtry %}
+
     <!-- Actions -->
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap mb-4">
       <a href="{{ url_for('returns.create_return', sale_id=sale.id) }}"
          class="btn btn-warning">
-        <i class="bi bi-arrow-counterclockwise me-1"></i>Create Return
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Return
       </a>
       <a href="{{ url_for('sales.download_invoice', sale_id=sale.id) }}"
          class="btn btn-primary">
-        <i class="bi bi-download me-1"></i>Download Invoice
+        <i class="bi bi-download me-1"></i>Invoice
       </a>
       <a href="{{ url_for('sales.print_invoice', sale_id=sale.id) }}" target="_blank"
          class="btn btn-outline-secondary">
-        <i class="bi bi-printer me-1"></i>Print Invoice
+        <i class="bi bi-printer me-1"></i>Print
       </a>
       <a href="{{ url_for('sales.thermal_receipt', sale_id=sale.id) }}" target="_blank"
          class="btn btn-outline-secondary">
-        <i class="bi bi-receipt me-1"></i>Thermal Receipt
+        <i class="bi bi-receipt me-1"></i>Receipt
       </a>
-      <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Back to Sales
+      {% if sale.customer_phone %}
+      <a href="https://wa.me/{{ sale.customer_phone | replace('+','') | replace(' ','') }}?text={{ ('Invoice ' ~ (sale.invoice_number or sale.id) ~ ' — NPR ' ~ sale.total_amount | float | round(2) ~ ' — Smart Mart') | urlencode }}"
+         target="_blank" class="btn btn-outline-success">
+        <i class="bi bi-whatsapp me-1"></i>WhatsApp
+      </a>
+      {% endif %}
+      <a href="{{ url_for('sales.list_sales') }}" class="btn btn-outline-secondary ms-auto">
+        <i class="bi bi-arrow-left me-1"></i>Back
       </a>
     </div>
 
@@ -231,7 +265,11 @@
             <tr>
               <td class="fw-medium">#{{ r.id }}</td>
               <td class="text-muted small">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-              <td class="text-capitalize">{{ r.refund_mode.replace('_', ' ') }}</td>
+              <td class="text-capitalize">
+                {% set rm = r.refund_mode or 'cash' %}
+                {% if rm == 'cash' %}💵{% elif rm == 'store_credit' %}🏪{% elif rm == 'wallet' %}⭐{% else %}🔄{% endif %}
+                {{ rm.replace('_', ' ') | title }}
+              </td>
               <td class="text-end fw-semibold">NPR {{ "%.2f"|format(r.refund_amount|float) }}</td>
               <td class="text-end">
                 <a href="{{ url_for('returns.return_detail', return_id=r.id) }}" class="btn btn-sm btn-outline-primary">View</a>

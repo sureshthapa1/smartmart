@@ -183,7 +183,27 @@ def thermal_receipt(sale_id):
         shop = ShopSettings.get()
     except Exception:
         shop = None
-    return render_template("sales/thermal_receipt.html", sale=sale, shop=shop)
+
+    # Loyalty points for this sale
+    loyalty_txns = []
+    loyalty_balance = None
+    try:
+        from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+        txns = db.session.execute(
+            db.select(LoyaltyWalletTransaction)
+            .where(LoyaltyWalletTransaction.sale_id == sale_id)
+            .order_by(LoyaltyWalletTransaction.id)
+        ).scalars().all()
+        loyalty_txns = txns
+        if txns:
+            wallet = db.session.get(LoyaltyWallet, txns[0].wallet_id)
+            if wallet:
+                loyalty_balance = wallet.points_balance
+    except Exception:
+        pass
+
+    return render_template("sales/thermal_receipt.html", sale=sale, shop=shop,
+                           loyalty_txns=loyalty_txns, loyalty_balance=loyalty_balance)
 
 
 @sales_bp.route("/customer-statement")

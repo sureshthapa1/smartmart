@@ -412,8 +412,8 @@
           </div>
           <div class="d-flex align-items-center gap-3">
             <span class="fs-4 fw-bold text-white">NPR <span id="grandTotal">0.00</span></span>
-            <button type="submit" class="btn btn-success px-4 fw-semibold">
-              <i class="bi bi-check-circle me-1"></i>Confirm Sale
+            <button type="submit" class="btn btn-success px-4 fw-semibold" title="F10 to confirm">
+              <i class="bi bi-check-circle me-1"></i>Confirm Sale <kbd style="font-size:.65rem;background:rgba(255,255,255,.2);border:none;border-radius:3px;padding:.1em .3em;">F10</kbd>
             </button>
           </div>
         </div>
@@ -424,7 +424,7 @@
   <script>
     const PRODUCTS = [
       {% for p in products %}
-      { id: {{ p.id }}, name: {{ p.name | tojson }}, sku: {{ p.sku | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}
+      { id: {{ p.id }}, name: {{ p.name | tojson }}, sku: {{ p.sku | tojson }}, barcode: {{ (p.barcode or '') | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
 
@@ -761,6 +761,20 @@
     document.getElementById('promoBar')?.remove();
   }
 
+  // ── Keyboard shortcut: F10 to confirm sale ───────────────────────────
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'F10') {
+      e.preventDefault();
+      const submitBtn = document.querySelector('#saleForm button[type="submit"]');
+      if (submitBtn && !submitBtn.disabled) submitBtn.click();
+    }
+    // F2 to focus barcode input
+    if (e.key === 'F2') {
+      e.preventDefault();
+      document.getElementById('barcodeInput')?.focus();
+    }
+  });
+
   // ── Idempotency key — generate once per page load ────────────────────
   (function() {
     const key = 'sale-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
@@ -845,11 +859,13 @@
   function findProductBySku(query) {
     const q = query.trim();
     if (!q) return null;
-    // 1. Exact SKU match (case-insensitive) — what barcode scanners send
-    let found = PRODUCTS.find(p => p.sku && p.sku.toLowerCase() === q.toLowerCase());
-    // 2. Exact name match
+    // 1. Exact barcode match (manufacturer EAN/UPC)
+    let found = PRODUCTS.find(p => p.barcode && p.barcode === q);
+    // 2. Exact SKU match (case-insensitive)
+    if (!found) found = PRODUCTS.find(p => p.sku && p.sku.toLowerCase() === q.toLowerCase());
+    // 3. Exact name match
     if (!found) found = PRODUCTS.find(p => p.name.toLowerCase() === q.toLowerCase());
-    // 3. Partial name match
+    // 4. Partial name match
     if (!found) found = PRODUCTS.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
     return found;
   }
@@ -874,12 +890,33 @@
       if (!found) addRow(product.id, 1, product.price);
       barcodeInput.value = '';
       barcodeInput.style.borderColor = '#22c55e';
-      setTimeout(() => barcodeInput.style.borderColor = '', 800);
+      barcodeInput.style.background = 'rgba(34,197,94,.08)';
+      setTimeout(() => { barcodeInput.style.borderColor = ''; barcodeInput.style.background = ''; }, 600);
       barcodeInput.focus();
     } else {
+      // Clear the input and show visible error — silent failures are unacceptable at POS
       barcodeInput.style.borderColor = '#ef4444';
-      barcodeInput.title = 'SKU not found: ' + sku;
-      setTimeout(() => { barcodeInput.style.borderColor = ''; barcodeInput.title = ''; }, 2000);
+      barcodeInput.style.background = 'rgba(239,68,68,.08)';
+      barcodeInput.placeholder = `Not found: ${sku}`;
+      barcodeInput.value = '';
+      // Show a toast-style error near the barcode input
+      let toast = document.getElementById('barcodeErrorToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'barcodeErrorToast';
+        toast.style.cssText = 'position:absolute;top:100%;left:0;background:#ef4444;color:#fff;padding:.3rem .7rem;border-radius:6px;font-size:.75rem;font-weight:600;z-index:1000;white-space:nowrap;margin-top:2px;';
+        barcodeInput.parentElement.style.position = 'relative';
+        barcodeInput.parentElement.appendChild(toast);
+      }
+      toast.textContent = `❌ SKU/Barcode not found: ${sku}`;
+      toast.style.display = '';
+      setTimeout(() => {
+        barcodeInput.style.borderColor = '';
+        barcodeInput.style.background = '';
+        barcodeInput.placeholder = 'Scan barcode / type SKU…';
+        if (toast) toast.style.display = 'none';
+      }, 2500);
+      barcodeInput.focus();
     }
   }
 

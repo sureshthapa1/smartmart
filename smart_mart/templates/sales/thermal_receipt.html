@@ -68,7 +68,7 @@
     {% for item in sale.items %}
     {% set subtotal.val = subtotal.val + item.subtotal|float %}
     <tr>
-      <td class="item-name">{{ item.product.name[:20] if item.product else 'Item' }}</td>
+      <td class="item-name">{{ item.product.name | truncate(22, True, '…') if item.product else 'Item' }}</td>
       <td class="item-qty">{{ item.quantity }}</td>
       <td class="item-price">{{ "%.0f"|format(item.unit_price|float) }}</td>
       <td class="item-total">{{ "%.0f"|format(item.subtotal|float) }}</td>
@@ -79,7 +79,7 @@
   <table>
     <tr><td>Subtotal</td><td class="right">NPR {{ "%.2f"|format(subtotal.val) }}</td></tr>
     {% if sale.discount_amount and sale.discount_amount|float > 0 %}
-    <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note[:15] }}){% endif %}</td><td class="right">- NPR {{ "%.2f"|format(sale.discount_amount|float) }}</td></tr>
+    <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note[:18] }}){% endif %}</td><td class="right">- NPR {{ "%.2f"|format(sale.discount_amount|float) }}</td></tr>
     {% endif %}
     {% if sale.tax_amount and sale.tax_amount|float > 0 %}
     <tr><td>VAT ({{ sale.tax_rate|int if sale.tax_rate else '' }}%)</td><td class="right">NPR {{ "%.2f"|format(sale.tax_amount|float) }}</td></tr>
@@ -92,9 +92,32 @@
   </table>
 
   <div class="divider-solid"></div>
+  <table>
+    <tr><td>Served by</td><td class="right">{{ sale.user.username if sale.user else '—' }}</td></tr>
+    <tr><td>Payment</td><td class="right">{{ (sale.payment_mode or 'cash') | upper }}</td></tr>
+  </table>
+
+  {# Loyalty points summary — shown if customer earned/redeemed on this sale #}
+  {% if loyalty_txns %}
+  <div class="divider"></div>
+  <div class="center bold" style="font-size:10px">LOYALTY POINTS</div>
+  {% for txn in loyalty_txns %}
+  <div style="font-size:10px;display:flex;justify-content:space-between;padding:1px 0;">
+    <span>{{ 'Earned' if txn.points_change > 0 else 'Redeemed' }}</span>
+    <span class="bold">{{ '+' if txn.points_change > 0 else '' }}{{ txn.points_change }} pts</span>
+  </div>
+  {% endfor %}
+  {% if loyalty_balance is not none %}
+  <div style="font-size:10px;display:flex;justify-content:space-between;padding:1px 0;">
+    <span>Balance</span><span class="bold">{{ loyalty_balance }} pts</span>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="divider-solid"></div>
   <div class="footer">
     {{ shop.footer_note if shop and shop.footer_note else 'Thank you for shopping with us!' }}<br>
-    <span style="font-size:9px">Printed: {{ now.strftime('%Y-%m-%d %H:%M') if now else '' }}</span>
+    <span style="font-size:9px">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</span>
   </div>
 
   <div class="no-print" style="margin-top:12px;text-align:center">

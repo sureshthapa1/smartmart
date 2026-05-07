@@ -14,6 +14,7 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     category = db.Column(db.String(80))
     sku = db.Column(db.String(80), unique=True, nullable=False)
+    barcode = db.Column(db.String(80), nullable=True)  # EAN-13/UPC manufacturer barcode
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
@@ -24,6 +25,8 @@ class Product(db.Model):
     unit = db.Column(db.String(20), nullable=True, default="pcs")
     reorder_point = db.Column(db.Integer, nullable=True, default=10)  # MOQ alert threshold
     is_active = db.Column(db.Boolean, nullable=False, default=True)  # False = discontinued
+    max_discount_pct = db.Column(db.Numeric(5, 2), nullable=True)    # max % discount allowed
+    tax_category = db.Column(db.String(20), nullable=True, default="standard")  # standard|exempt|reduced
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False,
                            default=lambda: datetime.now(timezone.utc),
