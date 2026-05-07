@@ -589,3 +589,194 @@ def bi_profit_loss():
     data = ReportService.profit_and_loss(start, end)
     return render_template("reports/bi_profit_loss.html",
                            data=data, start_date=start_raw, end_date=end_raw)
+
+
+@reports_bp.route("/profit-margin")
+@login_required
+def profit_margin():
+    """Gross profit margin per product and per category."""
+    _require_perm("can_view_profit_report")
+    from sqlalchemy import func, and_
+    from ...extensions import db
+    from ...models.sale import Sale, SaleItem
+    from ...models.product import Product
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    # Per-product margin
+    rows = db.session.execute(
+        db.select(
+            Product.id,
+            Product.name,
+            Product.category,
+            Product.sku,
+            func.sum(SaleItem.quantity).label("qty_sold"),
+            func.sum(SaleItem.subtotal).label("revenue"),
+            func.sum(
+                func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
+            ).label("cogs"),
+        )
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Product.id, Product.name, Product.category, Product.sku)
+        .order_by(func.sum(SaleItem.subtotal).desc())
+    ).all()
+
+    products = []
+    for r in rows:
+        revenue = float(r.revenue or 0)
+        cogs = float(r.cogs or 0)
+        gross_profit = revenue - cogs
+        margin_pct = round(gross_profit / revenue * 100, 1) if revenue else 0
+        products.append({
+            "id": r.id, "name": r.name, "category": r.category or "—",
+            "sku": r.sku, "qty_sold": r.qty_sold or 0,
+            "revenue": revenue, "cogs": cogs,
+            "gross_profit": gross_profit, "margin_pct": margin_pct,
+        })
+
+    # Per-category margin
+    cat_rows = db.session.execute(
+        db.select(
+            Product.category,
+            func.sum(SaleItem.subtotal).label("revenue"),
+            func.sum(
+                func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
+            ).label("cogs"),
+        )
+        .join(SaleItem, SaleItem.product_id == Product.id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Product.category)
+        .order_by(func.sum(SaleItem.subtotal).desc())
+    ).all()
+
+    categories = []
+    for r in cat_rows:
+        revenue = float(r.revenue or 0)
+        cogs = float(r.cogs or 0)
+        gross_profit = revenue - cogs
+        margin_pct = round(gross_profit / revenue * 100, 1) if revenue else 0
+        categories.append({
+            "category": r.category or "Uncategorized",
+            "revenue": revenue, "cogs": cogs,
+            "gross_profit": gross_profit, "margin_pct": margin_pct,
+        })
+
+    total_revenue = sum(p["revenue"] for p in products)
+    total_cogs = sum(p["cogs"] for p in products)
+    total_profit = total_revenue - total_cogs
+    overall_margin = round(total_profit / total_revenue * 100, 1) if total_revenue else 0
+
+    return render_template("reports/profit_margin.html",
+                           products=products, categories=categories,
+                           total_revenue=total_revenue, total_cogs=total_cogs,
+                           total_profit=total_profit, overall_margin=overall_margin,
+                           start_date=start_raw, end_date=end_raw)
+
+
+@reports_bp.route("/customer-spend")
+@login_required
+def customer_spend():
+    """Top customers by spend, visit frequency, and loyalty tier."""
+    _require_perm("can_view_reports")
+    from sqlalchemy import func, and_
+    from ...extensions import db
+    from ...models.sale import Sale
+    from ...models.customer import Customer
+    from ...models.ai_enhancements import LoyaltyWallet
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    rows = db.session.execute(
+        db.select(
+            Customer.id,
+            Customer.name,
+            Customer.phone,
+            Customer.visit_count,
+            Customer.last_visit,
+            func.count(Sale.id).label("sale_count"),
+            func.sum(Sale.total_amount).label("total_spent"),
+            func.avg(Sale.total_amount).label("avg_order"),
+        )
+        .join(Sale, Sale.customer_id == Customer.id)
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(Customer.id, Customer.name, Customer.phone,
+                  Customer.visit_count, Customer.last_visit)
+        .order_by(func.sum(Sale.total_amount).desc())
+        .limit(100)
+    ).all()
+
+    # Get loyalty tiers in one query
+    wallet_tiers = dict(db.session.execute(
+        db.select(LoyaltyWallet.customer_id, LoyaltyWallet.tier, LoyaltyWallet.points_balance)
+    ).all())
+
+    customers = []
+    for r in rows:
+        wallet = wallet_tiers.get(r.id)
+        customers.append({
+            "id": r.id, "name": r.name, "phone": r.phone or "—",
+            "sale_count": r.sale_count or 0,
+            "total_spent": float(r.total_spent or 0),
+            "avg_order": float(r.avg_order or 0),
+            "last_visit": r.last_visit,
+            "tier": wallet[1] if wallet else "—",
+            "points": wallet[2] if wallet else 0,
+        })
+
+    return render_template("reports/customer_spend.html",
+                           customers=customers,
+                           start_date=start_raw, end_date=end_raw)
+
+
+@reports_bp.route("/vat-report")
+@login_required
+def vat_report():
+    """VAT/tax aggregation report for tax filing."""
+    _require_perm("can_view_reports")
+    from sqlalchemy import func, and_
+    from ...extensions import db
+    from ...models.sale import Sale
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    # Aggregate from stored tax fields
+    result = db.session.execute(
+        db.select(
+            func.count(Sale.id).label("sale_count"),
+            func.sum(Sale.total_amount).label("total_revenue"),
+            func.sum(Sale.tax_amount).label("total_vat"),
+            func.sum(Sale.discount_amount).label("total_discount"),
+        )
+        .where(
+            and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+        )
+    ).one()
+
+    # Daily VAT breakdown
+    daily_rows = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.count(Sale.id).label("sales"),
+            func.sum(Sale.total_amount).label("revenue"),
+            func.sum(Sale.tax_amount).label("vat"),
+        )
+        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .group_by(func.date(Sale.sale_date))
+        .order_by(func.date(Sale.sale_date))
+    ).all()
+
+    total_revenue = float(result.total_revenue or 0)
+    total_vat = float(result.total_vat or 0)
+    taxable_amount = total_revenue - total_vat
+
+    return render_template("reports/vat_report.html",
+                           sale_count=result.sale_count or 0,
+                           total_revenue=total_revenue,
+                           total_vat=total_vat,
+                           taxable_amount=taxable_amount,
+                           total_discount=float(result.total_discount or 0),
+                           daily_rows=daily_rows,
+                           start_date=start_raw, end_date=end_raw)

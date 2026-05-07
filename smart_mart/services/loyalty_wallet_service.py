@@ -46,13 +46,28 @@ def _wallet_for_customer(customer: Customer) -> LoyaltyWallet:
 def get_or_create_wallet(customer_name: str, customer_phone: str | None = None) -> LoyaltyWallet | None:
     if not customer_name or customer_name.strip().lower() in ("", "walk-in customer"):
         return None
+    name_clean = customer_name.strip()
+
+    # Try phone-based lookup first (most precise — avoids name collisions)
+    if customer_phone and customer_phone.strip():
+        phone_clean = customer_phone.strip()
+        customer = db.session.execute(
+            db.select(Customer).where(Customer.phone == phone_clean)
+        ).scalar_one_or_none()
+        if customer:
+            return _wallet_for_customer(customer)
+
+    # Fall back to name-based lookup
     customer = db.session.execute(
-        db.select(Customer).where(db.func.lower(Customer.name) == customer_name.strip().lower())
+        db.select(Customer).where(db.func.lower(Customer.name) == name_clean.lower())
     ).scalar_one_or_none()
     if customer is None:
-        customer = Customer(name=customer_name.strip(), phone=customer_phone or None, visit_count=0)
+        customer = Customer(name=name_clean, phone=customer_phone or None, visit_count=0)
         db.session.add(customer)
         db.session.flush()
+    elif customer_phone and not customer.phone:
+        # Backfill phone if we now have it
+        customer.phone = customer_phone
     return _wallet_for_customer(customer)
 
 

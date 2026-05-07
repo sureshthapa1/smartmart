@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Customer Spend Report — Smart Mart{% endblock %}
+{% block page_title %}Customer Spend Report{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('reports.cash_flow') }}">Reports</a></li><li class="breadcrumb-item active">Customer Spend</li>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Customer Spend Report</div>
+    <div class="page-header-sub">Top customers by revenue, visits, and loyalty tier</div>
+  </div>
+  <form method="get" class="d-flex gap-2 align-items-end">
+    <div><label class="form-label small">From</label><input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}"></div>
+    <div><label class="form-label small">To</label><input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}"></div>
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-people-fill text-primary"></i>
+    <span>Top Customers</span>
+    <span class="badge bg-primary ms-1">{{ customers | length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th class="text-end">Sales</th>
+          <th class="text-end">Total Spent</th>
+          <th class="text-end">Avg Order</th>
+          <th>Tier</th>
+          <th class="text-end">Points</th>
+          <th>Last Visit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td class="text-muted small">{{ loop.index }}</td>
+          <td>
+            <a href="{{ url_for('customers.customer_profile', customer_id=c.id) }}" class="fw-semibold text-decoration-none">{{ c.name }}</a>
+          </td>
+          <td class="text-muted small">{{ c.phone }}</td>
+          <td class="text-end">{{ c.sale_count }}</td>
+          <td class="text-end fw-semibold text-success">NPR {{ "{:,.0f}".format(c.total_spent) }}</td>
+          <td class="text-end text-muted">NPR {{ "{:,.0f}".format(c.avg_order) }}</td>
+          <td>
+            {% if c.tier == 'Platinum' %}<span class="badge bg-primary">💎 Platinum</span>
+            {% elif c.tier == 'Gold' %}<span class="badge bg-warning text-dark">🥇 Gold</span>
+            {% elif c.tier == 'Silver' %}<span class="badge bg-secondary">🥈 Silver</span>
+            {% elif c.tier != '—' %}<span class="badge bg-light text-dark">{{ c.tier }}</span>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="text-end">{% if c.points %}<span class="badge bg-warning text-dark">{{ c.points }} pts</span>{% else %}—{% endif %}</td>
+          <td class="text-muted small">{{ c.last_visit.strftime('%d %b %Y') if c.last_visit else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No customer data for this period.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

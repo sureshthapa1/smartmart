@@ -220,6 +220,35 @@
     </div>
   </div>
   <div class="col-6 col-xl-3">
+    <a href="{{ url_for('operations.credits') }}" class="text-decoration-none">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef2f2,#fecaca);color:#991b1b">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-credit-card-2-back me-1"></i>Pending Credits</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(pending_credits_total) }}</div>
+        <div class="stat-sub">{{ pending_credits_count }} outstanding sale{{ 's' if pending_credits_count != 1 }} <i class="bi bi-arrow-right ms-1"></i></div>
+        <div class="stat-bg">📋</div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('operations.closing') }}" class="text-decoration-none">
+    <div class="card stat-card h-100" style="background:{% if cash_session_open %}linear-gradient(135deg,#f0fdf4,#dcfce7);color:#166534{% else %}linear-gradient(135deg,#f8fafc,#f1f5f9);color:#475569{% endif %}">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-safe2 me-1"></i>Cash Session</div>
+        {% if cash_session_open %}
+        <div class="stat-value">NPR {{ "%.0f"|format(cash_session_balance) }}</div>
+        <div class="stat-sub"><span class="badge bg-success">Open</span> Today's cash <i class="bi bi-arrow-right ms-1"></i></div>
+        {% else %}
+        <div class="stat-value" style="font-size:1.2rem;">No Session</div>
+        <div class="stat-sub">Click to open <i class="bi bi-arrow-right ms-1"></i></div>
+        {% endif %}
+        <div class="stat-bg">🏧</div>
+      </div>
+    </div>
+    </a>
+  </div>
+  <div class="col-6 col-xl-3">
     <div class="card stat-card h-100" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);color:#166534">
       <div class="card-body p-4">
         <div class="stat-label"><i class="bi bi-calculator me-1"></i>Avg Transaction</div>

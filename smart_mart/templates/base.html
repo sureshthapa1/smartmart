@@ -657,6 +657,26 @@
                 <i class="bi bi-archive"></i>Dead Stock
               </a>
             </li>
+            {% if current_user.role == 'admin' %}
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.profit_margin' %}active{% endif %}"
+                 href="{{ url_for('reports.profit_margin') }}">
+                <i class="bi bi-percent"></i>Profit Margin
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.customer_spend' %}active{% endif %}"
+                 href="{{ url_for('reports.customer_spend') }}">
+                <i class="bi bi-person-check"></i>Customer Spend
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'reports.vat_report' %}active{% endif %}"
+                 href="{{ url_for('reports.vat_report') }}">
+                <i class="bi bi-receipt-cutoff"></i>VAT Report
+              </a>
+            </li>
+            {% endif %}
             {% endif %}
             {# — Credit — #}
             {% if current_user.role == 'admin' or (current_user.permissions and (current_user.permissions.can_view_reports or current_user.permissions.can_view_credit_report)) %}

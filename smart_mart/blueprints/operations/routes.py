@@ -61,8 +61,27 @@ def credits():
             flash(str(exc), "danger")
         return redirect(url_for("operations.credits"))
     page = request.args.get("page", 1, type=int)
-    data = operations_manager.get_credit_records(page=page)
-    return render_template("operations/credits.html", data=data, today=date.today())
+    search_q = request.args.get("q", "").strip() or None
+    data = operations_manager.get_credit_records(page=page, search=search_q)
+
+    # Enrich each credit record with total paid and remaining balance
+    from ...models.operations import CustomerCreditPayment
+    from sqlalchemy import func as _func
+    sale_ids = [r.id for r in data.get("records", [])]
+    paid_map = {}
+    if sale_ids:
+        paid_rows = db.session.execute(
+            db.select(
+                CustomerCreditPayment.sale_id,
+                _func.sum(CustomerCreditPayment.amount).label("paid"),
+            )
+            .where(CustomerCreditPayment.sale_id.in_(sale_ids))
+            .group_by(CustomerCreditPayment.sale_id)
+        ).all()
+        paid_map = {r.sale_id: float(r.paid or 0) for r in paid_rows}
+
+    return render_template("operations/credits.html", data=data, today=date.today(),
+                           paid_map=paid_map, search_q=search_q or "")
 
 
 @operations_bp.route("/suppliers", methods=["GET", "POST"])

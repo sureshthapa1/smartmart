@@ -541,16 +541,41 @@ def bulk_upload():
                 existing.supplier_id = supplier_id
                 if expiry_date:
                     existing.expiry_date = expiry_date
+                # Update new fields if provided
+                barcode_val = r.get("barcode") or r.get("ean") or r.get("upc") or None
+                if barcode_val:
+                    existing.barcode = barcode_val
+                max_disc = r.get("max_discount_pct") or r.get("max discount") or None
+                if max_disc:
+                    try:
+                        existing.max_discount_pct = float(max_disc)
+                    except ValueError:
+                        pass
+                tax_cat = r.get("tax_category") or r.get("tax category") or None
+                if tax_cat:
+                    existing.tax_category = tax_cat
                 updated += 1
             else:
                 # Create new product directly (no internal commit — we commit at end)
                 try:
                     from sqlalchemy.exc import IntegrityError
+                    barcode_val = r.get("barcode") or r.get("ean") or r.get("upc") or None
+                    max_disc_val = None
+                    try:
+                        raw_md = r.get("max_discount_pct") or r.get("max discount") or ""
+                        if raw_md:
+                            max_disc_val = float(raw_md)
+                    except ValueError:
+                        pass
+                    tax_cat_val = r.get("tax_category") or r.get("tax category") or "standard"
                     p_obj = Product(
                         name=name, category=cat_val, sku=sku,
                         cost_price=cost, selling_price=sell,
                         quantity=qty, unit=unit,
                         supplier_id=supplier_id, expiry_date=expiry_date,
+                        barcode=barcode_val,
+                        max_discount_pct=max_disc_val,
+                        tax_category=tax_cat_val,
                     )
                     db.session.add(p_obj)
                     db.session.flush()  # catch duplicate SKU immediately

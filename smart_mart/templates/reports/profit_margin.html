@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Profit Margin Report — Smart Mart{% endblock %}
+{% block page_title %}Profit Margin Report{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('reports.cash_flow') }}">Reports</a></li><li class="breadcrumb-item active">Profit Margin</li>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Profit Margin Report</div>
+    <div class="page-header-sub">Gross margin per product and category</div>
+  </div>
+  <form method="get" class="d-flex gap-2 align-items-end">
+    <div><label class="form-label small">From</label><input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}"></div>
+    <div><label class="form-label small">To</label><input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}"></div>
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+  </form>
+</div>
+
+<!-- Summary KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="text-muted small">Total Revenue</div><div class="fs-4 fw-bold text-primary">NPR {{ "{:,.0f}".format(total_revenue) }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="text-muted small">Total COGS</div><div class="fs-4 fw-bold text-warning">NPR {{ "{:,.0f}".format(total_cogs) }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="text-muted small">Gross Profit</div><div class="fs-4 fw-bold text-success">NPR {{ "{:,.0f}".format(total_profit) }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="card p-3 text-center"><div class="text-muted small">Overall Margin</div><div class="fs-4 fw-bold" style="color:#7c3aed">{{ overall_margin }}%</div></div></div>
+</div>
+
+<!-- Category breakdown -->
+<div class="card mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-tags me-2 text-primary"></i>By Category</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Category</th><th class="text-end">Revenue</th><th class="text-end">COGS</th><th class="text-end">Gross Profit</th><th>Margin</th></tr></thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td class="fw-semibold">{{ c.category }}</td>
+          <td class="text-end">NPR {{ "{:,.0f}".format(c.revenue) }}</td>
+          <td class="text-end text-muted">NPR {{ "{:,.0f}".format(c.cogs) }}</td>
+          <td class="text-end {% if c.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">NPR {{ "{:,.0f}".format(c.gross_profit) }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:8px;min-width:60px;"><div class="progress-bar {% if c.margin_pct >= 30 %}bg-success{% elif c.margin_pct >= 15 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ [c.margin_pct, 100]|min }}%"></div></div>
+              <span class="small fw-semibold">{{ c.margin_pct }}%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Per-product breakdown -->
+<div class="card">
+  <div class="card-header fw-semibold"><i class="bi bi-box-seam me-2 text-primary"></i>By Product (top 100)</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Product</th><th>Category</th><th class="text-end">Qty Sold</th><th class="text-end">Revenue</th><th class="text-end">COGS</th><th class="text-end">Profit</th><th>Margin</th></tr></thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td><a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="text-decoration-none fw-semibold">{{ p.name }}</a><br><code class="text-muted" style="font-size:.7rem;">{{ p.sku }}</code></td>
+          <td class="text-muted small">{{ p.category }}</td>
+          <td class="text-end">{{ p.qty_sold }}</td>
+          <td class="text-end">NPR {{ "{:,.0f}".format(p.revenue) }}</td>
+          <td class="text-end text-muted">NPR {{ "{:,.0f}".format(p.cogs) }}</td>
+          <td class="text-end {% if p.gross_profit >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">NPR {{ "{:,.0f}".format(p.gross_profit) }}</td>
+          <td><span class="badge {% if p.margin_pct >= 30 %}bg-success{% elif p.margin_pct >= 15 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ p.margin_pct }}%</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No sales data for this period.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

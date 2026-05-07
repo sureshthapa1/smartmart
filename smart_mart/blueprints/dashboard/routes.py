@@ -200,7 +200,38 @@ def index():
         insights.append({"type": "info", "icon": "bi-trophy",
                           "text": f"Top seller this month: {top5[0].Product.name}"})
 
-    # ── NLG daily summary — always regenerated so it reflects live data ──
+    # ── Cash session balance (open session for current user) ─────────────
+    cash_session_balance = None
+    cash_session_open = False
+    try:
+        from ...models.operations import CashSession
+        open_session = db.session.execute(
+            db.select(CashSession)
+            .where(CashSession.user_id == cu.id, CashSession.closed_at.is_(None))
+            .order_by(CashSession.opened_at.desc())
+        ).scalar_one_or_none()
+        if open_session:
+            cash_session_open = True
+            cash_session_balance = float(open_session.opening_balance or 0) + float(today_sales_amount)
+    except Exception:
+        pass
+
+    # ── Pending credits (outstanding credit sales) ────────────────────────
+    pending_credits_total = 0.0
+    pending_credits_count = 0
+    try:
+        from ...models.sale import Sale as _Sale
+        result = db.session.execute(
+            db.select(
+                func.count(_Sale.id).label("cnt"),
+                func.coalesce(func.sum(_Sale.total_amount), 0).label("total"),
+            )
+            .where(_Sale.payment_mode == "credit", _Sale.credit_collected == False)
+        ).one()
+        pending_credits_count = result.cnt or 0
+        pending_credits_total = float(result.total or 0)
+    except Exception:
+        pass
     nlg_summary = None
     from flask_login import current_user as cu
     if cu.role == "admin":
@@ -262,4 +293,8 @@ def index():
                            filter_end=str(filter_end),
                            nlg_summary=nlg_summary,
                            advisor_actions=advisor_actions,
+                           cash_session_open=cash_session_open,
+                           cash_session_balance=cash_session_balance,
+                           pending_credits_total=pending_credits_total,
+                           pending_credits_count=pending_credits_count,
                            )
