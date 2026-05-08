@@ -63,8 +63,19 @@ def _delete_product_image(filename: str) -> None:
 def list_products():
     search = request.args.get("q", "").strip() or None
     page = request.args.get("page", 1, type=int)
-    products = inventory_manager.get_products(search=search, page=page)
-    # Get total count for pagination
+    status_filter = request.args.get("status", "active")  # active | inactive | all
+
+    # Map status param to active_only flag
+    active_only = None
+    if status_filter == "active":
+        active_only = True
+    elif status_filter == "inactive":
+        active_only = False
+    # status == "all" → active_only stays None
+
+    products = inventory_manager.get_products(search=search, page=page, active_only=active_only)
+
+    # Total count for pagination (same filters)
     from sqlalchemy import func as _func, or_
     stmt = db.select(_func.count(Product.id))
     if search:
@@ -76,11 +87,17 @@ def list_products():
                 db.func.lower(Product.sku) == term,
             )
         )
+    if active_only is True:
+        stmt = stmt.where(Product.is_active == True)
+    elif active_only is False:
+        stmt = stmt.where(Product.is_active == False)
+
     total = db.session.execute(stmt).scalar() or 0
     per_page = 100
     total_pages = max(1, (total + per_page - 1) // per_page)
     return render_template("inventory/list.html", products=products, search=search or "",
-                           page=page, total=total, total_pages=total_pages, per_page=per_page)
+                           page=page, total=total, total_pages=total_pages, per_page=per_page,
+                           status_filter=status_filter)
 
 
 @inventory_bp.route("/create", methods=["GET", "POST"])

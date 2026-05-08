@@ -25,12 +25,20 @@
   <div class="card-body py-3">
     <form method="get" action="{{ url_for('inventory.list_products') }}">
       <div class="d-flex gap-2 flex-wrap align-items-center">
-        <div class="input-group" style="max-width:380px">
+        <div class="input-group" style="max-width:320px">
           <span class="input-group-text bg-transparent border-end-0"><i class="bi bi-search text-muted"></i></span>
           <input type="text" class="form-control border-start-0 ps-0" name="q" value="{{ search }}" placeholder="Search name, SKU, category…">
         </div>
+        <!-- Active/Inactive filter -->
+        <select name="status" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive / Discontinued</option>
+          <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All products</option>
+        </select>
         <button class="btn btn-primary btn-sm" type="submit">Search</button>
-        {% if search %}<a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+        {% if search or status_filter != 'active' %}
+        <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -49,6 +57,7 @@
           <th class="text-center">Stock</th>
           <th>Supplier</th>
           <th>Expiry</th>
+          <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -77,6 +86,13 @@
           </td>
           <td class="text-muted small">{{ p.supplier.name if p.supplier else '—' }}</td>
           <td class="text-muted small">{{ p.expiry_date.strftime('%Y-%m-%d') if p.expiry_date else '—' }}</td>
+          <td>
+            {% if p.is_active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </td>
           <td>
             <div class="d-flex gap-1">
               <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>

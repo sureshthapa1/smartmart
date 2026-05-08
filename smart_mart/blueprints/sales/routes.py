@@ -146,7 +146,25 @@ def create_sale():
 @login_required
 def sale_detail(sale_id):
     sale = sales_manager.get_sale(sale_id)
-    return render_template("sales/detail.html", sale=sale)
+    # Loyalty points for this sale
+    loyalty_txns = []
+    loyalty_balance = None
+    try:
+        from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+        txns = db.session.execute(
+            db.select(LoyaltyWalletTransaction)
+            .where(LoyaltyWalletTransaction.sale_id == sale_id)
+            .order_by(LoyaltyWalletTransaction.id)
+        ).scalars().all()
+        loyalty_txns = txns
+        if txns:
+            wallet = db.session.get(LoyaltyWallet, txns[0].wallet_id)
+            if wallet:
+                loyalty_balance = wallet.points_balance
+    except Exception:
+        pass
+    return render_template("sales/detail.html", sale=sale,
+                           loyalty_txns=loyalty_txns, loyalty_balance=loyalty_balance)
 
 
 @sales_bp.route("/<int:sale_id>/invoice")

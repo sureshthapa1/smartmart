@@ -205,14 +205,37 @@
       </div>
     </div>
 
-    <!-- Loyalty Points Summary -->
-    {% set loyalty_txns_detail = [] %}
-    {% if sale.id %}
-    {% set _txns = namespace(items=[]) %}
-    {% for item in [] %}{% endfor %}{# placeholder — populated below #}
+    <!-- Loyalty Points Summary (shown when customer earned/redeemed on this sale) -->
+    {% if loyalty_txns %}
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-star-fill text-warning"></i>
+        <span class="fw-semibold">Loyalty Points</span>
+        {% if loyalty_balance is not none %}
+        <span class="badge bg-warning text-dark ms-auto">Balance: {{ loyalty_balance }} pts</span>
+        {% endif %}
+      </div>
+      <div class="card-body py-2">
+        {% for txn in loyalty_txns %}
+        <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+          <span class="small {% if txn.points_change > 0 %}text-success{% else %}text-primary{% endif %}">
+            {% if txn.points_change > 0 %}
+              <i class="bi bi-plus-circle me-1"></i>Earned {{ txn.points_change }} pts
+            {% else %}
+              <i class="bi bi-dash-circle me-1"></i>Redeemed {{ txn.points_change | abs }} pts
+            {% endif %}
+          </span>
+          <span class="text-muted small">
+            {% if txn.rupee_value and txn.rupee_value|float > 0 %}NPR {{ "%.2f"|format(txn.rupee_value|float) }}{% endif %}
+            {% if txn.expires_at and txn.points_change > 0 %}
+              · Expires {{ txn.expires_at | nst('%d %b %Y') }}
+            {% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
     {% endif %}
-    {% set _wallet_info = namespace(txns=[], balance=none) %}
-    {% try %}{% except %}{% endtry %}
 
     <!-- Actions -->
     <div class="d-flex gap-2 flex-wrap mb-4">

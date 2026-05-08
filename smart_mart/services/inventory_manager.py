@@ -97,8 +97,14 @@ def delete_product(product_id: int) -> None:
     db.session.commit()
 
 
-def get_products(search: str | None = None, page: int = 1, per_page: int = 100) -> list[Product]:
-    """Return paginated products with optional search by name/category/SKU."""
+def get_products(search: str | None = None, page: int = 1, per_page: int = 100,
+                 active_only: bool | None = None) -> list[Product]:
+    """Return paginated products with optional search by name/category/SKU.
+
+    active_only=True  → only active products
+    active_only=False → only inactive/discontinued products
+    active_only=None  → all products (default)
+    """
     stmt = db.select(Product).order_by(Product.name)
     if search:
         term = search.strip().lower()
@@ -109,6 +115,10 @@ def get_products(search: str | None = None, page: int = 1, per_page: int = 100) 
                 func.lower(Product.sku) == term,
             )
         )
+    if active_only is True:
+        stmt = stmt.where(Product.is_active == True)
+    elif active_only is False:
+        stmt = stmt.where(Product.is_active == False)
     offset = (page - 1) * per_page
     stmt = stmt.limit(per_page).offset(offset)
     return db.session.execute(stmt).scalars().all()
