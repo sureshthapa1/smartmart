@@ -82,6 +82,7 @@ with app.app_context():
         safe_add(conn, "sales", "promotion_id", "INTEGER REFERENCES promotions(id)")
         safe_add(conn, "sales", "tax_rate", "NUMERIC(5,2) DEFAULT 0")
         safe_add(conn, "sales", "tax_amount", "NUMERIC(10,2) DEFAULT 0")
+        safe_add(conn, "sales", "credit_due_date", "DATE")
 
         # Purchases
         safe_add(conn, "purchases", "tax_rate", "NUMERIC(5,2) DEFAULT 0")
@@ -89,6 +90,10 @@ with app.app_context():
 
         # Products
         safe_add(conn, "products", "inventory_value", "NUMERIC(14,2) DEFAULT 0")
+        safe_add(conn, "products", "is_active", "BOOLEAN DEFAULT true")
+        safe_add(conn, "products", "barcode", "VARCHAR(80)")
+        safe_add(conn, "products", "max_discount_pct", "NUMERIC(5,2)")
+        safe_add(conn, "products", "tax_category", "VARCHAR(20) DEFAULT 'standard'")
 
         # Stock movements
         safe_add(conn, "stock_movements", "stock_take_id", "INTEGER REFERENCES stock_takes(id)")
@@ -102,6 +107,18 @@ with app.app_context():
 
         # Expense → BI sync link (must come AFTER bi_operating_expenses exists)
         safe_add(conn, "expenses", "bi_opex_id", "INTEGER REFERENCES bi_operating_expenses(id)")
+
+        # Offers system
+        for col in ["can_view_offers", "can_assign_offers", "can_apply_offers"]:
+            safe_add(conn, "user_permissions", col, "BOOLEAN DEFAULT true")
+        safe_add(conn, "user_permissions", "can_manage_offers", "BOOLEAN DEFAULT false")
+        safe_add(conn, "user_permissions", "can_void_sale", "BOOLEAN DEFAULT false")
+        safe_add(conn, "offers", "start_date", "DATE")
+        safe_add(conn, "offers", "end_date", "DATE")
+
+        # Loyalty points expiry
+        safe_add(conn, "loyalty_wallet_transactions", "expires_at", "TIMESTAMP")
+        safe_add(conn, "loyalty_wallet_transactions", "is_expired", "BOOLEAN DEFAULT false")
 
     print("Migration complete.")
 
