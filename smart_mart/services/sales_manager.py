@@ -168,12 +168,21 @@ def create_sale(items: list[dict], user_id: int,
             if customer_name and customer_name.strip().lower() != "walk-in customer":
                 Customer.upsert(customer_name, customer_phone, customer_address)
                 db.session.flush()
-                # Auto-populate customer_id FK
-                cust = db.session.execute(
-                    db.select(Customer).where(
+                # Auto-populate customer_id FK — use phone for precise match,
+                # fall back to name only if no phone provided
+                cust = None
+                if customer_phone and customer_phone.strip():
+                    cust = db.session.execute(
+                        db.select(Customer).where(Customer.phone == customer_phone.strip())
+                    ).scalar_one_or_none()
+                if cust is None:
+                    # Name + phone match
+                    q = db.select(Customer).where(
                         db.func.lower(Customer.name) == customer_name.strip().lower()
                     )
-                ).scalar_one_or_none()
+                    if customer_phone and customer_phone.strip():
+                        q = q.where(Customer.phone == customer_phone.strip())
+                    cust = db.session.execute(q).scalar_one_or_none()
                 if cust:
                     sale.customer_id = cust.id
         except Exception as e:

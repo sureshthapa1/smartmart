@@ -47,28 +47,51 @@ def get_or_create_wallet(customer_name: str, customer_phone: str | None = None) 
     if not customer_name or customer_name.strip().lower() in ("", "walk-in customer"):
         return None
     name_clean = customer_name.strip()
+    phone_clean = (customer_phone or "").strip() or None
 
-    # Try phone-based lookup first (most precise — avoids name collisions)
-    if customer_phone and customer_phone.strip():
-        phone_clean = customer_phone.strip()
+    # ── Priority 1: phone-based lookup (most precise) ─────────────────────
+    if phone_clean:
         customer = db.session.execute(
             db.select(Customer).where(Customer.phone == phone_clean)
         ).scalar_one_or_none()
         if customer:
             return _wallet_for_customer(customer)
 
-    # Fall back to name-based lookup
-    customer = db.session.execute(
+    # ── Priority 2: name + phone match ───────────────────────────────────
+    if phone_clean:
+        customer = db.session.execute(
+            db.select(Customer).where(
+                db.func.lower(Customer.name) == name_clean.lower(),
+                Customer.phone == phone_clean,
+            )
+        ).scalar_one_or_none()
+        if customer:
+            return _wallet_for_customer(customer)
+
+    # ── Priority 3: name-only — ONLY if exactly one match with no phone ──
+    # Prevents two "Ram Sharma" customers sharing a wallet
+    name_matches = db.session.execute(
         db.select(Customer).where(db.func.lower(Customer.name) == name_clean.lower())
-    ).scalar_one_or_none()
-    if customer is None:
-        customer = Customer(name=name_clean, phone=customer_phone or None, visit_count=0)
+    ).scalars().all()
+
+    if len(name_matches) == 1:
+        customer = name_matches[0]
+        # Only use name match if: no phone on file, or no phone provided
+        if not customer.phone or not phone_clean:
+            if phone_clean and not customer.phone:
+                customer.phone = phone_clean  # backfill phone
+            return _wallet_for_customer(customer)
+
+    # ── Priority 4: no match — create new customer ────────────────────────
+    if len(name_matches) == 0:
+        customer = Customer(name=name_clean, phone=phone_clean, visit_count=0)
         db.session.add(customer)
         db.session.flush()
-    elif customer_phone and not customer.phone:
-        # Backfill phone if we now have it
-        customer.phone = customer_phone
-    return _wallet_for_customer(customer)
+        return _wallet_for_customer(customer)
+
+    # Multiple name matches with different phones — can't determine which one
+    # Return None rather than picking the wrong wallet
+    return None
 
 
 def wallet_snapshot(wallet: LoyaltyWallet | None) -> dict:
