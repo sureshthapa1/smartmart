@@ -26,7 +26,7 @@ Step-by-step guide to deploy Smart Mart on Render with PostgreSQL and automated 
    - **Region**: Singapore
    - **Branch**: `main`
    - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt && bash build.sh`
+   - **Build Command**: `bash build.sh`
    - **Start Command**: `gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:$PORT --workers 2 --threads 2 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -`
    - **Plan**: Starter ($7/month)
 
@@ -46,6 +46,8 @@ In the web service → **Environment** tab, add these:
 | `BOT_SECRET` | *(generate a strong random value)* | Required for scheduled bot calls |
 | `APP_URL` | `https://your-app.onrender.com` | Required by the cron service |
 | `LOG_LEVEL` | `INFO` | |
+
+The repo includes `.python-version` with `3.11.9` so Render uses Python 3.11 instead of its platform default.
 
 **Generate a SECRET_KEY:**
 ```bash

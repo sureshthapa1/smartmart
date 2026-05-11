@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+echo "=== Python runtime ==="
+python --version
+pip --version
+
 echo "=== Installing dependencies ==="
 pip install -r requirements.txt
 
