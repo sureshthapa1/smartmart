@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}AI Advisor - Smart Mart{% endblock %}
+{% block page_title %}AI Advisor{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">AI Advisor</li>{% endblock %}
+{% block content %}
+{% if not api_key_configured %}
+<div class="alert alert-warning">
+  <strong>ANTHROPIC_API_KEY not configured.</strong>
+  Add it in Render environment variables to enable the GoldKernel Smart Business Advisor.
+</div>
+{% endif %}
+
+<div class="card" style="max-width:920px">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-stars text-warning"></i>
+    <span>GoldKernel Smart Business Advisor</span>
+  </div>
+  <div class="card-body">
+    <div class="d-flex gap-2 flex-wrap mb-3" id="quickAsks">
+      {% for q in [
+        'How were sales today?',
+        'Which product sold most this month?',
+        'What items are running low?',
+        'What is my profit this month?',
+        'Any tips for Dashain stock planning?',
+        'Which customers buy most often?'
+      ] %}
+      <button class="btn btn-outline-primary btn-sm quick-ask" type="button">{{ q }}</button>
+      {% endfor %}
+    </div>
+    <div id="chatBox" class="border rounded-3 p-3 mb-3 bg-light" style="height:460px;overflow-y:auto"></div>
+    <form id="chatForm" class="d-flex gap-2">
+      <input id="messageInput" class="form-control" placeholder="Ask about sales, inventory, profit, customers..." autocomplete="off" {% if not api_key_configured %}disabled{% endif %}>
+      <button class="btn btn-primary" type="submit" {% if not api_key_configured %}disabled{% endif %}>Ask</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const chatBox = document.getElementById('chatBox');
+const history = [];
+function md(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.*)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/\n/g, '<br>');
+}
+function add(role, text, pending=false) {
+  const row = document.createElement('div');
+  row.className = `d-flex mb-2 ${role === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
+  row.innerHTML = `<div class="px-3 py-2 rounded-3 ${role === 'user' ? 'bg-success text-white' : 'bg-white border'}" style="max-width:75%">${pending ? '<span class="typing">Thinking...</span>' : md(text)}</div>`;
+  chatBox.appendChild(row);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return row;
+}
+async function ask(message) {
+  if (!message) return;
+  add('user', message);
+  history.push({role:'user', content:message});
+  const pending = add('assistant', '', true);
+  try {
+    const res = await fetch('/ai/chat/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, history:history.slice(-10)})});
+    const data = await res.json();
+    const reply = data.reply || data.error || 'No reply.';
+    pending.querySelector('div').innerHTML = md(reply);
+    history.push({role:'assistant', content:reply});
+  } catch (e) {
+    pending.querySelector('div').textContent = 'AI Advisor is unavailable right now.';
+  }
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+document.getElementById('chatForm')?.addEventListener('submit', e => {
+  e.preventDefault();
+  const input = document.getElementById('messageInput');
+  const message = input.value.trim();
+  input.value = '';
+  ask(message);
+});
+document.querySelectorAll('.quick-ask').forEach(btn => btn.addEventListener('click', () => ask(btn.textContent.trim())));
+</script>
+{% endblock %}

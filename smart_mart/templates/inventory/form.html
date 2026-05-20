@@ -171,6 +171,14 @@
               <div class="form-text">Alert when stock falls below this.</div>
             </div>
 
+            <div class="col-md-3">
+              <label class="form-label fw-medium">Low Stock Threshold</label>
+              <input type="number" class="form-control" name="low_stock_threshold" min="0"
+                     value="{{ product.low_stock_threshold if product and product.low_stock_threshold is not none else 500 }}"
+                     placeholder="500">
+              <div class="form-text">Dashboard alert threshold in grams.</div>
+            </div>
+
             <!-- Barcode (EAN/UPC) -->
             <div class="col-md-4">
               <label class="form-label fw-medium">Barcode (EAN/UPC)</label>

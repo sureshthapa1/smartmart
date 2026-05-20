@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Price Alerts - Smart Mart{% endblock %}
+{% block page_title %}Price Alerts{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}">Inventory</a></li>
+<li class="breadcrumb-item active">Price Alerts</li>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th class="text-end">Old Cost</th>
+          <th class="text-end">New Cost</th>
+          <th class="text-end">Increase</th>
+          <th class="text-end">Suggested Retail</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in alerts %}
+        <tr>
+          <td class="fw-semibold">{{ row.product.name }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.old_cost) }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.new_cost) }}</td>
+          <td class="text-end"><span class="badge bg-warning text-dark">{{ "%.1f"|format(row.increase_pct) }}%</span></td>
+          <td class="text-end fw-semibold">NPR {{ "%.2f"|format(row.suggested_price) }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('inventory.price_history', product_id=row.product.id) }}">History</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-5">No 10% supplier cost increases found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

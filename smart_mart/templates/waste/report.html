@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Waste Report - Smart Mart{% endblock %}
+{% block page_title %}Waste Report{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('waste.index') }}">Waste</a></li>
+<li class="breadcrumb-item active">Report</li>
+{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="card metric-card orange h-100">
+      <div class="card-body">
+        <div class="metric-label">Waste Cost This Month</div>
+        <div class="metric-value">NPR {{ "%.2f"|format(total) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card metric-card blue h-100">
+      <div class="card-body">
+        <div class="metric-label">Previous Month</div>
+        <div class="metric-value">NPR {{ "%.2f"|format(previous_total) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Breakdown by Reason</div>
+      <table class="table mb-0">
+        {% for row in by_reason %}
+        <tr><td>{{ row.reason.replace('_', ' ')|title }}</td><td class="text-end">NPR {{ "%.2f"|format(row.total|float) }}</td></tr>
+        {% else %}
+        <tr><td class="text-center text-muted py-4">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">Top Wasted Products</div>
+      <table class="table mb-0">
+        {% for row in by_product %}
+        <tr><td>{{ row.name }}</td><td class="text-end">{{ row.qty }}g</td><td class="text-end">NPR {{ "%.2f"|format(row.total|float) }}</td></tr>
+        {% else %}
+        <tr><td class="text-center text-muted py-4">No data.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

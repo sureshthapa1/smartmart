@@ -48,15 +48,22 @@ def login(username: str, password: str) -> User | None:
     from flask import request as flask_request
     ip = _get_client_ip()
 
-    if is_rate_limited(ip):
-        return None
-
     user: User | None = db.session.execute(
         db.select(User).filter_by(username=username)
     ).scalar_one_or_none()
 
     if user is None or not check_password(password, user.password_hash):
         record_failed_attempt(ip)
+        try:
+            from ..models.login_attempt import LoginAttempt
+            db.session.add(LoginAttempt(
+                username=username,
+                ip_address=ip,
+                successful=False,
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         return None
 
     clear_attempts(ip)

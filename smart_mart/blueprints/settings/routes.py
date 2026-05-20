@@ -44,6 +44,8 @@ def index():
     s = ShopSettings.get()
     if request.method == "POST":
         s.shop_name = request.form.get("shop_name", "").strip() or "Smart Mart"
+        s.name = s.shop_name
+        s.owner_name = request.form.get("owner_name", "").strip() or None
         s.pan_number = request.form.get("pan_number", "").strip() or None
         s.address = request.form.get("address", "").strip() or None
         s.phone = request.form.get("phone", "").strip() or None

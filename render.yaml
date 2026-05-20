@@ -2,7 +2,7 @@ services:
   - type: web
     name: smart-mart
     runtime: python
-    buildCommand: bash build.sh
+    buildCommand: bash build.sh && flask --app run.py db upgrade
     startCommand: gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:$PORT --workers 2 --threads 2 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -
     envVars:
       - key: FLASK_ENV
@@ -20,6 +20,9 @@ services:
         sync: false
       # REQUIRED: Set a strong password for the admin account.
       - key: ADMIN_PASSWORD
+        sync: false
+      # REQUIRED for AI Advisor chat responses.
+      - key: ANTHROPIC_API_KEY
         sync: false
       # Optional: override the admin username (default: admin)
       - key: ADMIN_USERNAME

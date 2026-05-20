@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Gift Bundles - Smart Mart{% endblock %}
+{% block page_title %}Gift Bundles{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Gift Bundles</li>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Gift Bundles</div>
+    <div class="page-header-sub">Hamper packs for festivals, weddings, and daily gifting</div>
+  </div>
+  {% if current_user.role == 'admin' %}
+  <a href="{{ url_for('bundles.create_bundle') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Create Bundle</a>
+  {% endif %}
+</div>
+
+<ul class="nav nav-pills mb-3">
+  {% for label in ['All'] + seasons %}
+  <li class="nav-item">
+    <a class="nav-link {% if active_season == label %}active{% endif %}" href="{{ url_for('bundles.index', season=label) }}">{{ label }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="row g-3">
+  {% for bundle in bundles %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between gap-2">
+          <div>
+            <h5 class="fw-bold mb-1">{{ bundle.name }}</h5>
+            <div class="text-muted small">{{ bundle.season_tag or 'General' }}</div>
+          </div>
+          <span class="badge {% if bundle.is_active %}bg-success{% else %}bg-secondary{% endif %}">{{ 'Active' if bundle.is_active else 'Inactive' }}</span>
+        </div>
+        <p class="text-muted small mt-2 mb-2">{{ bundle.description or '—' }}</p>
+        <ul class="small mb-3">
+          {% for item in bundle.items %}
+          <li>{{ item.component.name if item.component else 'Product' }} - {{ item.quantity }}g</li>
+          {% endfor %}
+        </ul>
+        <div class="d-flex justify-content-between align-items-end mb-3">
+          <div>
+            <div class="text-muted small">Price</div>
+            <div class="fs-4 fw-bold text-success">NPR {{ "%.2f"|format(bundle.price|float) }}</div>
+          </div>
+          <div class="text-end">
+            <div class="text-muted small">Margin</div>
+            <div class="fw-semibold {% if bundle.margin_pct < 20 %}text-danger{% else %}text-primary{% endif %}">{{ "%.1f"|format(bundle.margin_pct) }}%</div>
+          </div>
+        </div>
+        {% if bundle.is_active %}
+        <form method="post" action="{{ url_for('bundles.sell', bundle_id=bundle.id) }}" class="d-flex gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="number" name="units" class="form-control form-control-sm" min="1" value="1" style="max-width:90px">
+          <select name="payment_method" class="form-select form-select-sm">
+            <option value="cash">Cash</option><option value="fonepay">Fonepay</option><option value="esewa">eSewa</option>
+            <option value="khalti">Khalti</option><option value="qr">QR</option><option value="bank">Bank</option><option value="credit">Credit</option>
+          </select>
+          <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-cart-check"></i></button>
+        </form>
+        {% endif %}
+      </div>
+      {% if current_user.role == 'admin' %}
+      <div class="card-footer bg-white d-flex gap-2">
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('bundles.edit_bundle', bundle_id=bundle.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('bundles.toggle', bundle_id=bundle.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-secondary btn-sm">{{ 'Deactivate' if bundle.is_active else 'Activate' }}</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12"><div class="text-center text-muted py-5">No bundles yet.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

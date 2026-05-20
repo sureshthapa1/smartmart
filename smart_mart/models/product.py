@@ -18,6 +18,7 @@ class Product(db.Model):
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
+    low_stock_threshold = db.Column(db.Integer, nullable=True, default=500)
     inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
@@ -37,6 +38,14 @@ class Product(db.Model):
     sale_items = db.relationship("SaleItem", back_populates="product")
     purchase_items = db.relationship("PurchaseItem", back_populates="product")
     stock_movements = db.relationship("StockMovement", back_populates="product")
+
+    @property
+    def stock_quantity(self):
+        return self.quantity
+
+    @stock_quantity.setter
+    def stock_quantity(self, value):
+        self.quantity = int(value or 0)
 
     def __repr__(self):
         return f"<Product {self.sku} - {self.name}>"

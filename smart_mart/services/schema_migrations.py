@@ -287,6 +287,25 @@ def _migration_steps() -> list[MigrationStep]:
             "Add can_void_sale permission for cashier void workflow.",
             lambda conn: _safe_add_column(conn, "user_permissions", "can_void_sale", "BOOLEAN DEFAULT false"),
         ),
+        (
+            "2026_05_16_goldkernel_feature_pack_columns",
+            "Add GoldKernel feature pack columns for payments, loyalty, settings, and low stock.",
+            lambda conn: (
+                _safe_add_column(conn, "products", "low_stock_threshold", "INTEGER DEFAULT 500"),
+                _safe_add_column(conn, "sales", "payment_method", "VARCHAR(20) DEFAULT 'cash'"),
+                _safe_add_column(conn, "sales", "sale_type", "VARCHAR(20) DEFAULT 'regular'"),
+                _safe_add_column(conn, "customers", "loyalty_points", "INTEGER DEFAULT 0"),
+                _safe_add_column(conn, "customers", "loyalty_tier", "VARCHAR(20) DEFAULT 'silver'"),
+                _safe_add_column(conn, "customers", "total_spent", "NUMERIC(12,2) DEFAULT 0"),
+                _safe_add_column(conn, "shop_settings", "name", "VARCHAR(120) DEFAULT 'GoldKernel Dry Fruits & Treats'"),
+                _safe_add_column(conn, "shop_settings", "owner_name", "VARCHAR(120)"),
+            ),
+        ),
+        (
+            "2026_05_16_goldkernel_feature_pack_tables",
+            "Ensure feature pack tables exist (db.create_all handles model tables).",
+            lambda conn: None,
+        ),
     ]
 
 

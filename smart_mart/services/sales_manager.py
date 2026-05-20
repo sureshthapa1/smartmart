@@ -37,11 +37,13 @@ class InsufficientStockError(ValueError):
 def create_sale(items: list[dict], user_id: int,
                 customer_name: str = None, customer_address: str = None,
                 customer_phone: str = None, payment_mode: str = "cash",
+                payment_method: str | None = None,
                 discount_amount: float = 0, discount_note: str = None,
                 wallet_redeem_points: int = 0,
                 promotion_id: int = None,
                 applied_customer_offer_ids: list[int] | None = None,
-                credit_due_date=None) -> Sale:
+                credit_due_date=None,
+                sale_type: str = "regular") -> Sale:
     """Create a confirmed sale with row-level locking to prevent overselling."""
     try:
         # ── Period lock guard ─────────────────────────────────────────────
@@ -89,6 +91,7 @@ def create_sale(items: list[dict], user_id: int,
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
         total_amount = max(0, gross_total_amount - (discount_amount or 0))
+        normalized_payment = (payment_method or payment_mode or "cash").strip().lower()
 
         redeemed_points = 0
         loyalty_discount_amount = 0.0
@@ -128,7 +131,9 @@ def create_sale(items: list[dict], user_id: int,
             customer_name=customer_name,
             customer_address=customer_address,
             customer_phone=customer_phone,
-            payment_mode=payment_mode or "cash",
+            payment_mode=normalized_payment,
+            payment_method=normalized_payment,
+            sale_type=sale_type or "regular",
             discount_amount=(discount_amount or 0) + loyalty_discount_amount,
             discount_note=discount_note,
             promotion_id=promotion_id,
@@ -185,6 +190,14 @@ def create_sale(items: list[dict], user_id: int,
                     cust = db.session.execute(q).scalar_one_or_none()
                 if cust:
                     sale.customer_id = cust.id
+                    cust.total_spent = float(cust.total_spent or 0) + float(total_amount)
+                    cust.loyalty_points = int(cust.loyalty_points or 0) + int(total_amount // 10)
+                    if cust.total_spent >= 100000:
+                        cust.loyalty_tier = "platinum"
+                    elif cust.total_spent >= 25000:
+                        cust.loyalty_tier = "gold"
+                    else:
+                        cust.loyalty_tier = "silver"
         except Exception as e:
             logger.warning("Customer upsert failed: %s", e)
 
@@ -218,7 +231,7 @@ def create_sale(items: list[dict], user_id: int,
         audit_service.log("create", "Sale", sale.id,
                           f"Invoice {sale.invoice_number or sale.id}",
                           changes={"total_amount": [None, str(sale.total_amount)],
-                                   "payment_mode": [None, sale.payment_mode]})
+                                   "payment_method": [None, sale.payment_method]})
         db.session.commit()
     except Exception as exc:
         logger.warning("Sale audit logging failed for sale %s: %s", sale.id, exc)
@@ -299,15 +312,8 @@ def _mark_customer_offers_used(
         co.usage_count += 1
         co.applied_sale_id = sale.id
 
-    # Note: we do NOT reject if total_offer_discount > posted_discount.
-    # The POS already applied the discount client-side; we just mark offers used.
-    # Mismatch is logged for audit but never blocks the sale.
     if total_offer_discount > posted_discount + 0.01:
-        logger.warning(
-            "Sale #%d: offer discount NPR %.2f exceeds posted discount NPR %.2f — "
-            "accepting (client-side discount already applied to total).",
-            sale.id, total_offer_discount, posted_discount,
-        )
+        raise ValueError("Offer discount is larger than the submitted sale discount.")
 
     if labels:
         logger.info("Applied customer offers to sale #%d: %s", sale.id, ", ".join(labels))
@@ -328,7 +334,10 @@ def count_sales(filters: dict) -> int:
     if filters.get("end_date"):
         conditions.append(Sale.sale_date <= filters["end_date"])
     if filters.get("payment_mode"):
-        conditions.append(Sale.payment_mode == filters["payment_mode"])
+        conditions.append(or_(
+            Sale.payment_method == filters["payment_mode"],
+            Sale.payment_mode == filters["payment_mode"],
+        ))
     if filters.get("search"):
         term = f"%{filters['search'].lower()}%"
         conditions.append(or_(
@@ -350,7 +359,10 @@ def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
     if filters.get("end_date"):
         conditions.append(Sale.sale_date <= filters["end_date"])
     if filters.get("payment_mode"):
-        conditions.append(Sale.payment_mode == filters["payment_mode"])
+        conditions.append(or_(
+            Sale.payment_method == filters["payment_mode"],
+            Sale.payment_mode == filters["payment_mode"],
+        ))
     if filters.get("search"):
         term = f"%{filters['search'].lower()}%"
         conditions.append(or_(

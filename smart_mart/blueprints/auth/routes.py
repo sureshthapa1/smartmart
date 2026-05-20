@@ -4,12 +4,14 @@ from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from ...extensions import limiter
 from ...services import authenticator
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))
@@ -17,11 +19,6 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-
-        from ...services.authenticator import is_rate_limited, _get_client_ip
-        if is_rate_limited(_get_client_ip()):
-            flash("Too many failed login attempts. Please wait 10 minutes and try again.", "danger")
-            return render_template("auth/login.html", now=datetime.now())
 
         user = authenticator.login(username, password)
         if user is not None:
@@ -73,6 +70,7 @@ def change_password():
 # ── Password Reset (token-based, no email required) ───────────────────────────
 
 @auth_bp.route("/reset-password/request", methods=["GET", "POST"])
+@limiter.limit("3 per minute", methods=["POST"])
 def request_password_reset():
     """Step 1 — admin generates a reset token for a username.
     The token is written to the server log; the operator relays it to the user.
@@ -109,6 +107,7 @@ def request_password_reset():
 
 
 @auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+@limiter.limit("3 per minute", methods=["POST"])
 def reset_password_confirm(token: str):
     """Step 2 — user follows the link and sets a new password."""
     from ...services.password_reset_service import verify_reset_token

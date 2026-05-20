@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Price History - {{ product.name }}{% endblock %}
+{% block page_title %}Price History{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}">Inventory</a></li>
+<li class="breadcrumb-item active">{{ product.name }}</li>
+{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="post" action="{{ url_for('inventory.record_supplier_price', product_id=product.id) }}" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-3">
+        <label class="form-label">Supplier</label>
+        <input name="supplier_name" class="form-control" placeholder="Supplier name">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Cost / 100g</label>
+        <input type="number" step="0.01" min="0" name="cost_price" class="form-control" required value="{{ product.cost_price }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Qty (kg)</label>
+        <input type="number" step="0.001" min="0" name="quantity_kg" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Invoice Ref</label>
+        <input name="invoice_ref" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" type="submit">Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <canvas id="priceChart" height="90"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Date</th><th>Supplier</th><th class="text-end">Cost / 100g</th><th class="text-end">Qty (kg)</th><th>Invoice</th></tr></thead>
+      <tbody>
+        {% for record in records|reverse %}
+        <tr>
+          <td>{{ record.recorded_at.strftime('%Y-%m-%d') }}</td>
+          <td>{{ record.supplier_name or '—' }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(record.cost_price|float) }}</td>
+          <td class="text-end">{{ record.quantity_kg or '—' }}</td>
+          <td>{{ record.invoice_ref or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No supplier price records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const labels = {{ records | map(attribute='recorded_at') | map('string') | list | tojson }};
+const values = {{ records | map(attribute='cost_price') | map('float') | list | tojson }};
+new Chart(document.getElementById('priceChart'), {
+  type: 'line',
+  data: { labels, datasets: [{ label: 'Cost / 100g', data: values, borderColor: '#C9991A', backgroundColor: '#C9991A22', fill: true, tension: .25 }] },
+  options: { scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endblock %}

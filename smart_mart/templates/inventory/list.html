@@ -32,6 +32,7 @@
         <!-- Active/Inactive filter -->
         <select name="status" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
           <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
+          <option value="low" {% if status_filter == 'low' %}selected{% endif %}>Low Stock</option>
           <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive / Discontinued</option>
           <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All products</option>
         </select>
@@ -73,6 +74,9 @@
               <div style="width:34px;height:34px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">{{ get_emoji(p.name, p.category) }}</div>
               {% endif %}
               <span class="fw-semibold" style="font-size:.875rem">{{ p.name }}</span>
+              {% if p.id in price_alert_product_ids %}
+              <a href="{{ url_for('inventory.price_alerts') }}" class="badge bg-warning text-dark text-decoration-none" title="Supplier cost rose 10% or more">↑</a>
+              {% endif %}
             </div>
           </td>
           <td><span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;font-size:.7rem">{{ p.category or '—' }}</span></td>
@@ -85,7 +89,21 @@
             </span>
           </td>
           <td class="text-muted small">{{ p.supplier.name if p.supplier else '—' }}</td>
-          <td class="text-muted small">{{ p.expiry_date.strftime('%Y-%m-%d') if p.expiry_date else '—' }}</td>
+          <td class="small">
+            {% if p.expiry_date %}
+              <div class="text-muted">{{ p.expiry_date.strftime('%Y-%m-%d') }}</div>
+              {% if p.expiry_date < today %}
+                <span class="badge bg-danger">EXPIRED</span>
+              {% elif (p.expiry_date - today).days <= 7 %}
+                <span class="badge text-dark" style="background:#fdba74;">Expires Soon</span>
+              {% else %}
+                <span class="badge bg-success">OK</span>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+              <span class="badge bg-success">OK</span>
+            {% endif %}
+          </td>
           <td>
             {% if p.is_active %}
               <span class="badge bg-success">Active</span>

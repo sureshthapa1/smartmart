@@ -1,10 +1,10 @@
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from flask import Flask, redirect, url_for, render_template, session
+from flask import Flask, flash, redirect, url_for, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
-from .extensions import db, login_manager, bcrypt, csrf
+from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate
 from .services.schema_migrations import run_pending_migrations
 
 
@@ -47,8 +47,19 @@ def create_app(config_name="development"):
     login_manager.init_app(app)
     bcrypt.init_app(app)
     csrf.init_app(app)
+    migrate.init_app(app, db)
+    limiter.init_app(app)
 
     from . import models  # noqa: F401
+
+    if os.environ.get("FLASK_ENV") == "production":
+        db_url = os.environ.get("DATABASE_URL")
+        db_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+        if not db_url or db_uri.startswith("sqlite"):
+            app.logger.warning(
+                "Production environment is using SQLite because DATABASE_URL is not set. "
+                "Use PostgreSQL for production data safety."
+            )
 
     _register_blueprints(app)
 
@@ -138,13 +149,18 @@ def create_app(config_name="development"):
         if dt is None:
             return ""
         try:
-            from .services.bs_date import bs_format
-            # Apply NST offset first if it's a datetime
+            from .utils.nepali_date import ad_to_bs, format_bs
             if hasattr(dt, "hour"):
                 dt = dt + _NST_OFFSET
-            return bs_format(dt, nepali=nepali)
+            return format_bs(*ad_to_bs(dt))
         except Exception:
-            return ""
+            try:
+                from .services.bs_date import bs_format
+                if hasattr(dt, "hour"):
+                    dt = dt + _NST_OFFSET
+                return bs_format(dt, nepali=nepali)
+            except Exception:
+                return ""
 
     @app.template_filter("from_json")
     def from_json_filter(value):
@@ -223,6 +239,14 @@ def create_app(config_name="development"):
                 app.logger.exception("Auto-migration retry failed: %s", migration_exc)
         return render_template("errors/500.html"), 500
 
+    @app.errorhandler(429)
+    def rate_limit_error(e):
+        flash("Too many login attempts. Please wait 1 minute and try again.", "danger")
+        if request.endpoint and request.endpoint.startswith("auth."):
+            from datetime import datetime as _dt
+            return render_template("auth/login.html", now=_dt.now()), 429
+        return render_template("errors/500.html"), 429
+
     return app
 
 
@@ -254,6 +278,11 @@ def _register_blueprints(app):
         (".blueprints.customers", "customers_bp"),
         (".blueprints.finance", "finance_bp"),
         (".blueprints.offers", "offers_bp"),
+        (".blueprints.bundles", "bundles_bp"),
+        (".blueprints.waste", "waste_bp"),
+        (".blueprints.targets", "targets_bp"),
+        (".blueprints.loyalty", "loyalty_bp"),
+        (".blueprints.ai_chat", "ai_chat_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
     ]

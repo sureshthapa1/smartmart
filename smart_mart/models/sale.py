@@ -2,13 +2,26 @@ from datetime import datetime, timezone
 from ..extensions import db
 
 
+PAYMENT_METHODS = [
+    ("cash", "Cash"),
+    ("fonepay", "Fonepay"),
+    ("esewa", "eSewa"),
+    ("khalti", "Khalti"),
+    ("qr", "QR Code"),
+    ("bank", "Bank Transfer"),
+    ("credit", "Credit / Udharo"),
+]
+
+
 class Sale(db.Model):
     __tablename__ = "sales"
     __table_args__ = (
         db.Index("ix_sale_date", "sale_date"),
         db.Index("ix_sale_payment_mode", "payment_mode"),
+        db.Index("ix_sale_payment_method", "payment_method"),
         db.Index("ix_sale_customer_name", "customer_name"),
     )
+    PAYMENT_METHODS = PAYMENT_METHODS
 
     id = db.Column(db.Integer, primary_key=True)
     invoice_number = db.Column(db.String(30), nullable=True)
@@ -20,6 +33,8 @@ class Sale(db.Model):
     customer_address = db.Column(db.String(255), nullable=True)
     customer_phone = db.Column(db.String(50), nullable=True)
     payment_mode = db.Column(db.String(20), nullable=True, default="cash")  # cash|qr|card|other
+    payment_method = db.Column(db.String(20), nullable=False, default="cash")
+    sale_type = db.Column(db.String(20), nullable=False, default="regular")
     discount_amount = db.Column(db.Numeric(10, 2), nullable=True, default=0)
     discount_note = db.Column(db.String(120), nullable=True)
     credit_due_date = db.Column(db.Date, nullable=True)   # collection reminder for credit/udharo

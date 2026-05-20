@@ -63,7 +63,7 @@ def _delete_product_image(filename: str) -> None:
 def list_products():
     search = request.args.get("q", "").strip() or None
     page = request.args.get("page", 1, type=int)
-    status_filter = request.args.get("status", "active")  # active | inactive | all
+    status_filter = request.args.get("status", "active")  # active | inactive | all | low
 
     # Map status param to active_only flag
     active_only = None
@@ -73,7 +73,24 @@ def list_products():
         active_only = False
     # status == "all" → active_only stays None
 
-    products = inventory_manager.get_products(search=search, page=page, active_only=active_only)
+    if status_filter == "low":
+        from sqlalchemy import func as _func, or_
+        term = search.strip().lower() if search else None
+        stmt_products = db.select(Product).where(
+            Product.is_active == True,
+            Product.quantity <= _func.coalesce(Product.low_stock_threshold, 500),
+        ).order_by(Product.quantity.asc(), Product.name.asc())
+        if term:
+            stmt_products = stmt_products.where(or_(
+                db.func.lower(Product.name).contains(term),
+                db.func.lower(Product.category).contains(term),
+                db.func.lower(Product.sku) == term,
+            ))
+        products = db.session.execute(
+            stmt_products.limit(100).offset((page - 1) * 100)
+        ).scalars().all()
+    else:
+        products = inventory_manager.get_products(search=search, page=page, active_only=active_only)
 
     # Total count for pagination (same filters)
     from sqlalchemy import func as _func, or_
@@ -91,13 +108,37 @@ def list_products():
         stmt = stmt.where(Product.is_active == True)
     elif active_only is False:
         stmt = stmt.where(Product.is_active == False)
+    if status_filter == "low":
+        stmt = stmt.where(Product.is_active == True)
+        stmt = stmt.where(Product.quantity <= _func.coalesce(Product.low_stock_threshold, 500))
 
     total = db.session.execute(stmt).scalar() or 0
     per_page = 100
     total_pages = max(1, (total + per_page - 1) // per_page)
+    price_alert_product_ids = set()
+    try:
+        from ...models.supplier_price_record import SupplierPriceRecord
+        latest_rows = db.session.execute(
+            db.select(SupplierPriceRecord)
+            .where(SupplierPriceRecord.product_id.in_([p.id for p in products] or [0]))
+            .order_by(SupplierPriceRecord.product_id, SupplierPriceRecord.recorded_at.desc())
+        ).scalars().all()
+        grouped = {}
+        for row in latest_rows:
+            grouped.setdefault(row.product_id, []).append(row)
+        for product_id, rows in grouped.items():
+            if len(rows) >= 2 and float(rows[1].cost_price or 0) > 0:
+                increase = (float(rows[0].cost_price) - float(rows[1].cost_price)) / float(rows[1].cost_price)
+                if increase >= 0.10:
+                    price_alert_product_ids.add(product_id)
+    except Exception:
+        pass
+
+    from datetime import date as _date
     return render_template("inventory/list.html", products=products, search=search or "",
                            page=page, total=total, total_pages=total_pages, per_page=per_page,
-                           status_filter=status_filter)
+                           status_filter=status_filter, today=_date.today(),
+                           price_alert_product_ids=price_alert_product_ids)
 
 
 @inventory_bp.route("/create", methods=["GET", "POST"])
@@ -643,6 +684,88 @@ def export_csv():
     )
 
 
+@inventory_bp.route("/products/<int:product_id>/price", methods=["POST"])
+@login_required
+def record_supplier_price(product_id):
+    _require_perm("can_edit_product")
+    product = db.get_or_404(Product, product_id)
+    try:
+        from ...models.supplier_price_record import SupplierPriceRecord
+        new_cost = float(request.form.get("cost_price", 0) or 0)
+        if new_cost <= 0:
+            raise ValueError("Cost price must be greater than zero.")
+        record = SupplierPriceRecord(
+            product_id=product.id,
+            supplier_name=request.form.get("supplier_name", "").strip() or None,
+            cost_price=new_cost,
+            quantity_kg=float(request.form.get("quantity_kg", 0) or 0) or None,
+            invoice_ref=request.form.get("invoice_ref", "").strip() or None,
+            recorded_by=current_user.id,
+        )
+        product.cost_price = new_cost
+        db.session.add(record)
+        db.session.commit()
+        flash("Supplier price recorded and product cost updated.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(f"Could not record supplier price: {exc}", "danger")
+    return redirect(url_for("inventory.price_history", product_id=product_id))
+
+
+@inventory_bp.route("/products/<int:product_id>/price-history")
+@login_required
+def price_history(product_id):
+    _require_perm("can_view_stock_report")
+    from ...models.supplier_price_record import SupplierPriceRecord
+
+    product = db.get_or_404(Product, product_id)
+    records = db.session.execute(
+        db.select(SupplierPriceRecord)
+        .where(SupplierPriceRecord.product_id == product.id)
+        .order_by(SupplierPriceRecord.recorded_at)
+    ).scalars().all()
+    return render_template("inventory/price_history.html", product=product, records=records)
+
+
+@inventory_bp.route("/price-alerts")
+@login_required
+def price_alerts():
+    _require_perm("can_view_stock_report")
+    from datetime import datetime, timedelta
+    from ...models.supplier_price_record import SupplierPriceRecord
+
+    cutoff = datetime.utcnow() - timedelta(days=90)
+    products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+    alerts = []
+    for product in products:
+        latest = db.session.execute(
+            db.select(SupplierPriceRecord)
+            .where(SupplierPriceRecord.product_id == product.id)
+            .order_by(SupplierPriceRecord.recorded_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        old = db.session.execute(
+            db.select(SupplierPriceRecord)
+            .where(SupplierPriceRecord.product_id == product.id)
+            .where(SupplierPriceRecord.recorded_at <= cutoff)
+            .order_by(SupplierPriceRecord.recorded_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if latest and old and float(old.cost_price or 0) > 0:
+            increase_pct = (float(latest.cost_price) - float(old.cost_price)) / float(old.cost_price) * 100
+            if increase_pct >= 10:
+                current_margin = 0.35
+                suggested_price = float(latest.cost_price) / (1 - current_margin)
+                alerts.append({
+                    "product": product,
+                    "increase_pct": increase_pct,
+                    "old_cost": float(old.cost_price),
+                    "new_cost": float(latest.cost_price),
+                    "suggested_price": suggested_price,
+                })
+    return render_template("inventory/price_alerts.html", alerts=alerts)
+
+
 @inventory_bp.route("/labels", methods=["GET", "POST"])
 @login_required
 @login_required
@@ -837,6 +960,7 @@ def _form_to_data(form) -> dict:
         "expiry_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
         "reorder_point": int(form.get("reorder_point", 10) or 10),
+        "low_stock_threshold": int(form.get("low_stock_threshold", 500) or 500),
         "barcode": form.get("barcode", "").strip() or None,
         "is_active": form.get("is_active") == "on",
         "tax_category": form.get("tax_category", "standard").strip() or "standard",

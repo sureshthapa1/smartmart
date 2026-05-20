@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Loyalty Cards - Smart Mart{% endblock %}
+{% block page_title %}Loyalty Cards{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">Loyalty</li>{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Customer</th><th>Tier</th><th class="text-end">Points</th><th class="text-end">Total Spent</th><th></th></tr></thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr>
+          <td class="fw-semibold">{{ customer.name }}<div class="text-muted small">{{ customer.phone or '' }}</div></td>
+          <td><span class="badge {% if customer.loyalty_tier == 'platinum' %}bg-dark{% elif customer.loyalty_tier == 'gold' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ (customer.loyalty_tier or 'silver')|title }}</span></td>
+          <td class="text-end">{{ customer.loyalty_points or 0 }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format((customer.total_spent or 0)|float) }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('loyalty.card', customer_id=customer.id) }}">Card</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-5">No customers yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

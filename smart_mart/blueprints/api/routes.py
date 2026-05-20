@@ -94,27 +94,126 @@ def profit_trend():
 @api_bp.route("/customer-search")
 @login_required
 def customer_search():
-    """Search customers by name or phone for smart billing autofill."""
+    """Search saved customers and historical sale names for billing autofill."""
     q = request.args.get("q", "").strip()
     if len(q) < 1:
         return jsonify([])
     from ...models.customer import Customer
-    rows = db.session.execute(
+    term = f"%{q.lower()}%"
+
+    customer_rows = db.session.execute(
         db.select(Customer)
         .where(
-            func.lower(Customer.name).contains(q.lower()) |
-            Customer.phone.contains(q)
+            db.or_(
+                func.lower(Customer.name).like(term),
+                func.lower(func.coalesce(Customer.phone, "")).like(term),
+                func.lower(func.coalesce(Customer.address, "")).like(term),
+            )
         )
-        .order_by(Customer.visit_count.desc())
-        .limit(8)
+        .order_by(Customer.visit_count.desc(), Customer.last_visit.desc(), Customer.name)
+        .limit(12)
     ).scalars().all()
-    return jsonify([{
-        "id": c.id,
-        "name": c.name,
-        "phone": c.phone or "",
-        "address": c.address or "",
-        "visits": c.visit_count,
-    } for c in rows])
+
+    suggestions = {}
+
+    def add_suggestion(name, phone="", address="", visits=0, customer_id=None, last_visit=None):
+        clean_name = (name or "").strip()
+        if not clean_name or clean_name.lower() == "walk-in customer":
+            return
+        clean_phone = (phone or "").strip()
+        clean_address = (address or "").strip()
+        key = (clean_name.lower(), clean_phone)
+        existing = suggestions.get(key)
+        if existing is None or visits > existing["visits"]:
+            suggestions[key] = {
+                "id": customer_id,
+                "name": clean_name,
+                "phone": clean_phone,
+                "address": clean_address,
+                "visits": int(visits or 0),
+                "_last_visit": last_visit,
+            }
+        elif existing:
+            if customer_id and not existing.get("id"):
+                existing["id"] = customer_id
+            if clean_address and not existing.get("address"):
+                existing["address"] = clean_address
+            existing["visits"] = max(existing["visits"], int(visits or 0))
+            if last_visit and (not existing.get("_last_visit") or last_visit > existing["_last_visit"]):
+                existing["_last_visit"] = last_visit
+
+    for c in customer_rows:
+        add_suggestion(
+            c.name,
+            c.phone,
+            c.address,
+            c.visit_count,
+            c.id,
+            c.last_visit,
+        )
+
+    sale_rows = db.session.execute(
+        db.select(
+            Sale.customer_name.label("name"),
+            Sale.customer_phone.label("phone"),
+            Sale.customer_address.label("address"),
+            func.count(Sale.id).label("visits"),
+            func.max(Sale.sale_date).label("last_visit"),
+        )
+        .where(
+            Sale.customer_name.isnot(None),
+            func.length(func.trim(Sale.customer_name)) > 0,
+            func.lower(Sale.customer_name) != "walk-in customer",
+            db.or_(
+                func.lower(Sale.customer_name).like(term),
+                func.lower(func.coalesce(Sale.customer_phone, "")).like(term),
+                func.lower(func.coalesce(Sale.customer_address, "")).like(term),
+            ),
+        )
+        .group_by(Sale.customer_name, Sale.customer_phone, Sale.customer_address)
+        .order_by(func.count(Sale.id).desc(), func.max(Sale.sale_date).desc())
+        .limit(20)
+    ).all()
+
+    for row in sale_rows:
+        matched_customer = None
+        if row.phone:
+            matched_customer = db.session.execute(
+                db.select(Customer).where(
+                    Customer.phone == row.phone,
+                    func.lower(Customer.name) == row.name.strip().lower(),
+                )
+            ).scalar_one_or_none()
+        if matched_customer is None:
+            matched_customer = db.session.execute(
+                db.select(Customer)
+                .where(func.lower(Customer.name) == row.name.strip().lower())
+                .order_by(Customer.visit_count.desc())
+            ).scalars().first()
+
+        add_suggestion(
+            row.name,
+            row.phone,
+            row.address,
+            row.visits,
+            matched_customer.id if matched_customer else None,
+            row.last_visit,
+        )
+
+    results = sorted(
+        suggestions.values(),
+        key=lambda item: (
+            item["visits"],
+            item["_last_visit"].isoformat() if item.get("_last_visit") else "",
+            item["name"].lower(),
+        ),
+        reverse=True,
+    )[:8]
+
+    for item in results:
+        item.pop("_last_visit", None)
+
+    return jsonify(results)
 
 
 @api_bp.route("/customers/<int:customer_id>")

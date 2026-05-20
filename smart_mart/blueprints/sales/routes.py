@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -12,6 +13,7 @@ from ...models.product import Product
 from ...services import sales_manager
 from ...services.sales_manager import InsufficientStockError
 from ...services.decorators import login_required, admin_required
+from ...utils.expiry_check import check_cart_for_expiry
 
 sales_bp = Blueprint("sales", __name__, url_prefix="/sales")
 
@@ -73,12 +75,36 @@ def create_sale():
     products = db.session.execute(
         db.select(Product).where(Product.is_active == True).order_by(Product.name)
     ).scalars().all()
+    target_progress = _target_progress()
 
     if request.method == "POST":
         items = _parse_items(request.form)
         if not items:
             flash("Please add at least one item to the sale.", "danger")
-            return render_template("sales/create.html", products=products)
+            return render_template("sales/create.html", products=products, target_progress=target_progress)
+
+        products_by_id = {
+            p.id: p for p in db.session.execute(
+                db.select(Product).where(Product.id.in_([item["product_id"] for item in items]))
+            ).scalars().all()
+        }
+        cart_for_expiry = [
+            SimpleNamespace(
+                product_id=item["product_id"],
+                product_name=products_by_id[item["product_id"]].name if item["product_id"] in products_by_id else "Product",
+                expiry_date=products_by_id[item["product_id"]].expiry_date if item["product_id"] in products_by_id else None,
+            )
+            for item in items
+        ]
+        expiry_issues = check_cart_for_expiry(cart_for_expiry)
+        if any(issue.severity == "expired" for issue in expiry_issues):
+            for issue in expiry_issues:
+                if issue.severity == "expired":
+                    flash(issue.message, "danger")
+            return redirect(url_for("sales.create_sale"))
+        for issue in expiry_issues:
+            if issue.severity == "warning":
+                flash(issue.message, "warning")
 
         # ── Idempotency: prevent double-post on network retry ──────────────
         idem_key = request.form.get("idempotency_key", "").strip()
@@ -115,7 +141,8 @@ def create_sale():
                 customer_name=request.form.get("customer_name", "").strip() or None,
                 customer_address=request.form.get("customer_address", "").strip() or None,
                 customer_phone=request.form.get("customer_phone", "").strip() or None,
-                payment_mode=request.form.get("payment_mode", "cash"),
+                payment_mode=request.form.get("payment_mode") or request.form.get("payment_method", "cash"),
+                payment_method=request.form.get("payment_method") or request.form.get("payment_mode", "cash"),
                 discount_amount=float(request.form.get("discount_amount", 0) or 0),
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
@@ -132,6 +159,14 @@ def create_sale():
                     record.result_sale_id = sale.id
                     db.session.commit()
 
+            if sale.customer_id:
+                earned_points = int(float(sale.total_amount or 0) // 10)
+                try:
+                    customer_points = sale.customer.loyalty_points if sale.customer else None
+                    if earned_points > 0 and customer_points is not None:
+                        flash(f"+{earned_points} points earned! Customer now has {customer_points} points.", "success")
+                except Exception:
+                    pass
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
         except InsufficientStockError as e:
@@ -139,7 +174,7 @@ def create_sale():
         except ValueError as e:
             flash(str(e), "danger")
 
-    return render_template("sales/create.html", products=products)
+    return render_template("sales/create.html", products=products, target_progress=target_progress)
 
 
 @sales_bp.route("/<int:sale_id>")
@@ -175,6 +210,21 @@ def download_invoice(sale_id):
         pdf_bytes,
         mimetype="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=invoice_{sale_id}.pdf"},
+    )
+
+
+@sales_bp.route("/<int:sale_id>/invoice/pdf")
+@login_required
+def download_vat_invoice(sale_id):
+    sale = sales_manager.get_sale(sale_id)
+    from ...models.shop_settings import ShopSettings
+    from ...utils.vat_invoice import generate_vat_invoice
+
+    pdf_bytes = generate_vat_invoice(sale, ShopSettings.get())
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=vat_invoice_{sale_id}.pdf"},
     )
 
 
@@ -450,3 +500,11 @@ def _parse_customer_offer_ids(form) -> list[int]:
         if customer_offer_id > 0 and customer_offer_id not in ids:
             ids.append(customer_offer_id)
     return ids
+
+
+def _target_progress():
+    try:
+        from ...blueprints.targets.routes import current_target_progress
+        return current_target_progress(current_user.id)
+    except Exception:
+        return {"has_target": False}

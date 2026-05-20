@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Target Leaderboard - Smart Mart{% endblock %}
+{% block page_title %}Monthly Leaderboard{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('targets.index') }}">Sales Targets</a></li>
+<li class="breadcrumb-item active">Leaderboard</li>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead><tr><th>Staff Name</th><th class="text-end">Monthly Target</th><th class="text-end">Achieved</th><th>% Complete</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="fw-semibold">{{ row.target.user.username if row.target.user else row.target.user_id }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.target.amount|float) }}</td>
+          <td class="text-end">NPR {{ "%.2f"|format(row.achieved) }}</td>
+          <td style="min-width:180px">
+            <div class="progress" style="height:10px"><div class="progress-bar bg-{{ 'success' if row.pct >= 80 else 'warning' if row.pct >= 50 else 'danger' }}" style="width:{{ [row.pct, 100]|min }}%"></div></div>
+            <span class="small text-muted">{{ row.pct }}%</span>
+          </td>
+          <td><span class="badge bg-{{ 'success' if row.pct >= 100 else 'warning' }}"> {{ 'Met' if row.pct >= 100 else 'In progress' }} </span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-5">No monthly targets for this month.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

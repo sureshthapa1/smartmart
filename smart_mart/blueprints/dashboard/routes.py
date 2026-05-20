@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 from flask import Blueprint, jsonify, render_template, request
+from flask_login import current_user as cu
 from sqlalchemy import func
 
 from ...extensions import db
@@ -48,6 +49,12 @@ def index():
     month_start = today.replace(day=1)
     filter_start, filter_end, filter_label = _parse_filter()
     active_filter = request.args.get("filter", "today")
+    low_stock_alerts = []
+    try:
+        from ...utils.low_stock import get_low_stock_alerts
+        low_stock_alerts = get_low_stock_alerts()
+    except Exception:
+        pass
 
     # ── Today metrics ─────────────────────────────────────────────────────
     today_sales_amount = db.session.execute(
@@ -110,6 +117,15 @@ def index():
 
     # ── Monthly profit ────────────────────────────────────────────────────
     monthly_profit = cash_flow_manager.profit_loss(month_start, today)["profit"]
+    waste_cost_month = 0.0
+    try:
+        from ...models.waste_record import WasteRecord
+        waste_cost_month = float(db.session.execute(
+            db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
+            .where(func.date(WasteRecord.created_at) >= month_start)
+        ).scalar() or 0)
+    except Exception:
+        pass
 
     # ── Total products ────────────────────────────────────────────────────
     total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
@@ -233,7 +249,6 @@ def index():
     except Exception:
         pass
     nlg_summary = None
-    from flask_login import current_user as cu
     if cu.role == "admin":
         try:
             from ...services.ai_nlg import generate_daily_report
@@ -297,4 +312,6 @@ def index():
                            cash_session_balance=cash_session_balance,
                            pending_credits_total=pending_credits_total,
                            pending_credits_count=pending_credits_count,
+                           low_stock_alerts=low_stock_alerts,
+                           waste_cost_month=waste_cost_month,
                            )

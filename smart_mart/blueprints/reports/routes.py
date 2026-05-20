@@ -170,6 +170,66 @@ def sales_report():
                            period=period, start_date=start_raw, end_date=end_raw)
 
 
+@reports_bp.route("/payment-reconciliation")
+@login_required
+def payment_reconciliation():
+    _require_perm("can_view_reports")
+    from ...utils.payment_reports import daily_payment_reconciliation
+
+    raw_date = request.args.get("date", "")
+    try:
+        target_date = date.fromisoformat(raw_date) if raw_date else date.today()
+    except ValueError:
+        target_date = date.today()
+        flash("Invalid date; showing today.", "warning")
+    data = daily_payment_reconciliation(target_date)
+    return render_template("reports/payment_reconciliation.html", data=data)
+
+
+@reports_bp.route("/payment-reconciliation/pdf")
+@login_required
+def payment_reconciliation_pdf():
+    _require_perm("can_view_reports")
+    from io import BytesIO
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from ...utils.payment_reports import daily_payment_reconciliation
+
+    raw_date = request.args.get("date", "")
+    try:
+        target_date = date.fromisoformat(raw_date) if raw_date else date.today()
+    except ValueError:
+        target_date = date.today()
+    data = daily_payment_reconciliation(target_date)
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4)
+    styles = getSampleStyleSheet()
+    rows = [["Payment Method", "Number of Sales", "Total Collected (NPR)"]]
+    rows.extend([
+        [row["label"], row["sale_count"], f"{row['total_collected']:,.2f}"]
+        for row in data["records"]
+    ])
+    table = Table(rows)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A5C3A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+    ]))
+    doc.build([
+        Paragraph(f"Daily Payment Reconciliation - {target_date.isoformat()}", styles["Heading1"]),
+        Spacer(1, 12),
+        table,
+    ])
+    return Response(
+        buf.getvalue(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=payment_reconciliation_{target_date}.pdf"},
+    )
+
+
 @reports_bp.route("/top-products")
 @login_required
 def top_products():

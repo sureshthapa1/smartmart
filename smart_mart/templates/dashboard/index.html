@@ -31,6 +31,19 @@
 <!-- Birthday Alerts (loaded via JS) -->
 <div id="birthdayAlerts"></div>
 
+{% if low_stock_alerts %}
+{% set has_zero_stock = low_stock_alerts | selectattr('severity', 'equalto', 'critical') | list | length > 0 %}
+<div class="alert alert-{{ 'danger' if has_zero_stock else 'warning' }} alert-dismissible fade show d-flex align-items-center gap-2 mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  <div class="small">
+    <strong>{{ low_stock_alerts|length }} low-stock item{{ 's' if low_stock_alerts|length != 1 }}:</strong>
+    {{ low_stock_alerts[:3] | map(attribute='name') | join(', ') }}
+    <a href="{{ url_for('inventory.list_products', status='low') }}" class="ms-1">View all <i class="bi bi-arrow-right-short"></i></a>
+  </div>
+  <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- Date Filter Bar -->
 <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
   <span class="text-muted small fw-medium me-1">View:</span>
@@ -158,6 +171,18 @@
         <div class="stat-bg">🎯</div>
       </div>
     </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('waste.index') }}" class="text-decoration-none">
+    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);color:#991b1b">
+      <div class="card-body p-4">
+        <div class="stat-label"><i class="bi bi-trash3 me-1"></i>Waste Cost</div>
+        <div class="stat-value">NPR {{ "%.0f"|format(waste_cost_month) }}</div>
+        <div class="stat-sub">This month <i class="bi bi-arrow-right ms-1"></i></div>
+        <div class="stat-bg"><i class="bi bi-trash3"></i></div>
+      </div>
+    </div>
+    </a>
   </div>
   {% else %}
   {# Staff: show their own sales count instead of profit/cash #}

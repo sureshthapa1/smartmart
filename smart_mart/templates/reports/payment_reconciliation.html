@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Payment Reconciliation - Smart Mart{% endblock %}
+{% block page_title %}Payment Reconciliation{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Reports</li>
+<li class="breadcrumb-item active">Payment Reconciliation</li>
+{% endblock %}
+{% block content %}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+      <div>
+        <label class="form-label small fw-semibold mb-1">Date</label>
+        <input type="date" name="date" class="form-control form-control-sm" value="{{ data.date.isoformat() }}">
+      </div>
+      <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+      <a class="btn btn-outline-secondary btn-sm ms-auto"
+         href="{{ url_for('reports.payment_reconciliation_pdf', date=data.date.isoformat()) }}">
+        <i class="bi bi-filetype-pdf me-1"></i>Export PDF
+      </a>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card metric-card green h-100">
+      <div class="card-body">
+        <div class="metric-label">Cash in Drawer</div>
+        <div class="metric-value">NPR {{ "%.2f"|format(data.cash_total) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card metric-card blue h-100">
+      <div class="card-body">
+        <div class="metric-label">Digital Payments</div>
+        <div class="metric-value">NPR {{ "%.2f"|format(data.digital_total) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card metric-card orange h-100">
+      <div class="card-body">
+        <div class="metric-label">Credit / Udharo</div>
+        <div class="metric-value">NPR {{ "%.2f"|format(data.credit_total) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Payment Method</th>
+          <th class="text-end">Number of Sales</th>
+          <th class="text-end">Total Collected (NPR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in data.records %}
+        <tr>
+          <td class="fw-semibold">{{ row.label }}</td>
+          <td class="text-end">{{ row.sale_count }}</td>
+          <td class="text-end fw-semibold">{{ "%.2f"|format(row.total_collected) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td class="fw-bold">Total</td>
+          <td></td>
+          <td class="text-end fw-bold">NPR {{ "%.2f"|format(data.grand_total) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}

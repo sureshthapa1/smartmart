@@ -210,6 +210,18 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.blueprint == 'bundles' %}active{% endif %}"
+           href="{{ url_for('bundles.index') }}">
+          <i class="bi bi-gift"></i>Gift Bundles
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.blueprint == 'ai_chat' %}active{% endif %}"
+           href="{{ url_for('ai_chat.index') }}">
+          <i class="bi bi-stars"></i>AI Advisor
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'operations.closing' %}active{% endif %}"
            href="{{ url_for('operations.closing') }}">
           <i class="bi bi-safe2"></i>Cash Session
@@ -281,6 +293,12 @@
               <a class="nav-link {% if request.endpoint == 'operations.loyalty' %}active{% endif %}"
                  href="{{ url_for('operations.loyalty') }}">
                 <i class="bi bi-star"></i>Loyalty Points
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.blueprint == 'loyalty' %}active{% endif %}"
+                 href="{{ url_for('loyalty.index') }}">
+                <i class="bi bi-credit-card-2-front"></i>Loyalty Cards
               </a>
             </li>
             <li class="nav-item">
@@ -409,12 +427,12 @@
         </div>
       </li>
       <li class="nav-item">
-        <a class="nav-link submenu-toggle {% if request.blueprint in ['stock_take','transfers'] or request.endpoint in ['operations.reorders','operations.inventory_tools'] %}active{% else %}collapsed{% endif %}"
+        <a class="nav-link submenu-toggle {% if request.blueprint in ['stock_take','transfers','waste'] or request.endpoint in ['operations.reorders','operations.inventory_tools','inventory.price_alerts'] %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#stockMenu" role="button"
-           aria-expanded="{% if request.blueprint in ['stock_take','transfers'] or request.endpoint in ['operations.reorders','operations.inventory_tools'] %}true{% else %}false{% endif %}">
+           aria-expanded="{% if request.blueprint in ['stock_take','transfers','waste'] or request.endpoint in ['operations.reorders','operations.inventory_tools','inventory.price_alerts'] %}true{% else %}false{% endif %}">
           <i class="bi bi-bar-chart-steps"></i>Stock
         </a>
-        <div class="collapse {% if request.blueprint in ['stock_take','transfers'] or request.endpoint in ['operations.reorders','operations.inventory_tools'] %}show{% endif %}" id="stockMenu">
+        <div class="collapse {% if request.blueprint in ['stock_take','transfers','waste'] or request.endpoint in ['operations.reorders','operations.inventory_tools','inventory.price_alerts'] %}show{% endif %}" id="stockMenu">
           <ul class="nav flex-column submenu">
             {% if current_user.role == 'admin' or (current_user.permissions and current_user.permissions.can_view_stock_take) %}
             <li class="nav-item">
@@ -436,6 +454,24 @@
               <a class="nav-link {% if request.endpoint == 'operations.reorders' %}active{% endif %}"
                  href="{{ url_for('operations.reorders') }}">
                 <i class="bi bi-arrow-clockwise"></i>Reorder Suggestions
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'inventory.list_products' and request.args.get('status') == 'low' %}active{% endif %}"
+                 href="{{ url_for('inventory.list_products', status='low') }}">
+                <i class="bi bi-exclamation-triangle"></i>Low Stock
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'inventory.price_alerts' %}active{% endif %}"
+                 href="{{ url_for('inventory.price_alerts') }}">
+                <i class="bi bi-graph-up-arrow"></i>Price History
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.blueprint == 'waste' %}active{% endif %}"
+                 href="{{ url_for('waste.index') }}">
+                <i class="bi bi-trash3"></i>Waste Tracking
               </a>
             </li>
             <li class="nav-item">
@@ -856,6 +892,12 @@
       {% if current_user.role == 'admin' %}
       <div class="nav-section">Admin</div>
       <li class="nav-item">
+        <a class="nav-link {% if request.blueprint == 'targets' %}active{% endif %}"
+           href="{{ url_for('targets.index') }}">
+          <i class="bi bi-bullseye"></i>Sales Targets
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.endpoint in ['admin.users','admin.create_user','admin.edit_user','admin.staff_permissions','admin.edit_permissions','admin.staff_activity'] %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#staffMenu" role="button"
            aria-expanded="{% if request.endpoint in ['admin.users','admin.create_user','admin.edit_user','admin.staff_permissions','admin.edit_permissions','admin.staff_activity'] %}true{% else %}false{% endif %}">
@@ -879,6 +921,12 @@
               <a class="nav-link {% if request.endpoint == 'admin.staff_activity' %}active{% endif %}"
                  href="{{ url_for('admin.staff_activity') }}">
                 <i class="bi bi-activity"></i>Activity Log
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.blueprint == 'targets' %}active{% endif %}"
+                 href="{{ url_for('targets.index') }}">
+                <i class="bi bi-bullseye"></i>Sales Targets
               </a>
             </li>
           </ul>

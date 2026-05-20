@@ -48,6 +48,10 @@
               <input type="text" name="shop_name" class="form-control" value="{{ s.shop_name or '' }}" required>
             </div>
             <div class="col-md-4">
+              <label class="form-label fw-medium">Owner Name</label>
+              <input type="text" name="owner_name" class="form-control" value="{{ s.owner_name or '' }}">
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-medium">PAN Number</label>
               <input type="text" name="pan_number" class="form-control" value="{{ s.pan_number or '' }}" placeholder="e.g. 123456789">
             </div>

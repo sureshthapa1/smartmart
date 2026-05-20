@@ -69,6 +69,20 @@
       {% endfor %}
     {% endwith %}
 
+    {% if target_progress and target_progress.has_target %}
+    <div class="card mb-3" id="targetProgressCard">
+      <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center small fw-semibold mb-2">
+          <span>Today's Target: NPR <span id="targetAchieved">{{ "%.0f"|format(target_progress.achieved) }}</span> / <span id="targetAmount">{{ "%.0f"|format(target_progress.target) }}</span></span>
+          <span id="targetPct">{{ "%.0f"|format(target_progress.pct) }}%</span>
+        </div>
+        <div class="progress" style="height:14px">
+          <div id="targetBar" class="progress-bar bg-{{ target_progress.color }}" style="width:{{ [target_progress.pct, 100]|min }}%"></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h4 class="fw-bold mb-0" style="color:#0f172a;">New Sale</h4>
@@ -169,7 +183,7 @@
                      class="form-control form-control-sm" placeholder="City / District">
             </div>
             <div class="col-12">
-              <label class="form-label fw-medium small">Payment Mode <span class="text-danger">*</span></label>
+              <label class="form-label fw-medium small">Payment Method <span class="text-danger">*</span></label>
               <div class="d-flex gap-2 flex-wrap">
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash" checked>
@@ -178,6 +192,22 @@
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_qr" value="qr">
                   <label class="form-check-label" for="pm_qr">📱 QR / eSewa / Khalti</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_fonepay" value="fonepay">
+                  <label class="form-check-label" for="pm_fonepay"><i class="bi bi-phone me-1"></i>Fonepay</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa">
+                  <label class="form-check-label" for="pm_esewa"><i class="bi bi-wallet2 me-1"></i>eSewa</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_khalti" value="khalti">
+                  <label class="form-check-label" for="pm_khalti"><i class="bi bi-lightning-charge me-1"></i>Khalti</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_bank" value="bank">
+                  <label class="form-check-label" for="pm_bank"><i class="bi bi-bank me-1"></i>Bank Transfer</label>
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_card" value="card">
@@ -985,7 +1015,14 @@
             customerPhone.value = c.phone || '';
             customerAddress.value = c.address || '';
             suggestions.style.display = 'none';
-            onCustomerSelected(c.id, c.name, c.phone || '');
+            if (c.id) {
+              onCustomerSelected(c.id, c.name, c.phone || '');
+            } else {
+              activeCustomerId = null;
+              hideOfferBanner();
+              document.getElementById('aiPanel').style.display = 'none';
+              loadWallet(c.name, c.phone || '');
+            }
           });
           suggestions.appendChild(div);
         });
@@ -1248,7 +1285,9 @@
       });
       clearBtn.style.display = 'none';
     };
-  }
+
+    if (activeCustomerId) {
+      fetch(`/api/customers/${activeCustomerId}/offer-feedback`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({applied: true, offer: offerText}),
@@ -1966,6 +2005,24 @@
         return _origFetch(url, opts);
       };
     })();
+  </script>
+  <script>
+    async function refreshTargetProgress() {
+      const card = document.getElementById('targetProgressCard');
+      if (!card) return;
+      try {
+        const res = await fetch('/targets/progress');
+        const data = await res.json();
+        if (!data.has_target) return;
+        document.getElementById('targetAchieved').textContent = Math.round(data.achieved).toLocaleString();
+        document.getElementById('targetAmount').textContent = Math.round(data.target).toLocaleString();
+        document.getElementById('targetPct').textContent = `${Math.round(data.pct)}%`;
+        const bar = document.getElementById('targetBar');
+        bar.style.width = `${Math.min(data.pct, 100)}%`;
+        bar.className = `progress-bar bg-${data.color}`;
+      } catch (e) {}
+    }
+    setInterval(refreshTargetProgress, 60000);
   </script>
 </body>
 </html>

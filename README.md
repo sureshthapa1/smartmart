@@ -33,7 +33,7 @@ A full-featured, AI-powered retail management system built with Python/Flask. De
 - **Customer Intelligence** — Segmentation, churn prediction, CLV, personalized offers
 - **NLG Reports** — Auto-generated daily/weekly business summaries
 - **Profit Leak Detection** — Identify discount losses and low-margin products
-- **AI Chatbot** *(coming soon)* — Natural language queries about sales, stock, customers
+- **AI Chatbot** — Natural language queries about sales, stock, customers, and Nepal retail planning
 - **Voice Assistant** *(coming soon)* — Voice-driven business queries via browser Web Speech API
 - **Competitor Pricing** *(coming soon)* — Track competitor prices and get pricing suggestions
 - **Cash Flow Prediction** *(coming soon)* — 30-day cash flow forecasting
@@ -105,6 +105,7 @@ Create a `.env` file:
 ```
 SECRET_KEY=your-secret-key-here
 FLASK_ENV=development
+ANTHROPIC_API_KEY=sk-ant-...      # Optional locally; required for AI Advisor replies
 ```
 
 Generate a secret key:
@@ -112,11 +113,26 @@ Generate a secret key:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
+Production/Render environment variables:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...      # Required for AI chatbot
+FLASK_ENV=production
+SECRET_KEY=<random 32-byte hex>
+DATABASE_URL=postgresql://...     # Render provides this automatically
+```
+
 ### 3. Initialize database
 
 ```bash
-python migrate.py
+flask --app run.py db upgrade
 python seed.py        # optional: load sample data
+```
+
+After first deploy or after any model change:
+
+```bash
+flask db upgrade
 ```
 
 ### 4. Run
@@ -133,15 +149,29 @@ Open **http://127.0.0.1:5000** — default login: `admin` / (set during seed)
 FLASK_ENV=production SECRET_KEY=your-key gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:5000 --workers 2
 ```
 
+### Deployment
+
+Render runs the configured build command in `render.yaml`, which installs dependencies and applies database migrations with:
+
+```bash
+flask --app run.py db upgrade
+```
+
+Run the same migration command after the first deploy and after every model change:
+
+```bash
+flask db upgrade
+```
+
 ---
 
 ## Running Tests
 
 ```bash
-pytest tests/ -q
+pytest --tb=short
 ```
 
-84 tests covering unit, integration, and property-based tests (Hypothesis).
+The suite covers unit, integration, and property-based tests (Hypothesis).
 
 ---
 
@@ -151,7 +181,6 @@ The following features are scaffolded but not yet active. Each shows a "coming s
 
 | Feature | Status | Notes |
 |---|---|---|
-| **AI Chatbot** | Coming soon | Will support plain-English queries about sales, stock, profit, and customers |
 | **Voice Assistant** | Coming soon | Will use the browser's Web Speech API — no extra software required |
 | **Competitor Pricing** | Coming soon | Manual price entry + AI-powered pricing suggestions |
 | **Cash Flow Prediction** | Coming soon | 30-day forecast using moving averages and day-of-week patterns |

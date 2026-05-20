@@ -3,6 +3,11 @@ from .supplier import Supplier
 from .category import Category
 from .product import Product
 from .sale import Sale, SaleItem
+from .login_attempt import LoginAttempt
+from .bundle import Bundle, BundleItem
+from .waste_record import WasteRecord
+from .supplier_price_record import SupplierPriceRecord
+from .sales_target import SalesTarget
 from .sale_return import SaleReturn, SaleReturnItem
 from .purchase import Purchase, PurchaseItem
 from .expense import Expense
@@ -64,6 +69,8 @@ from ..bi.models import (
 __all__ = [
     "User", "Supplier", "Category", "Product",
     "Sale", "SaleItem", "SaleReturn", "SaleReturnItem", "Purchase", "PurchaseItem",
+    "LoginAttempt", "Bundle", "BundleItem", "WasteRecord",
+    "SupplierPriceRecord", "SalesTarget",
     "Expense", "StockMovement", "ShopSettings",
     "UserPermissions", "UserActivity", "Customer", "ProductIconMap",
     "AIModelVersion", "AIRecommendation", "AIAlert", "AIRetrainingLog", "AIFeedbackLog",

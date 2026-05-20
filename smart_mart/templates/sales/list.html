@@ -36,6 +36,10 @@
         <label class="form-label small fw-semibold mb-1">Payment</label>
         <select name="payment" class="form-select form-select-sm">
           <option value="">All</option>
+          <option value="fonepay" {{ 'selected' if pay_filter == 'fonepay' }}>Fonepay</option>
+          <option value="esewa" {{ 'selected' if pay_filter == 'esewa' }}>eSewa</option>
+          <option value="khalti" {{ 'selected' if pay_filter == 'khalti' }}>Khalti</option>
+          <option value="bank" {{ 'selected' if pay_filter == 'bank' }}>Bank Transfer</option>
           <option value="cash"   {{ 'selected' if pay_filter == 'cash'   }}>💵 Cash</option>
           <option value="qr"     {{ 'selected' if pay_filter == 'qr'     }}>📱 QR</option>
           <option value="card"   {{ 'selected' if pay_filter == 'card'   }}>💳 Card</option>
@@ -80,7 +84,7 @@
           <td class="small">{% if sale.customer_name %}{{ sale.customer_name }}{% else %}<span class="text-muted">Walk-in</span>{% endif %}</td>
           <td class="text-muted small">{{ sale.user.username if sale.user else '—' }}</td>
           <td>
-            {% set pm = sale.payment_mode or 'cash' %}
+            {% set pm = sale.payment_method or sale.payment_mode or 'cash' %}
             <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
               {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
               {{ pm | capitalize }}
