@@ -769,9 +769,12 @@ def customer_spend():
     ).all()
 
     # Get loyalty tiers in one query
-    wallet_tiers = dict(db.session.execute(
-        db.select(LoyaltyWallet.customer_id, LoyaltyWallet.tier, LoyaltyWallet.points_balance)
-    ).all())
+    wallet_tiers = {
+        customer_id: {"tier": tier, "points": points_balance}
+        for customer_id, tier, points_balance in db.session.execute(
+            db.select(LoyaltyWallet.customer_id, LoyaltyWallet.tier, LoyaltyWallet.points_balance)
+        ).all()
+    }
 
     customers = []
     for r in rows:
@@ -782,8 +785,8 @@ def customer_spend():
             "total_spent": float(r.total_spent or 0),
             "avg_order": float(r.avg_order or 0),
             "last_visit": r.last_visit,
-            "tier": wallet[1] if wallet else "—",
-            "points": wallet[2] if wallet else 0,
+            "tier": wallet["tier"] if wallet else "—",
+            "points": wallet["points"] if wallet else 0,
         })
 
     return render_template("reports/customer_spend.html",

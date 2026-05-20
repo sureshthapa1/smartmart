@@ -507,6 +507,7 @@ def notification_dashboard():
         get_notification_stats,
         validate_provider_config,
     )
+    from ...extensions import db
     from ...models.notification_log import NotificationLog
 
     failed = get_failed_notifications(limit=100)

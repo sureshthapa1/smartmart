@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from smart_mart.extensions import db
 from smart_mart.models.audit_log import AuditLog
+from smart_mart.models.ai_enhancements import LoyaltyWallet
 from smart_mart.models.bundle import Bundle, BundleItem
 from smart_mart.models.customer import Customer
 from smart_mart.models.login_attempt import LoginAttempt
@@ -147,6 +148,30 @@ def test_customer_search_does_not_attach_wrong_phone_owner(client, db):
     assert data[0]["name"] == "Legacy Phone Owner"
     assert data[0]["phone"] == "9809998888"
     assert data[0]["id"] is None
+
+
+def test_problem_sections_render_with_existing_business_data(client, db):
+    user = _admin("section_smoke_admin")
+    _login(client, user)
+    customer = Customer(name="Credit Customer", phone="9802223333", address="Dhangadhi")
+    db.session.add(customer)
+    db.session.flush()
+    db.session.add(LoyaltyWallet(customer_id=customer.id, points_balance=150, tier="Gold"))
+    db.session.add(Sale(
+        user_id=user.id,
+        total_amount=500,
+        customer_id=customer.id,
+        customer_name=customer.name,
+        customer_phone=customer.phone,
+        payment_mode="credit",
+        payment_method="credit",
+        credit_due_date=date.today() + timedelta(days=7),
+    ))
+    db.session.commit()
+
+    for path in ("/admin/notifications", "/operations/credits", "/reports/customer-spend"):
+        response = client.get(path)
+        assert response.status_code == 200, path
 
 
 def test_expired_cart_item_blocks_sale(client, db):

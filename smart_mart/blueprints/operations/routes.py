@@ -67,7 +67,7 @@ def credits():
     # Enrich each credit record with total paid and remaining balance
     from ...models.operations import CustomerCreditPayment
     from sqlalchemy import func as _func
-    sale_ids = [r.id for r in data.get("records", [])]
+    sale_ids = [r["sale"].id for r in data.get("records", []) if r.get("sale")]
     paid_map = {}
     if sale_ids:
         paid_rows = db.session.execute(
