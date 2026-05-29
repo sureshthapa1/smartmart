@@ -34,9 +34,9 @@ A full-featured, AI-powered retail management system built with Python/Flask. De
 - **NLG Reports** — Auto-generated daily/weekly business summaries
 - **Profit Leak Detection** — Identify discount losses and low-margin products
 - **AI Chatbot** — Natural language queries about sales, stock, customers, and Nepal retail planning
-- **Voice Assistant** *(coming soon)* — Voice-driven business queries via browser Web Speech API
-- **Competitor Pricing** *(coming soon)* — Track competitor prices and get pricing suggestions
-- **Cash Flow Prediction** *(coming soon)* — 30-day cash flow forecasting
+- **Voice Assistant** — Voice-driven business queries via browser Web Speech API
+- **Competitor Pricing** — Track competitor prices and get AI-powered pricing suggestions
+- **Cash Flow Prediction** — 30-day cash flow forecasting using moving averages and day-of-week patterns
 
 ### Admin & Security
 - **Role-Based Access** — Admin and Staff roles with 50+ granular permissions
@@ -182,9 +182,9 @@ The following features are scaffolded but not yet active. Each shows a "coming s
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Voice Assistant** | Coming soon | Will use the browser's Web Speech API — no extra software required |
-| **Competitor Pricing** | Coming soon | Manual price entry + AI-powered pricing suggestions |
-| **Cash Flow Prediction** | Coming soon | 30-day forecast using moving averages and day-of-week patterns |
+| **Voice Assistant** | Live | Uses the browser Web Speech API — no extra software required. Route: `/ai/voice` |
+| **Competitor Pricing** | Live | Manual price entry + AI-powered pricing suggestions. Route: `/ai/competitor-pricing` |
+| **Cash Flow Prediction** | Live | 30-day forecast using moving averages and day-of-week patterns. Route: `/ai/cashflow` |
 
 ---
 
