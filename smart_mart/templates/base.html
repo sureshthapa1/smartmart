@@ -1036,9 +1036,14 @@
             </ol>
           </nav>
         </div>
-        <div class="topbar-search">
+        <div class="topbar-search" style="position:relative">
           <i class="bi bi-search"></i>
-          <input type="text" placeholder="Search products, sales..." id="globalSearch">
+          <input type="text" placeholder="Search products, sales, customers..." id="globalSearch"
+                 autocomplete="off" aria-label="Global search">
+          <div id="searchDropdown" style="display:none;position:absolute;top:110%;left:0;right:0;
+               background:var(--card-bg,#fff);border:1px solid #e2e8f0;border-radius:10px;
+               box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:9999;max-height:380px;overflow-y:auto">
+          </div>
         </div>
       </div>
       <div class="topbar-right">
@@ -1090,7 +1095,51 @@
     document.getElementById('sidebarToggle')?.addEventListener('click',()=>{document.getElementById('sidebar').classList.toggle('show')});
     const darkToggle=document.getElementById('darkToggle'),darkIcon=document.getElementById('darkIcon'),html=document.documentElement;
     if(localStorage.getItem('darkMode')==='1'){html.setAttribute('data-bs-theme','dark');if(darkIcon)darkIcon.className='bi bi-sun'}
-    darkToggle?.addEventListener('click',()=>{const isDark=html.getAttribute('data-bs-theme')==='dark';html.setAttribute('data-bs-theme',isDark?'light':'dark');if(darkIcon)darkIcon.className=isDark?'bi bi-moon-stars':'bi bi-sun';localStorage.setItem('darkMode',isDark?'0':'1')});
+    darkToggle?.addEventListener('click',()=>{const isDark=html.getAttribute('data-bs-theme')==='dark';html.setAttribute('data-bs-theme',isDark?'light':'dark');if(darkIcon)darkIcon.className=isDark?'bi bi-moon-stars':'bi bi-sun';localStorage.setItem('darkMode',isDark?'0':'1')})
+    // ── Global Search ─────────────────────────────────────────────────────
+    const gSearch=document.getElementById('globalSearch');
+    const gDrop=document.getElementById('searchDropdown');
+    let gTimer;
+    const typeIcons={product:'bi-box-seam',sale:'bi-receipt',customer:'bi-person',supplier:'bi-truck'};
+    const typeColors={product:'#6366f1',sale:'#10b981',customer:'#f59e0b',supplier:'#3b82f6'};
+    if(gSearch&&gDrop){
+      gSearch.addEventListener('input',()=>{
+        clearTimeout(gTimer);
+        const q=gSearch.value.trim();
+        if(q.length<2){gDrop.style.display='none';return;}
+        gTimer=setTimeout(async()=>{
+          try{
+            const r=await fetch('/api/search?q='+encodeURIComponent(q));
+            const d=await r.json();
+            if(!d.results||!d.results.length){gDrop.innerHTML='<div style="padding:1rem;color:#94a3b8;font-size:.83rem">No results found</div>';}
+            else{gDrop.innerHTML=d.results.map(item=>'<a href="'+item.url+'" style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;text-decoration:none;color:inherit;border-bottom:1px solid #f1f5f9"><i class="bi '+typeIcons[item.type]+'" style="color:'+typeColors[item.type]+';font-size:1rem;flex-shrink:0"></i><div style="min-width:0"><div style="font-size:.85rem;font-weight:500">'+item.label+'</div><div style="font-size:.75rem;color:#94a3b8">'+item.sub+'</div></div></a>').join('');}
+            gDrop.style.display='block';
+          }catch(e){gDrop.style.display='none';}
+        },280);
+      });
+      gSearch.addEventListener('keydown',e=>{if(e.key==='Escape'){gDrop.style.display='none';gSearch.blur();}});
+      document.addEventListener('click',e=>{if(!gSearch.contains(e.target)&&!gDrop.contains(e.target))gDrop.style.display='none';});
+    }
+
+    // ── Global Keyboard Shortcuts ─────────────────────────────────────────
+    // Ctrl+/ or ? = focus search | F2 = new sale | F3 = new purchase | F4 = dashboard
+    document.addEventListener('keydown', e => {
+      const tag = document.activeElement.tagName;
+      if(['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+      if((e.ctrlKey && e.key==='/') || e.key==='?'){
+        e.preventDefault();
+        gSearch && gSearch.focus();
+      } else if(e.key==='F2' && !e.ctrlKey){
+        e.preventDefault();
+        window.location.href='/sales/create';
+      } else if(e.key==='F3' && !e.ctrlKey){
+        e.preventDefault();
+        window.location.href='/purchases/create';
+      } else if(e.key==='F4' && !e.ctrlKey){
+        e.preventDefault();
+        window.location.href='/dashboard/';
+      }
+    });;
     // Register service worker for PWA
     if('serviceWorker' in navigator){navigator.serviceWorker.register('/static/sw.js').catch(()=>{})}
     const alertBell=document.getElementById('alertBell'),alertBody=document.getElementById('alertDropdownBody');
