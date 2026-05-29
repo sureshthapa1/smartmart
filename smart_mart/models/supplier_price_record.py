@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -12,7 +12,7 @@ class SupplierPriceRecord(db.Model):
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity_kg = db.Column(db.Numeric(10, 3))
     invoice_ref = db.Column(db.String(100))
-    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     recorded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
 
     product = db.relationship("Product")

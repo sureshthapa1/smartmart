@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -13,7 +13,7 @@ class Bundle(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     is_seasonal = db.Column(db.Boolean, default=False)
     season_tag = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     items = db.relationship(
         "BundleItem",
         back_populates="bundle",

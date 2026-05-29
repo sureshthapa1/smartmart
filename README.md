@@ -168,7 +168,8 @@ flask db upgrade
 ## Running Tests
 
 ```bash
-pytest --tb=short
+pip install -r requirements-dev.txt
+python -m pytest --tb=short
 ```
 
 The suite covers unit, integration, and property-based tests (Hypothesis).

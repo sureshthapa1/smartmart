@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -11,6 +11,6 @@ class SalesTarget(db.Model):
     target_date = db.Column(db.Date, nullable=False)
     target_type = db.Column(db.String(10), default="daily")
     amount = db.Column(db.Numeric(10, 2), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User")

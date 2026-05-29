@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -13,7 +13,7 @@ class WasteRecord(db.Model):
     cost_value = db.Column(db.Numeric(10, 2))
     notes = db.Column(db.Text)
     recorded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     product = db.relationship("Product")
     recorder = db.relationship("User")

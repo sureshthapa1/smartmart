@@ -15,10 +15,7 @@ target_metadata = target_db.metadata
 
 
 def get_engine():
-    try:
-        return target_db.get_engine()
-    except TypeError:
-        return target_db.engine
+    return target_db.engine
 
 
 def get_engine_url():
