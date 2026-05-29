@@ -90,12 +90,32 @@ SAMPLE_CUSTOMERS = [
 
 
 def ensure_admin():
-    admin = db.session.execute(db.select(User).filter_by(username="admin")).scalar_one_or_none()
+    import os as _os
+    admin_password = _os.environ.get("ADMIN_PASSWORD", "")
+    flask_env = _os.environ.get("FLASK_ENV", "development")
+
+    # In production, refuse to fall back to a hardcoded default password.
+    if flask_env == "production" and not admin_password:
+        raise RuntimeError(
+            "ADMIN_PASSWORD environment variable must be set in production. "
+            "Run: export ADMIN_PASSWORD=<your-secure-password>"
+        )
+
+    # In development, use a clear default and warn loudly.
+    if not admin_password:
+        admin_password = "admin123"
+        print(
+            "WARNING: Using default password admin123. "
+            "Set ADMIN_PASSWORD env var before deploying to production."
+        )
+
+    admin_username = _os.environ.get("ADMIN_USERNAME", "admin")
+    admin = db.session.execute(db.select(User).filter_by(username=admin_username)).scalar_one_or_none()
     if admin is None:
-        admin = User(username="admin", password_hash=hash_password("admin123"), role="admin")
+        admin = User(username=admin_username, password_hash=hash_password(admin_password), role="admin")
         db.session.add(admin)
         db.session.commit()
-        print("Admin user created: username=admin, password=admin123")
+        print(f"Admin user created: username={admin_username}")
     else:
         print("Admin user already exists.")
 
