@@ -1,7 +1,19 @@
 """Simple in-process TTL cache for dashboard/report endpoints.
 
 No external dependencies — uses a plain dict with timestamps.
-For multi-worker deployments swap the backend for Redis via flask-caching.
+
+IMPORTANT — Multi-worker limitation:
+  This cache lives in each worker process's memory. With Gunicorn --workers > 1
+  each worker has its own independent cache, so a cache invalidation in one worker
+  is NOT seen by other workers. This means stale data can be served for up to
+  ttl seconds after an update when running multiple workers.
+
+  To fix for production:
+    1. Switch to Redis: pip install flask-caching redis
+       and replace this module with Flask-Caching (CACHE_TYPE="redis").
+    2. Or keep --workers 1 (single-process) with --threads N for concurrency.
+       The current Render start command uses --workers 2; reduce to 1 if
+       cache consistency matters more than CPU parallelism.
 """
 from __future__ import annotations
 
