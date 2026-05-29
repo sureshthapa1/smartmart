@@ -4,6 +4,11 @@ from ..extensions import db
 
 class Purchase(db.Model):
     __tablename__ = "purchases"
+    __table_args__ = (
+        db.Index("ix_purchase_date", "purchase_date"),
+        db.Index("ix_purchase_supplier_id", "supplier_id"),
+        db.Index("ix_purchase_created_by", "created_by"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=False)
@@ -26,6 +31,10 @@ class Purchase(db.Model):
 
 class PurchaseItem(db.Model):
     __tablename__ = "purchase_items"
+    __table_args__ = (
+        db.Index("ix_purchase_item_purchase_id", "purchase_id"),
+        db.Index("ix_purchase_item_product_id", "product_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     purchase_id = db.Column(db.Integer, db.ForeignKey("purchases.id"), nullable=False)
