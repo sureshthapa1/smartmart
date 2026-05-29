@@ -22,38 +22,8 @@ from ..models.sale import Sale, SaleItem
 from ..models.ai_memory import AIModelVersion, AIRetrainingLog as AITrainingLog
 
 
-def _get_daily_sales_series(product_id: int, days: int = 90) -> list[float]:
-    end = date.today()
-    start = end - timedelta(days=days - 1)
-    rows = db.session.execute(
-        db.select(
-            func.date(Sale.sale_date).label("day"),
-            func.sum(SaleItem.quantity).label("qty"),
-        )
-        .join(SaleItem, SaleItem.sale_id == Sale.id)
-        .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
-        .group_by(func.date(Sale.sale_date))
-    ).all()
-    sales_map = {str(r.day): float(r.qty) for r in rows}
-    series = []
-    current = start
-    while current <= end:
-        series.append(sales_map.get(str(current), 0.0))
-        current += timedelta(days=1)
-    return series
-
-
-def _linear_regression(series: list[float]) -> tuple[float, float]:
-    n = len(series)
-    if n < 2:
-        return 0.0, series[0] if series else 0.0
-    x_mean = (n - 1) / 2
-    y_mean = sum(series) / n
-    num = sum((i - x_mean) * (series[i] - y_mean) for i in range(n))
-    den = sum((i - x_mean) ** 2 for i in range(n))
-    slope = num / den if den else 0.0
-    return slope, y_mean - slope * x_mean
+# Re-use shared helpers from ai_engine to avoid duplication
+from .ai_engine import _daily_sales_series as _get_daily_sales_series, _linear_regression
 
 
 def retrain_demand_model(product_id: int = None, trigger: str = "manual") -> dict:
