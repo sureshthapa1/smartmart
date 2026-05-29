@@ -17,17 +17,29 @@ logger = logging.getLogger(__name__)
 
 
 def _generate_invoice_number() -> str:
-    """Generate invoice number in format INV-YYYYMMDD-XXXX (Task 4)."""
+    """Generate invoice number in format INV-YYYYMMDD-XXXX.
+
+    Uses MAX() on existing invoice numbers for the day rather than COUNT(),
+    which prevents duplicate numbers when two sales are created concurrently
+    (COUNT can return the same value for two simultaneous transactions).
+    """
     from datetime import date as _date
     today_str = _date.today().strftime("%Y%m%d")
     prefix = f"INV-{today_str}-"
-    # Count existing invoices with today's prefix to get next sequence
-    count = db.session.execute(
-        db.select(db.func.count(Sale.id)).where(
+    # Use MAX to find the highest sequence for today, not COUNT
+    max_invoice = db.session.execute(
+        db.select(db.func.max(Sale.invoice_number)).where(
             Sale.invoice_number.like(f"{prefix}%")
         )
-    ).scalar() or 0
-    return f"{prefix}{count + 1:04d}"
+    ).scalar()
+    if max_invoice:
+        try:
+            last_seq = int(max_invoice.split("-")[-1])
+        except (ValueError, IndexError):
+            last_seq = 0
+    else:
+        last_seq = 0
+    return f"{prefix}{last_seq + 1:04d}"
 
 
 class InsufficientStockError(ValueError):
