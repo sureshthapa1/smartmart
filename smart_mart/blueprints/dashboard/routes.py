@@ -12,6 +12,7 @@ from ...models.sale import Sale, SaleItem
 from ...models.expense import Expense
 from ...services import alert_engine, cash_flow_manager
 from ...services.decorators import login_required
+from ...services.cache_service import get as _cache_get, set as _cache_set, invalidate_prefix as _cache_invalidate
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
@@ -248,25 +249,36 @@ def index():
         pending_credits_total = float(result.total or 0)
     except Exception:
         pass
+    # NLG summary + advisor actions — cached per-day to avoid recomputing on every load
     nlg_summary = None
-    if cu.role == "admin":
-        try:
-            from ...services.ai_nlg import generate_daily_report
-            nlg_data = generate_daily_report()
-            nlg_summary = nlg_data.get("narrative", "")
-        except Exception:
-            pass
-
-    # ── AI Business Advisor — surface top critical actions on dashboard ───
     advisor_actions = []
     if cu.role == "admin":
-        try:
-            from ...services.ai_business_advisor import product_action_recommendations
-            all_actions = product_action_recommendations()
-            # Show top 3 critical/urgent actions only
-            advisor_actions = [a for a in all_actions if a.get("priority", 9) <= 2][:3]
-        except Exception:
-            pass
+        import datetime as _dt
+        _nlg_key = f"dashboard_nlg:{_dt.date.today()}"
+        _cached_nlg = _cache_get(_nlg_key)
+        if _cached_nlg is not None:
+            nlg_summary = _cached_nlg
+        else:
+            try:
+                from ...services.ai_nlg import generate_daily_report
+                nlg_data = generate_daily_report()
+                nlg_summary = nlg_data.get("narrative", "")
+                _cache_set(_nlg_key, nlg_summary, ttl=3600)  # cache 1 hour
+            except Exception:
+                pass
+
+        _adv_key = f"dashboard_advisor:{_dt.date.today()}"
+        _cached_adv = _cache_get(_adv_key)
+        if _cached_adv is not None:
+            advisor_actions = _cached_adv
+        else:
+            try:
+                from ...services.ai_business_advisor import product_action_recommendations
+                all_actions = product_action_recommendations()
+                advisor_actions = [a for a in all_actions if a.get("priority", 9) <= 2][:3]
+                _cache_set(_adv_key, advisor_actions, ttl=3600)  # cache 1 hour
+            except Exception:
+                pass
 
     return render_template("dashboard/index.html",
                            # Sales
