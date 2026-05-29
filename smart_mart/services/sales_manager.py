@@ -252,8 +252,29 @@ def create_sale(items: list[dict], user_id: int,
     try:
         from .cache_service import invalidate_prefix
         invalidate_prefix("bi_dashboard")
+        invalidate_prefix(f"alert_count:")  # reset alert badge cache
     except Exception:
         pass
+
+    # Send WhatsApp/SMS receipt to customer (non-blocking — failure never breaks the sale)
+    try:
+        if customer_phone and customer_phone.strip():
+            from .notification_service import send_notification
+            from ..models.shop_settings import ShopSettings
+            shop = ShopSettings.get()
+            inv = sale.invoice_number or str(sale.id)
+            msg = (
+                f"Thank you for shopping at {shop.shop_name}!\n"
+                f"Invoice: {inv}\n"
+                f"Amount: NPR {float(sale.total_amount):,.0f}\n"
+                f"Payment: {sale.payment_method or sale.payment_mode}\n"
+            )
+            if sale.payment_mode == "credit":
+                msg += f"Balance due: NPR {float(sale.total_amount):,.0f}\n"
+            msg += "We appreciate your business!"
+            send_notification(customer_phone.strip(), msg, channel="whatsapp")
+    except Exception as exc:
+        logger.debug("Post-sale WhatsApp receipt failed (non-critical): %s", exc)
 
     return sale
 
