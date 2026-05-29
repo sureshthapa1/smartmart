@@ -743,3 +743,102 @@ def bot_status():
             for n in notifications[:10]
         ],
     })
+
+
+# ── Global Search ─────────────────────────────────────────────────────────────
+
+@api_bp.route("/search")
+@login_required
+def global_search():
+    """Fast global search across products, sales, customers, and suppliers.
+    Returns up to 5 results per category, used by the topbar search bar.
+    """
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify({"results": []})
+
+    term = f"%{q.lower()}%"
+    results = []
+
+    # Products
+    from ...models.product import Product
+    products = db.session.execute(
+        db.select(Product)
+        .where(
+            db.or_(
+                db.func.lower(Product.name).like(term),
+                db.func.lower(Product.sku).like(term),
+            )
+        )
+        .where(Product.is_active == True)
+        .limit(5)
+    ).scalars().all()
+    for p in products:
+        results.append({
+            "type": "product",
+            "icon": "bi-box-seam",
+            "label": p.name,
+            "sub": f"SKU: {p.sku} | Stock: {p.quantity}",
+            "url": f"/inventory/{p.id}/edit",
+        })
+
+    # Sales / invoices
+    from ...models.sale import Sale
+    sales = db.session.execute(
+        db.select(Sale)
+        .where(
+            db.or_(
+                db.func.lower(Sale.invoice_number).like(term),
+                db.func.lower(Sale.customer_name).like(term),
+            )
+        )
+        .order_by(Sale.sale_date.desc())
+        .limit(5)
+    ).scalars().all()
+    for s in sales:
+        results.append({
+            "type": "sale",
+            "icon": "bi-receipt",
+            "label": s.invoice_number or f"Sale #{s.id}",
+            "sub": f"{s.customer_name or 'Walk-in'} | NPR {float(s.total_amount):,.0f}",
+            "url": f"/sales/{s.id}",
+        })
+
+    # Customers
+    from ...models.customer import Customer
+    customers = db.session.execute(
+        db.select(Customer)
+        .where(
+            db.or_(
+                db.func.lower(Customer.name).like(term),
+                db.func.lower(Customer.phone).like(term),
+            )
+        )
+        .limit(5)
+    ).scalars().all()
+    for c in customers:
+        results.append({
+            "type": "customer",
+            "icon": "bi-person",
+            "label": c.name,
+            "sub": f"Phone: {c.phone or '-'} | Tier: {c.loyalty_tier or 'bronze'}",
+            "url": f"/customers/{c.id}",
+        })
+
+    # Suppliers
+    from ...models.supplier import Supplier
+    suppliers = db.session.execute(
+        db.select(Supplier)
+        .where(db.func.lower(Supplier.name).like(term))
+        .limit(3)
+    ).scalars().all()
+    for s in suppliers:
+        results.append({
+            "type": "supplier",
+            "icon": "bi-truck",
+            "label": s.name,
+            "sub": f"Contact: {s.contact or '-'}",
+            "url": f"/purchases/suppliers/{s.id}/edit",
+        })
+
+    return jsonify({"results": results[:12]})
