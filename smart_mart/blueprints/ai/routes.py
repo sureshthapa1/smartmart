@@ -93,6 +93,10 @@ def chatbot():
 @ai_bp.route("/chatbot/query", methods=["POST"])
 @login_required
 def chatbot_query():
+    """Chatbot query — uses Anthropic API when key is configured, falls back to
+    the built-in keyword engine so the chatbot always works even without an API key.
+    """
+    import os as _os
     from flask import session as flask_session
     data = request.get_json() or {}
     message = data.get("message", "").strip()
@@ -101,14 +105,55 @@ def chatbot_query():
 
     history = flask_session.get("chatbot_history", [])
 
-    # Build context-aware message for short follow-ups
-    context_msg = message
-    if history and len(message.split()) <= 4:
-        last_bot = next((h["text"] for h in reversed(history) if h["role"] == "bot"), "")
-        if last_bot:
-            context_msg = f"{last_bot[:80]} {message}"
+    api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
+    reply = None
 
-    reply = ai_engine.chatbot_query(context_msg)
+    if api_key:
+        # ── Anthropic API path ──────────────────────────────────────────
+        try:
+            import urllib.request as _req, json as _json
+            # Build live data context for grounding
+            kw_reply = ai_engine.chatbot_query(message)  # fast DB stats
+            system = (
+                "You are the SmartMart AI assistant for a retail shop in Nepal. "
+                "Answer in 2-4 sentences. Currency is NPR. "
+                "Use the LIVE DATA below to answer factual questions.\n\n"
+                f"[LIVE DATA]\n{kw_reply}\n[/LIVE DATA]\n"
+                "If the live data already answers the question fully, summarise it clearly. "
+                "Otherwise answer from your own knowledge."
+            )
+            msgs = [{"role": "user", "content": message}]
+            body = _json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 400,
+                "system": system,
+                "messages": msgs,
+            }).encode()
+            req = _req.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=body,
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                method="POST",
+            )
+            with _req.urlopen(req, timeout=10) as resp:
+                result = _json.loads(resp.read())
+            reply = result["content"][0]["text"].strip()
+        except Exception as _exc:
+            import logging as _log
+            _log.getLogger(__name__).warning("Chatbot API call failed, using fallback: %s", _exc)
+
+    if not reply:
+        # ── Keyword-matching fallback (always available, no API key needed) ──
+        context_msg = message
+        if history and len(message.split()) <= 4:
+            last_bot = next((h["text"] for h in reversed(history) if h["role"] == "bot"), "")
+            if last_bot:
+                context_msg = f"{last_bot[:80]} {message}"
+        reply = ai_engine.chatbot_query(context_msg)
 
     history.append({"role": "user", "text": message})
     history.append({"role": "bot", "text": reply})
