@@ -72,10 +72,16 @@ def change_password():
 @auth_bp.route("/reset-password/request", methods=["GET", "POST"])
 @limiter.limit("3 per minute", methods=["POST"])
 def request_password_reset():
-    """Step 1 — admin generates a reset token for a username.
-    The token is written to the server log; the operator relays it to the user.
+    """Step 1 — an authenticated admin (or unauthenticated user) requests a
+    password reset token for a given username.
+
+    The reset URL is:
+      1. Shown on-screen to the requesting admin (if already logged in).
+      2. Always written to the server log as a fallback.
+    This avoids requiring server-log access for multi-staff shops.
     """
     from flask import current_app
+    from flask_login import current_user as _cu
     from ...services.password_reset_service import generate_reset_token
     from ...models.user import User
     from ...extensions import db
@@ -86,19 +92,28 @@ def request_password_reset():
             db.select(User).where(User.username == username)
         ).scalar_one_or_none()
 
-        # Always show the same message to prevent username enumeration
         if user:
             token = generate_reset_token(user.id)
             reset_url = url_for("auth.reset_password_confirm", token=token, _external=True)
+            # Always log as a security audit trail
             current_app.logger.warning(
                 "PASSWORD RESET requested for user '%s' (id=%s). "
                 "Reset URL (valid 30 min): %s",
                 user.username, user.id, reset_url,
             )
+            # If the requesting user is already an authenticated admin,
+            # show the reset link directly on screen so they can relay it
+            # without needing server-log access.
+            if _cu.is_authenticated and getattr(_cu, "role", "") == "admin":
+                flash(
+                    f"Reset link for '{user.username}' (valid 30 min): {reset_url}",
+                    "info",
+                )
+                return redirect(url_for("auth.request_password_reset"))
 
         flash(
-            "If that username exists, a reset link has been written to the server log. "
-            "Ask your system administrator to retrieve it.",
+            "If that username exists, a reset link has been generated. "
+            "Admins can see it on screen; others should ask their administrator.",
             "info",
         )
         return redirect(url_for("auth.login"))
