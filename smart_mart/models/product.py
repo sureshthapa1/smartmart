@@ -8,6 +8,7 @@ class Product(db.Model):
         db.Index("ix_product_sku", "sku"),
         db.Index("ix_product_quantity", "quantity"),
         db.Index("ix_product_category", "category"),
+        db.CheckConstraint("quantity >= 0", name="ck_product_quantity_non_negative"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -18,7 +19,7 @@ class Product(db.Model):
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
-    low_stock_threshold = db.Column(db.Integer, nullable=True, default=500)
+    low_stock_threshold = db.Column(db.Integer, nullable=True, default=10)  # matches LOW_STOCK_THRESHOLD config
     inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
