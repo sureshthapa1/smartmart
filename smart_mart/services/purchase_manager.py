@@ -120,3 +120,49 @@ def delete_supplier(supplier_id: int) -> None:
 def list_suppliers() -> list[Supplier]:
     """Return all suppliers ordered by name."""
     return db.session.execute(db.select(Supplier).order_by(Supplier.name)).scalars().all()
+
+
+def delete_purchase(purchase_id: int, user_id: int) -> None:
+    """Delete a purchase record and reverse its stock movements.
+
+    Raises ValueError if the purchase has associated supplier returns,
+    to preserve audit integrity.
+    """
+    from ..models.supplier_return import SupplierReturn
+    purchase = db.get_or_404(Purchase, purchase_id)
+
+    # Guard: block deletion if supplier returns reference this purchase
+    has_returns = db.session.execute(
+        db.select(db.func.count(SupplierReturn.id))
+        .where(SupplierReturn.purchase_id == purchase_id)
+    ).scalar() or 0
+    if has_returns:
+        raise ValueError(
+            f"Cannot delete Purchase #{purchase_id}: "
+            "it has associated supplier return records. Void the returns first."
+        )
+
+    # Reverse stock for each item
+    for item in purchase.items:
+        product = db.session.get(Product, item.product_id)
+        if product:
+            product.quantity = max(0, product.quantity - item.quantity)
+            db.session.add(StockMovement(
+                product_id=product.id,
+                change_amount=-item.quantity,
+                change_type="purchase_reversal",
+                reference_id=purchase.id,
+                created_by=user_id,
+                timestamp=datetime.now(timezone.utc),
+            ))
+
+    try:
+        from . import audit_service
+        audit_service.log("delete", "Purchase", purchase.id,
+                          f"Purchase #{purchase.id} (supplier {purchase.supplier_id})",
+                          changes={"deleted_by": [None, str(user_id)]})
+    except Exception:
+        pass
+
+    db.session.delete(purchase)
+    db.session.commit()
