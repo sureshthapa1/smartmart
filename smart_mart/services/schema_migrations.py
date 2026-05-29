@@ -207,6 +207,10 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id)"),
                 _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movements_type ON stock_movements(change_type)"),
                 _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_date ON purchases(purchase_date)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_supplier_id ON purchases(supplier_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_created_by ON purchases(created_by)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchase_items_purchase_id ON purchase_items(purchase_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchase_items_product_id ON purchase_items(product_id)"),
             ),
         ),
         (
@@ -305,6 +309,16 @@ def _migration_steps() -> list[MigrationStep]:
             "2026_05_16_goldkernel_feature_pack_tables",
             "Ensure feature pack tables exist (db.create_all handles model tables).",
             lambda conn: None,
+        ),
+        (
+            "2026_05_29_purchase_indexes",
+            "Add missing indexes on purchases and purchase_items tables.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_supplier_id ON purchases(supplier_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchases_created_by ON purchases(created_by)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchase_items_purchase_id ON purchase_items(purchase_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchase_items_product_id ON purchase_items(product_id)"),
+            ),
         ),
     ]
 
