@@ -411,7 +411,8 @@ def run_pending_orders_bot(stale_hours: int = 2) -> dict:
     from ..models.online_order import OnlineOrder
     from ..models.operations import AppNotification
 
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - __import__('datetime').timedelta(hours=stale_hours)
+    from datetime import timedelta as _td
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - _td(hours=stale_hours)
 
     stale = db.session.execute(
         db.select(OnlineOrder).where(
@@ -460,7 +461,8 @@ def run_promotion_bot() -> dict:
     from ..models.operations import AppNotification
 
     today = date.today()
-    tomorrow = today + __import__('datetime').timedelta(days=1)
+    from datetime import timedelta as _td2
+    tomorrow = today + _td2(days=1)
 
     expiring = db.session.execute(
         db.select(Promotion).where(
