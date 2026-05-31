@@ -7,394 +7,430 @@
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  .metric-card { transition: transform .15s, box-shadow .15s; }
-  .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08)!important; }
-  .quick-btn { transition: all .15s; }
-  .quick-btn:hover { transform: translateY(-1px); }
-  .insight-badge { font-size:.8rem; }
+  .kpi-card{border-radius:14px;border:none;transition:transform .15s,box-shadow .15s;overflow:hidden}
+  .kpi-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.1)!important}
+  .kpi-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+  .kpi-value{font-size:1.5rem;font-weight:800;line-height:1.1;letter-spacing:-.02em}
+  .kpi-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;opacity:.7}
+  .kpi-sub{font-size:.77rem;opacity:.75;margin-top:.15rem}
+  .alert-kpi{border-radius:12px;border:none;transition:transform .12s,box-shadow .12s}
+  .alert-kpi:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.08)!important}
+  .dash-section{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin:1.5rem 0 .7rem;display:flex;align-items:center;gap:.5rem}
+  .dash-section::after{content:'';flex:1;height:1px;background:#f1f5f9}
+  .qa-btn{border-radius:10px;font-size:.82rem;font-weight:600;padding:.45rem .9rem;transition:all .15s}
+  .qa-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+  .dash-table td,.dash-table th{padding:.5rem .75rem;font-size:.82rem}
+  .dash-table thead th{background:#f8fafc;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e2e8f0}
 </style>
 {% endblock %}
 
 {% block content %}
 
-{% if nlg_summary %}
-{% if current_user.role == 'admin' %}
-<div class="alert alert-info alert-dismissible fade show d-flex gap-2 mb-3" role="alert" id="nlgBanner">
-  <i class="bi bi-stars flex-shrink-0 mt-1"></i>
-  <div class="small" style="white-space:pre-line;">{{ nlg_summary }}</div>
+{# ── AI Summary Banner ─────────────────────────────────────── #}
+{% if nlg_summary and current_user.role == 'admin' %}
+<div class="alert alert-dismissible fade show mb-3 d-flex gap-2" role="alert"
+     style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border:1px solid #c4b5fd;border-radius:12px">
+  <i class="bi bi-stars flex-shrink-0 mt-1" style="color:#7c3aed"></i>
+  <div class="small" style="white-space:pre-line;color:#4c1d95">{{ nlg_summary }}</div>
   <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"
-          onclick="fetch('/api/nlg/dismiss', {method:'POST'})"></button>
+          onclick="fetch('/api/nlg/dismiss',{method:'POST'})"></button>
 </div>
 {% endif %}
-{% endif %}
 
-<!-- Birthday Alerts (loaded via JS) -->
-<div id="birthdayAlerts"></div>
+{# ── Dynamic alerts (JS-injected birthdays + bills) ────────── #}
+<div id="dynamicAlerts"></div>
 
+{# ── Low Stock Banner ──────────────────────────────────────── #}
 {% if low_stock_alerts %}
-{% set has_zero_stock = low_stock_alerts | selectattr('severity', 'equalto', 'critical') | list | length > 0 %}
-<div class="alert alert-{{ 'danger' if has_zero_stock else 'warning' }} alert-dismissible fade show d-flex align-items-center gap-2 mb-3" role="alert">
+{% set has_critical = low_stock_alerts|selectattr('severity','equalto','critical')|list|length > 0 %}
+<div class="alert alert-{{ 'danger' if has_critical else 'warning' }} alert-dismissible fade show d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:12px">
   <i class="bi bi-exclamation-triangle-fill"></i>
   <div class="small">
     <strong>{{ low_stock_alerts|length }} low-stock item{{ 's' if low_stock_alerts|length != 1 }}:</strong>
-    {{ low_stock_alerts[:3] | map(attribute='name') | join(', ') }}
-    <a href="{{ url_for('inventory.list_products', status='low') }}" class="ms-1">View all <i class="bi bi-arrow-right-short"></i></a>
+    {{ low_stock_alerts[:4]|map(attribute='name')|join(', ') }}{% if low_stock_alerts|length > 4 %} &amp; {{ low_stock_alerts|length - 4 }} more{% endif %}
+    <a href="{{ url_for('inventory.list_products', status='low') }}" class="ms-2 fw-semibold">View all →</a>
   </div>
   <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
 
-<!-- Date Filter Bar -->
-<div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
-  <span class="text-muted small fw-medium me-1">View:</span>
-  {% for f, label in [('today','Today'),('week','This Week'),('month','This Month'),('quarter','Quarter'),('year','Year')] %}
-  <a href="{{ url_for('dashboard.index', filter=f) }}"
-     class="btn btn-sm {% if active_filter == f %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-    {{ label }}
-  </a>
+{# ── AI Advisor Critical Actions ───────────────────────────── #}
+{% if advisor_actions and current_user.role == 'admin' %}
+<div class="row g-2 mb-3">
+  {% for action in advisor_actions %}
+  <div class="col-md-4">
+    <div class="card h-100" style="border-left:3px solid var(--bs-{{ action.color }});border-radius:10px">
+      <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+        <span class="badge bg-{{ action.color }} mt-1" style="font-size:.62rem;white-space:nowrap">{{ action.action_label }}</span>
+        <div style="min-width:0">
+          <div class="fw-semibold small text-truncate">{{ action.product_name }}</div>
+          <div class="text-muted" style="font-size:.72rem;line-height:1.3">{{ action.reason[:80] }}{% if action.reason|length > 80 %}…{% endif %}</div>
+        </div>
+        <a href="{{ url_for('inventory.edit_product', product_id=action.product_id) }}"
+           class="btn btn-outline-{{ action.color }} ms-auto flex-shrink-0" style="font-size:.68rem;padding:.15rem .45rem;border-radius:6px">Fix</a>
+      </div>
+    </div>
+  </div>
   {% endfor %}
-  <form method="get" class="d-flex gap-1 align-items-center ms-1">
-    <input type="hidden" name="filter" value="custom">
-    <input type="date" name="start" class="form-control form-control-sm" value="{{ filter_start }}" style="width:130px;">
-    <span class="text-muted small">–</span>
-    <input type="date" name="end" class="form-control form-control-sm" value="{{ filter_end }}" style="width:130px;">
-    <button type="submit" class="btn btn-sm btn-outline-primary">Go</button>
-  </form>
-  <span class="ms-auto badge rounded-pill" style="background:#f1f5f9;color:#475569;">{{ filter_label }}</span>
+</div>
+{% endif %}
+
+{# ════════════════════════════════════════════════════
+   1 · TODAY AT A GLANCE
+   ════════════════════════════════════════════════════ #}
+<div class="dash-section">Today at a Glance</div>
+<div class="row g-3">
+
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('sales.list_sales') }}?filter=today" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0)">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="kpi-icon" style="background:#16a34a22"><i class="bi bi-cart-check" style="color:#16a34a"></i></div>
+          <span style="font-size:.7rem;font-weight:600;color:#16a34a">TODAY</span>
+        </div>
+        <div class="kpi-value" style="color:#14532d">NPR {{ "%.0f"|format(today_sales) }}</div>
+        <div class="kpi-label" style="color:#166534">Sales</div>
+        <div class="kpi-sub" style="color:#166534">{{ today_sales_count }} transaction{{ 's' if today_sales_count != 1 }}</div>
+      </div>
+    </div></a>
+  </div>
+
+  {% if current_user.role == 'admin' %}
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe)">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="kpi-icon" style="background:#7c3aed22"><i class="bi bi-graph-up" style="color:#7c3aed"></i></div>
+          <span style="font-size:.7rem;font-weight:600;color:#7c3aed">PROFIT</span>
+        </div>
+        <div class="kpi-value" style="color:#3b0764">NPR {{ "%.0f"|format(today_profit) }}</div>
+        <div class="kpi-label" style="color:#5b21b6">Today's Profit</div>
+        <div class="kpi-sub" style="color:#5b21b6">After cost of goods</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('reports.cash_flow') }}" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe)">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="kpi-icon" style="background:#1d4ed822"><i class="bi bi-wallet2" style="color:#1d4ed8"></i></div>
+          <span style="font-size:.7rem;font-weight:600;color:#1d4ed8">CASH</span>
+        </div>
+        <div class="kpi-value" style="color:#1e3a8a">NPR {{ "%.0f"|format(cash_balance) }}</div>
+        <div class="kpi-label" style="color:#1e40af">Cash Balance</div>
+        <div class="kpi-sub" style="color:#1e40af">Revenue minus expenses →</div>
+      </div>
+    </div></a>
+  </div>
+
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('operations.closing') }}" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100"
+         style="background:{% if cash_session_open %}linear-gradient(135deg,#f0fdf4,#dcfce7){% else %}linear-gradient(135deg,#f8fafc,#f1f5f9){% endif %}">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="kpi-icon" style="background:#64748b22"><i class="bi bi-safe2" style="color:{% if cash_session_open %}#16a34a{% else %}#64748b{% endif %}"></i></div>
+          {% if cash_session_open %}<span class="badge bg-success" style="font-size:.62rem">Open</span>
+          {% else %}<span class="badge bg-secondary" style="font-size:.62rem">Closed</span>{% endif %}
+        </div>
+        {% if cash_session_open %}
+        <div class="kpi-value" style="color:#14532d">NPR {{ "%.0f"|format(cash_session_balance) }}</div>
+        {% else %}
+        <div class="kpi-value" style="color:#475569;font-size:1.1rem">No Session</div>
+        {% endif %}
+        <div class="kpi-label" style="color:{% if cash_session_open %}#166534{% else %}#64748b{% endif %}">Cash Session</div>
+        <div class="kpi-sub" style="color:#94a3b8">Click to manage →</div>
+      </div>
+    </div></a>
+  </div>
+
+  {% else %}
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#0e749022"><i class="bi bi-calendar-week" style="color:#0e7490"></i></div>
+        <div class="kpi-value" style="color:#155e75">NPR {{ "%.0f"|format(weekly_sales) }}</div>
+        <div class="kpi-label" style="color:#155e75">This Week</div>
+        <div class="kpi-sub" style="color:#155e75">{{ weekly_sales_count }} sales</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#7e22ce22"><i class="bi bi-calendar-month" style="color:#7e22ce"></i></div>
+        <div class="kpi-value" style="color:#4a044e">NPR {{ "%.0f"|format(monthly_sales) }}</div>
+        <div class="kpi-label" style="color:#6b21a8">This Month</div>
+        <div class="kpi-sub" style="color:#6b21a8">{{ monthly_sales_count }} sales</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-<!-- Quick Action Buttons -->
-<div class="d-flex gap-2 mb-4 flex-wrap">
-  <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary quick-btn">
+{# ════════════════════════════════════════════════════
+   2 · PERIOD METRICS  (admin only, filterable)
+   ════════════════════════════════════════════════════ #}
+{% if current_user.role == 'admin' %}
+<div class="dash-section">Period Overview
+  <div class="ms-auto d-flex gap-1 flex-wrap" style="font-size:.72rem;font-weight:400;text-transform:none;letter-spacing:0">
+    {% for f, label in [('today','Today'),('week','Week'),('month','Month'),('quarter','Quarter'),('year','Year')] %}
+    <a href="{{ url_for('dashboard.index', filter=f) }}"
+       class="btn btn-sm {% if active_filter == f %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+       style="padding:.2rem .55rem;font-size:.7rem;border-radius:6px">{{ label }}</a>
+    {% endfor %}
+    <form method="get" class="d-flex gap-1 align-items-center">
+      <input type="hidden" name="filter" value="custom">
+      <input type="date" name="start" class="form-control form-control-sm" value="{{ filter_start }}" style="width:118px;font-size:.73rem">
+      <span class="text-muted">–</span>
+      <input type="date" name="end" class="form-control form-control-sm" value="{{ filter_end }}" style="width:118px;font-size:.73rem">
+      <button type="submit" class="btn btn-sm btn-outline-primary" style="padding:.2rem .55rem;font-size:.7rem">Go</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#7e22ce22"><i class="bi bi-graph-up-arrow" style="color:#7c3aed"></i></div>
+        <div class="kpi-value" style="color:#4a044e">NPR {{ "%.0f"|format(monthly_profit) }}</div>
+        <div class="kpi-label" style="color:#6b21a8">Monthly Profit</div>
+        <div class="kpi-sub" style="color:#6b21a8">This month to date</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#0e749022"><i class="bi bi-calendar-week" style="color:#0e7490"></i></div>
+        <div class="kpi-value" style="color:#155e75">NPR {{ "%.0f"|format(weekly_sales) }}</div>
+        <div class="kpi-label" style="color:#155e75">This Week</div>
+        <div class="kpi-sub" style="color:#155e75">{{ weekly_sales_count }} sales</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#ea580c22"><i class="bi bi-currency-exchange" style="color:#ea580c"></i></div>
+        <div class="kpi-value" style="color:#7c2d12">NPR {{ "%.0f"|format(stock_value) }}</div>
+        <div class="kpi-label" style="color:#9a3412">Stock Value</div>
+        <div class="kpi-sub" style="color:#9a3412">{{ total_products }} products</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#16a34a22"><i class="bi bi-calculator" style="color:#16a34a"></i></div>
+        <div class="kpi-value" style="color:#14532d">NPR {{ "%.0f"|format(avg_transaction_value) }}</div>
+        <div class="kpi-label" style="color:#166534">Avg Transaction</div>
+        <div class="kpi-sub" style="color:#166534">{{ filter_label }} · {{ period_sales_count }} sales</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-0">
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#d9770622"><i class="bi bi-receipt" style="color:#d97706"></i></div>
+        <div class="kpi-value" style="color:#78350f">{{ total_sales_count }}</div>
+        <div class="kpi-label" style="color:#92400e">Total Invoices</div>
+        <div class="kpi-sub" style="color:#92400e">All time →</div>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('operations.credits') }}" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fef2f2,#fecaca)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#dc262622"><i class="bi bi-credit-card-2-back" style="color:#dc2626"></i></div>
+        <div class="kpi-value" style="color:#7f1d1d">NPR {{ "%.0f"|format(pending_credits_total) }}</div>
+        <div class="kpi-label" style="color:#991b1b">Pending Credits</div>
+        <div class="kpi-sub" style="color:#991b1b">{{ pending_credits_count }} outstanding →</div>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="{{ url_for('waste.index') }}" class="text-decoration-none">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fff1f2,#ffe4e6)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#e11d4822"><i class="bi bi-trash3" style="color:#e11d48"></i></div>
+        <div class="kpi-value" style="color:#881337">NPR {{ "%.0f"|format(waste_cost_month) }}</div>
+        <div class="kpi-label" style="color:#9f1239">Waste This Month</div>
+        <div class="kpi-sub" style="color:#9f1239">View waste log →</div>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card kpi-card shadow-sm h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff)">
+      <div class="card-body p-3">
+        <div class="kpi-icon mb-2" style="background:#7e22ce22"><i class="bi bi-calendar-month" style="color:#7e22ce"></i></div>
+        <div class="kpi-value" style="color:#4a044e">NPR {{ "%.0f"|format(monthly_sales) }}</div>
+        <div class="kpi-label" style="color:#6b21a8">This Month Sales</div>
+        <div class="kpi-sub" style="color:#6b21a8">{{ monthly_sales_count }} transactions</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ════════════════════════════════════════════════════
+   3 · QUICK ACTIONS
+   ════════════════════════════════════════════════════ #}
+<div class="dash-section">Quick Actions</div>
+<div class="d-flex gap-2 flex-wrap">
+  <a href="{{ url_for('sales.create_sale') }}" class="btn btn-success qa-btn">
+    <i class="bi bi-lightning-charge me-1"></i>New Sale
+    <kbd style="font-size:.6rem;background:rgba(255,255,255,.25);border:none;border-radius:3px;padding:.1em .3em">F2</kbd>
+  </a>
+  <a href="{{ url_for('purchases.create_purchase') }}" class="btn btn-warning qa-btn">
+    <i class="bi bi-truck me-1"></i>New Purchase
+    <kbd style="font-size:.6rem;background:rgba(255,255,255,.25);border:none;border-radius:3px;padding:.1em .3em">F3</kbd>
+  </a>
+  <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary qa-btn">
     <i class="bi bi-plus-circle me-1"></i>Add Product
   </a>
-  <a href="{{ url_for('sales.create_sale') }}" class="btn btn-success quick-btn">
-    <i class="bi bi-cart-plus me-1"></i>New Sale
-  </a>
-  <a href="{{ url_for('purchases.create_purchase') }}" class="btn btn-warning quick-btn">
-    <i class="bi bi-truck me-1"></i>Add Purchase
-  </a>
-  <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary quick-btn">
+  <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary qa-btn">
     <i class="bi bi-box-seam me-1"></i>Inventory
   </a>
   {% if current_user.role == 'admin' %}
-  <a href="{{ url_for('advisor.index') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#6366f1;color:#6366f1">
-    <i class="bi bi-stars me-1"></i>Business Advisor
+  <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary qa-btn" style="border-color:#f59e0b;color:#d97706">
+    <i class="bi bi-receipt-cutoff me-1"></i>Add Expense
   </a>
-  <a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#0891b2;color:#0891b2">
+  <a href="{{ url_for('operations.closing') }}" class="btn btn-outline-secondary qa-btn" style="border-color:#8b5cf6;color:#7c3aed">
+    <i class="bi bi-safe2 me-1"></i>Day Close
+  </a>
+  <a href="{{ url_for('reports.sales_report') }}" class="btn btn-outline-secondary qa-btn" style="border-color:#22c55e;color:#16a34a">
+    <i class="bi bi-bar-chart-line me-1"></i>Reports
+  </a>
+  <a href="{{ url_for('advisor.index') }}" class="btn btn-outline-secondary qa-btn" style="border-color:#6366f1;color:#6366f1">
+    <i class="bi bi-stars me-1"></i>AI Advisor
+  </a>
+  <a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="btn btn-outline-secondary qa-btn" style="border-color:#0891b2;color:#0891b2">
     <i class="bi bi-graph-up-arrow me-1"></i>BI Dashboard
-  </a>
-  <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#f59e0b;color:#d97706">
-    <i class="bi bi-receipt me-1"></i>Add Expense
-  </a>
-  <a href="{{ url_for('reports.sales_report') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#22c55e;color:#16a34a">
-    <i class="bi bi-bar-chart-line me-1"></i>View Reports
-  </a>
-  <a href="{{ url_for('operations.closing') }}" class="btn btn-outline-secondary quick-btn" style="border-color:#8b5cf6;color:#7c3aed">
-    <i class="bi bi-safe2 me-1"></i>Cash Session
   </a>
   {% endif %}
 </div>
 
-<!-- Smart Insights -->
+{# ════════════════════════════════════════════════════
+   4 · ALERTS & ACTIONS REQUIRED
+   ════════════════════════════════════════════════════ #}
+<div class="dash-section">Alerts & Actions Required</div>
+<div class="row g-2">
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('inventory.list_products') }}?status=low" class="text-decoration-none">
+    <div class="card alert-kpi shadow-sm" style="border-left:4px solid #f59e0b">
+      <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+        <div class="kpi-icon" style="background:#fffbeb">⚠️</div>
+        <div>
+          <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Low Stock</div>
+          <div class="fs-3 fw-bold" style="color:#d97706;line-height:1">{{ alert_counts.low_stock }}</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted"></i>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
+    <div class="card alert-kpi shadow-sm" style="border-left:4px solid #ef4444">
+      <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+        <div class="kpi-icon" style="background:#fef2f2">📅</div>
+        <div>
+          <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Expiry</div>
+          <div class="fs-3 fw-bold text-danger" style="line-height:1">{{ alert_counts.expiry }}</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted"></i>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('operations.reorders') }}" class="text-decoration-none">
+    <div class="card alert-kpi shadow-sm" style="border-left:4px solid #8b5cf6">
+      <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+        <div class="kpi-icon" style="background:#f5f3ff">🔄</div>
+        <div>
+          <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Reorder</div>
+          <div class="fs-3 fw-bold" style="color:#7c3aed;line-height:1">{{ alert_counts.reorder }}</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted"></i>
+      </div>
+    </div></a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
+    <div class="card alert-kpi shadow-sm" style="border-left:4px solid #06b6d4">
+      <div class="card-body py-3 px-3 d-flex align-items-center gap-3">
+        <div class="kpi-icon" style="background:#ecfeff">🔥</div>
+        <div>
+          <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">High Demand</div>
+          <div class="fs-3 fw-bold text-info" style="line-height:1">{{ alert_counts.high_demand }}</div>
+        </div>
+        <i class="bi bi-arrow-right ms-auto text-muted"></i>
+      </div>
+    </div></a>
+  </div>
+</div>
+
 {% if insights and current_user.role == 'admin' %}
-<div class="d-flex gap-2 mb-4 flex-wrap">
+<div class="d-flex gap-2 mt-2 flex-wrap">
   {% for ins in insights %}
-  <span class="badge rounded-pill insight-badge bg-{{ ins.type }} bg-opacity-10 text-{{ ins.type }} border border-{{ ins.type }} border-opacity-25 px-3 py-2">
+  <span class="badge rounded-pill bg-{{ ins.type }} bg-opacity-10 text-{{ ins.type }} border border-{{ ins.type }} border-opacity-25 px-3 py-2" style="font-size:.77rem">
     <i class="bi {{ ins.icon }} me-1"></i>{{ ins.text }}
   </span>
   {% endfor %}
 </div>
 {% endif %}
 
-<!-- AI Advisor Critical Actions -->
-{% if advisor_actions and current_user.role == 'admin' %}
-<div class="row g-2 mb-4">
-  {% for action in advisor_actions %}
-  <div class="col-md-4">
-    <div class="card border-{{ action.color }} h-100" style="border-left:4px solid !important">
-      <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
-        <span class="badge bg-{{ action.color }} mt-1" style="font-size:.65rem;white-space:nowrap">{{ action.action_label }}</span>
-        <div style="min-width:0">
-          <div class="fw-semibold small text-truncate">{{ action.product_name }}</div>
-          <div class="text-muted" style="font-size:.75rem;line-height:1.3">{{ action.reason[:80] }}{% if action.reason|length > 80 %}…{% endif %}</div>
-        </div>
-        <a href="{{ url_for('inventory.edit_product', product_id=action.product_id) }}" class="btn btn-xs btn-outline-{{ action.color }} ms-auto flex-shrink-0" style="font-size:.7rem;padding:.2rem .5rem">Fix</a>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- Top Metric Cards Row 1 -->
-<div class="row g-3 mb-3">
-  <div class="col-6 col-xl-3">
-    <a href="{{ url_for('sales.list_sales') }}?filter=today" class="text-decoration-none">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);color:#166534">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-cart-check me-1"></i>Today's Sales</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(today_sales) }}</div>
-        <div class="stat-sub">{{ today_sales_count }} transaction{{ 's' if today_sales_count != 1 else '' }} <i class="bi bi-arrow-right ms-1"></i></div>
-        <div class="stat-bg">💰</div>
-      </div>
-    </div>
-    </a>
-  </div>
-  {% if current_user.role == 'admin' %}
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);color:#5b21b6">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-graph-up me-1"></i>Today's Profit</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(today_profit) }}</div>
-        <div class="stat-sub">Sales minus cost</div>
-        <div class="stat-bg">📈</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-wallet2 me-1"></i>Cash Balance</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(cash_balance) }}</div>
-        <div class="stat-sub">Revenue minus expenses</div>
-        <div class="stat-bg">🏦</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#7e22ce">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-graph-up-arrow me-1"></i>Monthly Profit</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(monthly_profit) }}</div>
-        <div class="stat-sub">This month</div>
-        <div class="stat-bg">🎯</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <a href="{{ url_for('waste.index') }}" class="text-decoration-none">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);color:#991b1b">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-trash3 me-1"></i>Waste Cost</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(waste_cost_month) }}</div>
-        <div class="stat-sub">This month <i class="bi bi-arrow-right ms-1"></i></div>
-        <div class="stat-bg"><i class="bi bi-trash3"></i></div>
-      </div>
-    </div>
-    </a>
-  </div>
-  {% else %}
-  {# Staff: show their own sales count instead of profit/cash #}
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe);color:#155e75">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-calendar-week me-1"></i>This Week</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(weekly_sales) }}</div>
-        <div class="stat-sub">{{ weekly_sales_count }} sales</div>
-        <div class="stat-bg">📅</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);color:#6b21a8">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-calendar-month me-1"></i>This Month</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(monthly_sales) }}</div>
-        <div class="stat-sub">{{ monthly_sales_count }} sales</div>
-        <div class="stat-bg">🗓️</div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-</div>
-
-<!-- Metric Cards Row 2 -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-xl-3">
-    <a href="{{ url_for('sales.list_sales') }}" class="text-decoration-none">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);color:#92400e">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-receipt me-1"></i>Total Sales</div>
-        <div class="stat-value">{{ total_sales_count }}</div>
-        <div class="stat-sub">All time <i class="bi bi-arrow-right ms-1"></i></div>
-        <div class="stat-bg">🧾</div>
-      </div>
-    </div>
-    </a>
-  </div>
-  {% if current_user.role == 'admin' %}
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#9a3412">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-currency-exchange me-1"></i>Stock Value</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(stock_value) }}</div>
-        <div class="stat-sub">{{ total_products }} products</div>
-        <div class="stat-bg">📦</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe);color:#155e75">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-calendar-week me-1"></i>This Week</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(weekly_sales) }}</div>
-        <div class="stat-sub">{{ weekly_sales_count }} sales</div>
-        <div class="stat-bg">📅</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-xl-3">
-    <a href="{{ url_for('operations.credits') }}" class="text-decoration-none">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fef2f2,#fecaca);color:#991b1b">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-credit-card-2-back me-1"></i>Pending Credits</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(pending_credits_total) }}</div>
-        <div class="stat-sub">{{ pending_credits_count }} outstanding sale{{ 's' if pending_credits_count != 1 }} <i class="bi bi-arrow-right ms-1"></i></div>
-        <div class="stat-bg">📋</div>
-      </div>
-    </div>
-    </a>
-  </div>
-  <div class="col-6 col-xl-3">
-    <a href="{{ url_for('operations.closing') }}" class="text-decoration-none">
-    <div class="card stat-card h-100" style="background:{% if cash_session_open %}linear-gradient(135deg,#f0fdf4,#dcfce7);color:#166534{% else %}linear-gradient(135deg,#f8fafc,#f1f5f9);color:#475569{% endif %}">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-safe2 me-1"></i>Cash Session</div>
-        {% if cash_session_open %}
-        <div class="stat-value">NPR {{ "%.0f"|format(cash_session_balance) }}</div>
-        <div class="stat-sub"><span class="badge bg-success">Open</span> Today's cash <i class="bi bi-arrow-right ms-1"></i></div>
-        {% else %}
-        <div class="stat-value" style="font-size:1.2rem;">No Session</div>
-        <div class="stat-sub">Click to open <i class="bi bi-arrow-right ms-1"></i></div>
-        {% endif %}
-        <div class="stat-bg">🏧</div>
-      </div>
-    </div>
-    </a>
-  </div>
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);color:#166534">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-calculator me-1"></i>Avg Transaction</div>
-        <div class="stat-value">NPR {{ "%.0f"|format(avg_transaction_value) }}</div>
-        <div class="stat-sub">{{ filter_label }} · {{ period_sales_count }} sales</div>
-        <div class="stat-bg">💳</div>
-      </div>
-    </div>
-  </div>
-  {% else %}
-  {# Staff: show product count (no cost value) #}
-  <div class="col-6 col-xl-3">
-    <div class="card stat-card h-100" style="background:linear-gradient(135deg,#fff7ed,#fed7aa);color:#9a3412">
-      <div class="card-body p-4">
-        <div class="stat-label"><i class="bi bi-box-seam me-1"></i>Products</div>
-        <div class="stat-value">{{ total_products }}</div>
-        <div class="stat-sub">In inventory</div>
-        <div class="stat-bg">📦</div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-</div>
-
-<!-- Alert Cards (clickable) -->
-<div class="row g-3 mb-4">
-  <div class="col-sm-3">
-    <a href="{{ url_for('inventory.list_products') }}?q=low" class="text-decoration-none">
-      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #f59e0b!important;">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#fffbeb;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">⚠️</div>
-          <div>
-            <div class="text-muted small">Low Stock</div>
-            <div class="fs-3 fw-bold text-warning">{{ alert_counts.low_stock }}</div>
-          </div>
-          <i class="bi bi-arrow-right ms-auto text-muted"></i>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-sm-3">
-    <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #ef4444!important;">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#fef2f2;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">📅</div>
-          <div>
-            <div class="text-muted small">Expiry Alerts</div>
-            <div class="fs-3 fw-bold text-danger">{{ alert_counts.expiry }}</div>
-          </div>
-          <i class="bi bi-arrow-right ms-auto text-muted"></i>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-sm-3">
-    <a href="{{ url_for('alerts.index') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #06b6d4!important;">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#ecfeff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🔥</div>
-          <div>
-            <div class="text-muted small">High Demand</div>
-            <div class="fs-3 fw-bold text-info">{{ alert_counts.high_demand }}</div>
-          </div>
-          <i class="bi bi-arrow-right ms-auto text-muted"></i>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-sm-3">
-    <a href="{{ url_for('operations.reorders') }}" class="text-decoration-none">
-      <div class="card shadow-sm h-100 metric-card" style="border-left:4px solid #8b5cf6!important;">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div style="width:42px;height:42px;background:#f5f3ff;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🔄</div>
-          <div>
-            <div class="text-muted small">Reorder Needed</div>
-            <div class="fs-3 fw-bold text-purple" style="color:#7c3aed">{{ alert_counts.reorder }}</div>
-          </div>
-          <i class="bi bi-arrow-right ms-auto text-muted"></i>
-        </div>
-      </div>
-    </a>
-  </div>
-</div>
-
-<!-- Charts Row -->
-<div class="row g-3 mb-4">
+{# ════════════════════════════════════════════════════
+   5 · TRENDS CHARTS
+   ════════════════════════════════════════════════════ #}
+<div class="dash-section">Trends</div>
+<div class="row g-3">
   <div class="col-lg-8">
     <div class="card shadow-sm">
-      <div class="card-header fw-semibold d-flex align-items-center gap-2">
-        <i class="bi bi-graph-up text-primary"></i>Sales Trend
-        <span class="badge bg-light text-muted ms-1" style="font-size:.7rem;">{{ filter_label }}</span>
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3" style="background:#fff;border-bottom:1px solid #f1f5f9">
+        <i class="bi bi-graph-up text-primary"></i> Sales Trend
+        <span class="badge ms-1" style="background:#f1f5f9;color:#64748b;font-size:.68rem">{{ filter_label }}</span>
         {% if current_user.role == 'admin' %}
-        <a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="btn btn-outline-primary btn-sm ms-auto">
-          <i class="bi bi-graph-up-arrow me-1"></i>Full BI Dashboard
+        <a href="{{ url_for('bi_dashboard.bi_dashboard_page') }}" class="btn btn-outline-primary btn-sm ms-auto" style="font-size:.73rem">
+          Full BI Dashboard →
         </a>
         {% endif %}
       </div>
-      <div class="card-body"><canvas id="salesChart" height="100"></canvas></div>
+      <div class="card-body pb-3"><canvas id="salesChart" height="105"></canvas></div>
     </div>
   </div>
   <div class="col-lg-4">
     <div class="card shadow-sm h-100">
-      <div class="card-header fw-semibold d-flex align-items-center gap-2">
-        <i class="bi bi-trophy-fill text-warning"></i>Top 5 Products (Month)
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3" style="background:#fff;border-bottom:1px solid #f1f5f9">
+        <i class="bi bi-trophy-fill text-warning"></i> Top 5 Products
+        <span class="ms-auto text-muted" style="font-size:.7rem">This Month</span>
       </div>
       <div class="card-body p-0">
-        <table class="table table-hover mb-0 align-middle">
+        <table class="table dash-table mb-0 align-middle">
           <tbody>
             {% for r in top5 %}
             <tr>
               <td class="ps-3">
-                <span class="badge rounded-pill me-1"
-                      style="background:{% if loop.index == 1 %}#fbbf24{% elif loop.index == 2 %}#94a3b8{% elif loop.index == 3 %}#cd7c2f{% else %}#f1f5f9{% endif %};color:{% if loop.index <= 3 %}#fff{% else %}#475569{% endif %};">
+                <span class="badge rounded-pill me-2"
+                      style="background:{% if loop.index==1 %}#fbbf24{% elif loop.index==2 %}#94a3b8{% elif loop.index==3 %}#cd7c2f{% else %}#f1f5f9{% endif %};color:{% if loop.index<=3 %}#fff{% else %}#475569{% endif %}">
                   {{ loop.index }}
-                </span>
-                {{ r.Product.name }}
+                </span>{{ r.Product.name }}
               </td>
-              <td class="text-end pe-3"><span class="badge bg-success">{{ r.qty_sold }}</span></td>
+              <td class="text-end pe-3">
+                <span class="badge bg-success bg-opacity-10 text-success">{{ r.qty_sold }}</span>
+              </td>
             </tr>
             {% else %}
-            <tr><td colspan="2" class="text-center text-muted py-4">No sales this month.</td></tr>
+            <tr><td colspan="2" class="text-center text-muted py-4 small">No sales this month yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -403,31 +439,32 @@
   </div>
 </div>
 
-<!-- Recent Sales + Dead Stock Row -->
-<div class="row g-3 mb-4">
+{# ════════════════════════════════════════════════════
+   6 · RECENT ACTIVITY + DEAD STOCK
+   ════════════════════════════════════════════════════ #}
+<div class="dash-section">Recent Activity</div>
+<div class="row g-3">
   <div class="col-lg-7">
     <div class="card shadow-sm">
-      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-clock-history me-2 text-primary"></i>Recent Sales</span>
-        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-primary btn-sm">
-          <i class="bi bi-list-ul me-1"></i>View All
-        </a>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between py-3" style="background:#fff;border-bottom:1px solid #f1f5f9">
+        <span class="d-flex align-items-center gap-2"><i class="bi bi-clock-history text-primary"></i>Recent Sales</span>
+        <a href="{{ url_for('sales.list_sales') }}" class="btn btn-primary btn-sm" style="font-size:.73rem">View All</a>
       </div>
       <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
+        <table class="table dash-table table-hover mb-0 align-middle">
           <thead><tr><th>Invoice</th><th>Customer</th><th>Staff</th><th class="text-end">Amount</th><th>Time</th></tr></thead>
           <tbody>
             {% for s in recent_sales %}
             <tr>
-              <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="text-decoration-none fw-medium">
-                {{ s.invoice_number or '#' ~ s.id }}</a></td>
-              <td class="text-muted small">{{ s.customer_name or 'Walk-in' }}</td>
-              <td class="text-muted small">{{ s.user.username if s.user else '—' }}</td>
+              <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" class="fw-semibold text-decoration-none">
+                {{ s.invoice_number or '#'~s.id }}</a></td>
+              <td class="text-muted">{{ s.customer_name or 'Walk-in' }}</td>
+              <td class="text-muted">{{ s.user.username if s.user else '—' }}</td>
               <td class="text-end fw-semibold text-success">NPR {{ "%.0f"|format(s.total_amount) }}</td>
-              <td class="text-muted small">{{ s.sale_date | nst('%H:%M') }}</td>
+              <td class="text-muted">{{ s.sale_date|nst('%H:%M') }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="text-center text-muted py-4">No sales today.</td></tr>
+            <tr><td colspan="5" class="text-center text-muted py-4 small">No sales today yet.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -436,43 +473,31 @@
   </div>
   <div class="col-lg-5">
     <div class="card shadow-sm h-100">
-      <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-hourglass-split me-2 text-danger"></i>Dead/Slow Stock</span>
-        <span class="badge bg-danger rounded-pill">No sales 30d</span>
+      <div class="card-header fw-semibold d-flex align-items-center justify-content-between py-3" style="background:#fff;border-bottom:1px solid #f1f5f9">
+        <span class="d-flex align-items-center gap-2"><i class="bi bi-hourglass-split text-danger"></i>Dead / Slow Stock</span>
+        <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:.65rem">No sales 30d</span>
       </div>
       <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead><tr><th>Product</th><th class="text-end">Qty</th><th>Action</th></tr></thead>
+        <table class="table dash-table table-hover mb-0 align-middle">
+          <thead><tr><th>Product</th><th class="text-end">Qty</th><th>Act.</th></tr></thead>
           <tbody>
-            {% macro product_icon(name, category) %}
-              {%- set n = (name ~ ' ' ~ (category or ''))|lower -%}
-              {%- if 'rice' in n or 'flour' in n -%}🌾{%- elif 'milk' in n or 'dairy' in n -%}🥛
-              {%- elif 'oil' in n or 'ghee' in n -%}🫙{%- elif 'tea' in n -%}🍵
-              {%- elif 'soap' in n or 'shampoo' in n -%}🧴{%- elif 'medicine' in n or 'tablet' in n -%}💊
-              {%- elif 'phone' in n or 'mobile' in n -%}📱{%- else -%}📦{%- endif %}
-            {% endmacro %}
+            {% macro picon(name,cat) %}{%- set n=(name~' '~(cat or ''))|lower -%}{%- if 'rice' in n or 'flour' in n -%}🌾{%- elif 'milk' in n or 'dairy' in n -%}🥛{%- elif 'oil' in n or 'ghee' in n -%}🫙{%- elif 'tea' in n -%}🍵{%- elif 'soap' in n or 'shampoo' in n -%}🧴{%- elif 'medicine' in n or 'tablet' in n -%}💊{%- elif 'phone' in n or 'mobile' in n -%}📱{%- else -%}📦{%- endif %}{% endmacro %}
             {% for p in dead_stock %}
             <tr>
               <td>
                 <div class="d-flex align-items-center gap-2">
-                  <span style="font-size:1.1rem;">{{ product_icon(p.name, p.category) }}</span>
-                  <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="fw-medium small text-decoration-none">{{ p.name }}</a>
+                  <span>{{ picon(p.name,p.category) }}</span>
+                  <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="fw-medium small text-decoration-none text-truncate" style="max-width:130px">{{ p.name }}</a>
                 </div>
               </td>
-              <td class="text-end"><span class="badge bg-secondary">{{ p.quantity }}</span></td>
+              <td class="text-end"><span class="badge bg-secondary bg-opacity-15 text-secondary">{{ p.quantity }}</span></td>
               <td>
-                <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}"
-                   class="btn btn-sm btn-outline-warning py-0 px-2" title="Adjust Price">
-                  <i class="bi bi-tag"></i>
-                </a>
-                <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}"
-                   class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1" title="Adjust Stock">
-                  <i class="bi bi-plus"></i>
-                </a>
+                <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}" class="btn btn-outline-warning btn-sm py-0 px-1" title="Adjust Price"><i class="bi bi-tag"></i></a>
+                <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1" title="Restock"><i class="bi bi-plus"></i></a>
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="3" class="text-center text-muted py-4">All products selling well! 🎉</td></tr>
+            <tr><td colspan="3" class="text-center text-muted py-4 small">All products selling well 🎉</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -481,25 +506,27 @@
   </div>
 </div>
 
-<!-- Low Stock Table -->
+{# ════════════════════════════════════════════════════
+   7 · LOW STOCK TABLE  (only when items exist)
+   ════════════════════════════════════════════════════ #}
 {% if low_stock %}
-<div class="card shadow-sm mb-4">
-  <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-    <span><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Low Stock Items</span>
-    <span class="badge bg-warning text-dark">{{ low_stock | length }}</span>
+<div class="dash-section">Low Stock — Restock Needed</div>
+<div class="card shadow-sm mb-2">
+  <div class="card-header fw-semibold d-flex align-items-center justify-content-between py-3" style="background:#fff;border-bottom:1px solid #f1f5f9">
+    <span class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i>Low Stock Items</span>
+    <span class="badge bg-warning text-dark rounded-pill">{{ low_stock|length }}</span>
   </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
+    <table class="table dash-table table-hover mb-0 align-middle">
       <thead><tr><th>Product</th><th>SKU</th><th class="text-end">Qty</th><th>Action</th></tr></thead>
       <tbody>
         {% for p in low_stock %}
         <tr>
           <td class="fw-medium">{{ p.name }}</td>
-          <td><code class="text-muted">{{ p.sku }}</code></td>
+          <td><code class="text-muted" style="font-size:.76rem">{{ p.sku }}</code></td>
           <td class="text-end"><span class="badge bg-warning text-dark">{{ p.quantity }}</span></td>
           <td>
-            <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}"
-               class="btn btn-sm btn-outline-primary">
+            <a href="{{ url_for('inventory.adjust_stock', product_id=p.id) }}" class="btn btn-sm btn-outline-primary" style="font-size:.73rem">
               <i class="bi bi-plus-circle me-1"></i>Restock
             </a>
           </td>
@@ -516,83 +543,64 @@
 {% block scripts %}
 <script>
 async function loadChart(url, canvasId, label, color) {
-  const res = await fetch(url);
-  const json = await res.json();
-  new Chart(document.getElementById(canvasId), {
-    type: 'line',
-    data: {
-      labels: json.labels,
-      datasets: [{
-        label, data: json.data,
-        borderColor: color,
-        backgroundColor: color + '18',
-        fill: true, tension: 0.4,
-        pointRadius: 3, pointHoverRadius: 5,
-        borderWidth: 2
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
-        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    new Chart(document.getElementById(canvasId), {
+      type: 'line',
+      data: {
+        labels: json.labels,
+        datasets: [{ label, data: json.data, borderColor: color, backgroundColor: color+'18',
+          fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5, borderWidth: 2 }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+          x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+        }
       }
-    }
-  });
+    });
+  } catch(e) {}
 }
 loadChart("{{ url_for('api.sales_trend') }}", 'salesChart', 'Sales (NPR)', '#6366f1');
-{% if current_user.role == 'admin' %}
-// profit chart removed from dashboard — available in Reports
-{% endif %}
 
 // Birthday alerts
-fetch('/customers/birthdays-today')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) return;
-    const box = document.getElementById('birthdayAlerts');
-    const items = data.map(c =>
-      `<span class="fw-semibold">${c.name}</span>${c.is_today ? ' 🎂 Today!' : ` (in ${c.days_until} day${c.days_until>1?'s':''})`}`
-    ).join(' &bull; ');
-    box.innerHTML = `<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-3">
+fetch('/customers/birthdays-today').then(r=>r.json()).then(data=>{
+  if(!data.length) return;
+  const items = data.map(c=>`<span class="fw-semibold">${c.name}</span>${c.is_today?' 🎂 Today!':\` (in ${c.days_until} day${c.days_until>1?'s':''})\``).join(' &bull; ');
+  document.getElementById('dynamicAlerts').innerHTML +=
+    `<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-3" style="border-radius:12px">
       <i class="bi bi-cake2-fill flex-shrink-0 mt-1"></i>
-      <div class="small"><strong>Upcoming Birthdays:</strong> ${items} — Consider sending a special offer!</div>
+      <div class="small"><strong>Upcoming Birthdays:</strong> ${items} — Send a special offer!</div>
       <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
     </div>`;
-  }).catch(() => {});
+}).catch(()=>{});
 
 // Recurring expense reminders
-fetch('/expenses/recurring/due-reminders')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) return;
-    const box = document.getElementById('birthdayAlerts');
-    const overdue = data.filter(d => d.overdue);
-    const dueSoon = data.filter(d => !d.overdue);
-    let html = '';
-    if (overdue.length) {
-      const names = overdue.map(d => `<strong>${d.name}</strong> (NPR ${d.amount.toLocaleString()})`).join(', ');
-      html += `<div class="alert alert-danger alert-dismissible fade show d-flex gap-2 mb-2">
-        <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
-        <div class="small"><strong>Overdue Bills:</strong> ${names}
-        <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-danger py-0 px-2">Pay Now</a></div>
-        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
-      </div>`;
-    }
-    if (dueSoon.length) {
-      const names = dueSoon.map(d => `<strong>${d.name}</strong> in ${d.days_until} day${d.days_until!==1?'s':''}`).join(' &bull; ');
-      html += `<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-2">
-        <i class="bi bi-bell-fill flex-shrink-0 mt-1"></i>
-        <div class="small"><strong>Upcoming Bills:</strong> ${names}
-        <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-warning py-0 px-2 text-dark">View</a></div>
-        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
-      </div>`;
-    }
-    if (html) {
-      const reminderBox = document.createElement('div');
-      reminderBox.innerHTML = html;
-      document.getElementById('birthdayAlerts').prepend(reminderBox);
-    }
-  }).catch(() => {});
+fetch('/expenses/recurring/due-reminders').then(r=>r.json()).then(data=>{
+  if(!data.length) return;
+  const overdue=data.filter(d=>d.overdue), dueSoon=data.filter(d=>!d.overdue);
+  let html='';
+  if(overdue.length){
+    const names=overdue.map(d=>`<strong>${d.name}</strong> (NPR ${d.amount.toLocaleString()})`).join(', ');
+    html+=`<div class="alert alert-danger alert-dismissible fade show d-flex gap-2 mb-2" style="border-radius:12px">
+      <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+      <div class="small"><strong>Overdue Bills:</strong> ${names}
+      <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-danger py-0 px-2">Pay Now</a></div>
+      <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+    </div>`;
+  }
+  if(dueSoon.length){
+    const names=dueSoon.map(d=>`<strong>${d.name}</strong> in ${d.days_until} day${d.days_until!==1?'s':''}`).join(' &bull; ');
+    html+=`<div class="alert alert-warning alert-dismissible fade show d-flex gap-2 mb-2" style="border-radius:12px">
+      <i class="bi bi-bell-fill flex-shrink-0 mt-1"></i>
+      <div class="small"><strong>Upcoming Bills:</strong> ${names}
+      <a href="/expenses/recurring" class="ms-2 btn btn-sm btn-warning py-0 px-2 text-dark">View</a></div>
+      <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+    </div>`;
+  }
+  if(html) document.getElementById('dynamicAlerts').innerHTML+=html;
+}).catch(()=>{});
 </script>
 {% endblock %}
