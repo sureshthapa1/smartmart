@@ -1,40 +1,23 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>Bulk Product Upload — Smart Mart</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <style>
-    body{background:#f8fafc;font-family:'Segoe UI',system-ui,sans-serif;}
-    .card{border:none!important;border-radius:12px!important;}
-    .drop-zone{border:2px dashed #6366f1;border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:background .2s;}
-    .drop-zone:hover,.drop-zone.dragover{background:#eef2ff;}
-    .drop-zone .icon{font-size:2.5rem;color:#6366f1;}
-    .btn-primary{background:#6366f1;border-color:#6366f1;}
-    .btn-primary:hover{background:#4f46e5;border-color:#4f46e5;}
-    .format-table th{background:#f1f5f9;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;}
-    .format-table td{font-size:.85rem;}
-  </style>
-</head>
-<body>
-  <nav class="navbar navbar-dark px-3 py-2" style="background:#0f172a;">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm me-3" style="background:#1e293b;color:#94a3b8;border:none;">
-      <i class="bi bi-house-door me-1"></i>Dashboard
-    </a>
-    <span class="navbar-brand fw-bold mb-0"><i class="bi bi-shop me-2" style="color:#6366f1;"></i>Smart Mart</span>
-    <div class="d-flex gap-2">
-      <a href="{{ url_for('inventory.list_products') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-arrow-left me-1"></i>Products
-      </a>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;">
-        <i class="bi bi-box-arrow-right me-1"></i>Logout
-      </a>
-    </div>
-  </nav>
+{% extends "base.html" %}
+{% block title %}Bulk Product Upload — Smart Mart{% endblock %}
+{% block page_title %}Bulk Upload{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}">Products</a></li>
+<li class="breadcrumb-item active">Bulk Upload</li>
+{% endblock %}
 
-  <div class="container py-4" style="max-width:900px;">
+{% block head %}
+<style>
+  .drop-zone{border:2px dashed #6366f1;border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:background .2s}
+  .drop-zone:hover,.drop-zone.dragover{background:#eef2ff}
+  .drop-zone .icon{font-size:2.5rem;color:#6366f1}
+  .format-table th{background:#f1f5f9;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+  .format-table td{font-size:.85rem}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:900px;">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2">
@@ -138,5 +121,33 @@
       }
     });
   </script>
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const dropText = document.getElementById('dropText');
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) {
+        dropText.textContent = '✅ ' + fileInput.files[0].name;
+        dropZone.style.background = '#eef2ff';
+      }
+    });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        dropText.textContent = '✅ ' + file.name;
+        dropZone.style.background = '#eef2ff';
+      }
+    });
+  </script>
+{% endblock %}
