@@ -70,7 +70,69 @@ PRODUCT_KNOWLEDGE_BASE = {
 }
 
 
-def analyze_product_image(filename: str, file_size_bytes: int = 0) -> dict:
+def _claude_vision_analyze(image_path: str) -> dict | None:
+    """Use Claude claude-haiku-4-5 vision to analyze a product image.
+    Returns None if API key not set or call fails.
+    """
+    import os, base64, urllib.request, json
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key or not os.path.exists(image_path):
+        return None
+    try:
+        with open(image_path, "rb") as f:
+            img_b64 = base64.b64encode(f.read()).decode()
+        ext = image_path.rsplit(".", 1)[-1].lower()
+        media_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                     "gif": "image/gif", "webp": "image/webp"}
+        media_type = media_map.get(ext, "image/jpeg")
+        payload = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 300,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                    {"type": "text", "text": (
+                        "Look at this product image. Reply ONLY with a JSON object (no markdown) with these keys: "
+                        "name (string, product name), category (string, one of: "
+                        "Food & Grocery, Beverages, Personal Care, Household, Electronics, Clothing, Stationery, Other), "
+                        "suggested_price_min (number, NPR), suggested_price_max (number, NPR), "
+                        "description (string, 1 sentence). "
+                        "Base the price on Nepal market rates."
+                    )}
+                ]
+            }]
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+        text = result["content"][0]["text"].strip()
+        # Strip markdown code blocks if present
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        data = json.loads(text)
+        return {
+            "name": data.get("name", ""),
+            "category": data.get("category", "Other"),
+            "suggested_price_min": float(data.get("suggested_price_min", 0)),
+            "suggested_price_max": float(data.get("suggested_price_max", 0)),
+            "description": data.get("description", ""),
+            "source": "claude_vision",
+        }
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).debug("Claude vision failed: %s", exc)
+        return None
+
+
+def analyze_product_image(filename: str, file_size_bytes: int = 0,
+                          image_path: str | None = None) -> dict:
     """
     Analyze a product image filename to suggest product details.
 
