@@ -505,6 +505,86 @@ def run_promotion_bot() -> dict:
 
 # ── Master runner ─────────────────────────────────────────────────────────────
 
+
+
+def run_supplier_performance_bot() -> dict:
+    """Weekly bot: score all suppliers and flag underperformers."""
+    from .ai_supplier_scorer import supplier_scorecard_all
+    from ..models.ai_memory import AIAlert
+    try:
+        report = supplier_scorecard_all()
+        flagged = 0
+        for s in report.get("suppliers", []):
+            if s.get("grade") in ("D", "F"):
+                existing = db.session.execute(
+                    db.select(AIAlert)
+                    .where(AIAlert.alert_type == "supplier_performance")
+                    .where(AIAlert.entity_id == s.get("supplier_id"))
+                    .where(AIAlert.is_resolved == False)
+                ).scalar_one_or_none()
+                if not existing:
+                    db.session.add(AIAlert(
+                        alert_type="supplier_performance",
+                        severity="medium",
+                        title=f"Supplier '{s.get('name')}' rated {s.get('grade')}",
+                        description=f"Consistency score: {s.get('consistency_score',0):.1f}/100. Consider reviewing terms.",
+                        entity_type="supplier",
+                        entity_id=s.get("supplier_id"),
+                    ))
+                    flagged += 1
+        db.session.commit()
+        return {"bot": "supplier_performance", "status": "ok",
+                "suppliers_scored": len(report.get("suppliers", [])), "alerts_created": flagged}
+    except Exception as exc:
+        logger.error("supplier_performance_bot failed: %s", exc)
+        return {"bot": "supplier_performance", "status": "error", "error": str(exc)}
+
+
+def run_profit_leak_bot() -> dict:
+    """Weekly bot: scan for profit leaks and create alerts for critical items."""
+    from .ai_profit_leak import profit_leak_dashboard
+    from ..models.ai_memory import AIAlert
+    try:
+        dashboard = profit_leak_dashboard()
+        flagged = 0
+        for p in dashboard.get("low_margin_products", {}).get("products", [])[:5]:
+            if float(p.get("margin_pct", 100)) < 5:
+                existing = db.session.execute(
+                    db.select(AIAlert)
+                    .where(AIAlert.alert_type == "low_margin")
+                    .where(AIAlert.entity_id == p.get("product_id"))
+                    .where(AIAlert.is_resolved == False)
+                ).scalar_one_or_none()
+                if not existing:
+                    db.session.add(AIAlert(
+                        alert_type="low_margin",
+                        severity="high",
+                        title=f"Low margin: {p.get('name')} ({p.get('margin_pct',0):.1f}%)",
+                        description=f"NPR {p.get('selling_price',0):.0f} sell vs NPR {p.get('cost_price',0):.0f} cost. Raise price or cut cost.",
+                        entity_type="product",
+                        entity_id=p.get("product_id"),
+                    ))
+                    flagged += 1
+        db.session.commit()
+        return {"bot": "profit_leak", "status": "ok", "alerts_created": flagged,
+                "total_leakage": dashboard.get("total_leakage_estimate", 0)}
+    except Exception as exc:
+        logger.error("profit_leak_bot failed: %s", exc)
+        return {"bot": "profit_leak", "status": "error", "error": str(exc)}
+
+
+def run_model_retrain_bot() -> dict:
+    """Daily bot: retrain demand forecasting models with latest sales data."""
+    from .ai_learning_engine import run_full_retraining
+    try:
+        result = run_full_retraining(trigger="scheduled")
+        return {"bot": "model_retrain", "status": "ok",
+                "models_retrained": result.get("models_retrained", 0),
+                "products_updated": result.get("products_updated", 0)}
+    except Exception as exc:
+        logger.error("model_retrain_bot failed: %s", exc)
+        return {"bot": "model_retrain", "status": "error", "error": str(exc)}
+
 def run_all_bots(user_id: int = 1) -> dict:
     """Run all daily bots. Returns a summary of what each bot did."""
     results = {}
@@ -518,6 +598,9 @@ def run_all_bots(user_id: int = 1) -> dict:
         ("anomaly_bot",        run_anomaly_bot),
         ("pending_orders_bot", run_pending_orders_bot),
         ("promotion_bot",      run_promotion_bot),
+        ("supplier_perf_bot",  run_supplier_performance_bot),
+        ("profit_leak_bot",    run_profit_leak_bot),
+        ("model_retrain_bot",  run_model_retrain_bot),
     ]:
         try:
             results[name] = fn()
