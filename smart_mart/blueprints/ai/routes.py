@@ -426,6 +426,13 @@ def advanced_dashboard():
 # FEATURE 2: CUSTOMER SEGMENTATION
 # ═══════════════════════════════════════════════════════════════════════════
 
+@ai_bp.route("/customers/segments")
+@admin_required
+def customer_segments_page():
+    """Render the customer segmentation dashboard page."""
+    return render_template("ai/customer_segments.html")
+
+
 @ai_bp.route("/api/customers/segments")
 @admin_required
 def api_customer_segments():
