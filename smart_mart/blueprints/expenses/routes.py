@@ -10,6 +10,7 @@ from flask_login import current_user
 from ...extensions import db
 from ...models.expense import Expense
 from ...services.decorators import admin_required, login_required
+from ...services.ai_expense_categorizer import categorize_expense as _auto_categorize
 
 expenses_bp = Blueprint("expenses", __name__, url_prefix="/expenses")
 
