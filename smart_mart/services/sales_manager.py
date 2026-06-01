@@ -455,7 +455,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
                                      Paragraph, Spacer, HRFlowable)
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
     sale: Sale = get_sale(sale_id)
     buffer = BytesIO()
