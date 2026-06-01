@@ -750,12 +750,23 @@ def bot_status():
 @api_bp.route("/search")
 @login_required
 def global_search():
-    """Fast global search across products, sales, customers, and suppliers.
-    Returns up to 5 results per category, used by the topbar search bar.
+    """Global search — uses AI smart search (Claude NLP) when key is set,
+    falls back to fast keyword search. Used by the topbar search bar.
     """
     q = request.args.get("q", "").strip()
     if len(q) < 2:
         return jsonify({"results": []})
+
+    # For longer, natural language queries use AI smart search
+    if len(q) > 10 and " " in q:
+        try:
+            from ...services.ai_smart_search import smart_search
+            result = smart_search(q)
+            if result.get("results"):
+                return jsonify({"results": result["results"][:12]})
+        except Exception:
+            pass  # fall through to keyword search below
+
 
     term = f"%{q.lower()}%"
     results = []
@@ -842,3 +853,45 @@ def global_search():
         })
 
     return jsonify({"results": results[:12]})
+
+
+# ── POS Cart Validator ────────────────────────────────────────────────────────
+
+@api_bp.route("/validate-cart", methods=["POST"])
+@login_required
+def validate_cart():
+    """Pre-submission cart validation using AI invoice detector.
+    Called by the POS before confirming a sale to catch errors early.
+    Returns warnings and errors the cashier can act on before committing.
+    """
+    from ...services.ai_invoice_detector import validate_sale_items
+    data = request.get_json() or {}
+    items = data.get("items", [])
+    discount = float(data.get("discount_amount", 0))
+    if not items:
+        return jsonify({"valid": True, "warnings": [], "errors": []})
+    result = validate_sale_items(items, discount)
+    return jsonify({
+        "valid": len(result.get("errors", [])) == 0,
+        "warnings": result.get("warnings", []),
+        "errors": result.get("errors", []),
+        "summary": result.get("summary", ""),
+    })
+
+
+# ── Expense Auto-Categorizer ──────────────────────────────────────────────────
+
+@api_bp.route("/suggest-expense-category", methods=["POST"])
+@login_required
+def suggest_expense_category():
+    """Return AI-suggested category + icon for an expense note.
+    Called live from the expense form as the user types the description.
+    """
+    from ...services.ai_expense_categorizer import categorize_expense
+    data = request.get_json() or {}
+    note = data.get("note", "").strip()
+    amount = float(data.get("amount", 0))
+    if not note:
+        return jsonify({"category": "", "label": "", "icon": "", "confidence": 0})
+    result = categorize_expense(note, amount)
+    return jsonify(result)
