@@ -6,7 +6,6 @@ from sqlalchemy import func
 from ..extensions import db
 from ..models.shift import Shift
 from ..models.sale import Sale
-from ..models.operations import CashSession
 
 
 def get_open_shift(user_id: int) -> Shift | None:
