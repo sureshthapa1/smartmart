@@ -12,7 +12,7 @@ from ...models.sale import Sale, SaleItem
 from ...models.expense import Expense
 from ...services import alert_engine, cash_flow_manager
 from ...services.decorators import login_required
-from ...services.cache_service import get as _cache_get, set as _cache_set, invalidate_prefix as _cache_invalidate
+from ...services.cache_service import get as _cache_get, set as _cache_set
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
