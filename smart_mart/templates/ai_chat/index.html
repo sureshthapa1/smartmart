@@ -1,83 +1,191 @@
 {% extends "base.html" %}
-{% block title %}AI Advisor - Smart Mart{% endblock %}
+{% block title %}AI Advisor — Smart Mart{% endblock %}
 {% block page_title %}AI Advisor{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">AI Advisor</li>{% endblock %}
+
+{% block head %}
+<style>
+  .chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 200px);min-height:500px;max-width:860px}
+  .chat-header{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:14px 14px 0 0;padding:1rem 1.25rem;color:#fff}
+  .chat-body{flex:1;overflow-y:auto;padding:1.25rem;background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-bottom:none;scroll-behavior:smooth}
+  .chat-footer{background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:.75rem 1rem}
+  .msg-row{display:flex;margin-bottom:.75rem;animation:fadeUp .2s ease}
+  .msg-row.user{justify-content:flex-end}
+  .bubble{max-width:75%;padding:.6rem .9rem;border-radius:14px;font-size:.87rem;line-height:1.55}
+  .bubble.user{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-bottom-right-radius:4px}
+  .bubble.bot{background:#fff;border:1px solid #e2e8f0;color:#1e293b;border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .bubble.bot strong{color:#4f46e5}
+  .bubble ul{margin:.3rem 0 0 1rem;padding:0}
+  .typing-dot{display:inline-block;width:6px;height:6px;background:#6366f1;border-radius:50%;animation:bounce .9s infinite;margin:0 2px}
+  .typing-dot:nth-child(2){animation-delay:.15s}
+  .typing-dot:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .quick-chip{border-radius:20px;font-size:.78rem;padding:.3rem .75rem;background:#ede9fe;color:#5b21b6;border:none;transition:all .15s;cursor:pointer}
+  .quick-chip:hover{background:#ddd6fe;transform:translateY(-1px)}
+  .chat-input{border:none;outline:none;width:100%;font-size:.9rem;background:transparent;resize:none;max-height:120px;overflow-y:auto}
+  .send-btn{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .15s;flex-shrink:0}
+  .send-btn:hover{opacity:.85}
+  .send-btn:disabled{opacity:.4}
+  .avatar-bot{width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;margin-right:.5rem;align-self:flex-end}
+</style>
+{% endblock %}
+
 {% block content %}
 {% if not api_key_configured %}
-<div class="alert alert-warning">
-  <strong>ANTHROPIC_API_KEY not configured.</strong>
-  Add it in Render environment variables to enable the GoldKernel Smart Business Advisor.
+<div class="alert alert-warning d-flex gap-2 mb-3" style="border-radius:12px">
+  <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+  <div><strong>API key not configured.</strong> Set <code>ANTHROPIC_API_KEY</code> in your environment variables to enable the AI Advisor. The quick chatbot still works below.</div>
 </div>
 {% endif %}
 
-<div class="card" style="max-width:920px">
-  <div class="card-header d-flex align-items-center gap-2">
-    <i class="bi bi-stars text-warning"></i>
-    <span>GoldKernel Smart Business Advisor</span>
+<div class="chat-wrap shadow-sm" style="border-radius:14px">
+
+  <div class="chat-header d-flex align-items-center gap-3">
+    <div style="width:42px;height:42px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0">🤖</div>
+    <div style="flex:1">
+      <div class="fw-bold" style="font-size:1rem">Smart Mart AI Advisor</div>
+      <div style="font-size:.75rem;opacity:.8">Ask anything about sales, stock, profit, or customers — in plain English</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge rounded-pill" style="background:rgba(255,255,255,.25);font-size:.7rem">
+        <span style="color:#4ade80">●</span> Online
+      </span>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;font-size:.75rem" id="clearBtn">
+        <i class="bi bi-trash me-1"></i>Clear
+      </button>
+    </div>
   </div>
-  <div class="card-body">
-    <div class="d-flex gap-2 flex-wrap mb-3" id="quickAsks">
+
+  <div class="chat-body" id="chatBox">
+    <div class="msg-row">
+      <div class="avatar-bot">🤖</div>
+      <div class="bubble bot">
+        👋 <strong>Hello!</strong> I'm your Smart Mart AI Advisor.<br><br>
+        I can help you with:<br>
+        📊 <strong>Sales</strong> — today, this week, this month<br>
+        💰 <strong>Profit & Finance</strong> — margins, expenses, cash flow<br>
+        📦 <strong>Inventory</strong> — low stock, dead stock, top products<br>
+        👥 <strong>Customers</strong> — top buyers, credit, loyalty<br>
+        🇳🇵 <strong>Nepal Retail</strong> — Dashain planning, VAT tips<br><br>
+        Try one of the quick questions below or type your own!
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-footer">
+    <div class="d-flex gap-2 flex-wrap mb-2" id="quickAsks">
       {% for q in [
         'How were sales today?',
         'Which product sold most this month?',
         'What items are running low?',
         'What is my profit this month?',
-        'Any tips for Dashain stock planning?',
-        'Which customers buy most often?'
+        'Tips for Dashain stock planning?',
+        'Which customers buy most often?',
+        'Show me dead stock',
+        'What is my cash balance?'
       ] %}
-      <button class="btn btn-outline-primary btn-sm quick-ask" type="button">{{ q }}</button>
+      <button class="quick-chip" type="button">{{ q }}</button>
       {% endfor %}
     </div>
-    <div id="chatBox" class="border rounded-3 p-3 mb-3 bg-light" style="height:460px;overflow-y:auto"></div>
-    <form id="chatForm" class="d-flex gap-2">
-      <input id="messageInput" class="form-control" placeholder="Ask about sales, inventory, profit, customers..." autocomplete="off" {% if not api_key_configured %}disabled{% endif %}>
-      <button class="btn btn-primary" type="submit" {% if not api_key_configured %}disabled{% endif %}>Ask</button>
-    </form>
+    <div class="d-flex align-items-end gap-2 p-2" style="border:1.5px solid #e2e8f0;border-radius:12px;background:#f8fafc">
+      <textarea class="chat-input" id="messageInput" rows="1"
+                placeholder="Ask about your business..." autocomplete="off"
+                {% if not api_key_configured %}disabled{% endif %}></textarea>
+      <button class="send-btn" id="sendBtn" {% if not api_key_configured %}disabled{% endif %}>
+        <i class="bi bi-send-fill" style="font-size:.85rem"></i>
+      </button>
+    </div>
+    <div class="text-muted mt-1" style="font-size:.7rem;text-align:right">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</div>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 const chatBox = document.getElementById('chatBox');
+const msgInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
 const history = [];
+
 function md(text) {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^#{1,3} (.*)$/gm, '<div class="fw-bold mt-2">$1</div>')
     .replace(/^- (.*)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g, m => '<ul class="mb-1">'+m+'</ul>')
+    .replace(/\n\n/g, '<br><br>')
     .replace(/\n/g, '<br>');
 }
-function add(role, text, pending=false) {
+
+function addMsg(role, text, pending=false) {
   const row = document.createElement('div');
-  row.className = `d-flex mb-2 ${role === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
-  row.innerHTML = `<div class="px-3 py-2 rounded-3 ${role === 'user' ? 'bg-success text-white' : 'bg-white border'}" style="max-width:75%">${pending ? '<span class="typing">Thinking...</span>' : md(text)}</div>`;
+  row.className = `msg-row${role==='user'?' user':''}`;
+  if(role !== 'user') row.innerHTML = `<div class="avatar-bot">🤖</div>`;
+  const bubble = document.createElement('div');
+  bubble.className = `bubble ${role==='user'?'user':'bot'}`;
+  bubble.innerHTML = pending
+    ? `<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>`
+    : md(text);
+  row.appendChild(bubble);
   chatBox.appendChild(row);
   chatBox.scrollTop = chatBox.scrollHeight;
-  return row;
+  return bubble;
 }
+
 async function ask(message) {
-  if (!message) return;
-  add('user', message);
+  if(!message.trim()) return;
+  addMsg('user', message);
   history.push({role:'user', content:message});
-  const pending = add('assistant', '', true);
+  sendBtn.disabled = true;
+  const bubble = addMsg('assistant', '', true);
   try {
-    const res = await fetch('/ai/chat/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, history:history.slice(-10)})});
+    const res = await fetch('/ai/chat/ask', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message, history: history.slice(-10)})
+    });
     const data = await res.json();
-    const reply = data.reply || data.error || 'No reply.';
-    pending.querySelector('div').innerHTML = md(reply);
+    const reply = data.reply || data.error || 'Sorry, I could not get a response.';
+    bubble.innerHTML = md(reply);
     history.push({role:'assistant', content:reply});
-  } catch (e) {
-    pending.querySelector('div').textContent = 'AI Advisor is unavailable right now.';
+  } catch(e) {
+    bubble.innerHTML = '<span class="text-danger">AI Advisor is unavailable right now. Please try again.</span>';
   }
   chatBox.scrollTop = chatBox.scrollHeight;
+  sendBtn.disabled = false;
+  msgInput.focus();
 }
-document.getElementById('chatForm')?.addEventListener('submit', e => {
-  e.preventDefault();
-  const input = document.getElementById('messageInput');
-  const message = input.value.trim();
-  input.value = '';
-  ask(message);
+
+sendBtn.addEventListener('click', () => {
+  const msg = msgInput.value.trim();
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+  ask(msg);
 });
-document.querySelectorAll('.quick-ask').forEach(btn => btn.addEventListener('click', () => ask(btn.textContent.trim())));
+
+msgInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const msg = msgInput.value.trim();
+    msgInput.value = '';
+    msgInput.style.height = 'auto';
+    ask(msg);
+  }
+});
+
+msgInput.addEventListener('input', () => {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+});
+
+document.querySelectorAll('.quick-chip').forEach(btn =>
+  btn.addEventListener('click', () => { ask(btn.textContent.trim()); })
+);
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  history.length = 0;
+  chatBox.innerHTML = '';
+});
 </script>
 {% endblock %}
