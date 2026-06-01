@@ -514,6 +514,8 @@
             <li style="padding:.3rem 1rem .1rem 2.6rem;font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#334155;font-weight:700;margin-top:.25rem">Intelligence</li>
             <li><a class="nav-link {% if request.endpoint == 'ai.customer_intelligence' %}active{% endif %}"
                    href="{{ url_for('ai.customer_intelligence') }}"><i class="bi bi-person-bounding-box"></i> Customer Intel</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'ai.customer_segments_page' %}active{% endif %}"
+                   href="{{ url_for('ai.customer_segments_page') }}"><i class="bi bi-diagram-3"></i> Segmentation</a></li>
             <li><a class="nav-link {% if request.endpoint == 'ai.cashflow_page' %}active{% endif %}"
                    href="{{ url_for('ai.cashflow_page') }}"><i class="bi bi-cash-coin"></i> Cash Flow AI</a></li>
             <li><a class="nav-link {% if request.endpoint == 'ai.anomalies_page' %}active{% endif %}"
