@@ -11,6 +11,7 @@ from flask_login import current_user
 from ...extensions import db
 from ...models.product import Product
 from ...services import sales_manager
+from ...services.ai_invoice_detector import validate_sale_items as _validate_items
 from ...services.sales_manager import InsufficientStockError
 from ...services.decorators import login_required, admin_required
 from ...utils.expiry_check import check_cart_for_expiry
