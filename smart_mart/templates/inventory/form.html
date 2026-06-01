@@ -1,47 +1,25 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>{{ action }} Product — Smart Mart</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{--accent:#6366f1;--accent2:#8b5cf6}
-    body{background:#f1f5f9;font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:.9rem}
-    .top-bar{background:#0f172a;padding:.6rem 1.25rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:200}
-    .top-bar .brand{color:#fff;font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:.5rem}
-    .top-bar .brand-dot{width:28px;height:28px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#fff}
-    .card{border:1px solid rgba(226,232,240,.7)!important;border-radius:14px!important;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05)}
-    .card-header{background:#fff;border-bottom:1px solid #f1f5f9;border-radius:14px 14px 0 0!important;padding:.9rem 1.25rem;font-weight:600}
-    .form-control,.form-select{border-radius:9px;border-color:#e2e8f0;font-size:.865rem;padding:.5rem .85rem;transition:all .18s}
-    .form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
-    .form-label{font-size:.8rem;font-weight:600;color:#475569;margin-bottom:.3rem}
-    .btn{border-radius:9px;font-weight:500;font-size:.845rem;transition:all .18s}
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;box-shadow:0 2px 8px rgba(99,102,241,.35)}
-    .btn-primary:hover{background:linear-gradient(135deg,#4f46e5,#7c3aed);transform:translateY(-1px)}
-    .btn-outline-secondary{border-color:#e2e8f0;color:#64748b}
-    .btn-outline-secondary:hover{background:#f8fafc;border-color:#cbd5e1;color:#334155}
-    .alert{border-radius:11px;border:none}
-    .ts-wrapper.single .ts-control{border-radius:9px}
-    .ts-dropdown{border-radius:9px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:9999}
-    .ts-dropdown .option{padding:.45rem .75rem;font-size:.865rem}
-    .ts-dropdown .option:hover,.ts-dropdown .option.active{background:var(--accent);color:#fff}
-    .ts-dropdown .create{color:var(--accent);font-weight:500}
-    .ts-control input{font-size:.865rem!important}
-    .input-group-text{border-color:#e2e8f0;background:#f8fafc}
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
-    <div class="brand"><div class="brand-dot"><i class="bi bi-shop"></i></div>Smart Mart</div>
-    <a href="{{ url_for('inventory.list_products') }}" class="btn btn-sm ms-auto" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px"><i class="bi bi-box-seam me-1"></i>Inventory</a>
-  </div>
+{% extends "base.html" %}
+{% block title %}{{ action }} Product — Smart Mart{% endblock %}
+{% block page_title %}{{ action }} Product{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}">Products</a></li>
+<li class="breadcrumb-item active">{{ action }}</li>
+{% endblock %}
 
-  <div class="container py-4" style="max-width:780px">
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<style>
+  .ts-wrapper.single .ts-control{border-radius:9px}
+  .ts-dropdown{border-radius:9px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:9999}
+  .ts-dropdown .option{padding:.45rem .75rem;font-size:.865rem}
+  .ts-dropdown .option:hover,.ts-dropdown .option.active{background:#6366f1;color:#fff}
+  .ts-dropdown .create{color:#6366f1;font-weight:500}
+  .ts-control input{font-size:.865rem!important}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:780px">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="alert alert-{{ category }} alert-dismissible fade show d-flex align-items-center gap-2">
@@ -78,9 +56,7 @@
                 {% endif %}
               </select>
               <div class="form-text text-muted">Search 200+ common items or type any custom name.</div>
-            </div>
-
-            <!-- SKU -->
+                        <!-- SKU -->
             <div class="col-md-4">
               <label class="form-label fw-medium">SKU / Barcode <span class="text-danger">*</span></label>
               <input type="text" class="form-control" name="sku"
@@ -411,5 +387,140 @@
     });
   }
   </script>
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+  const COMMON_PRODUCTS = [
+    "Basmati Rice","Sona Masoori Rice","Brown Rice","White Rice","Beaten Rice (Chiura)",
+    "Wheat Flour (Atta)","Maida","Semolina (Suji)","Corn Flour","Oats","Poha","Barley",
+    "Red Lentil (Masoor Dal)","Yellow Lentil (Moong Dal)","Black Lentil (Urad Dal)",
+    "Chickpeas (Chana)","Kidney Beans (Rajma)","Green Peas","Soybean",
+    "Mustard Oil","Sunflower Oil","Soybean Oil","Coconut Oil","Ghee","Dalda",
+    "Turmeric Powder","Red Chilli Powder","Coriander Powder","Cumin Seeds","Garam Masala",
+    "Black Pepper","Cardamom","Cinnamon","Bay Leaves","Fenugreek Seeds",
+    "Salt (Iodized)","Rock Salt","Vinegar","Soy Sauce","Tomato Ketchup",
+    "White Sugar","Brown Sugar","Jaggery (Gur)","Honey",
+    "Full Cream Milk","Toned Milk","Curd (Dahi)","Paneer","Butter","Cheese Slice",
+    "Cream","Condensed Milk","Milk Powder",
+    "Eggs (Dozen)","Chicken (Whole)","Chicken Breast","Mutton","Fish (Fresh)","Prawns",
+    "Tomato","Onion","Potato","Garlic","Ginger","Carrot","Cabbage","Cauliflower",
+    "Spinach","Brinjal","Bitter Gourd","Bottle Gourd","Pumpkin","Green Chilli",
+    "Capsicum","Cucumber","Radish","Beetroot","Mushroom","Corn",
+    "Banana","Apple","Mango","Orange","Papaya","Guava","Watermelon","Grapes",
+    "Pomegranate","Lemon","Pineapple","Strawberry",
+    "Mineral Water (500ml)","Mineral Water (1L)","Mineral Water (2L)",
+    "Coca Cola","Pepsi","Sprite","Fanta","7UP","Mountain Dew",
+    "Orange Juice","Apple Juice","Mango Juice","Mixed Fruit Juice",
+    "Green Tea","Black Tea","Coffee Powder","Nescafe","Horlicks","Bournvita","Complan",
+    "Bread (White)","Bread (Brown)","Biscuit (Marie)","Biscuit (Glucose)","Parle-G",
+    "Bourbon Biscuit","Oreo","Chips (Lays)","Kurkure","Popcorn","Peanuts",
+    "Cashew Nuts","Almonds","Raisins","Wai Wai Noodles","Maggi Noodles","Pasta",
+    "Dairy Milk Chocolate","KitKat","Munch","5 Star","Eclairs Toffee","Candy",
+    "Surf Excel","Ariel Detergent","Tide Detergent","Vim Bar","Vim Liquid",
+    "Harpic Toilet Cleaner","Lizol Floor Cleaner","Phenyl","Mosquito Coil","Hit Spray",
+    "Tissue Paper","Toilet Paper","Garbage Bags",
+    "Lux Soap","Dove Soap","Lifebuoy Soap","Dettol Soap",
+    "Head & Shoulders Shampoo","Pantene Shampoo","Dove Shampoo","Clinic Plus",
+    "Colgate Toothpaste","Pepsodent Toothpaste","Oral-B Toothbrush",
+    "Dettol Handwash","Lifebuoy Handwash","Savlon Antiseptic",
+    "Nivea Cream","Vaseline","Parachute Hair Oil","Whisper Pads","Stayfree Pads",
+    "Pampers Diapers","Huggies Diapers","Johnson Baby Powder","Cerelac",
+    "Ballpoint Pen","Pencil","Eraser","Notebook (A4)","Exercise Book","Marker Pen",
+    "AA Battery","AAA Battery","Phone Charger","USB Cable","LED Bulb (9W)","LED Bulb (15W)",
+    "Paracetamol","Aspirin","Antacid","ORS Sachet","Vitamin C","Cough Syrup",
+    "Bandage","Cotton","Antiseptic Cream",
+    "Cigarette","Lighter","Match Box","Candle","Incense Sticks (Agarbatti)"
+  ];
+
+  // ── Product Name: Tom Select on a <select>, create=true ─────────────────
+  const nameSel = new TomSelect('#productNameSelect', {
+    create: true,
+    createOnBlur: true,
+    persist: false,
+    maxOptions: 20,
+    placeholder: 'Type or search product name…',
+    options: COMMON_PRODUCTS.map(v => ({ value: v, text: v })),
+    {% if product %}items: [{{ product.name | tojson }}],{% endif %}
+    render: {
+      option_create(data, escape) {
+        return `<div class="create">✏️ Add "<strong>${escape(data.input)}</strong>" as new product</div>`;
+      }
+    },
+    onChange(val) {
+      document.getElementById('nameHidden').value = val || '';
+    }
+  });
+  // Set initial value
+  document.getElementById('nameHidden').value = nameSel.getValue() || '';
+
+  // ── Category: Tom Select with create ────────────────────────────────────
+  const existingCats = new Set([...document.querySelectorAll('#categorySelect option')]
+    .map(o => o.value).filter(Boolean));
+
+  const catSel = new TomSelect('#categorySelect', {
+    create: true,
+    createOnBlur: true,
+    persist: false,
+    placeholder: 'Search or type new category…',
+    render: {
+      option_create(data, escape) {
+        return `<div class="create">➕ Create category "<strong>${escape(data.input)}</strong>"</div>`;
+      }
+    },
+    onChange(val) {
+      if (val && !existingCats.has(val)) {
+        // New category — put in new_category, clear category
+        document.getElementById('categoryHidden').value = '';
+        document.getElementById('newCategoryHidden').value = val;
+      } else {
+        document.getElementById('categoryHidden').value = val || '';
+        document.getElementById('newCategoryHidden').value = '';
+      }
+    }
+  });
+  // Set initial
+  const initCat = {{ (product.category | tojson) if product and product.category else 'null' }};
+  if (initCat) {
+    document.getElementById('categoryHidden').value = initCat;
+  }
+
+  // ── Supplier: Tom Select searchable ─────────────────────────────────────
+  new TomSelect('#supplierSelect', {
+    allowEmptyOption: true,
+    placeholder: 'Search supplier…'
+  });
+
+  // ── On submit: validate name is filled ──────────────────────────────────
+  document.getElementById('productForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('nameHidden').value.trim();
+    if (!name) {
+      e.preventDefault();
+      alert('Please enter a product name.');
+      nameSel.focus();
+    }
+  });
+
+  // ── Image preview ─────────────────────────────────────────────────────
+  const imgInput = document.getElementById('productImageInput');
+  if (imgInput) {
+    imgInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        // Update or create preview
+        let preview = document.getElementById('imagePreview');
+        let box = document.getElementById('imagePreviewBox');
+        if (preview) {
+          preview.src = e.target.result;
+        } else if (box) {
+          box.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;">`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  </script>
+{% endblock %}
