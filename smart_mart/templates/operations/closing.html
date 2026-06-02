@@ -1,47 +1,154 @@
 {% extends "base.html" %}
-{% block title %}Daily Closing - Smart Mart{% endblock %}
-{% block page_title %}Daily Closing{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Daily Closing</li>{% endblock %}
+{% block title %}Day Close — Smart Mart{% endblock %}
+{% block page_title %}Day Close{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Day Close</li>
+{% endblock %}
+
+{% block head %}
+<style>
+  .session-card{border-radius:16px;border:none;overflow:hidden}
+  .open-badge{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-left:4px solid #10b981;border-radius:12px;padding:.75rem 1rem}
+  .variance-ok{color:#16a34a;font-weight:700}
+  .variance-bad{color:#dc2626;font-weight:700}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row g-3">
+
+{# ── Active Session Banner ─────────────────────────────────────── #}
+{% if session %}
+<div class="open-badge d-flex align-items-center gap-3 mb-4">
+  <i class="bi bi-safe2 text-success" style="font-size:1.5rem"></i>
+  <div style="flex:1">
+    <div class="fw-bold text-success">Cash Session Open</div>
+    <div class="text-muted small">
+      Opened {{ session.opened_at.strftime('%d %b %Y at %H:%M') }} ·
+      Opening cash: <strong>NPR {{ "%.2f"|format(session.opening_cash|float) }}</strong>
+      {% if session.expected_cash %}· Expected: <strong>NPR {{ "%.2f"|format(session.expected_cash|float) }}</strong>{% endif %}
+    </div>
+  </div>
+  <div class="text-end">
+    <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em">Duration</div>
+    <div class="fw-bold text-success" id="sessionDuration">—</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  {# ── Left: Open / Close Form ──────────────────────────────────── #}
   <div class="col-lg-5">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">{{ 'Close Active Session' if session else 'Open Cash Session' }}</div>
-      <div class="card-body">
-        <form method="post" class="row g-3">
+    <div class="card shadow-sm session-card">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3"
+           style="background:{% if session %}linear-gradient(135deg,#fef2f2,#fee2e2){% else %}linear-gradient(135deg,#f0fdf4,#dcfce7){% endif %}">
+        <i class="bi bi-{% if session %}safe2 text-danger{% else %}safe text-success{% endif %}"></i>
+        {{ 'Close Cash Session' if session else 'Open Cash Session' }}
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% if session %}
           <input type="hidden" name="action" value="close">
           <input type="hidden" name="session_id" value="{{ session.id }}">
-          <div class="col-12"><div class="text-muted small">Opened at {{ session.opened_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
-          <div class="col-12"><input type="number" step="0.01" min="0" name="closing_cash" class="form-control" placeholder="Closing cash counted" required></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Closing Cash Counted (NPR) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">NPR</span>
+              <input type="number" step="0.01" min="0" name="closing_cash" class="form-control form-control-lg"
+                     placeholder="0.00" required autofocus id="closingCashInput">
+            </div>
+            {% if session.expected_cash %}
+            <div class="mt-2 text-muted small" id="variancePreview">
+              Expected: NPR {{ "%.2f"|format(session.expected_cash|float) }} · Variance: <span id="varVal">—</span>
+            </div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Notes</label>
+            <textarea name="notes" rows="2" class="form-control" placeholder="e.g. Short by NPR 50 (change error)"></textarea>
+          </div>
+          <button class="btn btn-danger w-100 fw-semibold" type="submit">
+            <i class="bi bi-safe2 me-2"></i>Close Session & End Day
+          </button>
           {% else %}
           <input type="hidden" name="action" value="open">
-          <div class="col-12"><input type="number" step="0.01" min="0" name="opening_cash" class="form-control" placeholder="Opening cash" required></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Opening Cash (NPR) <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">NPR</span>
+              <input type="number" step="0.01" min="0" name="opening_cash" class="form-control form-control-lg"
+                     placeholder="0.00" required autofocus>
+            </div>
+            <div class="text-muted small mt-1">Count the float in the till before opening.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Notes</label>
+            <textarea name="notes" rows="2" class="form-control" placeholder="Optional opening notes"></textarea>
+          </div>
+          <button class="btn btn-success w-100 fw-semibold" type="submit">
+            <i class="bi bi-safe me-2"></i>Open Cash Session
+          </button>
           {% endif %}
-          <div class="col-12"><textarea name="notes" rows="3" class="form-control" placeholder="Notes"></textarea></div>
-          <div class="col-12"><button class="btn btn-primary" type="submit">{{ 'Close Session' if session else 'Open Session' }}</button></div>
         </form>
       </div>
     </div>
+
+    {# ── Quick Day Stats ──────────────────────────────────────────── #}
+    <div class="card shadow-sm mt-3">
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+        <i class="bi bi-graph-up text-primary"></i> Today's Summary
+      </div>
+      <div class="card-body p-0">
+        <div id="daySummary" class="p-3 text-muted small text-center">
+          <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading…
+        </div>
+      </div>
+    </div>
   </div>
+
+  {# ── Right: Session History ────────────────────────────────────── #}
   <div class="col-lg-7">
     <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Recent Sessions</div>
+      <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+        <i class="bi bi-clock-history text-muted"></i> Session History
+        <span class="badge bg-secondary ms-auto rounded-pill" style="font-size:.68rem">{{ sessions|length }}</span>
+      </div>
       <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead><tr><th>Status</th><th>Opened</th><th class="text-end">Opening</th><th class="text-end">Expected</th><th class="text-end">Closing</th><th class="text-end">Variance</th></tr></thead>
+        <table class="table table-hover mb-0 align-middle" style="font-size:.83rem">
+          <thead style="background:#f8fafc">
+            <tr>
+              <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Status</th>
+              <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Opened</th>
+              <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Opening</th>
+              <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Expected</th>
+              <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Closing</th>
+              <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Variance</th>
+            </tr>
+          </thead>
           <tbody>
             {% for s in sessions %}
+            {% set var = (s.variance or 0)|float %}
             <tr>
-              <td><span class="badge {% if s.status == 'open' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ s.status }}</span></td>
-              <td>{{ s.opened_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="ps-3">
+                <span class="badge {% if s.status == 'open' %}bg-warning text-dark{% else %}bg-success{% endif %} rounded-pill"
+                      style="font-size:.68rem">
+                  {% if s.status == 'open' %}🔓 Open{% else %}✅ Closed{% endif %}
+                </span>
+              </td>
+              <td class="text-muted">{{ s.opened_at.strftime('%d %b %y %H:%M') }}</td>
               <td class="text-end">NPR {{ "%.2f"|format(s.opening_cash|float) }}</td>
-              <td class="text-end">NPR {{ "%.2f"|format((s.expected_cash or 0)|float) }}</td>
-              <td class="text-end">NPR {{ "%.2f"|format((s.closing_cash or 0)|float) }}</td>
-              <td class="text-end {% if s.variance and s.variance != 0 %}text-warning fw-semibold{% endif %}">NPR {{ "%.2f"|format((s.variance or 0)|float) }}</td>
+              <td class="text-end text-muted">NPR {{ "%.2f"|format((s.expected_cash or 0)|float) }}</td>
+              <td class="text-end">{% if s.closing_cash %}NPR {{ "%.2f"|format(s.closing_cash|float) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+              <td class="text-end {% if var > 0 %}variance-ok{% elif var < 0 %}variance-bad{% else %}text-muted{% endif %}">
+                {% if var != 0 %}{{ '+' if var > 0 }}NPR {{ "%.2f"|format(var) }}{% else %}—{% endif %}
+              </td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="text-center text-muted py-4">No cash sessions yet.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-5 small">
+              <i class="bi bi-safe2 d-block mb-2" style="font-size:2rem;opacity:.3"></i>
+              No cash sessions yet. Open your first session above.
+            </td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -49,4 +156,52 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live session duration
+{% if session %}
+const openedAt = new Date('{{ session.opened_at.isoformat() }}Z');
+function updateDuration() {
+  const diff = Math.floor((Date.now() - openedAt) / 1000);
+  const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60);
+  document.getElementById('sessionDuration').textContent = `${h}h ${m}m`;
+}
+updateDuration(); setInterval(updateDuration, 30000);
+{% endif %}
+
+// Live variance preview
+{% if session and session.expected_cash %}
+const expected = {{ session.expected_cash|float }};
+document.getElementById('closingCashInput')?.addEventListener('input', function() {
+  const val = parseFloat(this.value) || 0;
+  const variance = val - expected;
+  const el = document.getElementById('varVal');
+  el.textContent = (variance >= 0 ? '+' : '') + 'NPR ' + variance.toFixed(2);
+  el.className = variance >= 0 ? 'variance-ok' : 'variance-bad';
+});
+{% endif %}
+
+// Load today's summary
+fetch('/api/sales-trend?days=1')
+  .then(r => r.json())
+  .then(data => {
+    const amount = (data.data || []).reduce((a,b) => a + (parseFloat(b)||0), 0);
+    document.getElementById('daySummary').innerHTML = `
+      <div class="row g-2 text-center">
+        <div class="col-6">
+          <div class="fw-bold text-success" style="font-size:1.1rem">NPR ${amount.toLocaleString('en-NP', {maximumFractionDigits:0})}</div>
+          <div class="text-muted" style="font-size:.72rem">Today's Revenue</div>
+        </div>
+        <div class="col-6">
+          <div class="fw-bold text-primary" style="font-size:1.1rem">${(data.labels||[]).length}</div>
+          <div class="text-muted" style="font-size:.72rem">Data Points</div>
+        </div>
+      </div>`;
+  }).catch(() => {
+    document.getElementById('daySummary').innerHTML =
+      '<div class="text-muted small">Sales data not available</div>';
+  });
+</script>
 {% endblock %}
