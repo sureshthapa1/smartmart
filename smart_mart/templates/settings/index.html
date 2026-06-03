@@ -13,6 +13,7 @@
       </div>
       <div class="card-body p-4">
         <form method="post" action="{{ url_for('settings.index') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
           <h6 class="fw-semibold text-uppercase text-muted mb-3" style="font-size:.75rem;letter-spacing:.08em;">
             <i class="bi bi-image me-1"></i>Shop Logo
