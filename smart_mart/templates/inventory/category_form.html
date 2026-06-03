@@ -13,6 +13,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-tags me-2 text-primary"></i>{{ 'Edit' if category else 'New' }} Category</div>
       <div class="card-body p-4">
         <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-4">
             <label class="form-label">Category Name <span class="text-danger">*</span></label>
             <input type="text" name="name" class="form-control" value="{{ category.name if category else '' }}" required autofocus placeholder="e.g. Beverages">
