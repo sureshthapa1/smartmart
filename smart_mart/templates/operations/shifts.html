@@ -9,6 +9,7 @@
       <div class="card-header fw-semibold">{{ 'Close Current Shift' if open_shift else 'Open New Shift' }}</div>
       <div class="card-body">
         <form method="post" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           {% if open_shift %}
           <input type="hidden" name="action" value="close">
           <input type="hidden" name="shift_id" value="{{ open_shift.id }}">
