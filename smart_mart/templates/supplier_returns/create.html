@@ -9,6 +9,7 @@
 <div class="row justify-content-center">
   <div class="col-lg-9">
     <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="card mb-3">
         <div class="card-header"><i class="bi bi-truck me-2 text-primary"></i>Return Details</div>
         <div class="card-body">
