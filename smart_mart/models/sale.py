@@ -36,6 +36,7 @@ class Sale(db.Model):
     payment_method = db.Column(db.String(20), nullable=False, default="cash")
     sale_type = db.Column(db.String(20), nullable=False, default="regular")
     discount_amount = db.Column(db.Numeric(10, 2), nullable=True, default=0)
+    commission_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     discount_note = db.Column(db.String(120), nullable=True)
     credit_due_date = db.Column(db.Date, nullable=True)   # collection reminder for credit/udharo
     credit_collected = db.Column(db.Boolean, nullable=False, default=False)
