@@ -15,20 +15,62 @@
   </a>
 </div>
 
-<div class="card">
+{% if takes %}
+<div class="row g-3 mb-4">
+  {% set completed = takes|selectattr('status','equalto','completed')|list %}
+  {% set in_progress = takes|selectattr('status','equalto','in_progress')|list %}
+  {% set total_variances = takes|sum(attribute='items_with_variance'|length) %}
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Completed</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#14532d">{{ completed|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">In Progress</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#78350f">{{ in_progress|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Total Takes</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#1e3a8a">{{ takes|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:{{ 'linear-gradient(135deg,#fef2f2,#fecaca)' if takes[-1].items_with_variance|length > 0 else 'linear-gradient(135deg,#f0fdf4,#dcfce7)' }};border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Last Variances</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:{{ '#7f1d1d' if takes[-1].items_with_variance|length > 0 else '#14532d' }}">
+          {{ takes[-1].items_with_variance|length if takes else 0 }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0">
-        <thead>
+        <thead style="background:#f8fafc">
           <tr>
-            <th>Reference</th>
-            <th>Status</th>
-            <th>Products</th>
-            <th>Variances</th>
-            <th>Created By</th>
-            <th>Date</th>
-            <th>Completed</th>
-            <th></th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Reference</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Status</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Products</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Variances</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Created By</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Date</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Completed</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem"></th>
           </tr>
         </thead>
         <tbody>
