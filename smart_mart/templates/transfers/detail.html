@@ -46,9 +46,11 @@
       <div class="card-body d-flex flex-column gap-2">
         {% if transfer.status == 'pending' %}
         <form method="post" action="{{ url_for('transfers.complete_transfer', transfer_id=transfer.id) }}" onsubmit="return confirm('Complete this transfer? Stock will be deducted.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-success w-100" type="submit"><i class="bi bi-check-circle me-1"></i>Complete Transfer</button>
         </form>
         <form method="post" action="{{ url_for('transfers.cancel_transfer', transfer_id=transfer.id) }}" onsubmit="return confirm('Cancel this transfer?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-outline-danger w-100" type="submit"><i class="bi bi-x-circle me-1"></i>Cancel</button>
         </form>
         {% else %}
