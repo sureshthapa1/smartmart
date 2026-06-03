@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user
 from sqlalchemy import func
 
-from ...extensions import db
+from ...extensions import db, limiter
 from ...models.sale import Sale
 from ...services.decorators import login_required, admin_required
 
@@ -858,6 +858,7 @@ def global_search():
 # ── POS Cart Validator ────────────────────────────────────────────────────────
 
 @api_bp.route("/validate-cart", methods=["POST"])
+@limiter.limit("60 per minute")
 @login_required
 def validate_cart():
     """Pre-submission cart validation using AI invoice detector.
@@ -882,6 +883,7 @@ def validate_cart():
 # ── Expense Auto-Categorizer ──────────────────────────────────────────────────
 
 @api_bp.route("/suggest-expense-category", methods=["POST"])
+@limiter.limit("30 per minute")
 @login_required
 def suggest_expense_category():
     """Return AI-suggested category + icon for an expense note.
