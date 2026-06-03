@@ -59,6 +59,7 @@
       <input type="text" id="riskSearch" class="form-control form-control-sm" placeholder="Search customer…" style="width:200px">
       <form method="post" action="{{ url_for('operations.credit_risk_recalculate') }}"
             onsubmit="return confirm('Recalculate all risk scores?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-sm btn-outline-secondary">
           <i class="bi bi-arrow-clockwise me-1"></i>Recalculate All
         </button>
@@ -160,6 +161,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post" action="{{ url_for('operations.credit_risk_override') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <p class="text-muted small mb-3">Customer: <strong id="overrideCustomerLabel"></strong></p>
           <input type="hidden" name="customer_name" id="overrideCustomerName">
