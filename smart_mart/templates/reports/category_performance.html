@@ -6,6 +6,9 @@
 <li class="breadcrumb-item active">Category Performance</li>
 {% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endblock %}
 {% block content %}
 <div class="card shadow-sm mb-4">
   <div class="card-body py-3">
@@ -27,36 +30,89 @@
   </div>
 </div>
 
+{% if rows %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <i class="bi bi-bar-chart text-primary"></i> Revenue by Category
+  </div>
+  <div class="card-body pb-3"><canvas id="catChart" height="80"></canvas></div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <i class="bi bi-grid-3x3-gap text-primary"></i> Category Breakdown
+    <a href="?start_date={{ start_date }}&end_date={{ end_date }}&export=csv"
+       class="btn btn-outline-success btn-sm ms-auto" style="font-size:.73rem">
+      <i class="bi bi-download me-1"></i>CSV
+    </a>
+  </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead>
+    <table class="table table-hover mb-0 align-middle" style="font-size:.84rem">
+      <thead style="background:#f8fafc">
         <tr>
-          <th>Category</th>
-          <th class="text-end">Qty Sold</th>
-          <th class="text-end">Revenue (NPR)</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Category</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Units Sold</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Revenue (NPR)</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Share</th>
         </tr>
       </thead>
       <tbody>
+        {% set total_rev = rows|sum(attribute='revenue') %}
         {% for row in rows %}
+        {% set share = (row.revenue / total_rev * 100) if total_rev else 0 %}
         <tr>
-          <td>
-            <span class="badge rounded-pill" style="background:#eef2ff;color:#4f46e5;font-size:.8rem;">
+          <td class="ps-3">
+            <span class="badge rounded-pill" style="background:#eef2ff;color:#4f46e5;font-size:.78rem">
               <i class="bi bi-tag me-1"></i>{{ row.category }}
             </span>
           </td>
-          <td class="text-end">{{ row.qty_sold }}</td>
-          <td class="text-end fw-semibold">{{ "%.2f"|format(row.revenue) }}</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="3" class="text-center text-muted py-5">
-            <i class="bi bi-tags fs-2 d-block mb-2"></i>No results found.
+          <td class="text-end fw-medium">{{ row.qty_sold }}</td>
+          <td class="text-end fw-semibold text-success">{{ "{:,.0f}".format(row.revenue) }}</td>
+          <td style="min-width:120px">
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:6px;border-radius:3px">
+                <div class="progress-bar" style="width:{{ share|round(1) }}%;background:#6366f1"></div>
+              </div>
+              <span class="text-muted" style="font-size:.72rem;white-space:nowrap">{{ share|round(1) }}%</span>
+            </div>
           </td>
         </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-5">
+          <i class="bi bi-tags d-block mb-2" style="font-size:2rem;opacity:.3"></i>No data for this period.
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if rows %}
+<script>
+new Chart(document.getElementById('catChart'), {
+  type: 'bar',
+  data: {
+    labels: [{% for r in rows %}"{{ r.category }}"{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+      label: 'Revenue (NPR)',
+      data: [{% for r in rows %}{{ r.revenue|round(0) }}{% if not loop.last %},{% endif %}{% endfor %}],
+      backgroundColor: '#6366f133',
+      borderColor: '#6366f1',
+      borderWidth: 2,
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#94a3b8', font: { size: 11 } } },
+      x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 11 } } }
+    }
+  }
+});
+</script>
+{% endif %}
 {% endblock %}
