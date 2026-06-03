@@ -12,6 +12,7 @@
       <div class="card-header"><i class="bi bi-clipboard-check me-2 text-primary"></i>Start Stock Take</div>
       <div class="card-body p-4">
         <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
             <label class="form-label">Scope</label>
             <div class="d-flex gap-3">
