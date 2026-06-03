@@ -144,6 +144,7 @@
           <form method="post" action="{{ url_for('inventory.delete_category', cat_id=c.cat.id) }}"
                 class="d-inline"
                 onsubmit="return confirm('Delete {{ c.cat.name }}? Products will become uncategorized.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
               <i class="bi bi-trash"></i>
             </button>
