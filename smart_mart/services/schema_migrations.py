@@ -320,6 +320,22 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_purchase_items_product_id ON purchase_items(product_id)"),
             ),
         ),
+        (
+            "2026_06_03_user_commission_rate",
+            "Add commission_rate column to users table for staff commission tracking.",
+            lambda conn: _safe_exec(
+                conn,
+                "ALTER TABLE users ADD COLUMN commission_rate NUMERIC(5,2) NOT NULL DEFAULT 0.00"
+            ),
+        ),
+        (
+            "2026_06_03_sale_commission_amount",
+            "Add commission_amount column to sales table.",
+            lambda conn: _safe_exec(
+                conn,
+                "ALTER TABLE sales ADD COLUMN commission_amount NUMERIC(10,2) NOT NULL DEFAULT 0.00"
+            ),
+        ),
     ]
 
 
