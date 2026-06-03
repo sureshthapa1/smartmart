@@ -3,28 +3,69 @@
 {% block page_title %}Stock Transfers{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Stock Transfers</li>{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-end mb-3">
-  <a href="{{ url_for('transfers.create_transfer') }}" class="btn btn-primary btn-sm"><i class="bi bi-arrow-left-right me-1"></i>New Transfer</a>
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Stock Transfers</div>
+    <div class="page-header-sub">Move stock between branches</div>
+  </div>
+  <a href="{{ url_for('transfers.create_transfer') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-arrow-left-right me-1"></i>New Transfer
+  </a>
 </div>
-<div class="card">
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <i class="bi bi-arrow-left-right text-primary"></i> All Transfers
+    <span class="badge bg-secondary ms-auto rounded-pill" style="font-size:.68rem">{{ transfers|length }}</span>
+  </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead><tr><th>#</th><th>From</th><th>To</th><th>Items</th><th>Status</th><th>Created</th><th></th></tr></thead>
+    <table class="table table-hover mb-0 align-middle" style="font-size:.84rem">
+      <thead style="background:#f8fafc">
+        <tr>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">#</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">From</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">To</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Items</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Status</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Date</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem"></th>
+        </tr>
+      </thead>
       <tbody>
         {% for t in transfers %}
         <tr>
-          <td class="fw-semibold">#{{ t.id }}</td>
-          <td>{{ t.from_branch.name }}</td>
-          <td>{{ t.to_branch.name }}</td>
-          <td>{{ t.total_items }} units</td>
+          <td class="ps-3 fw-semibold text-muted">#{{ t.id }}</td>
           <td>
-            <span class="badge {% if t.status == 'completed' %}bg-success{% elif t.status == 'cancelled' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ t.status }}</span>
+            <span class="badge rounded-pill" style="background:#ede9fe;color:#5b21b6;font-size:.75rem">
+              <i class="bi bi-building me-1"></i>{{ t.from_branch.name }}
+            </span>
           </td>
-          <td class="text-muted small">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td><a href="{{ url_for('transfers.transfer_detail', transfer_id=t.id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+          <td>
+            <span class="badge rounded-pill" style="background:#dcfce7;color:#166534;font-size:.75rem">
+              <i class="bi bi-building-check me-1"></i>{{ t.to_branch.name }}
+            </span>
+          </td>
+          <td><span class="badge bg-secondary bg-opacity-15 text-secondary">{{ t.total_items }} units</span></td>
+          <td>
+            <span class="badge rounded-pill
+              {% if t.status == 'completed' %}bg-success
+              {% elif t.status == 'cancelled' %}bg-secondary
+              {% else %}bg-warning text-dark{% endif %}"
+              style="font-size:.7rem">
+              {% if t.status == 'completed' %}✅{% elif t.status == 'cancelled' %}❌{% else %}🔄{% endif %}
+              {{ t.status|title }}
+            </span>
+          </td>
+          <td class="text-muted small">{{ t.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td>
+            <a href="{{ url_for('transfers.transfer_detail', transfer_id=t.id) }}"
+               class="btn btn-sm btn-outline-primary py-0 px-3">View</a>
+          </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No transfers yet.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-5">
+          <i class="bi bi-arrow-left-right d-block mb-2" style="font-size:2rem;opacity:.3"></i>
+          No transfers yet. Create one to move stock between branches.
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
