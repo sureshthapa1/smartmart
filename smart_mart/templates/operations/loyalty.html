@@ -103,6 +103,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-gift me-2 text-warning"></i>Manual Redeem Points</div>
       <div class="card-body">
         <form method="post" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-12">
             <label class="form-label small text-muted">Customer Name</label>
             <input name="customer_name" class="form-control" placeholder="Enter customer name" required list="customerList">
