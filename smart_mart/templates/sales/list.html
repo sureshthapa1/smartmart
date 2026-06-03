@@ -99,6 +99,7 @@
               <a href="{{ url_for('sales.thermal_receipt', sale_id=sale.id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Receipt"><i class="bi bi-receipt"></i></a>
               {% if current_user.role == 'admin' %}
               <form method="post" action="{{ url_for('sales.delete_sale', sale_id=sale.id) }}" class="d-inline" onsubmit="return confirm('Delete Sale #{{ sale.id }}? Stock will be reversed.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-arrow-counterclockwise"></i></button>
               </form>
               {% endif %}
