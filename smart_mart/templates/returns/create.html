@@ -10,6 +10,7 @@
 <div class="row g-3">
   <div class="col-lg-8">
     <form method="post" class="card shadow-sm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="card-header fw-semibold">
         <i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Return Items for Sale #{{ sale.id }}
       </div>
