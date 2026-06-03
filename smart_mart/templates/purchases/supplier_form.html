@@ -13,6 +13,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-building me-2 text-primary"></i>{{ 'Edit' if supplier else 'New' }} Supplier</div>
       <div class="card-body p-4">
         <form method="post" action="{{ url_for('purchases.edit_supplier', supplier_id=supplier.id) if supplier else url_for('purchases.create_supplier') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label">Supplier Name <span class="text-danger">*</span></label>
