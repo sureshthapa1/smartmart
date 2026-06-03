@@ -1,25 +1,118 @@
 {% extends "base.html" %}
-{% block title %}Reorder Suggestions - Smart Mart{% endblock %}
+{% block title %}Reorder Suggestions — Smart Mart{% endblock %}
 {% block page_title %}Reorder Suggestions{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Reorder Suggestions</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Reorder Suggestions</li>
+{% endblock %}
 {% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Reorder Suggestions</div>
+    <div class="page-header-sub">Products below reorder level based on last 30 days of sales velocity</div>
+  </div>
+  <a href="{{ url_for('purchases.create_purchase') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-cart-plus me-1"></i>Create Purchase Order
+  </a>
+</div>
+
+{% if suggestions %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#fef2f2,#fecaca);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Need Reorder</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#7f1d1d">{{ suggestions|length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Total Units Needed</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#78350f">{{ suggestions|sum(attribute='suggested_qty') }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#ecfeff,#cffafe);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Total Sold (30d)</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#155e75">{{ suggestions|sum(attribute='sold_recently') }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm h-100" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:none;border-radius:14px">
+      <div class="card-body p-3 text-center">
+        <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Est. Days Cover</div>
+        <div class="fw-bold" style="font-size:1.8rem;color:#14532d">
+          {{ ((suggestions|sum(attribute='suggested_qty')) / ([suggestions|sum(attribute='sold_recently'), 1]|max) * 30)|int }}d
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm">
-  <div class="card-header fw-semibold">Suggested Reorders</div>
+  <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">
+    <i class="bi bi-cart-plus text-danger"></i> Products to Reorder
+    {% if suggestions %}
+    <span class="badge bg-danger ms-1 rounded-pill" style="font-size:.68rem">{{ suggestions|length }}</span>
+    {% endif %}
+  </div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead><tr><th>Product</th><th class="text-end">In Stock</th><th class="text-end">Reorder Level</th><th class="text-end">Sold 30d</th><th class="text-end">Suggested Qty</th></tr></thead>
-      <tbody>
-      {% for row in suggestions %}
+    <table class="table table-hover mb-0 align-middle" style="font-size:.84rem">
+      <thead style="background:#f8fafc">
         <tr>
-          <td>{{ row.product.name }}</td>
-          <td class="text-end">{{ row.product.quantity }}</td>
-          <td class="text-end">{{ row.profile.reorder_level }}</td>
-          <td class="text-end">{{ row.sold_recently }}</td>
-          <td class="text-end fw-semibold {% if row.suggested_qty > 0 %}text-danger{% endif %}">{{ row.suggested_qty }}</td>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Product</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">In Stock</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Reorder Level</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Sold (30d)</th>
+          <th class="text-end" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Suggest Qty</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Urgency</th>
+          <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;font-weight:700;padding:.6rem 1rem">Action</th>
         </tr>
-      {% else %}
-        <tr><td colspan="5" class="text-center text-muted py-4">No reorder suggestions right now.</td></tr>
-      {% endfor %}
+      </thead>
+      <tbody>
+        {% for row in suggestions %}
+        {% set urgency = 'critical' if row.product.quantity == 0 else ('high' if row.product.quantity < row.profile.reorder_level * 0.3 else 'medium') %}
+        <tr>
+          <td class="ps-3">
+            <div class="fw-semibold">{{ row.product.name }}</div>
+            <div class="text-muted" style="font-size:.72rem">{{ row.product.sku }}</div>
+          </td>
+          <td class="text-end">
+            <span class="badge {% if row.product.quantity == 0 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+              {{ row.product.quantity }}
+            </span>
+          </td>
+          <td class="text-end text-muted">{{ row.profile.reorder_level }}</td>
+          <td class="text-end fw-medium">{{ row.sold_recently }}</td>
+          <td class="text-end fw-bold text-danger">{{ row.suggested_qty }}</td>
+          <td>
+            <span class="badge rounded-pill
+              {% if urgency == 'critical' %}bg-danger
+              {% elif urgency == 'high' %}bg-warning text-dark
+              {% else %}bg-info text-white{% endif %}"
+              style="font-size:.68rem">
+              {% if urgency == 'critical' %}🚨 Critical{% elif urgency == 'high' %}⚠️ High{% else %}📦 Medium{% endif %}
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('purchases.create_purchase') }}?product_id={{ row.product.id }}&qty={{ row.suggested_qty }}"
+               class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:.75rem">
+              <i class="bi bi-cart-plus me-1"></i>Order
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-5">
+          <i class="bi bi-check-circle d-block mb-2 text-success" style="font-size:2rem"></i>
+          No reorder suggestions right now. All products are well stocked!
+        </td></tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
