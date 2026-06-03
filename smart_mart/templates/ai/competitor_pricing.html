@@ -10,6 +10,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-plus-circle me-2 text-primary"></i>Record Competitor Price</div>
       <div class="card-body p-4">
         <form method="post" action="{{ url_for('ai.add_competitor_price') }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="col-12">
             <label class="form-label">Product <span class="text-danger">*</span></label>
             <select name="product_id" class="form-select" required>
@@ -62,6 +63,7 @@
               <td class="text-muted small">{{ latest.observed_at.strftime('%Y-%m-%d') }}</td>
               <td>
                 <form method="post" action="{{ url_for('ai.get_price_suggestion', product_id=p.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-sm btn-outline-primary" type="submit" title="Get AI suggestion">
                     <i class="bi bi-stars"></i> AI Suggest
                   </button>
