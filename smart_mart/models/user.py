@@ -10,6 +10,8 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(10), nullable=False, default="staff")  # 'admin' | 'staff'
+    commission_rate = db.Column(db.Numeric(5, 2), default=0.00, nullable=False)
+    # Commission rate as percentage (e.g. 2.5 = 2.5% of each sale amount)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
