@@ -59,6 +59,7 @@
       </div>
       <div class="card-body">
         <form method="post" id="labelForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div style="max-height:420px;overflow-y:auto" class="mb-3">
             {% for p in products %}
             <div class="form-check mb-1">
