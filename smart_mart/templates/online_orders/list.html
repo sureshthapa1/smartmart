@@ -110,6 +110,7 @@
               {% if current_user.role == 'admin' %}
               <form method="post" action="{{ url_for('online_orders.delete_order', order_id=order.id) }}"
                     class="d-inline" onsubmit="return confirm('Delete this order?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
               </form>
               {% endif %}
