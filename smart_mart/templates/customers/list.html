@@ -133,6 +133,7 @@
                 </a>
                 <form method="post" action="{{ url_for('customers.delete_customer', customer_id=c.id) }}"
                       class="d-inline" onsubmit="return confirm('Delete {{ c.name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                     <i class="bi bi-trash"></i>
                   </button>
