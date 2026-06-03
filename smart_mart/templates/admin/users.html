@@ -39,6 +39,7 @@
               <button class="btn btn-sm btn-outline-warning" title="Reset Password" data-bs-toggle="modal" data-bs-target="#resetModal{{ u.id }}"><i class="bi bi-key"></i></button>
               <a href="{{ url_for('admin.edit_permissions', user_id=u.id) }}" class="btn btn-sm btn-outline-secondary" title="Permissions"><i class="bi bi-shield-lock"></i></a>
               <form method="post" action="{{ url_for('admin.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Delete {{ u.username }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
               </form>
             </div>
@@ -47,6 +48,7 @@
         <div class="modal fade" id="resetModal{{ u.id }}" tabindex="-1">
           <div class="modal-dialog modal-sm">
             <form method="post" action="{{ url_for('admin.reset_password', user_id=u.id) }}" class="modal-content">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <div class="modal-header"><h6 class="modal-title fw-bold">Reset Password — {{ u.username }}</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
               <div class="modal-body">
                 <input type="password" class="form-control" name="new_password" required minlength="6" placeholder="New password (min 6 chars)">
