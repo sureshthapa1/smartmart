@@ -4,6 +4,7 @@
 {% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('transfers.list_transfers') }}" class="text-decoration-none">Transfers</a></li><li class="breadcrumb-item active">Create</li>{% endblock %}
 {% block content %}
 <form method="post" id="transferForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="row g-3 mb-3">
     <div class="col-md-4">
       <label class="form-label">From Branch <span class="text-danger">*</span></label>
