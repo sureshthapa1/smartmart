@@ -13,6 +13,7 @@
         {% set profile = profiles[product.id] %}
         <tr>
           <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="product_id" value="{{ product.id }}">
             <td>{{ product.name }}</td>
             <td><input name="barcode" class="form-control form-control-sm" value="{{ profile.barcode or '' }}"></td>
