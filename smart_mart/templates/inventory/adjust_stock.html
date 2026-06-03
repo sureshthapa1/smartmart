@@ -40,6 +40,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-arrow-left-right me-2 text-primary"></i>Stock Adjustment</div>
       <div class="card-body p-4">
         <form method="post" action="{{ url_for('inventory.adjust_stock', product_id=product.id) }}" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-4">
             <label class="form-label">Direction</label>
             <div class="row g-3">
