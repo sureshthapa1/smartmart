@@ -119,6 +119,7 @@
               <a href="{{ url_for('inventory.product_variants', product_id=p.id) }}" class="btn btn-sm btn-outline-secondary" title="Variants"><i class="bi bi-collection"></i></a>
               <a href="{{ url_for('ai.product_analysis', product_id=p.id) }}" class="btn btn-sm btn-outline-info" title="AI Analysis"><i class="bi bi-robot"></i></a>
               <form method="post" action="{{ url_for('inventory.delete_product', product_id=p.id) }}" class="d-inline" onsubmit="return confirm('Delete {{ p.name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
               </form>
               {% endif %}
