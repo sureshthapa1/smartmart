@@ -235,6 +235,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="post" action="{{ url_for('operations.suppliers') }}" id="payForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-header">
           <h5 class="modal-title" id="payModalLabel">
             <i class="bi bi-cash-coin text-primary me-2"></i>Record Supplier Payment
