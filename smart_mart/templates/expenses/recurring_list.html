@@ -119,6 +119,7 @@
             <div class="d-flex gap-1">
               <form method="post" action="{{ url_for('expenses.pay_recurring', item_id=item.id) }}"
                     onsubmit="return confirm('Mark {{ item.name }} as paid for NPR {{ item.amount }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-success" title="Mark as Paid">
                   <i class="bi bi-check-circle me-1"></i>Pay
                 </button>
@@ -129,6 +130,7 @@
               </a>
               <form method="post" action="{{ url_for('expenses.delete_recurring', item_id=item.id) }}"
                     onsubmit="return confirm('Deactivate {{ item.name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Deactivate">
                   <i class="bi bi-trash"></i>
                 </button>
