@@ -73,6 +73,32 @@ def create_sale(items: list[dict], user_id: int,
         except Exception:
             pass  # Don't block sales if period check fails
 
+        # ── Credit limit enforcement ───────────────────────────────────────
+        if payment_mode == "credit" and customer_phone:
+            try:
+                from ..models.customer import Customer
+                cust = db.session.execute(
+                    db.select(Customer).where(Customer.phone == str(customer_phone).strip())
+                ).scalar_one_or_none()
+                if cust and cust.credit_limit and float(cust.credit_limit) > 0:
+                    outstanding = db.session.execute(
+                        db.select(db.func.sum(Sale.total_amount))
+                        .where(Sale.customer_phone == str(customer_phone).strip())
+                        .where(Sale.payment_mode == "credit")
+                        .where(Sale.is_credit_settled == False)
+                    ).scalar() or 0
+                    if float(outstanding) + float(total_amount) > float(cust.credit_limit):
+                        raise ValueError(
+                            f"Credit limit exceeded for {cust.name}. "
+                            f"Limit: NPR {float(cust.credit_limit):,.0f}, "
+                            f"Outstanding: NPR {float(outstanding):,.0f}, "
+                            f"This sale: NPR {float(total_amount):,.0f}."
+                        )
+            except ValueError:
+                raise
+            except Exception:
+                pass  # Non-blocking — don't fail sale if credit check errors
+
         invoice_number = None
         try:
             invoice_number = _generate_invoice_number()
@@ -132,6 +158,16 @@ def create_sale(items: list[dict], user_id: int,
                 _tax_rate = float(_ss.vat_rate)
                 # VAT is inclusive — extract from total
                 _tax_amount = round(total_amount * _tax_rate / (100 + _tax_rate), 2)
+        except Exception:
+            pass
+
+        # Auto-calculate staff commission
+        commission_amount = 0.0
+        try:
+            from ..models.user import User as _User
+            staff = db.session.get(_User, user_id)
+            if staff and staff.commission_rate:
+                commission_amount = float(total_amount) * float(staff.commission_rate) / 100.0
         except Exception:
             pass
 
