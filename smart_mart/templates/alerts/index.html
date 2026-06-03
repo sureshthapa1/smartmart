@@ -12,6 +12,7 @@
 <div class="d-flex justify-content-end mb-3">
   {% if total_active > 0 %}
   <form method="post" action="{{ url_for('alerts.dismiss') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button class="btn btn-outline-secondary btn-sm" type="submit">
       <i class="bi bi-check2-all me-1"></i>Mark All as Read
     </button>
