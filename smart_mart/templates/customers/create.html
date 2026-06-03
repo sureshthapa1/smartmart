@@ -19,6 +19,7 @@
       <div class="card-header fw-semibold"><i class="bi bi-person-plus me-2 text-primary"></i>New Customer</div>
       <div class="card-body">
         <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
             <label class="form-label fw-medium">Full Name <span class="text-danger">*</span></label>
             <input type="text" name="name" class="form-control" required autofocus placeholder="e.g. Ram Bahadur">
