@@ -7,6 +7,7 @@
   <div class="card-header fw-semibold">Create Branch</div>
   <div class="card-body">
     <form method="post" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="create">
       <div class="col-md-4"><input name="name" class="form-control" placeholder="Branch name" required></div>
       <div class="col-md-3"><input name="code" class="form-control" placeholder="Code (e.g. KTM-01)" required></div>
@@ -31,6 +32,7 @@
           <td class="d-flex gap-2">
             <!-- Toggle active -->
             <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="action" value="toggle">
               <input type="hidden" name="branch_id" value="{{ branch.id }}">
               <button class="btn btn-sm {% if branch.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" type="submit">
@@ -58,6 +60,7 @@
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <form method="post" class="modal-content">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="edit">
       <input type="hidden" name="branch_id" id="editBranchId">
       <div class="modal-header">
