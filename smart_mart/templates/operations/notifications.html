@@ -1,47 +1,85 @@
 {% extends "base.html" %}
-{% block title %}Notifications - Smart Mart{% endblock %}
+{% block title %}Notifications — Smart Mart{% endblock %}
 {% block page_title %}Notifications{% endblock %}
-{% block breadcrumb %}<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li><li class="breadcrumb-item active">Notifications</li>{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('operations.index') }}" class="text-decoration-none">Operations</a></li>
+<li class="breadcrumb-item active">Notifications</li>
+{% endblock %}
 {% block content %}
-{% set unread = notifications | selectattr('is_read', 'equalto', false) | list %}
-<div class="card shadow-sm">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span class="fw-semibold">
-      System Notifications
-      {% if unread %}
-      <span class="badge bg-danger ms-1">{{ unread | length }}</span>
-      {% endif %}
-    </span>
+{% set unread = notifications|selectattr('is_read','equalto',false)|list %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">System Notifications</div>
+    <div class="page-header-sub">Alerts and system messages for your store</div>
+  </div>
+  <div class="d-flex gap-2">
     {% if unread %}
     <form method="post">
       <input type="hidden" name="action" value="mark_all">
-      <button class="btn btn-sm btn-outline-secondary" type="submit">Mark All as Read</button>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline-secondary btn-sm" type="submit">
+        <i class="bi bi-check-all me-1"></i>Mark All Read
+      </button>
     </form>
     {% endif %}
+    <a href="{{ url_for('operations.notification_log') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-chat-dots me-1"></i>SMS/WhatsApp Log
+    </a>
   </div>
-  <div class="list-group list-group-flush">
+</div>
+
+{% if unread %}
+<div class="alert d-flex gap-2 mb-3" style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:12px">
+  <i class="bi bi-bell-fill flex-shrink-0 mt-1" style="color:#7c3aed"></i>
+  <div class="small" style="color:#4c1d95">
+    <strong>{{ unread|length }} unread notification{{ 's' if unread|length != 1 }}</strong> — review and acknowledge them below.
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
     {% for n in notifications %}
-    <div class="list-group-item d-flex align-items-start gap-3 {% if not n.is_read %}bg-light{% endif %}">
-      <div class="mt-1">
-        <span class="badge bg-{{ n.category }}">{{ n.category | capitalize }}</span>
+    {% set cat_colors = {'danger':'#fef2f2','warning':'#fffbeb','success':'#f0fdf4','info':'#eff6ff','primary':'#ede9fe'} %}
+    {% set cat_icons = {'danger':'bi-exclamation-triangle-fill text-danger','warning':'bi-exclamation-circle-fill text-warning','success':'bi-check-circle-fill text-success','info':'bi-info-circle-fill text-info','primary':'bi-bell-fill text-primary'} %}
+    <div class="d-flex align-items-start gap-3 p-3
+      {% if not loop.last %}border-bottom{% endif %}
+      {% if not n.is_read %}{{ '' }}{% else %}opacity-75{% endif %}"
+      style="{% if not n.is_read %}background:{{ cat_colors.get(n.category,'#f8fafc') }}{% endif %}">
+      <div class="flex-shrink-0 mt-1" style="font-size:1.1rem">
+        <i class="bi {{ cat_icons.get(n.category,'bi-bell text-secondary') }}"></i>
       </div>
       <div class="flex-grow-1">
-        <div class="fw-semibold {% if not n.is_read %}text-dark{% else %}text-muted{% endif %}">{{ n.title }}</div>
-        <div class="text-muted small">{{ n.body }}</div>
-        <div class="text-muted" style="font-size:0.75rem">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="fw-semibold {% if n.is_read %}text-muted{% endif %}" style="font-size:.88rem">
+          {{ n.title }}
+          {% if not n.is_read %}
+          <span class="badge bg-primary ms-1 rounded-pill" style="font-size:.6rem">NEW</span>
+          {% endif %}
+        </div>
+        <div class="text-muted" style="font-size:.8rem;margin-top:.15rem">{{ n.body }}</div>
+        <div class="text-muted" style="font-size:.72rem;margin-top:.2rem">
+          <i class="bi bi-clock me-1"></i>{{ n.created_at.strftime('%d %b %Y at %H:%M') }}
+        </div>
       </div>
       {% if not n.is_read %}
       <form method="post" class="flex-shrink-0">
         <input type="hidden" name="action" value="mark_one">
         <input type="hidden" name="notification_id" value="{{ n.id }}">
-        <button class="btn btn-sm btn-outline-secondary" type="submit">Mark Read</button>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-secondary py-0 px-2" type="submit" title="Mark as read">
+          <i class="bi bi-check2"></i>
+        </button>
       </form>
       {% else %}
-      <span class="text-muted small flex-shrink-0 mt-1">Read</span>
+      <span class="text-muted flex-shrink-0" style="font-size:.72rem">Read</span>
       {% endif %}
     </div>
     {% else %}
-    <div class="list-group-item text-center text-muted py-4">No notifications.</div>
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-bell-slash d-block mb-2" style="font-size:2.5rem;opacity:.3"></i>
+      <div class="fw-medium">No notifications</div>
+      <div class="small">You're all caught up!</div>
+    </div>
     {% endfor %}
   </div>
 </div>
