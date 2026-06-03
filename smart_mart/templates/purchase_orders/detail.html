@@ -51,6 +51,7 @@
       <div class="card-body d-flex flex-column gap-2">
         {% if po.status == 'draft' %}
         <form method="post" action="{{ url_for('purchase_orders.send_po', po_id=po.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send me-1"></i>Mark as Sent</button>
         </form>
         {% endif %}
@@ -60,6 +61,7 @@
         </button>
         <div class="collapse" id="receiveForm">
           <form method="post" action="{{ url_for('purchase_orders.receive_po', po_id=po.id) }}" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             {% for item in po.items %}
             <div class="mb-2">
               <label class="form-label small">{{ item.product.name if item.product else '—' }} (ordered: {{ item.quantity_ordered }}, received: {{ item.quantity_received }})</label>
@@ -72,6 +74,7 @@
         {% endif %}
         {% if po.status not in ('received', 'cancelled') %}
         <form method="post" action="{{ url_for('purchase_orders.cancel_po', po_id=po.id) }}" onsubmit="return confirm('Cancel this PO?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-outline-danger w-100" type="submit"><i class="bi bi-x-circle me-1"></i>Cancel PO</button>
         </form>
         {% endif %}
