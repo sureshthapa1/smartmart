@@ -42,6 +42,7 @@
       <div class="card-body">
         <div class="text-muted small mb-2">Update Status</div>
         <form method="post" action="{{ url_for('supplier_returns.update_status', return_id=sr.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <select name="status" class="form-select form-select-sm mb-2">
             {% for val, (label, _) in sr.STATUS_LABELS.items() %}
             <option value="{{ val }}" {{ 'selected' if sr.status == val }}>{{ label }}</option>
