@@ -12,6 +12,7 @@
 
 {% block content %}
 <form method="post" action="{{ url_for('online_orders.create_order') }}" id="orderForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="row g-4">
 
     <!-- Customer Details -->
