@@ -126,6 +126,7 @@
             {% else %}
             <form method="post" action="{{ url_for('reports.set_credit_due_date', sale_id=s.id) }}"
                   class="d-flex gap-1 align-items-center">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="date" name="due_date" class="form-control form-control-sm"
                      style="width:140px;"
                      value="{{ s.credit_due_date.isoformat() if s.credit_due_date else '' }}"
@@ -157,6 +158,7 @@
             {% if r.status != 'collected' %}
             <form method="post" action="{{ url_for('reports.mark_credit_collected', sale_id=s.id) }}"
                   onsubmit="return confirm('Mark this credit as collected?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-success">
                 <i class="bi bi-check-circle me-1"></i>Collected
               </button>
