@@ -55,6 +55,7 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <span class="fw-semibold"><i class="bi bi-lightbulb-fill text-warning me-2"></i>AI Recommendations</span>
         <form method="post" action="{{ url_for('ai.trigger_retrain') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-sm btn-outline-primary" type="submit">
             <i class="bi bi-arrow-repeat me-1"></i>Retrain Models Now
           </button>
@@ -81,11 +82,13 @@
             {% if rec.status == 'pending' %}
             <div class="d-flex gap-1 flex-shrink-0">
               <form method="post" action="{{ url_for('ai.feedback_action', rec_id=rec.id) }}" class="d-flex gap-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="accepted">
                 <input type="hidden" name="outcome" value="positive">
                 <button class="btn btn-sm btn-success" type="submit" title="Accept"><i class="bi bi-check-lg"></i></button>
               </form>
               <form method="post" action="{{ url_for('ai.feedback_action', rec_id=rec.id) }}" class="d-flex gap-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="rejected">
                 <input type="hidden" name="outcome" value="negative">
                 <button class="btn btn-sm btn-outline-danger" type="submit" title="Reject"><i class="bi bi-x-lg"></i></button>
