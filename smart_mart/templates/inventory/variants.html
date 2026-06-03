@@ -83,6 +83,7 @@
                    class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
                 <form method="post" action="{{ url_for('inventory.delete_variant', product_id=product.id, variant_id=v.id) }}"
                       class="d-inline" onsubmit="return confirm('Delete variant {{ v.variant_name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                 </form>
               </div>
