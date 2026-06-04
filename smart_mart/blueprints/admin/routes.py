@@ -484,13 +484,21 @@ def sync_visit_counts():
     from ...extensions import db
     from sqlalchemy import func
 
+    # Fix: single aggregated query instead of N queries (one per customer)
+    from sqlalchemy import func
+    visit_counts = dict(
+        db.session.execute(
+            db.select(
+                func.lower(Sale.customer_name),
+                func.count(Sale.id)
+            )
+            .group_by(func.lower(Sale.customer_name))
+        ).all()
+    )
     customers = db.session.execute(db.select(Customer)).scalars().all()
     updated = 0
     for c in customers:
-        actual = db.session.execute(
-            db.select(func.count(Sale.id))
-            .where(func.lower(Sale.customer_name) == c.name.lower())
-        ).scalar() or 0
+        actual = visit_counts.get(c.name.lower(), 0)
         if actual != c.visit_count:
             c.visit_count = actual
             updated += 1
