@@ -2,6 +2,39 @@
 {% block title %}{{ product.name }} — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block meta_desc %}Buy {{ product.name }} online. {{ product.category or 'Premium dry fruit' }} at NPR {{ "%.0f"|format(product.selling_price) }} — delivered in Nepal.{% endblock %}
 
+{% block og_image %}{% if product.image_filename %}{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block og_desc %}{{ product.description or (product.name + ' — ' + (product.category or 'Dry Fruit') + ' at NPR ' + '%.0f'|format(product.selling_price) + '. Delivered in Nepal.') }}{% endblock %}
+
+{% block head %}
+<link rel="canonical" href="{{ url_for('store.product_detail', product_id=product.id, _external=True) }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "{{ product.name | e }}",
+  "description": "{{ (product.description or product.name) | e }}",
+  "sku": "{{ product.sku | e }}",
+  {% if product.image_filename %}
+  "image": "{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}",
+  {% endif %}
+  "brand": {
+    "@type": "Brand",
+    "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}"
+  },
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "NPR",
+    "price": "{{ '%.2f'|format(product.selling_price) }}",
+    "availability": "{% if avail > 0 %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+    "seller": {
+      "@type": "Organization",
+      "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}"
+    }
+  }
+}
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="section-container py-4">
 
@@ -42,14 +75,23 @@
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:1rem;">SKU: {{ product.sku }}</div>
       {% endif %}
 
+      {% if product.description %}
+      <div style="font-size:.9rem;color:var(--muted);line-height:1.65;margin-bottom:1rem;">{{ product.description }}</div>
+      {% endif %}
+
+      {% if product.pack_size %}
+      <div style="display:inline-flex;align-items:center;gap:.4rem;background:#f9f5f0;border-radius:6px;padding:.25em .65em;font-size:.8rem;font-weight:700;color:var(--brand-dark);margin-bottom:1rem;">
+        <i class="bi bi-box2"></i> {{ product.pack_size }}
+      </div>
+      {% elif product.unit and product.unit != 'pcs' %}
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">per {{ product.unit }}</div>
+      {% endif %}
+
       <!-- PRICE -->
       <div style="margin-bottom:1.25rem;">
         <span style="font-size:2rem;font-weight:900;color:var(--brand-dark);">
           <span style="font-size:1rem;vertical-align:super;">NPR</span>{{ "%.0f"|format(product.selling_price) }}
         </span>
-        {% if product.unit %}
-        <span style="font-size:.82rem;color:var(--muted);margin-left:.4rem;">/ {{ product.unit }}</span>
-        {% endif %}
       </div>
 
       <!-- AVAILABILITY -->
@@ -94,6 +136,25 @@
       <button class="btn-add" disabled style="background:#e2e8f0;color:#94a3b8;cursor:not-allowed;padding:.6rem 1.5rem;border-radius:50px;font-size:.9rem;margin-bottom:1rem;">
         Out of Stock
       </button>
+      {% if avail <= 0 %}
+      <div style="margin-top:1rem;padding:1rem;background:#f9f5f0;border-radius:var(--radius-sm);">
+        <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:.5rem;">🔔 Notify me when available</div>
+        <form method="post" action="{{ url_for('store.notify_stock', product_id=product.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if customer %}
+          <input type="hidden" name="phone" value="{{ customer.phone }}">
+          <input type="hidden" name="name" value="{{ customer.name }}">
+          {% else %}
+          <input type="tel" name="phone" placeholder="Your phone: 98XXXXXXXX"
+                 style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.84rem;margin-bottom:.5rem;outline:none;"
+                 onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+          {% endif %}
+          <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.55rem;font-size:.85rem;">
+            <i class="bi bi-bell"></i> Notify Me
+          </button>
+        </form>
+      </div>
+      {% endif %}
       {% endif %}
 
       <!-- FEATURES -->

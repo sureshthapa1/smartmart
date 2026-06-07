@@ -73,6 +73,11 @@
           <div class="d-flex justify-content-between mb-2" style="font-size:.9rem;">
             <span style="color:var(--muted);">Subtotal</span><span style="font-weight:600;">NPR {{ "%.0f"|format(subtotal) }}</span>
           </div>
+          {% if subtotal < 200 and subtotal > 0 %}
+          <div style="font-size:.75rem;color:#dc2626;margin-bottom:.5rem;">
+            <i class="bi bi-exclamation-circle me-1"></i>Minimum order: NPR 200. Add NPR {{ "%.0f"|format(200 - subtotal) }} more.
+          </div>
+          {% endif %}
           <div class="d-flex justify-content-between mb-2" style="font-size:.9rem;">
             <span style="color:var(--muted);">Delivery</span>
             {% if delivery == 0 %}

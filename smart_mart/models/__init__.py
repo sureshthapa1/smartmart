@@ -59,6 +59,7 @@ from .idempotency_key import IdempotencyKey
 from .financial_period import FinancialPeriod
 from .offer import Offer, CustomerOffer, OfferNotification
 from .customer_account import CustomerAccount
+from .stock_notification import StockNotification
 from ..bi.models import (
     PurchaseBatch,
     PurchaseBatchItem,
@@ -103,6 +104,7 @@ __all__ = [
     "FinancialPeriod",
     "Offer", "CustomerOffer", "OfferNotification",
     "CustomerAccount",
+    "StockNotification",
     "PurchaseBatch",
     "PurchaseBatchItem",
     "PurchaseBatchExpense",
