@@ -67,7 +67,7 @@ class OnlineOrder(db.Model):
 
     @property
     def grand_total(self):
-        return float(self.total_amount) + float(self.delivery_charge or 0) - float(self.discount_amount or 0)
+        return float(self.total_amount or 0) + float(self.delivery_charge or 0) - float(self.discount_amount or 0)
 
     def next_status(self):
         try:

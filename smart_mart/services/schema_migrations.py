@@ -306,6 +306,11 @@ def _migration_steps() -> list[MigrationStep]:
             "Ensure feature pack tables exist (db.create_all handles model tables).",
             lambda conn: None,
         ),
+        (
+            "2026_06_07_customer_accounts_table",
+            "Ensure customer_accounts table exists for storefront login.",
+            lambda conn: None,  # db.create_all() handles this
+        ),
     ]
 
 

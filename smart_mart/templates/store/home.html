@@ -1,0 +1,163 @@
+{% extends "store/base_store.html" %}
+{% block title %}{{ settings.shop_name if settings else 'GoldKernel' }} — Premium Dry Fruits Nepal{% endblock %}
+
+{% block content %}
+
+<!-- HERO (only on non-search, non-filter views) -->
+{% if not q and not selected_category %}
+<section class="hero">
+  <div class="section-container">
+    <div class="hero-content fade-up">
+      <div class="hero-tag"><i class="bi bi-stars"></i> Nepal's Premium Dry Fruits</div>
+      <h1>Nature's Finest<br><span>Dry Fruits</span> &amp; Treats</h1>
+      <p>Handpicked almonds, cashews, pistachios &amp; more — delivered fresh to your door anywhere in Nepal.</p>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="#products" class="btn-brand"><i class="bi bi-bag-heart"></i> Shop Now</a>
+        <a href="{{ url_for('store.track') }}" class="btn-outline-brand" style="color:#fff;border-color:rgba(255,255,255,.3)"><i class="bi bi-geo-alt"></i> Track Order</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero-decorations">🥜🌰🍇</div>
+</section>
+
+<!-- TRUST BADGES -->
+<section style="background:#fff; border-bottom: 1px solid var(--border);">
+  <div class="section-container">
+    <div class="d-flex flex-wrap justify-content-center gap-4 py-3">
+      <div class="d-flex align-items-center gap-2" style="font-size:.82rem;color:var(--muted);">
+        <span style="font-size:1.2rem;">🚚</span>
+        <span><strong style="color:var(--text);">Fast Delivery</strong><br>Kathmandu &amp; beyond</span>
+      </div>
+      <div class="d-flex align-items-center gap-2" style="font-size:.82rem;color:var(--muted);">
+        <span style="font-size:1.2rem;">✅</span>
+        <span><strong style="color:var(--text);">100% Genuine</strong><br>Handpicked quality</span>
+      </div>
+      <div class="d-flex align-items-center gap-2" style="font-size:.82rem;color:var(--muted);">
+        <span style="font-size:1.2rem;">💳</span>
+        <span><strong style="color:var(--text);">Easy Payment</strong><br>COD · eSewa · Khalti</span>
+      </div>
+      <div class="d-flex align-items-center gap-2" style="font-size:.82rem;color:var(--muted);">
+        <span style="font-size:1.2rem;">🔄</span>
+        <span><strong style="color:var(--text);">Easy Returns</strong><br>7-day return policy</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- CATEGORY FILTER STRIP -->
+<div class="cat-strip" id="products">
+  <a href="{{ url_for('store.home', q=q or '') }}"
+     class="cat-pill {% if not selected_category %}active{% endif %}">
+    All Products
+  </a>
+  {% for cat in categories %}
+  <a href="{{ url_for('store.home', category=cat, q=q or '') }}"
+     class="cat-pill {% if selected_category == cat %}active{% endif %}">
+    {{ cat }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- SORT + RESULT HEADER -->
+<div class="section-container">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div style="font-size:.85rem; color:var(--muted);">
+      {% if q %}
+        Results for <strong style="color:var(--text);">"{{ q }}"</strong> —
+      {% elif selected_category %}
+        <strong style="color:var(--brand);">{{ selected_category }}</strong> —
+      {% endif %}
+      <span style="color:var(--text);">{{ products|length }} product{{ 's' if products|length != 1 }}</span>
+    </div>
+    <form method="get" action="" class="d-flex align-items-center gap-2" style="font-size:.82rem;">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+      <label style="color:var(--muted);">Sort:</label>
+      <select name="sort" class="form-select form-select-sm" style="width:auto;border-radius:8px;border-color:var(--border);font-size:.8rem;" onchange="this.form.submit()">
+        <option value="name" {% if sort=='name' %}selected{% endif %}>Name</option>
+        <option value="price_asc" {% if sort=='price_asc' %}selected{% endif %}>Price: Low → High</option>
+        <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price: High → Low</option>
+        <option value="newest" {% if sort=='newest' %}selected{% endif %}>Newest</option>
+      </select>
+    </form>
+  </div>
+
+  {% if products %}
+  <div class="row g-3">
+    {% for product in products %}
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.03 }}s">
+      <div class="product-card">
+        <div class="product-img-wrap">
+          {% if product.image_filename %}
+          <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}"
+               alt="{{ product.name }}" loading="lazy">
+          {% else %}
+          <div class="product-img-placeholder">
+            {% set icons = ['🥜','🌰','🍇','🍑','🫘','🌿','✨','🥥'] %}
+            {{ icons[loop.index0 % icons|length] }}
+          </div>
+          {% endif %}
+          {% if product.id in popular_ids and not q and not selected_category %}
+          <span class="product-badge">Popular</span>
+          {% endif %}
+          {% set low_thresh = [product.low_stock_threshold or 10, 20]|min %}
+          {% if product.quantity > 0 and product.quantity <= low_thresh %}
+          <span class="low-badge">Low Stock</span>
+          {% endif %}
+        </div>
+        <div class="product-body">
+          {% if product.category %}
+          <div class="product-cat">{{ product.category }}</div>
+          {% endif %}
+          <div class="product-name">{{ product.name }}</div>
+          {% if product.unit %}
+          <div class="product-unit">per {{ product.unit }}</div>
+          {% endif %}
+          <div class="mt-auto">
+            <div class="product-price">
+              <span class="currency">NPR</span>{{ "%.0f"|format(product.selling_price) }}
+            </div>
+          </div>
+        </div>
+        <div class="product-footer">
+          <button class="btn-add" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1"
+                  {% if product.quantity <= 0 %}disabled style="background:#e2e8f0;color:#94a3b8;cursor:not-allowed;"{% endif %}>
+            {% if product.quantity > 0 %}
+            <i class="bi bi-cart-plus"></i> Add
+            {% else %}
+            Out of Stock
+            {% endif %}
+          </button>
+          <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="btn-view" title="View Details">
+            <i class="bi bi-eye"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <h4>No products found</h4>
+    <p>Try a different search or browse all categories.</p>
+    <a href="{{ url_for('store.home') }}" class="btn-brand mt-2">Browse All Products</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ORDER TRACKING CTA -->
+<section style="background: linear-gradient(135deg,#1c1917,#292524); margin-top:3rem; padding:2.5rem 1.5rem;">
+  <div class="section-container text-center text-white">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">📦</div>
+    <h3 style="font-weight:800;margin-bottom:.5rem;">Already Ordered?</h3>
+    <p style="color:#a8a29e;margin-bottom:1.25rem;">Track your order status in real-time.</p>
+    <a href="{{ url_for('store.track') }}" class="btn-brand">
+      <i class="bi bi-geo-alt"></i> Track My Order
+    </a>
+  </div>
+</section>
+
+{% endblock %}

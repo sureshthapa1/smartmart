@@ -14,6 +14,7 @@ from ...models.online_order import OnlineOrder, OnlineOrderItem
 from ...models.product import Product
 from ...models.shop_settings import ShopSettings
 from ...services.decorators import login_required, admin_required
+from ...services.ecommerce_sync import EcommerceSyncError, apply_order_status
 
 online_orders_bp = Blueprint("online_orders", __name__, url_prefix="/online-orders")
 
@@ -205,23 +206,19 @@ def update_status(order_id):
         flash("Invalid status.", "danger")
         return redirect(url_for("online_orders.order_detail", order_id=order_id))
 
-    order.status = new_status
-    if new_status == "delivered":
-        order.delivered_at = datetime.now(timezone.utc)
-        order.payment_status = "paid" if order.payment_mode != "cod" else order.payment_status
-    elif new_status == "cancelled":
-        order.cancelled_at = datetime.now(timezone.utc)
-        order.cancel_reason = note or "Cancelled by staff"
-        # Restore stock on cancellation
-        for item in order.items:
-            product = db.session.get(Product, item.product_id)
-            if product:
-                product.quantity += item.quantity
+    try:
+        apply_order_status(
+            order,
+            new_status,
+            note=note,
+            actor=getattr(current_user, "username", "staff"),
+        )
+        db.session.commit()
+    except EcommerceSyncError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+        return redirect(url_for("online_orders.order_detail", order_id=order_id))
 
-    if note:
-        order.notes = (order.notes or "") + f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {note}"
-
-    db.session.commit()
     flash(f"Order status updated to {new_status}.", "success")
 
     # SMS customer if phone available and provider configured
