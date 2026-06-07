@@ -52,8 +52,12 @@ def _is_authorized() -> bool:
     if _is_admin_session():
         return True
     configured = _candidate_keys()
-    if not configured and (current_app.testing or current_app.debug):
-        return True
+    # Never allow unauthenticated access in production
+    if not configured:
+        import os
+        if os.environ.get("FLASK_ENV") == "production" or not (current_app.testing or current_app.debug):
+            return False
+        return True  # dev/test only
     return bool(configured.intersection(_provided_keys()))
 
 

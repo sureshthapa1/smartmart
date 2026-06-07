@@ -24,6 +24,10 @@ class Product(db.Model):
     expiry_date = db.Column(db.Date, nullable=True)
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
+    description = db.Column(db.Text, nullable=True)
+    pack_size = db.Column(db.String(40), nullable=True)  # e.g. "500g", "1kg", "250g"
+    slug = db.Column(db.String(160), nullable=True, unique=True)
+    is_featured = db.Column(db.Boolean, nullable=False, default=False)
     reorder_point = db.Column(db.Integer, nullable=True, default=10)  # MOQ alert threshold
     is_active = db.Column(db.Boolean, nullable=False, default=True)  # False = discontinued
     max_discount_pct = db.Column(db.Numeric(5, 2), nullable=True)    # max % discount allowed

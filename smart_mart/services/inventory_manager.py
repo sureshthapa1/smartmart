@@ -46,6 +46,14 @@ def create_product(data: dict) -> Product:
         db.session.commit()
     except Exception:
         pass
+
+    # Auto-fill description, image, pack_size if not provided
+    try:
+        from .product_autofill import autofill_product
+        autofill_product(product, force=False)
+    except Exception:
+        pass  # autofill is non-critical — never block product creation
+
     return product
 
 
@@ -84,6 +92,17 @@ def update_product(product_id: int, data: dict) -> Product:
             db.session.commit()
     except Exception:
         pass
+
+    # If name or category changed and image/description are missing, re-autofill
+    try:
+        name_changed = old_values.get("name") != str(product.name)
+        cat_changed  = old_values.get("category") != str(product.category or "")
+        if name_changed or cat_changed:
+            from .product_autofill import autofill_product
+            autofill_product(product, force=False)
+    except Exception:
+        pass  # autofill is non-critical
+
     return product
 
 

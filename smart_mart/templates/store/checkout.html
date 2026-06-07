@@ -54,10 +54,27 @@
           </div>
         </div>
 
-        <!-- PAYMENT METHOD -->
+        <!-- PROMO CODE -->
         <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1.25rem;">
           <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;">
             <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
+            <h3 style="font-size:.95rem;font-weight:800;margin:0;">Promo Code <span style="font-size:.75rem;color:var(--muted);font-weight:400;">(optional)</span></h3>
+          </div>
+          <div style="padding:1rem 1.5rem;">
+            <div style="display:flex;gap:.5rem;">
+              <input type="text" name="promo_code" id="promo-code" placeholder="Enter promo code"
+                     value="{{ form_data.get('promo_code','') }}" maxlength="30"
+                     style="flex:1;padding:.55rem .85rem;border:1.5px solid var(--border);border-radius:10px;font-size:.88rem;outline:none;text-transform:uppercase;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;">Discount will be applied at checkout</div>
+          </div>
+        </div>
+
+        <!-- PAYMENT METHOD -->
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1.25rem;">
+          <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
             <h3 style="font-size:.95rem;font-weight:800;margin:0;">Payment Method</h3>
           </div>
           <div style="padding:1.25rem 1.5rem;">

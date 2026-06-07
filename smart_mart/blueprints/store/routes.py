@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import re
+import time
 import uuid
 from functools import wraps
 from urllib.parse import urlparse
 
 from flask import (
-    Blueprint, jsonify, redirect, render_template,
+    Blueprint, Response, jsonify, redirect, render_template,
     request, session, url_for, flash, g
 )
 from sqlalchemy import func
@@ -37,8 +38,29 @@ store_bp = Blueprint("store", __name__, url_prefix="/store")
 FREE_DELIVERY_THRESHOLD = 2000.0
 DELIVERY_CHARGE        = 100.0
 MAX_QTY_PER_ITEM       = 50
+MIN_ORDER_AMOUNT       = 200.0
 NEPAL_PHONE_RE         = re.compile(r"^(97|98)\d{8}$")
 VALID_PAYMENT_METHODS  = {"cod", "esewa", "khalti", "ime_pay"}
+
+# ── Reservation expiry cooldown ───────────────────────────────────────────────
+_last_expiry_run: float = 0.0
+_EXPIRY_COOLDOWN = 60.0  # seconds
+
+
+def _maybe_expire_reservations() -> None:
+    global _last_expiry_run
+    now = time.monotonic()
+    if now - _last_expiry_run > _EXPIRY_COOLDOWN:
+        _last_expiry_run = now
+        expire_old_reservations()
+
+
+# ── Slug helper ───────────────────────────────────────────────────────────────
+def _slugify(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[\s_-]+', '-', text)
+    return text[:120]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -149,25 +171,35 @@ def home():
     products   = db.session.execute(stmt).scalars().all()
     categories = _get_categories()
 
-    # Top-selling by quantity sold (proxy: low remaining stock = high sales)
-    # Real "popular" = products with most online_order_items
-    popular_ids = set()
-    try:
-        rows = db.session.execute(
-            db.select(OnlineOrderItem.product_id, func.sum(OnlineOrderItem.quantity).label("sold"))
-            .group_by(OnlineOrderItem.product_id)
-            .order_by(func.sum(OnlineOrderItem.quantity).desc())
-            .limit(6)
-        ).all()
-        popular_ids = {r.product_id for r in rows}
-    except Exception:
-        pass
+    # Featured products: is_featured first, then fall back to best sellers
+    featured_products = db.session.execute(
+        db.select(Product)
+        .where(Product.is_active.isnot(False), Product.quantity > 0,
+               Product.is_featured == True)
+        .order_by(Product.name)
+        .limit(6)
+    ).scalars().all()
+
+    if not featured_products:
+        # Fall back to best-selling
+        popular_ids = set()
+        try:
+            rows = db.session.execute(
+                db.select(OnlineOrderItem.product_id, func.sum(OnlineOrderItem.quantity).label("sold"))
+                .group_by(OnlineOrderItem.product_id)
+                .order_by(func.sum(OnlineOrderItem.quantity).desc())
+                .limit(6)
+            ).all()
+            popular_ids = {r.product_id for r in rows}
+        except Exception:
+            pass
+        featured_products = [p for p in products if p.id in popular_ids][:6]
 
     return render_template(
         "store/home.html",
         products=products,
         categories=categories,
-        popular_ids=popular_ids,
+        featured_products=featured_products,
         settings=settings,
         q=q,
         selected_category=category,
@@ -175,7 +207,6 @@ def home():
         customer=g.customer,
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
     )
-
 
 # ── Product Detail ────────────────────────────────────────────────────────────
 
@@ -188,8 +219,21 @@ def product_detail(product_id):
         return redirect(url_for("store.home"))
 
     settings = _settings()
-    expire_old_reservations()
+    _maybe_expire_reservations()
     avail = available_quantity(product)
+
+    # Auto-populate slug if missing (Improvement 13)
+    if product and not product.slug:
+        candidate = _slugify(product.name)
+        existing_slug = db.session.execute(
+            db.select(Product).where(Product.slug == candidate, Product.id != product.id)
+        ).scalar_one_or_none()
+        if not existing_slug:
+            product.slug = candidate
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
     related = db.session.execute(
         db.select(Product)
@@ -342,7 +386,7 @@ def checkout():
 
     items    = []
     subtotal = 0.0
-    expire_old_reservations()
+    _maybe_expire_reservations()
 
     for pid_str, qty in raw_cart.items():
         try:
@@ -403,6 +447,39 @@ def checkout():
                 free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
             )
 
+        # Minimum order check
+        if subtotal < MIN_ORDER_AMOUNT:
+            flash(f"Minimum order amount is NPR {MIN_ORDER_AMOUNT:.0f}. Add more items to continue.", "warning")
+            return redirect(url_for("store.cart"))
+
+        # Promo code handling
+        discount_amount = 0.0
+        promo_code = request.form.get("promo_code", "").strip().upper()
+        if promo_code:
+            try:
+                from ...models.promotion import Promotion
+                from datetime import date
+                promo = db.session.execute(
+                    db.select(Promotion).where(
+                        Promotion.code == promo_code,
+                        Promotion.is_active == True,
+                    )
+                ).scalar_one_or_none()
+                if promo is None:
+                    flash(f"Promo code '{promo_code}' is not valid.", "warning")
+                elif hasattr(promo, 'end_date') and promo.end_date and promo.end_date < date.today():
+                    flash(f"Promo code '{promo_code}' has expired.", "warning")
+                elif hasattr(promo, 'discount_pct') and promo.discount_pct:
+                    discount_amount = round(float(subtotal) * float(promo.discount_pct) / 100, 2)
+                    flash(f"Code '{promo_code}' applied: {promo.discount_pct}% off", "success")
+                elif hasattr(promo, 'discount_amount') and promo.discount_amount:
+                    discount_amount = min(float(promo.discount_amount), float(subtotal))
+                    flash(f"Code '{promo_code}' applied: NPR {discount_amount:.0f} off", "success")
+            except Exception:
+                pass  # promo system not available
+
+        grand_total = subtotal + delivery - discount_amount
+
         payload = {
             "customer": {"name": name, "phone": phone, "email": email,
                          "address": address, "area": area},
@@ -410,7 +487,7 @@ def checkout():
                        "unit_price": float(it["product"].selling_price)} for it in items],
             "payment": {"method": method, "status": "pending", "provider": method},
             "delivery_charge": delivery,
-            "discount_amount": 0,
+            "discount_amount": discount_amount,
             "reservation_minutes": 30,
             "notes": notes,
             "order_source": "website",
@@ -439,7 +516,11 @@ def checkout():
             session.modified = True
             session.pop("cart", None)
 
-            return redirect(url_for("store.order_success", order_number=order_number))
+            payment_redirect = {"esewa": True, "khalti": True, "ime_pay": True}.get(method, False)
+            if payment_redirect:
+                return redirect(url_for("store.payment_pending", order_number=order_number))
+            else:
+                return redirect(url_for("store.order_success", order_number=order_number))
 
         except EcommerceSyncError as exc:
             flash(str(exc), "danger")
@@ -685,3 +766,131 @@ def api_stock(product_id):
     avail = available_quantity(product)
     return jsonify({"ok": True, "available": avail,
                     "price": float(product.selling_price)})
+
+
+# ── Payment Pending (Improvement 1) ──────────────────────────────────────────
+
+@store_bp.route("/order/<order_number>/payment")
+def payment_pending(order_number):
+    settings = _settings()
+    last_order = session.get("last_order", "")
+    owns_order = (last_order == order_number)
+    cust = g.customer
+    order = db.session.execute(
+        db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+    ).scalar_one_or_none()
+    if not order:
+        flash("Order not found.", "warning")
+        return redirect(url_for("store.home"))
+    if cust and order.customer_phone == cust.phone:
+        owns_order = True
+    if not owns_order:
+        return redirect(url_for("store.track", order_number=order_number))
+    return render_template("store/payment_pending.html", order=order,
+                           settings=settings, customer=cust)
+
+
+# ── Customer Order Cancellation (Improvement 5) ──────────────────────────────
+
+@store_bp.route("/order/<order_number>/cancel", methods=["POST"])
+@customer_login_required
+@limiter.limit("5/minute")
+def cancel_order(order_number):
+    cust = g.customer
+    order = db.session.execute(
+        db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+    ).scalar_one_or_none()
+    if not order:
+        flash("Order not found.", "danger")
+        return redirect(url_for("store.my_account"))
+    if order.customer_phone != cust.phone:
+        flash("You don't have permission to cancel this order.", "danger")
+        return redirect(url_for("store.my_account"))
+    if order.status not in ("pending",):
+        flash("Only pending orders can be cancelled. Please call us for other requests.", "warning")
+        return redirect(url_for("store.my_account"))
+    try:
+        from ...services.ecommerce_sync import apply_order_status
+        apply_order_status(order, "cancelled", note="Cancelled by customer", actor=cust.name)
+        db.session.commit()
+        flash(f"Order {order.order_number} has been cancelled.", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(f"Could not cancel order: {exc}", "danger")
+    return redirect(url_for("store.my_account"))
+
+
+# ── Back-in-Stock Notification (Improvement 9) ───────────────────────────────
+
+@store_bp.route("/product/<int:product_id>/notify", methods=["POST"])
+@limiter.limit("5/minute")
+def notify_stock(product_id):
+    product = db.session.get(Product, product_id)
+    if not product:
+        return jsonify({"ok": False}), 404
+    phone = request.form.get("phone", "").strip()
+    email = request.form.get("email", "").strip()
+    name = request.form.get("name", "").strip()
+    if not phone and not email:
+        flash("Please provide a phone number or email.", "warning")
+        return redirect(url_for("store.product_detail", product_id=product_id))
+    from ...models.stock_notification import StockNotification
+    # Avoid duplicate
+    existing = db.session.execute(
+        db.select(StockNotification).where(
+            StockNotification.product_id == product_id,
+            StockNotification.phone == phone,
+            StockNotification.notified == False,
+        )
+    ).scalar_one_or_none()
+    if not existing:
+        db.session.add(StockNotification(
+            product_id=product_id, phone=phone, email=email or None, name=name or None
+        ))
+        db.session.commit()
+    flash(f"We'll notify you when {product.name} is back in stock! 🔔", "success")
+    return redirect(url_for("store.product_detail", product_id=product_id))
+
+
+# ── SEO: Product by Slug (Improvement 13) ────────────────────────────────────
+
+@store_bp.route("/p/<slug>")
+@limiter.limit("120/minute")
+def product_by_slug(slug):
+    product = db.session.execute(
+        db.select(Product).where(Product.slug == slug)
+    ).scalar_one_or_none()
+    if not product:
+        from flask import abort
+        abort(404)
+    return redirect(url_for("store.product_detail", product_id=product.id), 301)
+
+
+# ── Sitemap (Improvement 12) ──────────────────────────────────────────────────
+
+@store_bp.route("/sitemap.xml")
+def sitemap():
+    from datetime import date
+    products = db.session.execute(
+        db.select(Product)
+        .where(Product.is_active.isnot(False), Product.quantity > 0)
+        .order_by(Product.updated_at.desc())
+    ).scalars().all()
+
+    base = request.url_root.rstrip("/")
+    urls = [
+        f"<url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>",
+        f"<url><loc>{base}/store/track</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>",
+    ]
+    for p in products:
+        lastmod = p.updated_at.strftime("%Y-%m-%d") if p.updated_at else date.today().isoformat()
+        urls.append(
+            f"<url><loc>{base}/store/product/{p.id}</loc>"
+            f"<lastmod>{lastmod}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        )
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += "\n".join(urls)
+    xml += "\n</urlset>"
+    return Response(xml, mimetype="application/xml")

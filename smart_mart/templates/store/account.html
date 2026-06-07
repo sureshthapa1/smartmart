@@ -156,6 +156,14 @@
                    style="font-size:.78rem;font-weight:600;color:var(--brand);text-decoration:none;border:1.5px solid var(--border);border-radius:8px;padding:.3rem .75rem;white-space:nowrap;">
                   <i class="bi bi-geo-alt"></i> Track
                 </a>
+                {% if order.status == 'pending' %}
+                <form method="post" action="{{ url_for('store.cancel_order', order_number=order.order_number) }}" style="display:inline;" onsubmit="return confirm('Cancel order {{ order.order_number }}?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" style="font-size:.78rem;font-weight:600;color:#ef4444;background:none;border:1.5px solid #fecaca;border-radius:8px;padding:.3rem .75rem;cursor:pointer;white-space:nowrap;">
+                    <i class="bi bi-x-circle"></i> Cancel
+                  </button>
+                </form>
+                {% endif %}
               </div>
 
             </div>

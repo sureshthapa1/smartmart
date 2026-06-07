@@ -311,6 +311,31 @@ def _migration_steps() -> list[MigrationStep]:
             "Ensure customer_accounts table exists for storefront login.",
             lambda conn: None,  # db.create_all() handles this
         ),
+        (
+            "2026_06_08_product_description",
+            "Add description column to products for storefront display.",
+            lambda conn: _safe_add_column(conn, "products", "description", "TEXT"),
+        ),
+        (
+            "2026_06_08_product_pack_size",
+            "Add pack_size column to products for weight/size display on storefront.",
+            lambda conn: _safe_add_column(conn, "products", "pack_size", "VARCHAR(40)"),
+        ),
+        (
+            "2026_06_08_product_slug",
+            "Add slug column to products for SEO-friendly URLs.",
+            lambda conn: _safe_add_column(conn, "products", "slug", "VARCHAR(160)"),
+        ),
+        (
+            "2026_06_08_product_is_featured",
+            "Add is_featured flag to products for storefront hero section.",
+            lambda conn: _safe_add_column(conn, "products", "is_featured", "BOOLEAN DEFAULT false"),
+        ),
+        (
+            "2026_06_08_stock_notifications_table",
+            "Ensure stock_notifications table exists for back-in-stock notifications.",
+            lambda conn: None,  # db.create_all() handles this
+        ),
     ]
 
 

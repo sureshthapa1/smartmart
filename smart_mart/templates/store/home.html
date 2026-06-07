@@ -98,10 +98,9 @@
             {{ icons[loop.index0 % icons|length] }}
           </div>
           {% endif %}
-          {% if product.id in popular_ids and not q and not selected_category %}
-          <span class="product-badge">Popular</span>
-          {% endif %}
-          {% set low_thresh = [product.low_stock_threshold or 10, 20]|min %}
+          {% if product in featured_products and not q and not selected_category %}
+          <span class="product-badge">⭐ Featured</span>
+          {% endif %}          {% set low_thresh = [product.low_stock_threshold or 10, 20]|min %}
           {% if product.quantity > 0 and product.quantity <= low_thresh %}
           <span class="low-badge">Low Stock</span>
           {% endif %}
@@ -111,7 +110,9 @@
           <div class="product-cat">{{ product.category }}</div>
           {% endif %}
           <div class="product-name">{{ product.name }}</div>
-          {% if product.unit %}
+          {% if product.pack_size %}
+          <div class="product-unit">{{ product.pack_size }}</div>
+          {% elif product.unit and product.unit != 'pcs' %}
           <div class="product-unit">per {{ product.unit }}</div>
           {% endif %}
           <div class="mt-auto">
