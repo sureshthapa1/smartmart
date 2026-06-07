@@ -19,6 +19,7 @@ from .customer import Customer
 from .product_icon_map import ProductIconMap
 from .ai_memory import AIModelVersion, AIRecommendation, AIAlert, AIRetrainingLog, AIFeedbackLog
 from .online_order import OnlineOrder, OnlineOrderItem
+from .ecommerce import StockReservation, EcommercePayment, SyncLog
 from .ai_enhancements import (
     LoyaltyWallet,
     LoyaltyWalletTransaction,
@@ -57,6 +58,7 @@ from .credit_note import CreditNote
 from .idempotency_key import IdempotencyKey
 from .financial_period import FinancialPeriod
 from .offer import Offer, CustomerOffer, OfferNotification
+from .customer_account import CustomerAccount
 from ..bi.models import (
     PurchaseBatch,
     PurchaseBatchItem,
@@ -75,6 +77,7 @@ __all__ = [
     "UserPermissions", "UserActivity", "Customer", "ProductIconMap",
     "AIModelVersion", "AIRecommendation", "AIAlert", "AIRetrainingLog", "AIFeedbackLog",
     "OnlineOrder", "OnlineOrderItem",
+    "StockReservation", "EcommercePayment", "SyncLog",
     "LoyaltyWallet", "LoyaltyWalletTransaction", "CustomerDuplicateFlag",
     "SyncEvent", "DeviceSyncState",
     "CompetitorPriceEntry", "CompetitorPriceSuggestion", "AIDecisionLog",
@@ -99,6 +102,7 @@ __all__ = [
     "IdempotencyKey",
     "FinancialPeriod",
     "Offer", "CustomerOffer", "OfferNotification",
+    "CustomerAccount",
     "PurchaseBatch",
     "PurchaseBatchItem",
     "PurchaseBatchExpense",

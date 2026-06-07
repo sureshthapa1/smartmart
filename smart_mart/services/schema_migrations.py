@@ -336,6 +336,11 @@ def _migration_steps() -> list[MigrationStep]:
                 "ALTER TABLE sales ADD COLUMN commission_amount NUMERIC(10,2) NOT NULL DEFAULT 0.00"
             ),
         ),
+        (
+            "2026_06_07_customer_accounts_table",
+            "Ensure customer_accounts table exists for storefront login.",
+            lambda conn: None,  # db.create_all() handles this
+        ),
     ]
 
 
