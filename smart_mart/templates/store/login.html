@@ -1,60 +1,54 @@
 {% extends "store/base_store.html" %}
-{% block title %}Login — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
-
+{% block title %}Sign In — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
-<div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;">
+<div style="min-height:75vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;">
   <div style="width:100%;max-width:420px;" class="fade-up">
 
-    <!-- CARD -->
-    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.08);">
-
+    <div class="ui-card" style="overflow:hidden;box-shadow:var(--shadow-lg);">
       <!-- Header -->
-      <div style="background:linear-gradient(135deg,#1c1917,#292524);padding:2rem;text-align:center;color:#fff;">
+      <div style="background:var(--brand-grad);padding:2rem;text-align:center;color:#fff;">
         <div style="font-size:2.5rem;margin-bottom:.5rem;">🥜</div>
-        <h2 style="font-size:1.3rem;font-weight:900;margin:0 0 .25rem;">Welcome Back</h2>
-        <p style="color:#a8a29e;font-size:.85rem;margin:0;">Sign in to your account</p>
+        <h2 style="font-size:1.25rem;font-weight:900;margin:0 0 .25rem;">Welcome Back</h2>
+        <p style="color:rgba(255,255,255,.82);font-size:.84rem;margin:0;">Sign in to your account</p>
       </div>
 
-      <!-- Form -->
       <div style="padding:1.75rem;">
         <form method="post" action="{{ url_for('store.login', next=next) }}" novalidate>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="next" value="{{ next }}">
 
           {% if next and next != '/' and 'store' in next %}
-          <div style="background:#eff6ff;border-radius:8px;padding:.65rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#1e40af;display:flex;align-items:center;gap:.5rem;">
+          <div class="flash-bar info" style="margin-bottom:1rem;">
             <i class="bi bi-arrow-return-right"></i>
-            You'll be redirected back after logging in.
+            You'll be redirected back after signing in.
           </div>
           {% endif %}
 
           <div style="margin-bottom:1rem;">
-            <label for="login-phone" style="display:block;font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:.4rem;">Phone Number</label>
-            <div style="position:relative;">
-              <i class="bi bi-telephone" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none;"></i>
-              <input id="login-phone" type="tel" name="phone" placeholder="98XXXXXXXX" required autofocus
-                     maxlength="15" autocomplete="tel"
-                     style="width:100%;padding:.6rem .85rem .6rem 2.4rem;border:1.5px solid var(--border);border-radius:10px;font-size:.9rem;outline:none;color:var(--text);"
-                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            <label class="field-label" for="login-phone">Phone Number</label>
+            <div class="field-wrap">
+              <i class="bi bi-telephone field-icon"></i>
+              <input id="login-phone" type="tel" name="phone" placeholder="98XXXXXXXX"
+                     required autofocus maxlength="15" autocomplete="tel"
+                     class="field-input has-icon">
             </div>
           </div>
 
-          <div style="margin-bottom:1.25rem;">
-            <label for="login-pw" style="display:block;font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:.4rem;">Password</label>
-            <div style="position:relative;">
-              <i class="bi bi-lock" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none;"></i>
-              <input type="password" name="password" id="login-pw" placeholder="Your password" required
-                     maxlength="128" autocomplete="current-password"
-                     style="width:100%;padding:.6rem 2.5rem .6rem 2.4rem;border:1.5px solid var(--border);border-radius:10px;font-size:.9rem;outline:none;color:var(--text);"
-                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+          <div style="margin-bottom:1.5rem;">
+            <label class="field-label" for="login-pw">Password</label>
+            <div class="field-wrap">
+              <i class="bi bi-lock field-icon"></i>
+              <input type="password" name="password" id="login-pw" placeholder="Your password"
+                     required maxlength="128" autocomplete="current-password"
+                     class="field-input has-icon" style="padding-right:2.6rem;">
               <button type="button" onclick="togglePw()" tabindex="-1"
-                      style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:0;">
+                      style="position:absolute;right:.8rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:.9rem;padding:0;line-height:1;">
                 <i class="bi bi-eye" id="pw-eye"></i>
               </button>
             </div>
           </div>
 
-          <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.7rem;font-size:.95rem;">
+          <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.75rem;font-size:.95rem;">
             <i class="bi bi-box-arrow-in-right"></i> Sign In
           </button>
         </form>
@@ -64,26 +58,25 @@
           <a href="{{ url_for('store.register_view') }}" style="color:var(--brand);font-weight:700;text-decoration:none;">Create one →</a>
         </div>
 
-        <div style="text-align:center;margin-top:.5rem;">
-          <span style="font-size:.78rem;color:var(--muted);">Forgot your password? Contact us at 
-            <a href="tel:{{ settings.phone if settings and settings.phone else '' }}" style="color:var(--brand);">{{ settings.phone if settings and settings.phone else 'our store' }}</a>
-            to reset it.
-          </span>
+        <div style="text-align:center;margin-top:.5rem;font-size:.78rem;color:var(--muted);">
+          Forgot password? Call
+          <a href="tel:{{ settings.phone if settings and settings.phone else '' }}" style="color:var(--brand);">
+            {{ settings.phone if settings and settings.phone else 'our store' }}
+          </a>
         </div>
 
         <div style="text-align:center;margin-top:.75rem;">
-          <a href="{{ url_for('store.home') }}" style="font-size:.8rem;color:var(--muted);text-decoration:none;">
+          <a href="{{ url_for('store.home') }}" class="btn-ghost" style="font-size:.8rem;padding:.35rem .85rem;">
             <i class="bi bi-arrow-left"></i> Continue without account
           </a>
         </div>
       </div>
-
     </div>
 
-    <!-- BENEFITS -->
-    <div style="display:flex;flex-direction:column;gap:.6rem;margin-top:1.25rem;">
-      {% for icon, text in [('🔄','View your order history'),('📦','Track deliveries easily'),('⚡','Faster checkout with saved address')] %}
-      <div style="display:flex;align-items:center;gap:.65rem;font-size:.82rem;color:var(--muted);">
+    <!-- Benefits -->
+    <div style="display:flex;flex-direction:column;gap:.55rem;margin-top:1.25rem;padding:0 .25rem;">
+      {% for icon, text in [('🔄','View & manage your order history'),('📦','Track all your deliveries easily'),('⚡','Faster checkout with saved address')] %}
+      <div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--muted);">
         <span>{{ icon }}</span><span>{{ text }}</span>
       </div>
       {% endfor %}
@@ -92,19 +85,13 @@
   </div>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script>
 function togglePw() {
-  const input = document.getElementById('login-pw');
+  const inp = document.getElementById('login-pw');
   const eye = document.getElementById('pw-eye');
-  if (input.type === 'password') {
-    input.type = 'text';
-    eye.className = 'bi bi-eye-slash';
-  } else {
-    input.type = 'password';
-    eye.className = 'bi bi-eye';
-  }
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  eye.className = inp.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye';
 }
 </script>
 {% endblock %}
