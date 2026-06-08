@@ -1,0 +1,235 @@
+{% extends "store/base_store.html" %}
+{% block title %}{{ product.name }} — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block meta_desc %}Buy {{ product.name }} online. {{ product.category or 'Premium dry fruit' }} at NPR {{ "%.0f"|format(product.selling_price) }} — delivered in Nepal.{% endblock %}
+
+{% block og_image %}{% if product.image_filename %}{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block og_desc %}{{ product.description or (product.name + ' — ' + (product.category or 'Dry Fruit') + ' at NPR ' + '%.0f'|format(product.selling_price) + '. Delivered in Nepal.') }}{% endblock %}
+
+{% block head %}
+<link rel="canonical" href="{{ url_for('store.product_detail', product_id=product.id, _external=True) }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "{{ product.name | e }}",
+  "description": "{{ (product.description or product.name) | e }}",
+  "sku": "{{ product.sku | e }}",
+  {% if product.image_filename %}
+  "image": "{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}",
+  {% endif %}
+  "brand": {
+    "@type": "Brand",
+    "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}"
+  },
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "NPR",
+    "price": "{{ '%.2f'|format(product.selling_price) }}",
+    "availability": "{% if avail > 0 %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+    "seller": {
+      "@type": "Organization",
+      "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}"
+    }
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="section-container py-4">
+
+  <!-- BREADCRUMB -->
+  <nav aria-label="breadcrumb" style="font-size:.8rem;margin-bottom:1.25rem;">
+    <ol class="breadcrumb" style="background:none;padding:0;margin:0;">
+      <li class="breadcrumb-item"><a href="{{ url_for('store.home') }}" style="color:var(--brand);text-decoration:none;">Home</a></li>
+      {% if product.category %}
+      <li class="breadcrumb-item"><a href="{{ url_for('store.home', category=product.category) }}" style="color:var(--brand);text-decoration:none;">{{ product.category }}</a></li>
+      {% endif %}
+      <li class="breadcrumb-item active" style="color:var(--muted);">{{ product.name }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-4 align-items-start">
+
+    <!-- PRODUCT IMAGE -->
+    <div class="col-md-5 fade-up">
+      <div class="product-detail-img" style="border-radius:var(--radius);overflow:hidden;aspect-ratio:1;background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;">
+        {% if product.image_filename %}
+        <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}"
+             alt="{{ product.name }}" style="width:100%;height:100%;object-fit:cover;">
+        {% else %}
+        <div style="font-size:7rem;opacity:.7;">🥜</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- PRODUCT INFO -->
+    <div class="col-md-7 fade-up fade-up-d1">
+      {% if product.category %}
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin-bottom:.4rem;">{{ product.category }}</div>
+      {% endif %}
+
+      <h1 style="font-size:1.6rem;font-weight:900;color:var(--text);margin-bottom:.5rem;">{{ product.name }}</h1>
+
+      {% if product.sku %}
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:1rem;">SKU: {{ product.sku }}</div>
+      {% endif %}
+
+      {% if product.description %}
+      <div style="font-size:.9rem;color:var(--muted);line-height:1.65;margin-bottom:1rem;">{{ product.description }}</div>
+      {% endif %}
+
+      {% if product.pack_size %}
+      <div style="display:inline-flex;align-items:center;gap:.4rem;background:#f9f5f0;border-radius:6px;padding:.25em .65em;font-size:.8rem;font-weight:700;color:var(--brand-dark);margin-bottom:1rem;">
+        <i class="bi bi-box2"></i> {{ product.pack_size }}
+      </div>
+      {% elif product.unit and product.unit != 'pcs' %}
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">per {{ product.unit }}</div>
+      {% endif %}
+
+      <!-- PRICE -->
+      <div style="margin-bottom:1.25rem;">
+        <span style="font-size:2rem;font-weight:900;color:var(--brand-dark);">
+          <span style="font-size:1rem;vertical-align:super;">NPR</span>{{ "%.0f"|format(product.selling_price) }}
+        </span>
+      </div>
+
+      <!-- AVAILABILITY -->
+      {% if avail > 10 %}
+      <div class="d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+        <span style="color:#16a34a;font-weight:600;">In Stock</span>
+        <span style="color:var(--muted);">({{ avail }} available)</span>
+      </div>
+      {% elif avail > 0 %}
+      <div class="d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>
+        <span style="color:#b45309;font-weight:600;">Only {{ avail }} left!</span>
+      </div>
+      {% else %}
+      <div class="d-flex align-items-center gap-2 mb-3" style="font-size:.85rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+        <span style="color:#dc2626;font-weight:600;">Out of Stock</span>
+      </div>
+      {% endif %}
+
+      <!-- QTY + ADD -->
+      {% if avail > 0 %}
+      <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+        <div class="qty-control">
+          <button type="button" id="qty-minus" onclick="changeQty(-1)">−</button>
+          <input type="number" id="qty-input" value="1" min="1" max="{{ avail }}" readonly>
+          <button type="button" id="qty-plus" onclick="changeQty(1)">+</button>
+        </div>
+        <button class="btn-add" id="add-btn" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1"
+                style="padding:.6rem 1.5rem;border-radius:50px;font-size:.9rem;">
+          <i class="bi bi-cart-plus"></i> Add to Cart
+        </button>
+      </div>
+      {% if cart_qty > 0 %}
+      <div style="font-size:.78rem;color:var(--brand);margin-top:.35rem;">
+        <i class="bi bi-bag-check me-1"></i>{{ cart_qty }} already in your cart
+        <a href="{{ url_for('store.cart') }}" style="color:var(--brand);font-weight:600;margin-left:.4rem;">View cart →</a>
+      </div>
+      {% endif %}
+      {% else %}
+      <button class="btn-add" disabled style="background:#e2e8f0;color:#94a3b8;cursor:not-allowed;padding:.6rem 1.5rem;border-radius:50px;font-size:.9rem;margin-bottom:1rem;">
+        Out of Stock
+      </button>
+      {% if avail <= 0 %}
+      <div style="margin-top:1rem;padding:1rem;background:#f9f5f0;border-radius:var(--radius-sm);">
+        <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:.5rem;">🔔 Notify me when available</div>
+        <form method="post" action="{{ url_for('store.notify_stock', product_id=product.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if customer %}
+          <input type="hidden" name="phone" value="{{ customer.phone }}">
+          <input type="hidden" name="name" value="{{ customer.name }}">
+          {% else %}
+          <input type="tel" name="phone" placeholder="Your phone: 98XXXXXXXX"
+                 style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.84rem;margin-bottom:.5rem;outline:none;"
+                 onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+          {% endif %}
+          <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.55rem;font-size:.85rem;">
+            <i class="bi bi-bell"></i> Notify Me
+          </button>
+        </form>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- FEATURES -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <div style="background:#f9f5f0;border-radius:var(--radius-sm);padding:.75rem;display:flex;align-items:center;gap:.6rem;">
+            <span style="font-size:1.2rem;">🚚</span>
+            <div>
+              <div style="font-size:.75rem;font-weight:700;color:var(--text);">Home Delivery</div>
+              <div style="font-size:.68rem;color:var(--muted);">NPR 100 flat rate</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:#f9f5f0;border-radius:var(--radius-sm);padding:.75rem;display:flex;align-items:center;gap:.6rem;">
+            <span style="font-size:1.2rem;">💵</span>
+            <div>
+              <div style="font-size:.75rem;font-weight:700;color:var(--text);">Cash on Delivery</div>
+              <div style="font-size:.68rem;color:var(--muted);">Pay when received</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RELATED PRODUCTS -->
+  {% if related %}
+  <div class="mt-5">
+    <div class="section-head" style="padding-left:0;padding-right:0;">
+      <div class="section-title">You Might Also <span>Like</span></div>
+      <a href="{{ url_for('store.home', category=product.category) }}" class="section-link">See all →</a>
+    </div>
+    <div class="row g-3">
+      {% for rp in related %}
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="product-card">
+          <div class="product-img-wrap">
+            {% if rp.image_filename %}
+            <img src="{{ url_for('static', filename='uploads/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
+            {% else %}
+            <div class="product-img-placeholder">🥜</div>
+            {% endif %}
+          </div>
+          <div class="product-body">
+            <div class="product-name">{{ rp.name }}</div>
+            <div class="product-price mt-auto"><span class="currency">NPR</span>{{ "%.0f"|format(rp.selling_price) }}</div>
+          </div>
+          <div class="product-footer">
+            <button class="btn-add" data-add-cart data-pid="{{ rp.id }}" data-name="{{ rp.name }}" data-qty="1">
+              <i class="bi bi-cart-plus"></i> Add
+            </button>
+            <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const maxQty = {{ avail }};
+function changeQty(delta) {
+  const input = document.getElementById('qty-input');
+  const btn = document.getElementById('add-btn');
+  let v = parseInt(input.value) + delta;
+  v = Math.max(1, Math.min(v, maxQty));
+  input.value = v;
+  if (btn) btn.dataset.qty = v;
+}
+</script>
+{% endblock %}

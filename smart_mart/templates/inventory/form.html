@@ -242,10 +242,30 @@
 
           </div>
 
-          <div class="mt-4 d-flex gap-2">
+          <div class="mt-4 d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary px-4">
               <i class="bi bi-check-lg me-1"></i>{{ action }} Product
             </button>
+            {% if product and product.id %}
+            <div class="d-flex gap-2">
+              <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
+                <input type="hidden" name="force" value="0">
+                <button type="submit" class="btn btn-outline-success"
+                        title="Auto-fill missing description, image and pack size based on product name"
+                        onclick="return confirm('Auto-fill missing fields for {{ product.name }}?\n\nThis will only fill empty fields (description, image, pack size).')">
+                  <i class="bi bi-stars me-1"></i> Auto-fill Missing
+                </button>
+              </form>
+              <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
+                <input type="hidden" name="force" value="1">
+                <button type="submit" class="btn btn-outline-warning"
+                        title="Force re-generate ALL auto-fill fields, overwriting existing values"
+                        onclick="return confirm('Force overwrite ALL auto-fill fields for {{ product.name }}?\n\nThis will replace existing description, image and pack size.')">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Force Regenerate
+                </button>
+              </form>
+            </div>
+            {% endif %}
             <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary">Cancel</a>
           </div>
         </form>

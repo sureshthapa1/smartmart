@@ -1,0 +1,205 @@
+{% extends "store/base_store.html" %}
+{% block title %}My Account — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+
+{% block content %}
+<div class="section-container py-4">
+
+  <!-- PAGE HEADER -->
+  <div class="d-flex align-items-center gap-3 mb-4 fade-up">
+    <div style="width:56px;height:56px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:1.4rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(180,83,9,.3);">
+      {{ customer.name[0].upper() }}
+    </div>
+    <div>
+      <h1 style="font-size:1.3rem;font-weight:900;margin:0;">{{ customer.name }}</h1>
+      <div style="font-size:.82rem;color:var(--muted);">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+    </div>
+    <a href="{{ url_for('store.logout') }}" class="ms-auto btn-outline-brand" style="padding:.4rem 1rem;font-size:.82rem;">
+      <i class="bi bi-box-arrow-right"></i> Logout
+    </a>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- LEFT: PROFILE + PASSWORD -->
+    <div class="col-lg-4">
+
+      <!-- Profile card -->
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1rem;" class="fade-up">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-weight:800;font-size:.9rem;">
+          <i class="bi bi-person me-2" style="color:var(--brand);"></i>Profile
+        </div>
+        <div style="padding:1.25rem;">
+          <form method="post" action="{{ url_for('store.account_update') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="margin-bottom:.85rem;">
+              <label for="acc-name" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Full Name</label>
+              <input id="acc-name" type="text" name="name" value="{{ customer.name }}" required
+                     maxlength="120" autocomplete="name"
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:.85rem;">
+              <label for="acc-phone" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Phone</label>
+              <input id="acc-phone" type="text" value="{{ customer.phone }}" disabled
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;background:#f9f5f0;color:var(--muted);">
+              <div style="font-size:.7rem;color:var(--muted);margin-top:.2rem;">Phone cannot be changed</div>
+            </div>
+            <div style="margin-bottom:.85rem;">
+              <label for="acc-email" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Email</label>
+              <input id="acc-email" type="email" name="email" value="{{ customer.email or '' }}" placeholder="Optional"
+                     maxlength="120" autocomplete="email"
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:.85rem;">
+              <label for="acc-address" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Delivery Address</label>
+              <input id="acc-address" type="text" name="address" value="{{ customer.address or '' }}" placeholder="Your default address"
+                     maxlength="255" autocomplete="street-address"
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:1rem;">
+              <label for="acc-area" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Area / Zone</label>
+              <input id="acc-area" type="text" name="area" value="{{ customer.area or '' }}" placeholder="Lazimpat, Baneshwor…"
+                     maxlength="80"
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.6rem;">
+              <i class="bi bi-check-lg"></i> Save Changes
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Change password card -->
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;" class="fade-up fade-up-d1">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-weight:800;font-size:.9rem;">
+          <i class="bi bi-shield-lock me-2" style="color:var(--brand);"></i>Change Password
+        </div>
+        <div style="padding:1.25rem;">
+          <form method="post" action="{{ url_for('store.account_change_password') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for field_name, label, ph, ac in [
+              ('current_password','Current Password','Your current password','current-password'),
+              ('new_password','New Password','At least 6 characters','new-password'),
+              ('confirm_password','Confirm New Password','Repeat new password','new-password')
+            ] %}
+            <div style="margin-bottom:.85rem;">
+              <label for="acc-{{ field_name }}" style="font-size:.75rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">{{ label }}</label>
+              <input id="acc-{{ field_name }}" type="password" name="{{ field_name }}" placeholder="{{ ph }}" required
+                     maxlength="128" autocomplete="{{ ac }}"
+                     style="width:100%;padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn-outline-brand w-100 justify-content-center" style="padding:.55rem;">
+              <i class="bi bi-key"></i> Update Password
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: ORDER HISTORY -->
+    <div class="col-lg-8 fade-up fade-up-d1" id="orders">
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-weight:800;font-size:.9rem;"><i class="bi bi-bag-check me-2" style="color:var(--brand);"></i>My Orders</div>
+          <a href="{{ url_for('store.track') }}" style="font-size:.8rem;color:var(--brand);text-decoration:none;font-weight:600;">Track an order →</a>
+        </div>
+
+        {% if orders %}
+        <div>
+          {% for order in orders %}
+          {% set slabel, scolor = order.status_label %}
+          <div style="padding:1.1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid #f5f5f4;{% endif %}">
+            <div class="d-flex align-items-start gap-3 flex-wrap">
+
+              <!-- Status icon -->
+              <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
+                background:{% if order.status=='delivered' %}#f0fdf4{% elif order.status=='cancelled' %}#fef2f2{% else %}#fffbeb{% endif %};
+                display:flex;align-items:center;justify-content:center;font-size:1.25rem;">
+                {% if order.status=='delivered' %}📦
+                {% elif order.status=='cancelled' %}❌
+                {% elif order.status=='out_for_delivery' %}🚴
+                {% elif order.status=='preparing' %}🔧
+                {% elif order.status=='confirmed' %}✅
+                {% else %}⏳{% endif %}
+              </div>
+
+              <!-- Details -->
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                  <span style="font-size:.9rem;font-weight:800;color:var(--text);">{{ order.order_number }}</span>
+                  <span style="font-size:.7rem;font-weight:700;padding:.2em .6em;border-radius:5px;
+                    background:{% if scolor=='success' %}#f0fdf4{% elif scolor=='danger' %}#fef2f2{% elif scolor=='warning' %}#fffbeb{% else %}#eff6ff{% endif %};
+                    color:{% if scolor=='success' %}#16a34a{% elif scolor=='danger' %}#dc2626{% elif scolor=='warning' %}#b45309{% else %}#2563eb{% endif %};">
+                    {{ slabel }}
+                  </span>
+                </div>
+                <div style="font-size:.8rem;color:var(--muted);margin-bottom:.3rem;">
+                  {{ order.items|length }} item{{ 's' if order.items|length != 1 }} ·
+                  <strong style="color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</strong> ·
+                  {% set pm_labels = {'cod': 'Cash on Delivery', 'esewa': 'eSewa', 'khalti': 'Khalti', 'ime_pay': 'IME Pay', 'online': 'Online'} %}
+                  {{ pm_labels.get(order.payment_mode, order.payment_mode|upper) }}
+                </div>
+                <div style="font-size:.75rem;color:var(--muted);">
+                  {{ order.created_at | nst('%d %b %Y, %H:%M') if order.created_at else '' }}
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="d-flex gap-2 flex-shrink-0">
+                <a href="{{ url_for('store.track', order_number=order.order_number) }}"
+                   style="font-size:.78rem;font-weight:600;color:var(--brand);text-decoration:none;border:1.5px solid var(--border);border-radius:8px;padding:.3rem .75rem;white-space:nowrap;">
+                  <i class="bi bi-geo-alt"></i> Track
+                </a>
+                {% if order.status == 'pending' %}
+                <form method="post" action="{{ url_for('store.cancel_order', order_number=order.order_number) }}" style="display:inline;" onsubmit="return confirm('Cancel order {{ order.order_number }}?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" style="font-size:.78rem;font-weight:600;color:#ef4444;background:none;border:1.5px solid #fecaca;border-radius:8px;padding:.3rem .75rem;cursor:pointer;white-space:nowrap;">
+                    <i class="bi bi-x-circle"></i> Cancel
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+
+            </div>
+
+            <!-- Items preview -->
+            <div style="margin-top:.65rem;padding:.6rem .75rem;background:#f9f5f0;border-radius:8px;font-size:.78rem;color:var(--muted);">
+              {{ order.items | map(attribute='product_name') | list | join(', ') | truncate(80) }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="empty-state" style="padding:3rem 1.5rem;">
+          <div class="empty-icon">🛒</div>
+          <h4>No orders yet</h4>
+          <p>Your order history will appear here after your first purchase.</p>
+          <a href="{{ url_for('store.home') }}" class="btn-brand mt-2"><i class="bi bi-bag-heart"></i> Start Shopping</a>
+        </div>
+        {% endif %}
+
+        {% if total_pages > 1 %}
+        <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:center;gap:.5rem;">
+          {% for p in range(1, total_pages+1) %}
+          <a href="{{ url_for('store.my_account', page=p) }}#orders"
+             style="padding:.3rem .75rem;border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;
+             {% if p == page %}background:var(--brand-grad);color:#fff;{% else %}border:1px solid var(--border);color:var(--muted);{% endif %}">
+            {{ p }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

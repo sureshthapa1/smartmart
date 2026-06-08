@@ -283,6 +283,8 @@ def _register_blueprints(app):
         (".blueprints.online_orders", "online_orders_bp"),
         (".blueprints.settings", "settings_bp"),
         (".blueprints.operations", "operations_bp"),
+        (".blueprints.ecommerce_api", "ecommerce_api_bp"),
+        (".blueprints.store", "store_bp"),
         (".blueprints.api", "api_bp"),
         (".blueprints.expenses", "expenses_bp"),
         (".blueprints.advisor", "advisor_bp"),
@@ -322,6 +324,12 @@ def _register_blueprints(app):
     try:
         from .blueprints.api.routes import run_bots
         csrf.exempt(run_bots)
+    except Exception:
+        pass
+
+    try:
+        from .blueprints.ecommerce_api import ecommerce_api_bp as _ecommerce_api_bp
+        csrf.exempt(_ecommerce_api_bp)
     except Exception:
         pass
 

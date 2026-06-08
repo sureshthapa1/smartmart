@@ -235,6 +235,25 @@ def delete_product(product_id):
     return redirect(url_for("inventory.list_products"))
 
 
+@inventory_bp.route("/<int:product_id>/autofill", methods=["POST"])
+@admin_required
+def autofill_product(product_id):
+    """Manually trigger auto-fill of description, image, and pack_size for a product."""
+    product = db.get_or_404(Product, product_id)
+    force = request.form.get("force", "0") == "1"
+    try:
+        from ...services.product_autofill import autofill_product as _autofill
+        updated = _autofill(product, force=force)
+        if updated:
+            fields = ", ".join(updated.keys())
+            flash(f"Auto-filled: {fields} for '{product.name}'.", "success")
+        else:
+            flash(f"'{product.name}' already has all fields filled. Use Force to overwrite.", "info")
+    except Exception as exc:
+        flash(f"Auto-fill failed: {exc}", "danger")
+    return redirect(url_for("inventory.edit_product", product_id=product_id))
+
+
 @inventory_bp.route("/<int:product_id>/adjust-stock", methods=["GET", "POST"])
 @login_required
 def adjust_stock(product_id):

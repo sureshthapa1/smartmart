@@ -1,0 +1,191 @@
+{% extends "store/base_store.html" %}
+{% block title %}Checkout — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block content %}
+<div class="section-container py-4">
+  <div class="mb-3 fade-up">
+    <a href="{{ url_for('store.cart') }}" style="color:var(--muted);text-decoration:none;font-size:.85rem;"><i class="bi bi-arrow-left"></i> Back to Cart</a>
+  </div>
+  <div class="row g-4">
+
+    <!-- CHECKOUT FORM -->
+    <div class="col-lg-7 fade-up">
+      <form method="post" action="{{ url_for('store.checkout') }}" id="checkout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- DELIVERY INFO -->
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1.25rem;">
+          <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span>
+            <h3 style="font-size:.95rem;font-weight:800;margin:0;">Delivery Information</h3>
+          </div>
+          <div style="padding:1.25rem 1.5rem;">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="form-label" for="field-name" style="font-size:.8rem;font-weight:700;color:var(--muted);">Full Name *</label>
+                <input id="field-name" type="text" name="name" class="form-control" placeholder="Ramesh Sharma"
+                       value="{{ form_data.get('name','') }}" required maxlength="120" autocomplete="name" style="border-radius:10px;border-color:var(--border);">
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="field-phone" style="font-size:.8rem;font-weight:700;color:var(--muted);">Phone Number *</label>
+                <input id="field-phone" type="tel" name="phone" class="form-control" placeholder="98XXXXXXXX or 97XXXXXXXX"
+                       value="{{ form_data.get('phone','') }}" required maxlength="15" autocomplete="tel" style="border-radius:10px;border-color:var(--border);">
+                <div style="font-size:.7rem;color:var(--muted);margin-top:.2rem;">Nepal number only (98/97 XXXXXXXX)</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="field-email" style="font-size:.8rem;font-weight:700;color:var(--muted);">Email (optional)</label>
+                <input id="field-email" type="email" name="email" class="form-control" placeholder="you@example.com"
+                       value="{{ form_data.get('email','') }}" maxlength="120" autocomplete="email" style="border-radius:10px;border-color:var(--border);">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="field-address" style="font-size:.8rem;font-weight:700;color:var(--muted);">Delivery Address *</label>
+                <input id="field-address" type="text" name="address" class="form-control" placeholder="House no., street, landmark"
+                       value="{{ form_data.get('address','') }}" required maxlength="255" autocomplete="street-address" style="border-radius:10px;border-color:var(--border);">
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="field-area" style="font-size:.8rem;font-weight:700;color:var(--muted);">Area / Zone</label>
+                <input id="field-area" type="text" name="area" class="form-control" placeholder="Lazimpat, Baneshwor…"
+                       value="{{ form_data.get('area','') }}" maxlength="80" style="border-radius:10px;border-color:var(--border);">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="field-notes" style="font-size:.8rem;font-weight:700;color:var(--muted);">Order Notes (optional)</label>
+                <textarea id="field-notes" name="notes" class="form-control" rows="2" placeholder="Any special instructions?"
+                          style="border-radius:10px;border-color:var(--border);">{{ form_data.get('notes','') }}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROMO CODE -->
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1.25rem;">
+          <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
+            <h3 style="font-size:.95rem;font-weight:800;margin:0;">Promo Code <span style="font-size:.75rem;color:var(--muted);font-weight:400;">(optional)</span></h3>
+          </div>
+          <div style="padding:1rem 1.5rem;">
+            <div style="display:flex;gap:.5rem;">
+              <input type="text" name="promo_code" id="promo-code" placeholder="Enter promo code"
+                     value="{{ form_data.get('promo_code','') }}" maxlength="30"
+                     style="flex:1;padding:.55rem .85rem;border:1.5px solid var(--border);border-radius:10px;font-size:.88rem;outline:none;text-transform:uppercase;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;">Discount will be applied at checkout</div>
+          </div>
+        </div>
+
+        <!-- PAYMENT METHOD -->
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:1.25rem;">
+          <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem;">
+            <span style="width:28px;height:28px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
+            <h3 style="font-size:.95rem;font-weight:800;margin:0;">Payment Method</h3>
+          </div>
+          <div style="padding:1.25rem 1.5rem;">
+            <div class="d-flex flex-column gap-2" id="payment-options">
+              {% for method, label, icon, desc in [
+                ('cod','Cash on Delivery','💵','Pay when your order arrives'),
+                ('esewa','eSewa','📱','Nepal\'s most popular e-wallet'),
+                ('khalti','Khalti','💜','Fast digital payment'),
+                ('ime_pay','IME Pay','🏦','Bank & mobile payment'),
+              ] %}
+              <label class="payment-option" style="display:flex;align-items:center;gap:.85rem;padding:.85rem 1rem;border-radius:var(--radius-sm);border:1.5px solid {% if form_data.get('payment_method', 'cod') == method %}var(--brand){% else %}var(--border){% endif %};cursor:pointer;transition:all .18s;background:{% if form_data.get('payment_method', 'cod') == method %}var(--brand-light){% else %}#fff{% endif %};">
+                <input type="radio" name="payment_method" value="{{ method }}" {% if form_data.get('payment_method', 'cod') == method %}checked{% endif %} style="display:none;">
+                <span style="font-size:1.4rem;">{{ icon }}</span>
+                <div style="flex:1;">
+                  <div style="font-weight:700;font-size:.9rem;">{{ label }}</div>
+                  <div style="font-size:.75rem;color:var(--muted);">{{ desc }}</div>
+                </div>
+                <div style="width:18px;height:18px;border-radius:50%;border:2px solid {% if form_data.get('payment_method', 'cod') == method %}var(--brand){% else %}#d4d4d0{% endif %};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  {% if form_data.get('payment_method', 'cod') == method %}<div style="width:8px;height:8px;border-radius:50%;background:var(--brand);"></div>{% endif %}
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- PLACE ORDER -->
+        <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.85rem;font-size:1rem;" id="place-btn">
+          <i class="bi bi-bag-check"></i> Place Order
+        </button>
+        <div style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:.75rem;">
+          <i class="bi bi-shield-lock me-1"></i>Your order is secure. Stock is reserved for 30 minutes after placing.
+        </div>
+      </form>
+    </div>
+
+    <!-- ORDER SUMMARY -->
+    <div class="col-lg-5 fade-up fade-up-d1">
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;position:sticky;top:calc(var(--nav-h) + 1rem);">
+        <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);">
+          <h3 style="font-size:.95rem;font-weight:800;margin:0;">Order Summary</h3>
+        </div>
+        <div style="padding:1.1rem 1.5rem;">
+          {% for item in items %}
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div style="width:44px;height:44px;flex-shrink:0;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+              {% if item.product.image_filename %}
+              <img src="{{ url_for('static', filename='uploads/' + item.product.image_filename) }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+              {% else %}🥜{% endif %}
+            </div>
+            <div class="flex-grow-1" style="min-width:0;">
+              <div style="font-size:.84rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ item.product.name }}</div>
+              <div style="font-size:.74rem;color:var(--muted);">×{{ item.qty }}</div>
+            </div>
+            <div style="font-size:.88rem;font-weight:700;color:var(--brand-dark);flex-shrink:0;">NPR {{ "%.0f"|format(item.line_total) }}</div>
+          </div>
+          {% endfor %}
+          <hr style="border-color:var(--border);margin:.75rem 0;">
+          <div class="d-flex justify-content-between mb-1" style="font-size:.88rem;"><span style="color:var(--muted);">Subtotal</span><span>NPR {{ "%.0f"|format(subtotal) }}</span></div>
+          <div class="d-flex justify-content-between mb-2" style="font-size:.88rem;">
+            <span style="color:var(--muted);">Delivery</span>
+            {% if delivery == 0 %}
+            <span style="color:#16a34a;font-weight:700;">FREE 🎉</span>
+            {% else %}
+            <span>NPR {{ "%.0f"|format(delivery) }}</span>
+            {% endif %}
+          </div>
+          {% if delivery > 0 and free_delivery_threshold %}
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:.5rem;">
+            Add NPR {{ "%.0f"|format(free_delivery_threshold - subtotal) }} more for free delivery
+          </div>
+          {% endif %}
+          <div class="d-flex justify-content-between" style="font-size:1.05rem;font-weight:800;">
+            <span>Total</span><span style="color:var(--brand-dark);">NPR {{ "%.0f"|format(grand_total) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Payment option selector
+document.querySelectorAll('.payment-option').forEach(label => {
+  label.addEventListener('click', function() {
+    document.querySelectorAll('.payment-option').forEach(l => {
+      l.style.borderColor = 'var(--border)';
+      l.style.background = '#fff';
+      const dot = l.querySelector('div>div');
+      const ring = l.querySelector('div:last-child');
+      if (ring) ring.style.borderColor = '#d4d4d0';
+      if (dot) dot.style.display = 'none';
+    });
+    this.style.borderColor = 'var(--brand)';
+    this.style.background = 'var(--brand-light)';
+    const ring = this.querySelector('div:last-child');
+    if (ring) {
+      ring.style.borderColor = 'var(--brand)';
+      ring.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;background:var(--brand);"></div>';
+    }
+  });
+});
+
+// Submit loading state
+document.getElementById('checkout-form').addEventListener('submit', function() {
+  const btn = document.getElementById('place-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Placing Order…';
+});
+</script>
+{% endblock %}
