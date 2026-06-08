@@ -22,7 +22,7 @@ def _uploads_dir() -> str:
     global _UPLOADS_DIR
     if _UPLOADS_DIR is None:
         here = os.path.dirname(os.path.dirname(__file__))  # smart_mart/
-        _UPLOADS_DIR = os.path.join(here, "static", "uploads")
+        _UPLOADS_DIR = os.path.join(here, "static", "uploads", "products")
         os.makedirs(_UPLOADS_DIR, exist_ok=True)
     return _UPLOADS_DIR
 
