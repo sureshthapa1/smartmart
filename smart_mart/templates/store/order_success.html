@@ -1,94 +1,84 @@
 {% extends "store/base_store.html" %}
 {% block title %}Order Placed! — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
-<div class="section-container py-5">
+<div class="sc" style="padding-top:2rem;padding-bottom:4rem;">
   <div style="max-width:560px;margin:0 auto;">
 
-    <!-- SUCCESS CARD -->
-    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;text-align:center;" class="fade-up">
-      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:2.5rem 2rem 1.75rem;">
-        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#22c55e);margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 24px rgba(22,163,74,.3);">✅</div>
-        <h2 style="font-size:1.4rem;font-weight:900;color:#14532d;margin-bottom:.4rem;">Order Placed Successfully!</h2>
-        <p style="color:#166534;font-size:.9rem;margin:0;">Thank you for your order. We'll confirm it shortly.</p>
+    <div class="ui-card fade-up" style="overflow:hidden;">
+      <!-- Success header -->
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:2.5rem 2rem 2rem;text-align:center;border-bottom:1px solid #bbf7d0;">
+        <div style="width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#16a34a,#22c55e);margin:0 auto .85rem;display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 8px 24px rgba(22,163,74,.28);">✅</div>
+        <h2 style="font-size:1.35rem;font-weight:900;color:#14532d;margin-bottom:.35rem;">Order Placed Successfully!</h2>
+        <p style="color:#166534;font-size:.88rem;margin:0;">Thank you! We'll confirm your order shortly.</p>
       </div>
 
-      <div style="padding:1.5rem 2rem;">
-        <!-- ORDER NUMBER -->
-        <div style="background:#f9f5f0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
-          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.25rem;">Order Number</div>
-          <div style="font-size:1.4rem;font-weight:900;color:var(--brand-dark);letter-spacing:.04em;">{{ order.order_number }}</div>
-          <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem;">Save this for tracking your order</div>
+      <div style="padding:1.5rem 1.75rem;">
+        <!-- Order number -->
+        <div style="background:var(--brand-light);border:1.5px solid #fde68a;border-radius:var(--r-lg);padding:1rem 1.25rem;text-align:center;margin-bottom:1.5rem;">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.25rem;">Your Order Number</div>
+          <div class="mono" style="font-size:1.45rem;font-weight:900;color:var(--brand-dark);">{{ order.order_number }}</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem;">Save this for tracking your order</div>
         </div>
 
-        <!-- DETAILS -->
-        <div class="d-flex flex-column gap-2 mb-3" style="font-size:.88rem;">
-          <div class="d-flex align-items-center gap-2">
-            <span style="color:var(--brand);font-size:1rem;">👤</span>
-            <span style="color:var(--muted);">Customer:</span>
-            <span style="font-weight:600;">{{ order.customer_name }}</span>
+        <!-- Details -->
+        <div style="display:flex;flex-direction:column;gap:.55rem;margin-bottom:1.25rem;font-size:.875rem;">
+          {% for icon, label, value in [
+            ('👤','Customer', order.customer_name),
+            ('📞','Phone', order.customer_phone),
+            ('📍','Delivery', order.delivery_address),
+            ('💳','Payment', order.payment_mode | upper),
+          ] %}
+          <div style="display:flex;align-items:flex-start;gap:.65rem;">
+            <span>{{ icon }}</span>
+            <span style="color:var(--muted);min-width:70px;">{{ label }}:</span>
+            <span style="font-weight:600;">{{ value }}</span>
           </div>
-          <div class="d-flex align-items-center gap-2">
-            <span style="color:var(--brand);font-size:1rem;">📞</span>
-            <span style="color:var(--muted);">Phone:</span>
-            <span style="font-weight:600;">{{ order.customer_phone }}</span>
-          </div>
-          <div class="d-flex align-items-start gap-2">
-            <span style="color:var(--brand);font-size:1rem;">📍</span>
-            <span style="color:var(--muted);">Delivery:</span>
-            <span style="font-weight:600;">{{ order.delivery_address }}</span>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <span style="color:var(--brand);font-size:1rem;">💳</span>
-            <span style="color:var(--muted);">Payment:</span>
-            <span style="font-weight:600;">{{ order.payment_mode | upper }}</span>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <span style="color:var(--brand);font-size:1rem;">💰</span>
-            <span style="color:var(--muted);">Total:</span>
-            <span style="font-weight:800;color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
+          {% endfor %}
+          <div style="display:flex;align-items:center;gap:.65rem;">
+            <span>💰</span>
+            <span style="color:var(--muted);min-width:70px;">Total:</span>
+            <span style="font-weight:800;font-size:1rem;color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
           </div>
         </div>
 
-        <!-- ORDER ITEMS -->
-        <div style="background:#f9f5f0;border-radius:10px;padding:.85rem 1rem;margin-bottom:1.25rem;">
-          <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.5rem;">Items</div>
+        <!-- Items -->
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:.9rem 1rem;margin-bottom:1.25rem;">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.5rem;">Items Ordered</div>
           {% for item in order.items %}
-          <div class="d-flex justify-content-between" style="font-size:.86rem;{% if not loop.last %}margin-bottom:.3rem;{% endif %}">
+          <div style="display:flex;justify-content:space-between;font-size:.86rem;{% if not loop.last %}margin-bottom:.3rem;{% endif %}">
             <span>{{ item.product_name }} <span style="color:var(--muted);">×{{ item.quantity }}</span></span>
             <span style="font-weight:600;">NPR {{ "%.0f"|format(item.subtotal) }}</span>
           </div>
           {% endfor %}
         </div>
 
-        <!-- STATUS INFO -->
-        <div style="background:#eff6ff;border-radius:10px;padding:.85rem 1rem;margin-bottom:1.5rem;display:flex;gap:.75rem;text-align:left;">
-          <span style="font-size:1.2rem;flex-shrink:0;">ℹ️</span>
-          <div style="font-size:.8rem;color:#1e40af;">
+        <!-- What next -->
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r);padding:.9rem 1rem;margin-bottom:1.5rem;display:flex;gap:.65rem;">
+          <span style="font-size:1.1rem;flex-shrink:0;margin-top:.1rem;">ℹ️</span>
+          <div style="font-size:.8rem;color:#1e40af;line-height:1.65;">
             <strong>What happens next?</strong><br>
-            Our team will confirm your order within a few hours. You'll receive a call for COD orders. Track your order anytime using the order number above.
+            Our team will confirm your order within a few hours. You'll receive a call for COD orders. Use the order number above to track anytime.
           </div>
         </div>
 
-        <!-- ACTION BUTTONS -->
-        <div class="d-flex gap-2 flex-wrap">
+        <!-- Actions -->
+        <div style="display:flex;gap:.65rem;flex-wrap:wrap;">
           <a href="{{ url_for('store.track', order_number=order.order_number) }}"
-             class="btn-brand flex-fill justify-content-center" style="padding:.65rem;">
+             class="btn-brand flex-fill justify-content-center" style="padding:.7rem;">
             <i class="bi bi-geo-alt"></i> Track Order
           </a>
           <a href="{{ url_for('store.home') }}"
-             class="btn-outline-brand flex-fill justify-content-center" style="padding:.6rem;">
+             class="btn-outline-brand flex-fill justify-content-center" style="padding:.65rem;">
             <i class="bi bi-shop"></i> Continue Shopping
           </a>
         </div>
 
         {% if not customer %}
-        <div style="margin-top:1.25rem;padding:1rem;background:#f9f5f0;border-radius:10px;text-align:center;">
-          <div style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem;">
-            <i class="bi bi-person-plus me-1"></i>Create an account to track all your orders easily
+        <div style="margin-top:1.25rem;padding:1rem;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);text-align:center;">
+          <div style="font-size:.82rem;color:var(--muted);margin-bottom:.6rem;">
+            <i class="bi bi-person-plus me-1"></i>Create an account to track all orders easily
           </div>
-          <a href="{{ url_for('store.register_view') }}" class="btn-outline-brand" style="padding:.4rem 1rem;font-size:.8rem;">
-            Create Account
-          </a>
+          <a href="{{ url_for('store.register_view') }}" class="btn-ghost">Create Account →</a>
         </div>
         {% endif %}
       </div>
