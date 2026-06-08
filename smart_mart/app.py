@@ -63,6 +63,11 @@ def create_app(config_name="development"):
 
     _register_blueprints(app)
 
+    # ── Jinja globals ─────────────────────────────────────────────────────
+    from datetime import datetime as _dt
+    app.jinja_env.globals['now'] = _dt.utcnow
+
+
     # ── HTTP Security Headers ─────────────────────────────────────────────
     @app.after_request
     def set_security_headers(response):
