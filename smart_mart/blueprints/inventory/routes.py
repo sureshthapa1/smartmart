@@ -30,32 +30,20 @@ ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "bmp"}
 
 
 def _allowed_file(filename: str) -> bool:
+    from ...services.image_service import ALLOWED_EXTENSIONS
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def _save_product_image(file) -> str | None:
-    """Save uploaded image and return the filename."""
-    if not file or file.filename == "":
-        return None
-    if not _allowed_file(file.filename):
-        return None
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    filename = f"{uuid.uuid4().hex}.{ext}"
-    upload_dir = os.path.join(current_app.static_folder, "uploads", "products")
-    os.makedirs(upload_dir, exist_ok=True)
-    file.save(os.path.join(upload_dir, filename))
-    return filename
+    """Upload product image via image_service (Cloudinary or local fallback)."""
+    from ...services.image_service import save_product_image
+    return save_product_image(file)
 
 
-def _delete_product_image(filename: str) -> None:
-    """Delete an existing product image file."""
-    if filename:
-        try:
-            path = os.path.join(current_app.static_folder, "uploads", "products", filename)
-            if os.path.exists(path):
-                os.remove(path)
-        except Exception:
-            pass
+def _delete_product_image(identifier: str) -> None:
+    """Delete product image via image_service."""
+    from ...services.image_service import delete_product_image
+    delete_product_image(identifier)
 
 
 @inventory_bp.route("/")
