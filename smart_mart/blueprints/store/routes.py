@@ -146,7 +146,7 @@ def home():
     category  = request.args.get("category", "").strip()
     sort      = request.args.get("sort", "name")
 
-    expire_old_reservations()
+    _maybe_expire_reservations()
 
     stmt = db.select(Product).where(Product.is_active.isnot(False), Product.quantity > 0)
     if q:
