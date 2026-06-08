@@ -1,0 +1,92 @@
+{% extends "store/base_store.html" %}
+{% block title %}Contact Us — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block meta_desc %}Get in touch with GoldKernel. We're here to help with orders, deliveries, and product questions.{% endblock %}
+{% block content %}
+<div class="section-container py-5" style="max-width:760px;">
+  <div class="fade-up">
+    <div style="text-align:center;margin-bottom:2rem;">
+      <div style="font-size:2.5rem;margin-bottom:.75rem;">📞</div>
+      <h1 style="font-size:1.8rem;font-weight:900;margin-bottom:.5rem;">Contact Us</h1>
+      <p style="color:var(--muted);">We're here to help. Reach out any time — we respond within a few hours.</p>
+    </div>
+
+    <div class="row g-4">
+      <!-- Contact info -->
+      <div class="col-md-5 fade-up">
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:1.5rem;height:100%;">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1.25rem;">Get in Touch</h3>
+
+          {% if settings and settings.phone %}
+          <a href="tel:{{ settings.phone }}" style="text-decoration:none;display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;padding:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);transition:background .15s;" onmouseover="this.style.background='var(--brand-light)'" onmouseout="this.style.background='#f9f5f0'">
+            <div style="width:38px;height:38px;border-radius:10px;background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📞</div>
+            <div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Phone / WhatsApp</div><div style="font-weight:700;color:var(--text);">{{ settings.phone }}</div></div>
+          </a>
+          {% endif %}
+
+          {% if settings and settings.email %}
+          <a href="mailto:{{ settings.email }}" style="text-decoration:none;display:flex;gap:.75rem;align-items:center;margin-bottom:1rem;padding:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);transition:background .15s;" onmouseover="this.style.background='var(--brand-light)'" onmouseout="this.style.background='#f9f5f0'">
+            <div style="width:38px;height:38px;border-radius:10px;background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">✉️</div>
+            <div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Email</div><div style="font-weight:700;color:var(--text);">{{ settings.email }}</div></div>
+          </a>
+          {% endif %}
+
+          {% if settings and settings.address %}
+          <div style="display:flex;gap:.75rem;align-items:flex-start;margin-bottom:1rem;padding:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);">
+            <div style="width:38px;height:38px;border-radius:10px;background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📍</div>
+            <div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Address</div><div style="font-weight:600;color:var(--text);font-size:.88rem;">{{ settings.address }}</div></div>
+          </div>
+          {% endif %}
+
+          <div style="padding:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);">
+            <div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem;">Business Hours</div>
+            <div style="font-size:.85rem;font-weight:600;">Sunday – Friday: 8am – 7pm</div>
+            <div style="font-size:.85rem;font-weight:600;">Saturday: 9am – 5pm</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message form -->
+      <div class="col-md-7 fade-up fade-up-d1">
+        <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:1.5rem;">
+          <h3 style="font-size:.95rem;font-weight:800;margin-bottom:1.25rem;">Send a Message</h3>
+          <form method="post" action="{{ url_for('store.contact') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="margin-bottom:.85rem;">
+              <label for="c-name" style="font-size:.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Your Name *</label>
+              <input id="c-name" type="text" name="name" placeholder="Ramesh Sharma" required maxlength="120" autocomplete="name"
+                     style="width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:.85rem;">
+              <label for="c-contact" style="font-size:.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Phone or Email *</label>
+              <input id="c-contact" type="text" name="contact" placeholder="98XXXXXXXX or your@email.com" required maxlength="120"
+                     style="width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;"
+                     onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:1rem;">
+              <label for="c-subject" style="font-size:.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Subject</label>
+              <select id="c-subject" name="subject" style="width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;background:#fff;"
+                      onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'">
+                <option value="order">Order enquiry</option>
+                <option value="delivery">Delivery question</option>
+                <option value="product">Product question</option>
+                <option value="return">Return / refund</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div style="margin-bottom:1rem;">
+              <label for="c-msg" style="font-size:.78rem;font-weight:700;color:var(--muted);display:block;margin-bottom:.3rem;">Message *</label>
+              <textarea id="c-msg" name="message" rows="4" placeholder="How can we help you?" required maxlength="1000"
+                        style="width:100%;padding:.55rem .8rem;border:1.5px solid var(--border);border-radius:9px;font-size:.88rem;outline:none;resize:vertical;"
+                        onfocus="this.style.borderColor='var(--brand)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+            </div>
+            <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.7rem;">
+              <i class="bi bi-send"></i> Send Message
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

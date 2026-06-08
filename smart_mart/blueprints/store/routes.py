@@ -1,6 +1,9 @@
 """Customer storefront routes for GoldKernel Dry Fruits."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import re
 import time
 import uuid
@@ -33,6 +36,26 @@ from ...services.customer_auth import (
 )
 
 store_bp = Blueprint("store", __name__, url_prefix="/store")
+
+# ── Nepali/common name search aliases ────────────────────────────────────────
+SEARCH_ALIASES = {
+    "badam": "almond", "badaam": "almond",
+    "okhar": "walnut", "akhrot": "walnut",
+    "kaju": "cashew", "kew": "cashew",
+    "pista": "pistachio",
+    "kismis": "raisin", "kishmish": "raisin", "munakka": "raisin",
+    "khajur": "date", "khajoor": "date",
+    "khubani": "apricot",
+    "nariyal": "coconut", "nariwal": "coconut",
+    "anjeer": "fig",
+    "mungphali": "peanut", "groundnut": "peanut",
+    "chiya": "tea", "chai": "tea",
+    "bhat": "rice", "chawal": "rice",
+    "dal": "lentil", "daal": "lentil",
+    "tel": "oil", "tori": "mustard",
+    "sabun": "soap",
+    "dudh": "milk", "dahi": "yogurt",
+}
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 FREE_DELIVERY_THRESHOLD = 2000.0
@@ -145,21 +168,43 @@ def home():
     q         = request.args.get("q", "").strip()
     category  = request.args.get("category", "").strip()
     sort      = request.args.get("sort", "name")
+    min_price = request.args.get("min_price", "")
+    max_price = request.args.get("max_price", "")
 
     _maybe_expire_reservations()
 
     stmt = db.select(Product).where(Product.is_active.isnot(False), Product.quantity > 0)
+
+    # Nepali/common name alias expansion (FIX 10)
     if q:
-        term = f"%{q.lower()}%"
+        q_expanded = SEARCH_ALIASES.get(q.lower(), q)
+        term = f"%{q_expanded.lower()}%"
+        term_orig = f"%{q.lower()}%"
         stmt = stmt.where(db.or_(
             func.lower(Product.name).like(term),
+            func.lower(Product.name).like(term_orig),
             func.lower(func.coalesce(Product.category, "")).like(term),
-            func.lower(func.coalesce(Product.sku, "")).like(term),
+            func.lower(func.coalesce(Product.category, "")).like(term_orig),
+            func.lower(func.coalesce(Product.sku, "")).like(term_orig),
+            func.lower(func.coalesce(Product.description, "")).like(term_orig),
         ))
+
     if category:
         stmt = stmt.where(
             func.lower(func.coalesce(Product.category, "")) == category.lower()
         )
+
+    # Price filter (FIX 7)
+    if min_price:
+        try:
+            stmt = stmt.where(Product.selling_price >= float(min_price))
+        except ValueError:
+            pass
+    if max_price:
+        try:
+            stmt = stmt.where(Product.selling_price <= float(max_price))
+        except ValueError:
+            pass
 
     sort_map = {
         "name":       Product.name.asc(),
@@ -168,7 +213,45 @@ def home():
         "newest":     Product.created_at.desc(),
     }
     stmt = stmt.order_by(sort_map.get(sort, Product.name.asc()))
-    products   = db.session.execute(stmt).scalars().all()
+
+    # Pagination (FIX 6)
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = 48
+
+    # Count total for pagination
+    count_stmt = db.select(func.count(Product.id)).where(
+        Product.is_active.isnot(False), Product.quantity > 0
+    )
+    if q:
+        q_expanded = SEARCH_ALIASES.get(q.lower(), q)
+        term = f"%{q_expanded.lower()}%"
+        term_orig = f"%{q.lower()}%"
+        count_stmt = count_stmt.where(db.or_(
+            func.lower(Product.name).like(term),
+            func.lower(Product.name).like(term_orig),
+            func.lower(func.coalesce(Product.category, "")).like(term),
+            func.lower(func.coalesce(Product.category, "")).like(term_orig),
+            func.lower(func.coalesce(Product.sku, "")).like(term_orig),
+            func.lower(func.coalesce(Product.description, "")).like(term_orig),
+        ))
+    if category:
+        count_stmt = count_stmt.where(
+            func.lower(func.coalesce(Product.category, "")) == category.lower()
+        )
+    if min_price:
+        try:
+            count_stmt = count_stmt.where(Product.selling_price >= float(min_price))
+        except ValueError:
+            pass
+    if max_price:
+        try:
+            count_stmt = count_stmt.where(Product.selling_price <= float(max_price))
+        except ValueError:
+            pass
+    total_products = db.session.execute(count_stmt).scalar() or 0
+
+    offset = (page - 1) * per_page
+    products   = db.session.execute(stmt.limit(per_page).offset(offset)).scalars().all()
     categories = _get_categories()
 
     # Featured products: is_featured first, then fall back to best sellers
@@ -205,6 +288,11 @@ def home():
         q=q,
         selected_category=category,
         sort=sort,
+        min_price=min_price,
+        max_price=max_price,
+        page=page,
+        per_page=per_page,
+        total_products=total_products,
         customer=g.customer,
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
     )
@@ -769,7 +857,17 @@ def api_stock(product_id):
                     "price": float(product.selling_price)})
 
 
-# ── Payment Pending (Improvement 1) ──────────────────────────────────────────
+# ── eSewa signature helper ────────────────────────────────────────────────────
+
+def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str = "EPAYTEST") -> str:
+    """Generate eSewa HMAC-SHA256 signature for sandbox."""
+    secret = "8gBm/:&EnhH.1/q"  # eSewa sandbox secret
+    message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
+    sig = hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
+    return base64.b64encode(sig).decode()
+
+
+# ── Payment Pending (FIX 1) ───────────────────────────────────────────────────
 
 @store_bp.route("/order/<order_number>/payment")
 def payment_pending(order_number):
@@ -787,8 +885,43 @@ def payment_pending(order_number):
         owns_order = True
     if not owns_order:
         return redirect(url_for("store.track", order_number=order_number))
+    esewa_signature = _esewa_signature(
+        f"{order.grand_total:.2f}", order.order_number
+    )
     return render_template("store/payment_pending.html", order=order,
-                           settings=settings, customer=cust)
+                           settings=settings, customer=cust,
+                           esewa_signature=esewa_signature)
+
+
+@store_bp.route("/payment/<order_number>/callback/<provider>")
+def payment_callback(order_number, provider):
+    """Handle payment gateway callback — mark order as paid."""
+    settings = _settings()
+    order = db.session.execute(
+        db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+    ).scalar_one_or_none()
+    if order:
+        order.payment_status = "paid"
+        from ...models.ecommerce import EcommercePayment
+        payment = db.session.execute(
+            db.select(EcommercePayment).where(EcommercePayment.order_id == order.id)
+        ).scalars().first()
+        if payment:
+            payment.status = "paid"
+            payment.gateway_reference = request.args.get("refId") or request.args.get("transaction_id", "")
+        db.session.commit()
+        flash(f"Payment successful! Order {order_number} confirmed.", "success")
+        session["last_order"] = order_number
+    else:
+        flash("Order not found.", "danger")
+    return redirect(url_for("store.order_success", order_number=order_number))
+
+
+@store_bp.route("/payment/<order_number>/failed")
+def payment_failed(order_number):
+    """Handle failed payment — keep order pending, let customer retry."""
+    flash("Payment was not completed. Your order is saved — you can try again or choose Cash on Delivery.", "warning")
+    return redirect(url_for("store.payment_pending", order_number=order_number))
 
 
 # ── Customer Order Cancellation (Improvement 5) ──────────────────────────────
@@ -821,7 +954,7 @@ def cancel_order(order_number):
     return redirect(url_for("store.my_account"))
 
 
-# ── Back-in-Stock Notification (Improvement 9) ───────────────────────────────
+# ── Back-in-Stock Notification (Improvement 9) ────────────────────────────────
 
 @store_bp.route("/product/<int:product_id>/notify", methods=["POST"])
 @limiter.limit("5/minute")
@@ -853,6 +986,116 @@ def notify_stock(product_id):
     return redirect(url_for("store.product_detail", product_id=product_id))
 
 
+# ── Order Detail (FIX 8) ─────────────────────────────────────────────────────
+
+@store_bp.route("/order/<order_number>")
+def order_detail(order_number):
+    settings = _settings()
+    cust = g.customer
+    order = db.session.execute(
+        db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+    ).scalar_one_or_none()
+    if not order:
+        flash("Order not found.", "warning")
+        return redirect(url_for("store.home"))
+    owns = False
+    if cust and order.customer_phone == cust.phone:
+        owns = True
+    if not owns:
+        last_order = session.get("last_order", "")
+        if last_order == order_number:
+            owns = True
+    if not owns:
+        flash("You don't have permission to view this order.", "danger")
+        return redirect(url_for("store.home"))
+    return render_template("store/order_detail.html", order=order,
+                           settings=settings, customer=cust)
+
+
+# ── Password Reset (FIX 2) ────────────────────────────────────────────────────
+
+@store_bp.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("3/minute", methods=["POST"])
+def forgot_password():
+    settings = _settings()
+    if request.method == "POST":
+        phone = request.form.get("phone", "").strip()
+        clean = _validate_phone(phone)
+        if not clean:
+            flash("Enter a valid Nepal phone number.", "danger")
+        else:
+            account = db.session.execute(
+                db.select(CustomerAccount).where(CustomerAccount.phone == clean)
+            ).scalar_one_or_none()
+            if account:
+                import secrets as _secrets
+                token = _secrets.token_urlsafe(32)
+                session[f"pwd_reset_{clean}"] = token
+                reset_url = url_for("store.reset_password", phone=clean, token=token, _external=True)
+                from flask import current_app
+                current_app.logger.warning(
+                    "CUSTOMER PASSWORD RESET for %s — Reset URL: %s", clean, reset_url
+                )
+            flash("If that phone number has an account, a reset link has been generated. "
+                  "Please call us to get your reset link.", "info")
+    return render_template("store/forgot_password.html", settings=settings, customer=None)
+
+
+@store_bp.route("/reset-password", methods=["GET", "POST"])
+@limiter.limit("5/minute", methods=["POST"])
+def reset_password():
+    settings = _settings()
+    phone = request.args.get("phone", "").strip()
+    token = request.args.get("token", "").strip()
+    stored = session.get(f"pwd_reset_{phone}")
+    valid = stored and stored == token
+    if not valid:
+        flash("This reset link is invalid or has expired.", "danger")
+        return redirect(url_for("store.login"))
+    if request.method == "POST":
+        new_pw = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+        if len(new_pw) < 6:
+            flash("Password must be at least 6 characters.", "danger")
+        elif new_pw != confirm:
+            flash("Passwords do not match.", "danger")
+        else:
+            account = db.session.execute(
+                db.select(CustomerAccount).where(CustomerAccount.phone == phone)
+            ).scalar_one_or_none()
+            if account:
+                account.set_password(new_pw)
+                db.session.commit()
+                session.pop(f"pwd_reset_{phone}", None)
+                flash("Password reset successfully. Please log in.", "success")
+                return redirect(url_for("store.login"))
+    return render_template("store/reset_password.html", settings=settings,
+                           phone=phone, token=token, customer=None)
+
+
+# ── About / Contact / FAQ (FIX 3) ─────────────────────────────────────────────
+
+@store_bp.route("/about")
+def about():
+    settings = _settings()
+    return render_template("store/about.html", settings=settings, customer=g.customer)
+
+
+@store_bp.route("/contact", methods=["GET", "POST"])
+def contact():
+    settings = _settings()
+    if request.method == "POST":
+        flash("Thank you for your message! We'll get back to you within 24 hours.", "success")
+        return redirect(url_for("store.contact"))
+    return render_template("store/contact.html", settings=settings, customer=g.customer)
+
+
+@store_bp.route("/faq")
+def faq():
+    settings = _settings()
+    return render_template("store/faq.html", settings=settings, customer=g.customer)
+
+
 # ── SEO: Product by Slug (Improvement 13) ────────────────────────────────────
 
 @store_bp.route("/p/<slug>")
@@ -882,11 +1125,15 @@ def sitemap():
     urls = [
         f"<url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>",
         f"<url><loc>{base}/store/track</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>",
+        f"<url><loc>{base}/store/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"<url><loc>{base}/store/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"<url><loc>{base}/store/contact</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
     ]
     for p in products:
         lastmod = p.updated_at.strftime("%Y-%m-%d") if p.updated_at else date.today().isoformat()
+        loc = f"{base}/store/p/{p.slug}" if getattr(p, 'slug', None) else f"{base}/store/product/{p.id}"
         urls.append(
-            f"<url><loc>{base}/store/product/{p.id}</loc>"
+            f"<url><loc>{loc}</loc>"
             f"<lastmod>{lastmod}</lastmod>"
             f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
         )

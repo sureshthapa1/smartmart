@@ -1,0 +1,92 @@
+{% extends "store/base_store.html" %}
+{% block title %}About Us — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block meta_desc %}Learn about GoldKernel — Nepal's trusted source for premium dry fruits and healthy treats delivered to your door.{% endblock %}
+{% block content %}
+<div class="section-container py-5" style="max-width:760px;">
+  <div class="fade-up">
+    <div style="text-align:center;margin-bottom:2.5rem;">
+      <div style="font-size:3rem;margin-bottom:.75rem;">🥜</div>
+      <h1 style="font-size:2rem;font-weight:900;margin-bottom:.5rem;">About {{ settings.shop_name if settings else 'GoldKernel' }}</h1>
+      <p style="color:var(--muted);font-size:1rem;">Nepal's trusted source for premium dry fruits &amp; healthy treats</p>
+    </div>
+
+    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:2rem;margin-bottom:1.5rem;">
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;color:var(--brand-dark);">🌱 Our Story</h2>
+      <p style="color:var(--muted);line-height:1.75;margin:0;">
+        GoldKernel started with a simple mission — bring the finest quality dry fruits and healthy snacks
+        directly to Nepali homes at fair prices. We source our products from trusted farms across Nepal,
+        India, Iran, and beyond, ensuring every product meets our strict quality standards before it reaches you.
+        From the high-altitude walnut orchards of Mustang to premium cashews from the finest farms, we
+        bring nature's best to your table.
+      </p>
+    </div>
+
+    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:2rem;margin-bottom:1.5rem;">
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1.25rem;color:var(--brand-dark);">🎯 Our Promise</h2>
+      <div class="row g-3">
+        {% for icon, title, desc in [
+          ('✅','100% Genuine','Every product is authentic and carefully quality-checked before dispatch.'),
+          ('🚚','Fast Delivery','Same-day or next-day delivery in Kathmandu Valley. We deliver 7 days a week.'),
+          ('💰','Fair Pricing','Direct sourcing from farms means better prices for you — no middlemen.'),
+          ('🔄','Easy Returns','7-day hassle-free return policy on all products if you are not satisfied.'),
+          ('📦','Fresh Stock','We maintain optimal storage to keep all products fresh and nutritious.'),
+          ('🤝','Trusted Since Day 1','Thousands of happy customers across Nepal trust us for their daily nutrition.'),
+        ] %}
+        <div class="col-sm-6">
+          <div style="display:flex;gap:.75rem;align-items:flex-start;padding:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);">
+            <span style="font-size:1.4rem;flex-shrink:0;">{{ icon }}</span>
+            <div>
+              <div style="font-weight:700;font-size:.9rem;margin-bottom:.2rem;">{{ title }}</div>
+              <div style="font-size:.82rem;color:var(--muted);">{{ desc }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:2rem;margin-bottom:1.5rem;">
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;color:var(--brand-dark);">📍 Our Products</h2>
+      <p style="color:var(--muted);line-height:1.75;margin-bottom:.75rem;">We specialise in premium dry fruits including almonds, cashews, walnuts, pistachios, raisins, dates, apricots, and dried coconut. We also stock everyday essentials for your household.</p>
+      <a href="{{ url_for('store.home') }}" class="btn-outline-brand" style="padding:.5rem 1.25rem;font-size:.88rem;">
+        <i class="bi bi-bag-heart"></i> Browse Our Products
+      </a>
+    </div>
+
+    {% if settings and (settings.phone or settings.email or settings.address) %}
+    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:2rem;margin-bottom:1.5rem;">
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;color:var(--brand-dark);">📞 Find Us</h2>
+      <div class="d-flex flex-column gap-2">
+        {% if settings.phone %}
+        <div class="d-flex gap-2 align-items-center">
+          <i class="bi bi-telephone" style="color:var(--brand);width:18px;"></i>
+          <a href="tel:{{ settings.phone }}" style="font-weight:600;color:var(--text);text-decoration:none;">{{ settings.phone }}</a>
+        </div>
+        {% endif %}
+        {% if settings.email %}
+        <div class="d-flex gap-2 align-items-center">
+          <i class="bi bi-envelope" style="color:var(--brand);width:18px;"></i>
+          <a href="mailto:{{ settings.email }}" style="font-weight:600;color:var(--text);text-decoration:none;">{{ settings.email }}</a>
+        </div>
+        {% endif %}
+        {% if settings.address %}
+        <div class="d-flex gap-2 align-items-start">
+          <i class="bi bi-geo-alt" style="color:var(--brand);width:18px;margin-top:2px;"></i>
+          <span style="font-weight:600;">{{ settings.address }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="background:linear-gradient(135deg,#1c1917,#292524);border-radius:var(--radius);padding:2rem;text-align:center;color:#fff;">
+      <h2 style="font-size:1.1rem;font-weight:800;margin-bottom:.75rem;">Ready to order?</h2>
+      <p style="color:#a8a29e;font-size:.88rem;margin-bottom:1.25rem;">Fresh dry fruits delivered to your door anywhere in Nepal</p>
+      <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Shop Now</a>
+        <a href="{{ url_for('store.contact') }}" class="btn-outline-brand" style="border-color:rgba(255,255,255,.3);color:#fff;"><i class="bi bi-chat-dots"></i> Contact Us</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

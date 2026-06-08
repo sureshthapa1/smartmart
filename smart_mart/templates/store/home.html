@@ -88,6 +88,11 @@
       </select>
     </form>
   </div>
+  <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">
+    {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> — {% elif selected_category %}<strong style="color:var(--brand);">{{ selected_category }}</strong> — {% endif %}
+    <span style="color:var(--text);">{{ total_products }} product{{ 's' if total_products != 1 }}</span>
+    {% if min_price or max_price %}<span style="color:var(--brand);font-size:.75rem;"> · filtered</span>{% endif %}
+  </div>
 
   {% if products %}
   {# Featured section — only on home with no filters #}

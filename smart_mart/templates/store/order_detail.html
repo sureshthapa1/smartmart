@@ -1,0 +1,167 @@
+{% extends "store/base_store.html" %}
+{% block title %}Order {{ order.order_number }} — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block content %}
+<div class="section-container py-4" style="max-width:760px;">
+  {% set slabel, scolor = order.status_label %}
+  {% set pm_labels = {'cod':'Cash on Delivery','esewa':'eSewa','khalti':'Khalti','ime_pay':'IME Pay','online':'Online'} %}
+  {% set flow = ['pending','confirmed','preparing','out_for_delivery','delivered'] %}
+  {% set cur_idx = flow.index(order.status) if order.status in flow else -1 %}
+
+  <div class="mb-3 fade-up">
+    <a href="{{ url_for('store.my_account') }}#orders" style="color:var(--muted);text-decoration:none;font-size:.85rem;">
+      <i class="bi bi-arrow-left me-1"></i>My Orders
+    </a>
+  </div>
+
+  <!-- Status header -->
+  <div style="background:linear-gradient(135deg,#1c1917,#292524);border-radius:var(--radius);padding:1.5rem;color:#fff;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;" class="fade-up">
+    <div>
+      <div style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#78716c;margin-bottom:.2rem;">Order Number</div>
+      <div style="font-size:1.25rem;font-weight:900;">{{ order.order_number }}</div>
+      <div style="font-size:.78rem;color:#a8a29e;margin-top:.2rem;">{{ order.created_at | nst('%d %b %Y, %H:%M') if order.created_at else '' }}</div>
+    </div>
+    <span style="display:inline-block;padding:.4em 1.1em;border-radius:50px;font-size:.82rem;font-weight:700;
+      background:{% if scolor=='success' %}#16a34a{% elif scolor=='danger' %}#dc2626{% elif scolor=='warning' %}#d97706{% elif scolor=='info' %}#0ea5e9{% else %}#6366f1{% endif %};color:#fff;">
+      {{ slabel }}
+    </span>
+  </div>
+
+  <!-- Progress bar -->
+  {% if order.status not in ['cancelled','returned'] %}
+  <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);padding:1.25rem;margin-bottom:1rem;" class="fade-up">
+    <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="position:absolute;top:16px;left:8%;right:8%;height:3px;background:#f1f5f9;z-index:0;border-radius:2px;">
+        {% if cur_idx > 0 %}
+        <div style="height:100%;width:{{ [cur_idx / 4 * 100, 100]|min }}%;background:var(--brand-grad);border-radius:2px;"></div>
+        {% endif %}
+      </div>
+      {% for s, icon, label in [('pending','⏳','Placed'),('confirmed','✅','Confirmed'),('preparing','🔧','Preparing'),('out_for_delivery','🚴','On the Way'),('delivered','📦','Delivered')] %}
+      {% set si = loop.index0 %}
+      <div style="z-index:1;text-align:center;flex:1;">
+        <div style="width:36px;height:36px;border-radius:50%;margin:0 auto .4rem;display:flex;align-items:center;justify-content:center;font-size:.9rem;
+          {% if si <= cur_idx %}background:var(--brand-grad);box-shadow:0 2px 8px rgba(180,83,9,.3);{% else %}background:#f1f5f9;{% endif %}">{{ icon }}</div>
+        <div style="font-size:.62rem;font-weight:600;color:{% if si <= cur_idx %}var(--brand){% else %}#94a3b8{% endif %};">{{ label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-3 fade-up fade-up-d1">
+    <!-- Items list -->
+    <div class="col-md-7">
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-weight:800;font-size:.9rem;">
+          🛍️ Items ({{ order.items|length }})
+        </div>
+        <div style="padding:.75rem 1.25rem;">
+          {% for item in order.items %}
+          <div class="d-flex align-items-center gap-3 {% if not loop.last %}mb-3 pb-3{% endif %}"
+               {% if not loop.last %}style="border-bottom:1px solid #f5f5f4;"{% endif %}>
+            <div style="width:52px;height:52px;flex-shrink:0;border-radius:10px;overflow:hidden;background:linear-gradient(135deg,#fef3c7,#fde68a);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">
+              {% if item.product and item.product.image_filename %}
+              <img src="{{ url_for('static', filename='uploads/' + item.product.image_filename) }}"
+                   alt="{{ item.product_name }}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+              {% else %}🥜{% endif %}
+            </div>
+            <div class="flex-grow-1" style="min-width:0;">
+              <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ item.product_name }}</div>
+              <div style="font-size:.78rem;color:var(--muted);">×{{ item.quantity }} @ NPR {{ "%.0f"|format(item.unit_price) }}</div>
+            </div>
+            <div style="font-weight:800;color:var(--brand-dark);flex-shrink:0;">NPR {{ "%.0f"|format(item.subtotal) }}</div>
+          </div>
+          {% endfor %}
+
+          <!-- Totals -->
+          <div style="border-top:2px solid var(--border);margin-top:.85rem;padding-top:.85rem;">
+            <div class="d-flex justify-content-between mb-1" style="font-size:.88rem;">
+              <span style="color:var(--muted);">Subtotal</span>
+              <span>NPR {{ "%.0f"|format(order.total_amount) }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1" style="font-size:.88rem;">
+              <span style="color:var(--muted);">Delivery</span>
+              {% if order.delivery_charge == 0 %}
+              <span style="color:#16a34a;font-weight:700;">FREE</span>
+              {% else %}
+              <span>NPR {{ "%.0f"|format(order.delivery_charge) }}</span>
+              {% endif %}
+            </div>
+            {% if order.discount_amount and order.discount_amount > 0 %}
+            <div class="d-flex justify-content-between mb-1" style="font-size:.88rem;color:#16a34a;">
+              <span>Discount</span><span>−NPR {{ "%.0f"|format(order.discount_amount) }}</span>
+            </div>
+            {% endif %}
+            <div class="d-flex justify-content-between" style="font-size:1.05rem;font-weight:900;">
+              <span>Total</span>
+              <span style="color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delivery + payment + actions -->
+    <div class="col-md-5">
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:.75rem;">
+        <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--border);font-weight:800;font-size:.9rem;">📍 Delivery</div>
+        <div style="padding:.85rem 1.25rem;font-size:.85rem;display:flex;flex-direction:column;gap:.35rem;">
+          <div><strong>{{ order.customer_name }}</strong></div>
+          <div style="color:var(--muted);">{{ order.customer_phone }}</div>
+          <div style="color:var(--muted);">{{ order.delivery_address }}</div>
+          {% if order.delivery_area %}<div style="color:var(--muted);">{{ order.delivery_area }}</div>{% endif %}
+          {% if order.estimated_delivery %}
+          <div style="color:var(--brand);font-size:.8rem;font-weight:600;margin-top:.2rem;">
+            <i class="bi bi-clock me-1"></i>Est: {{ order.estimated_delivery.strftime('%d %b %Y') }}
+          </div>
+          {% endif %}
+          {% if order.delivered_at %}
+          <div style="color:#16a34a;font-size:.8rem;font-weight:600;">
+            <i class="bi bi-check-circle-fill me-1"></i>Delivered {{ order.delivered_at.strftime('%d %b %Y') }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;margin-bottom:.75rem;">
+        <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--border);font-weight:800;font-size:.9rem;">💳 Payment</div>
+        <div style="padding:.85rem 1.25rem;font-size:.85rem;">
+          <div class="d-flex justify-content-between mb-1">
+            <span style="color:var(--muted);">Method</span>
+            <span style="font-weight:700;">{{ pm_labels.get(order.payment_mode, order.payment_mode|upper) }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span style="color:var(--muted);">Status</span>
+            <span style="font-weight:700;color:{% if order.payment_status=='paid' %}#16a34a{% else %}#d97706{% endif %};">
+              {{ order.payment_status|capitalize }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="d-flex gap-2 flex-column">
+        <a href="{{ url_for('store.track', order_number=order.order_number) }}"
+           class="btn-brand justify-content-center" style="padding:.6rem;">
+          <i class="bi bi-geo-alt"></i> Track Order
+        </a>
+        {% if order.status == 'pending' and customer and order.customer_phone == customer.phone %}
+        <form method="post" action="{{ url_for('store.cancel_order', order_number=order.order_number) }}"
+              onsubmit="return confirm('Cancel order {{ order.order_number }}?\nThis cannot be undone.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" style="width:100%;padding:.6rem;border:1.5px solid #fecaca;border-radius:50px;color:#dc2626;background:#fff;font-size:.88rem;font-weight:600;cursor:pointer;">
+            <i class="bi bi-x-circle"></i> Cancel Order
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if order.notes %}
+      <div style="margin-top:.75rem;background:#f9f5f0;border-radius:var(--radius-sm);padding:.75rem;font-size:.8rem;color:var(--muted);">
+        <i class="bi bi-chat-left-text me-1" style="color:var(--brand);"></i>
+        <strong>Notes:</strong> {{ order.notes.split('\n')[0] }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
