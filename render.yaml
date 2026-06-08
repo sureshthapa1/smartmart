@@ -24,6 +24,12 @@ services:
       # REQUIRED for AI Advisor chat responses.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # OPTIONAL: Set to enable persistent Cloudinary image storage.
+      # Without this, uploaded images are lost on each Render redeploy.
+      # Get free account at https://cloudinary.com — then set:
+      # CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+      - key: CLOUDINARY_URL
+        sync: false
       # Optional: override the admin username (default: admin)
       - key: ADMIN_USERNAME
         value: admin
