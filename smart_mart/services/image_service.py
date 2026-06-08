@@ -153,3 +153,18 @@ def product_image_url(identifier: Optional[str], width: int = 400) -> Optional[s
 
 def is_cloudinary_id(identifier: Optional[str]) -> bool:
     return bool(identifier and identifier.startswith("cld:"))
+
+
+def product_image_static_path(identifier: Optional[str]) -> Optional[str]:
+    """
+    Return the Flask static filename to pass to url_for('static', filename=...).
+    Returns None if identifier is a Cloudinary ID (use product_image_url instead).
+    Returns 'uploads/products/<filename>' for local images.
+    """
+    if not identifier or identifier.startswith("cld:"):
+        return None
+    # Strip any leading path components for safety
+    import os as _os
+    filename = _os.path.basename(identifier)
+    return f"uploads/products/{filename}"
+
