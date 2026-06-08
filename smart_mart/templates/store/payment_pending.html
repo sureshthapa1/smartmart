@@ -1,65 +1,79 @@
 {% extends "store/base_store.html" %}
 {% block title %}Complete Payment — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
-<div class="section-container py-5">
+<div class="sc" style="padding-top:2rem;padding-bottom:4rem;">
   <div style="max-width:520px;margin:0 auto;">
-    <div style="background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);overflow:hidden;text-align:center;" class="fade-up">
-      <div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);padding:2rem;color:#fff;">
+    <div class="ui-card fade-up" style="overflow:hidden;">
+
+      <!-- Header — warm brand gradient (consistent with rest of site) -->
+      <div style="background:var(--brand-grad);padding:2rem;text-align:center;color:#fff;">
         {% set pm_icons = {'esewa':'📱','khalti':'💜','ime_pay':'🏦'} %}
         {% set pm_names = {'esewa':'eSewa','khalti':'Khalti','ime_pay':'IME Pay'} %}
-        <div style="font-size:2.5rem;margin-bottom:.5rem;">{{ pm_icons.get(order.payment_mode, '💳') }}</div>
-        <h2 style="font-size:1.2rem;font-weight:900;margin:0 0 .25rem;">Complete Your Payment</h2>
-        <p style="color:#bfdbfe;font-size:.88rem;margin:0;">Order placed! Pay to confirm your order.</p>
+        <div style="font-size:2.5rem;margin-bottom:.6rem;">{{ pm_icons.get(order.payment_mode,'💳') }}</div>
+        <h2 style="font-size:1.2rem;font-weight:900;margin:0 0 .3rem;">Complete Your Payment</h2>
+        <p style="color:rgba(255,255,255,.82);font-size:.875rem;margin:0;">Order placed! Pay to confirm.</p>
       </div>
-      <div style="padding:1.5rem 2rem;">
-        <div style="background:#f9f5f0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
-          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.25rem;">Order Number</div>
-          <div style="font-size:1.3rem;font-weight:900;color:var(--brand-dark);">{{ order.order_number }}</div>
+
+      <div style="padding:1.5rem 1.75rem;">
+        <!-- Order number + amount -->
+        <div style="display:flex;gap:.75rem;align-items:center;background:var(--brand-light);border:1.5px solid #fde68a;border-radius:var(--r-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;">
+          <div style="flex:1;">
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Order</div>
+            <div class="mono" style="font-size:1.1rem;font-weight:900;color:var(--brand-dark);">{{ order.order_number }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Amount</div>
+            <div style="font-size:1.35rem;font-weight:900;color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</div>
+          </div>
         </div>
-        <div style="font-size:1.5rem;font-weight:900;color:var(--brand-dark);margin-bottom:1.25rem;">
-          NPR {{ "%.0f"|format(order.grand_total) }}
-        </div>
-        <div style="background:#eff6ff;border-radius:10px;padding:1rem;margin-bottom:1.25rem;text-align:left;">
-          <div style="font-weight:700;font-size:.9rem;color:#1e40af;margin-bottom:.5rem;">How to pay with {{ pm_names.get(order.payment_mode, order.payment_mode|upper) }}:</div>
+
+        <!-- Payment instructions -->
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:1.25rem;">
+          <div style="font-weight:700;font-size:.88rem;color:#1e40af;margin-bottom:.65rem;">
+            <i class="bi bi-info-circle me-1"></i>
+            How to pay with {{ pm_names.get(order.payment_mode, order.payment_mode|upper) }}:
+          </div>
           {% if order.payment_mode == 'esewa' %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.7;">
-            <li>Open your eSewa app</li>
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+            <li>Open your <strong>eSewa</strong> app</li>
             <li>Tap <strong>Send Money</strong></li>
-            <li>Enter our eSewa ID: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
-            <li>Enter amount: <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
-            <li>Use order number <strong>{{ order.order_number }}</strong> as remarks</li>
-            <li>Take a screenshot and call us to confirm</li>
+            <li>eSewa ID: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
+            <li>Amount: <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
+            <li>Remarks: <strong>{{ order.order_number }}</strong></li>
+            <li>Screenshot &amp; call us to confirm</li>
           </ol>
           {% elif order.payment_mode == 'khalti' %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.7;">
-            <li>Open your Khalti app</li>
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+            <li>Open your <strong>Khalti</strong> app</li>
             <li>Tap <strong>Send Money</strong></li>
-            <li>Enter our Khalti number: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
+            <li>Khalti number: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
             <li>Amount: <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
             <li>Remarks: <strong>{{ order.order_number }}</strong></li>
             <li>Send screenshot to confirm</li>
           </ol>
           {% else %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.7;">
-            <li>Open IME Pay app</li>
-            <li>Transfer NPR <strong>{{ "%.0f"|format(order.grand_total) }}</strong></li>
-            <li>Use <strong>{{ order.order_number }}</strong> as reference</li>
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+            <li>Open <strong>IME Pay</strong> app</li>
+            <li>Transfer <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
+            <li>Reference: <strong>{{ order.order_number }}</strong></li>
           </ol>
           {% endif %}
         </div>
+
         {% if settings and settings.phone %}
-        <div style="margin-bottom:1.25rem;">
-          <a href="tel:{{ settings.phone }}" class="btn-brand w-100 justify-content-center" style="padding:.65rem;">
-            <i class="bi bi-telephone"></i> Call to Confirm Payment
-          </a>
-        </div>
+        <a href="tel:{{ settings.phone }}" class="btn-brand w-100 justify-content-center" style="padding:.7rem;margin-bottom:.65rem;">
+          <i class="bi bi-telephone"></i> Call to Confirm Payment
+        </a>
         {% endif %}
-        <div class="d-flex gap-2">
-          <a href="{{ url_for('store.track', order_number=order.order_number) }}" class="btn-outline-brand flex-fill justify-content-center" style="padding:.55rem;">
+
+        <div style="display:flex;gap:.6rem;">
+          <a href="{{ url_for('store.track', order_number=order.order_number) }}"
+             class="btn-outline-brand flex-fill justify-content-center" style="padding:.6rem;">
             <i class="bi bi-geo-alt"></i> Track Order
           </a>
-          <a href="{{ url_for('store.home') }}" class="btn-outline-brand flex-fill justify-content-center" style="padding:.55rem;">
-            <i class="bi bi-shop"></i> Continue Shopping
+          <a href="{{ url_for('store.home') }}"
+             class="btn-ghost flex-fill justify-content-center" style="padding:.6rem;">
+            <i class="bi bi-shop"></i> Continue
           </a>
         </div>
       </div>
