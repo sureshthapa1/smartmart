@@ -297,6 +297,8 @@ def home():
         products=products,
         categories=categories,
         featured_products=featured_products,
+        selling_fast_ids=_fast_ids,
+        personalised=_personalised,
         settings=settings,
         q=q,
         selected_category=category,
