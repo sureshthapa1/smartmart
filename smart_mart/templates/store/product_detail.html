@@ -174,8 +174,40 @@
     </div>
   </div>
 
-  {# ── RELATED ───────────────────────────────────────────────────────── #}
-  {% if related %}
+  {# ── AI RECOMMENDATIONS ────────────────────────────────────────────── #}
+  {% if recommendations %}
+  <div style="margin-top:3.5rem;">
+    <div class="section-head fade-up">
+      <div class="section-title">🤝 Frequently Bought <span>Together</span></div>
+      <a href="{{ url_for('store.home', category=product.category) }}" class="section-link">See all →</a>
+    </div>
+    <div class="row g-3">
+      {% for rp in recommendations %}
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="product-card fade-up" style="animation-delay:{{ loop.index0 * 0.06 }}s;">
+          <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" style="text-decoration:none;">
+            <div class="product-img-wrap">
+              {% if rp.image_filename and not rp.image_filename.startswith('cld:') %}
+              <img src="{{ url_for('static', filename='uploads/products/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
+              {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
+            </div>
+            <div class="product-body">
+              <div class="product-name">{{ rp.name }}</div>
+              <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(rp.selling_price) }}</div>
+            </div>
+          </a>
+          <div class="product-footer">
+            <button class="btn-add" data-add-cart data-pid="{{ rp.id }}" data-name="{{ rp.name }}" data-qty="1">
+              <i class="bi bi-cart-plus"></i> Add
+            </button>
+            <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% elif related %}
   <div style="margin-top:3.5rem;">
     <div class="section-head fade-up">
       <div class="section-title">You Might Also <span>Like</span></div>
@@ -207,6 +239,7 @@
       {% endfor %}
     </div>
   </div>
+  {% endif %}
   {% endif %}
 
 </div>
