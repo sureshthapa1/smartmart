@@ -1,6 +1,158 @@
 {% extends "store/base_store.html" %}
 {% block title %}{{ settings.shop_name if settings else 'GoldKernel' }} — Premium Dry Fruits Nepal{% endblock %}
 
+{% block head %}
+<style>
+/* ── Search suggestion dropdown ────────────────────────────────────────── */
+.search-wrap { position:relative; }
+.suggestion-box {
+  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:9999;
+  background:var(--card-bg); border:1.5px solid var(--border);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-lg);
+  overflow:hidden; display:none;
+}
+.suggestion-box.open { display:block; }
+.suggestion-item {
+  display:flex; align-items:center; gap:.75rem;
+  padding:.65rem 1rem; cursor:pointer; text-decoration:none;
+  color:var(--text); transition:background var(--t-fast);
+}
+.suggestion-item:hover { background:var(--brand-light); }
+.suggestion-thumb {
+  width:36px; height:36px; flex-shrink:0;
+  border-radius:var(--r-sm); overflow:hidden;
+  background:linear-gradient(135deg,#fef9ee,#fde68a);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.1rem;
+}
+.suggestion-thumb img { width:100%; height:100%; object-fit:cover; }
+.suggestion-name { font-size:.875rem; font-weight:600; flex:1; min-width:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.suggestion-cat  { font-size:.7rem; color:var(--muted); }
+.suggestion-price{ font-size:.8rem; font-weight:700; color:var(--brand-dark); flex-shrink:0; }
+.suggestion-footer {
+  padding:.55rem 1rem; background:var(--surface);
+  border-top:1px solid var(--border);
+  font-size:.78rem; color:var(--brand); font-weight:600; text-align:center;
+}
+
+/* ── Velocity badge ────────────────────────────────────────────────────── */
+.badge-hot {
+  position:absolute; top:.5rem; right:.5rem;
+  background:linear-gradient(135deg,#ef4444,#f97316);
+  color:#fff; font-size:.6rem; font-weight:800;
+  letter-spacing:.04em; padding:.2em .55em;
+  border-radius:var(--r-full); text-transform:uppercase;
+  display:flex; align-items:center; gap:.25rem;
+  box-shadow:0 2px 6px rgba(239,68,68,.35);
+}
+
+/* ── Personalisation banner ────────────────────────────────────────────── */
+.personal-banner {
+  background:linear-gradient(135deg,var(--brand-light),#fff);
+  border:1.5px solid #fde68a; border-radius:var(--r-lg);
+  padding:.75rem 1.1rem; display:flex; align-items:center; gap:.75rem;
+  font-size:.85rem; margin-bottom:1.25rem;
+}
+.personal-banner strong { color:var(--brand-dark); }
+
+/* ── Chatbot widget ─────────────────────────────────────────────────────── */
+#chat-fab {
+  position:fixed; bottom:1.5rem; right:1.5rem; z-index:8000;
+  width:56px; height:56px; border-radius:50%;
+  background:var(--brand-grad); color:#fff;
+  border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem; box-shadow:0 4px 20px rgba(180,83,9,.4);
+  transition:transform var(--t-fast), box-shadow var(--t-fast);
+}
+#chat-fab:hover { transform:scale(1.08); box-shadow:0 6px 28px rgba(180,83,9,.5); }
+#chat-fab .chat-badge {
+  position:absolute; top:-2px; right:-2px;
+  width:14px; height:14px; border-radius:50%;
+  background:#22c55e; border:2px solid #fff;
+}
+
+#chat-window {
+  position:fixed; bottom:4.5rem; right:1.5rem; z-index:8000;
+  width:340px; max-width:calc(100vw - 2rem);
+  background:var(--card-bg); border:1.5px solid var(--border);
+  border-radius:var(--r-xl); box-shadow:var(--shadow-lg);
+  display:flex; flex-direction:column; overflow:hidden;
+  transform:scale(.92) translateY(16px); opacity:0;
+  pointer-events:none;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), opacity .2s ease;
+  max-height:520px;
+}
+#chat-window.open {
+  transform:scale(1) translateY(0); opacity:1; pointer-events:all;
+}
+.chat-head {
+  padding:.85rem 1rem; background:var(--brand-grad); color:#fff;
+  display:flex; align-items:center; gap:.65rem; flex-shrink:0;
+}
+.chat-head-avatar { font-size:1.3rem; }
+.chat-head-title { font-weight:800; font-size:.9rem; flex:1; }
+.chat-head-sub { font-size:.7rem; opacity:.82; }
+.chat-close {
+  background:none; border:none; color:#fff; font-size:1.1rem;
+  cursor:pointer; padding:.1rem; opacity:.8; line-height:1;
+}
+.chat-close:hover { opacity:1; }
+.chat-messages {
+  flex:1; overflow-y:auto; padding:.85rem 1rem;
+  display:flex; flex-direction:column; gap:.65rem;
+  min-height:200px;
+}
+.chat-msg {
+  max-width:84%; padding:.55rem .85rem;
+  border-radius:var(--r-lg); font-size:.84rem; line-height:1.5;
+}
+.chat-msg.bot {
+  background:var(--surface); border:1px solid var(--border);
+  border-bottom-left-radius:4px; align-self:flex-start; color:var(--text);
+}
+.chat-msg.user {
+  background:var(--brand-grad); color:#fff;
+  border-bottom-right-radius:4px; align-self:flex-end;
+}
+.chat-msg.typing { opacity:.55; font-style:italic; }
+.chat-quick {
+  display:flex; flex-wrap:wrap; gap:.4rem;
+  padding:.5rem 1rem; border-top:1px solid var(--border);
+}
+.chat-quick-btn {
+  padding:.28rem .7rem; border-radius:var(--r-full);
+  border:1.5px solid var(--border); background:var(--card-bg);
+  font-size:.72rem; font-weight:600; color:var(--text-2);
+  cursor:pointer; transition:all var(--t-fast);
+  white-space:nowrap;
+}
+.chat-quick-btn:hover { border-color:var(--brand); color:var(--brand); background:var(--brand-light); }
+.chat-input-row {
+  display:flex; gap:.5rem; padding:.65rem .85rem;
+  border-top:1px solid var(--border); flex-shrink:0;
+}
+.chat-input {
+  flex:1; padding:.5rem .75rem;
+  border:1.5px solid var(--border); border-radius:var(--r-full);
+  font-size:.84rem; font-family:inherit; outline:none;
+  transition:border-color var(--t-fast);
+}
+.chat-input:focus { border-color:var(--brand-dark); }
+.chat-send {
+  width:34px; height:34px; border-radius:50%;
+  background:var(--brand-grad); color:#fff;
+  border:none; cursor:pointer; display:flex;
+  align-items:center; justify-content:center;
+  font-size:.9rem; flex-shrink:0;
+  transition:opacity var(--t-fast);
+}
+.chat-send:hover { opacity:.88; }
+.chat-send:disabled { opacity:.45; cursor:not-allowed; }
+</style>
+{% endblock %}
+
 {% block content %}
 
 {# ── HERO ─────────────────────────────────────────────────────────── #}
@@ -70,17 +222,28 @@
 {# ── PRODUCTS ─────────────────────────────────────────────────────── #}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:2.5rem;">
 
+  {# ── Personalisation banner ────────────────────────────────────── #}
+  {% if customer and personalised and not q and not selected_category %}
+  <div class="personal-banner fade-up">
+    <span style="font-size:1.2rem;">👋</span>
+    <span>Welcome back, <strong>{{ customer.name.split()[0] }}</strong>! Showing your favourite categories first.</span>
+  </div>
+  {% endif %}
+
   {# Sort + results header #}
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;" class="fade-up">
     <div style="font-size:.85rem;color:var(--muted);">
-      {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> —{% elif selected_category %}<strong class="text-brand">{{ selected_category }}</strong> —{% endif %}
+      {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> —
+      {% elif selected_category %}<strong class="text-brand">{{ selected_category }}</strong> —{% endif %}
       <span style="color:var(--text);">{{ products|length }} product{{ 's' if products|length != 1 }}</span>
     </div>
     <form method="get" action="" style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;">
       {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
       {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
       <label style="color:var(--muted);font-weight:600;">Sort:</label>
-      <select name="sort" class="form-select form-select-sm" style="width:auto;border-radius:var(--r-full);border-color:var(--border);font-size:.8rem;" onchange="this.form.submit()">
+      <select name="sort" class="form-select form-select-sm"
+              style="width:auto;border-radius:var(--r-full);border-color:var(--border);font-size:.8rem;"
+              onchange="this.form.submit()">
         <option value="name"       {% if sort=='name'       %}selected{% endif %}>Name A–Z</option>
         <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price: Low → High</option>
         <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price: High → Low</option>
@@ -88,14 +251,9 @@
       </select>
     </form>
   </div>
-  <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">
-    {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> — {% elif selected_category %}<strong style="color:var(--brand);">{{ selected_category }}</strong> — {% endif %}
-    <span style="color:var(--text);">{{ total_products }} product{{ 's' if total_products != 1 }}</span>
-    {% if min_price or max_price %}<span style="color:var(--brand);font-size:.75rem;"> · filtered</span>{% endif %}
-  </div>
 
   {% if products %}
-  {# Featured section — only on home with no filters #}
+  {# Featured — only on unfiltered home #}
   {% if featured_products and not q and not selected_category %}
   <div style="margin-bottom:2.5rem;">
     <div class="section-head fade-up">
@@ -108,8 +266,8 @@
           <a href="{{ url_for('store.product_detail', product_id=product.id) }}" style="text-decoration:none;">
             <div class="product-img-wrap">
               {% if product.image_filename and not product.image_filename.startswith('cld:') %}
-                <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
-                     alt="{{ product.name }}" loading="lazy">
+              <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
+                   alt="{{ product.name }}" loading="lazy">
               {% else %}
               <div class="product-img-placeholder">
                 {% set icons=['🥜','🌰','🍇','🍑','🫘','🌿','✨','🥥'] %}
@@ -118,6 +276,9 @@
               {% endif %}
               {% if product.quantity <= 10 and product.quantity > 0 %}
               <span class="badge-low-stock">Only {{ product.quantity }} left</span>
+              {% endif %}
+              {% if product.id in selling_fast_ids %}
+              <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
               {% endif %}
             </div>
             <div class="product-body">
@@ -148,11 +309,11 @@
   {% endif %}
   <div class="row g-3">
     {% for product in products %}
-    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.03 }}s;">
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ [loop.index0 * 0.03, 0.5]|min }}s;">
       <div class="product-card">
         <a href="{{ url_for('store.product_detail', product_id=product.id) }}" style="text-decoration:none;">
           <div class="product-img-wrap">
-            {% if product.image_filename %}
+            {% if product.image_filename and not product.image_filename.startswith('cld:') %}
             <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
                  alt="{{ product.name }}" loading="lazy">
             {% else %}
@@ -163,6 +324,9 @@
             {% endif %}
             {% if product.quantity > 0 and product.quantity <= 10 %}
             <span class="badge-low-stock">{{ product.quantity }} left</span>
+            {% endif %}
+            {% if product.id in selling_fast_ids %}
+            <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
             {% endif %}
           </div>
           <div class="product-body">
@@ -192,4 +356,175 @@
   {% endif %}
 
 </div>
+
+{# ── AI CHATBOT WIDGET ─────────────────────────────────────────────── #}
+<button id="chat-fab" aria-label="Chat with us" title="Ask us anything">
+  <i class="bi bi-chat-heart-fill"></i>
+  <span class="chat-badge"></span>
+</button>
+
+<div id="chat-window" role="dialog" aria-label="Customer support chat">
+  <div class="chat-head">
+    <div class="chat-head-avatar">🥜</div>
+    <div style="flex:1;">
+      <div class="chat-head-title">GoldKernel Assistant</div>
+      <div class="chat-head-sub">Ask me anything about our products</div>
+    </div>
+    <button class="chat-close" id="chat-close-btn" aria-label="Close chat">✕</button>
+  </div>
+
+  <div class="chat-messages" id="chat-messages">
+    <div class="chat-msg bot">
+      Namaste! 👋 I'm here to help you find the perfect dry fruits. Ask me about products, delivery, gifting ideas, or anything else!
+    </div>
+  </div>
+
+  <div class="chat-quick" id="chat-quick">
+    <button class="chat-quick-btn" data-q="What's popular right now?">🔥 Popular</button>
+    <button class="chat-quick-btn" data-q="Gift ideas under NPR 1000?">🎁 Gifting</button>
+    <button class="chat-quick-btn" data-q="How does delivery work?">🚚 Delivery</button>
+    <button class="chat-quick-btn" data-q="What payment methods do you accept?">💳 Payment</button>
+  </div>
+
+  <div class="chat-input-row">
+    <input type="text" id="chat-input" class="chat-input"
+           placeholder="Type a message…" autocomplete="off" maxlength="300">
+    <button id="chat-send" class="chat-send" aria-label="Send message">
+      <i class="bi bi-send-fill"></i>
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Live Search Suggestions ──────────────────────────────────────────────
+(function() {
+  const inputs = document.querySelectorAll('input[type=search][name=q]');
+  inputs.forEach(function(inp) {
+    const wrap = inp.closest('form');
+    if (!wrap) return;
+
+    const box = document.createElement('div');
+    box.className = 'suggestion-box';
+    inp.parentElement.style.position = 'relative';
+    inp.parentElement.appendChild(box);
+
+    let timer;
+    inp.addEventListener('input', function() {
+      clearTimeout(timer);
+      const q = this.value.trim();
+      if (q.length < 2) { box.classList.remove('open'); return; }
+      timer = setTimeout(function() { fetchSuggestions(q, box, inp); }, 200);
+    });
+
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') box.classList.remove('open');
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!inp.parentElement.contains(e.target)) box.classList.remove('open');
+    });
+  });
+
+  function fetchSuggestions(q, box, inp) {
+    fetch('{{ url_for("store.search_suggestions_api") }}?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        if (!d || !d.results || !d.results.length) { box.classList.remove('open'); return; }
+        box.innerHTML = d.results.map(function(p) {
+          const url = p.slug
+            ? '/store/p/' + p.slug
+            : '/store/product/' + p.id;
+          const img = p.image_filename && !p.image_filename.startsWith('cld:')
+            ? '<img src="/static/uploads/products/' + p.image_filename + '" alt="" loading="lazy">'
+            : '🥜';
+          return '<a href="' + url + '" class="suggestion-item">'
+            + '<div class="suggestion-thumb">' + img + '</div>'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div class="suggestion-name">' + p.name + '</div>'
+            + (p.category ? '<div class="suggestion-cat">' + p.category + '</div>' : '')
+            + '</div>'
+            + '<div class="suggestion-price">NPR ' + Math.round(p.price) + '</div>'
+            + '</a>';
+        }).join('') + '<div class="suggestion-footer">Press Enter to search all results</div>';
+        box.classList.add('open');
+      })
+      .catch(function() { box.classList.remove('open'); });
+  }
+})();
+
+// ── Chatbot Widget ───────────────────────────────────────────────────────
+(function() {
+  const fab    = document.getElementById('chat-fab');
+  const win    = document.getElementById('chat-window');
+  const msgs   = document.getElementById('chat-messages');
+  const input  = document.getElementById('chat-input');
+  const send   = document.getElementById('chat-send');
+  const closeB = document.getElementById('chat-close-btn');
+  const quick  = document.getElementById('chat-quick');
+
+  let history = [];
+  let open = false;
+
+  function toggleChat() {
+    open = !open;
+    win.classList.toggle('open', open);
+    if (open) { input.focus(); }
+  }
+
+  fab.addEventListener('click', toggleChat);
+  closeB.addEventListener('click', function(e) { e.stopPropagation(); toggleChat(); });
+
+  function addMsg(text, role) {
+    const d = document.createElement('div');
+    d.className = 'chat-msg ' + role;
+    d.textContent = text;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    return d;
+  }
+
+  function sendMessage(text) {
+    text = (text || input.value).trim();
+    if (!text) return;
+    input.value = '';
+    send.disabled = true;
+    quick.style.display = 'none';
+    addMsg(text, 'user');
+    const typing = addMsg('…', 'bot typing');
+    history.push({ role: 'user', content: text });
+
+    fetch('{{ url_for("store.store_chat_api") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history: history.slice(-8) }),
+      credentials: 'same-origin',
+    })
+    .then(function(r) { return r.ok ? r.json() : { ok: false, reply: 'Sorry, I had trouble connecting. Please try again!' }; })
+    .then(function(d) {
+      typing.remove();
+      const reply = d.reply || 'Sorry, I could not get a response.';
+      addMsg(reply, 'bot');
+      history.push({ role: 'assistant', content: reply });
+      send.disabled = false;
+      input.focus();
+    })
+    .catch(function() {
+      typing.remove();
+      addMsg('Sorry, I had trouble connecting. Please try again!', 'bot');
+      send.disabled = false;
+    });
+  }
+
+  send.addEventListener('click', function() { sendMessage(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  document.querySelectorAll('.chat-quick-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { sendMessage(this.dataset.q); });
+  });
+})();
+</script>
 {% endblock %}
