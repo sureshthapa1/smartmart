@@ -34,6 +34,12 @@ from ...services.customer_auth import (
     get_current_customer, login_customer,
     logout_customer, register, authenticate,
 )
+from ...services.store_ai_service import (
+    selling_fast_ids as _selling_fast_ids,
+    get_velocity_map,
+    personalise_products,
+    search_suggestions,
+)
 
 store_bp = Blueprint("store", __name__, url_prefix="/store")
 
@@ -253,6 +259,14 @@ def home():
     offset = (page - 1) * per_page
     products   = db.session.execute(stmt.limit(per_page).offset(offset)).scalars().all()
     categories = _get_categories()
+
+    # AI: velocity + personalisation
+    _fast_ids = _selling_fast_ids()
+    cust_phone = g.customer.phone if g.customer else None
+    _personalised = False
+    if cust_phone:
+        products = personalise_products(list(products), cust_phone)
+        _personalised = True
 
     # Featured products: is_featured first, then fall back to best sellers
     featured_products = db.session.execute(
@@ -1110,6 +1124,36 @@ def product_by_slug(slug):
 
 
 # ── Sitemap (Improvement 12) ──────────────────────────────────────────────────
+
+
+
+# ── AI: Live Search Suggestions ───────────────────────────────────────────────
+
+@store_bp.route("/api/search-suggestions")
+@limiter.limit("60/minute")
+def search_suggestions_api():
+    """JSON endpoint for live search dropdown."""
+    q = request.args.get("q", "").strip()
+    from ...services.store_ai_service import search_suggestions
+    results = search_suggestions(q, limit=6)
+    return jsonify({"ok": True, "results": results})
+
+
+# ── AI: Store Chatbot ─────────────────────────────────────────────────────────
+
+@store_bp.route("/api/chat", methods=["POST"])
+@limiter.limit("30/minute")
+def store_chat_api():
+    """JSON endpoint for the store AI chatbot widget."""
+    data    = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    history = data.get("history") or []
+    if not message:
+        return jsonify({"ok": False, "error": "Empty message"}), 400
+    cust_name = g.customer.name if g.customer else None
+    from ...services.store_ai_service import chatbot_reply
+    reply = chatbot_reply(message, history=history, customer_name=cust_name)
+    return jsonify({"ok": True, "reply": reply})
 
 @store_bp.route("/sitemap.xml")
 def sitemap():
