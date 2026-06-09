@@ -1,5 +1,40 @@
 {% extends "store/base_store.html" %}
-{% block title %}Cart — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block title %}Cart — {{ settings.shop_name if settings else 'GoldKernel' }}
+  {# ── AI: You may also like (cart recommendations) ──────────────────── #}
+  {% if cart_recommendations %}
+  <div class="sc fade-up" style="padding-bottom:2rem;">
+    <div class="section-head">
+      <div class="section-title">💡 You May Also <span>Like</span></div>
+      <a href="{{ url_for('store.home') }}" class="section-link">Shop all →</a>
+    </div>
+    <div class="row g-3">
+      {% for rp in cart_recommendations %}
+      <div class="col-6 col-sm-4 col-md-3">
+        <div class="product-card">
+          <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" style="text-decoration:none;">
+            <div class="product-img-wrap">
+              {% if rp.image_filename and not rp.image_filename.startswith('cld:') %}
+              <img src="{{ url_for('static', filename='uploads/products/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
+              {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
+            </div>
+            <div class="product-body">
+              <div class="product-name">{{ rp.name }}</div>
+              <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(rp.selling_price) }}</div>
+            </div>
+          </a>
+          <div class="product-footer">
+            <button class="btn-add" data-add-cart data-pid="{{ rp.id }}" data-name="{{ rp.name }}" data-qty="1">
+              <i class="bi bi-cart-plus"></i> Add
+            </button>
+            <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+{% endblock %}
 {% block content %}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
 
