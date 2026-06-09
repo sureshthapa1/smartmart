@@ -339,6 +339,11 @@ def product_detail(product_id):
             except Exception:
                 db.session.rollback()
 
+    # AI recommendations (co-purchase affinity, falls back to same-category)
+    from ...services.store_ai_service import get_recommendations, selling_fast_ids as _sfi
+    recommendations = get_recommendations(product.id, limit=4)
+
+    # Fallback related (same category) for the elif in template
     related = db.session.execute(
         db.select(Product)
         .where(
@@ -358,6 +363,7 @@ def product_detail(product_id):
         product=product,
         avail=avail,
         cart_qty=cart_qty,
+        recommendations=recommendations,
         related=related,
         settings=settings,
         customer=g.customer,
