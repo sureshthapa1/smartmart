@@ -94,7 +94,7 @@
                 {% if product_img is defined %}
                   {{ product_img(product) }}
                 {% else %}
-                <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) if not product.image_filename.startswith('cld:') else '#' }}"
+                <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) if not product.image_filename.startswith('cld:') else url_for('static', filename='placeholder.jpg') }}"
                      alt="{{ product.name }}" loading="lazy">
                 {% endif %}
               {% else %}
