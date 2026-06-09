@@ -198,6 +198,7 @@ def home():
     return render_template(
         "store/home.html",
         products=products,
+        selected_category=category,
         categories=categories,
         featured_products=featured_products,
         settings=settings,
