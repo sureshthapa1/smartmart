@@ -40,7 +40,7 @@
             <div style="margin-bottom:.85rem;">
               <label class="field-label" for="acc-{{ field }}">{{ label }}</label>
               <input id="acc-{{ field }}" type="{{ type }}" name="{{ field }}"
-                     value="{{ customer[field] if customer[field] is defined else (customer | attr(field) or '') }}"
+                     value="{{ customer | attr(field) or '' }}"
                      placeholder="{{ ph }}" maxlength="{{ 120 if field in ('name','email') else 255 if field == 'address' else 80 }}"
                      autocomplete="{{ ac }}" class="field-input">
             </div>
