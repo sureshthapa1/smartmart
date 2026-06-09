@@ -399,12 +399,18 @@ def cart():
     delivery    = _calc_delivery(subtotal)
     grand_total = subtotal + delivery
 
+    # AI: cart recommendations
+    _cart_pids = [int(pid) for pid in raw_cart.keys() if str(pid).isdigit()]
+    from ...services.store_ai_service import get_cart_recommendations
+    cart_recs = get_cart_recommendations(_cart_pids, limit=4) if items else []
+
     return render_template(
         "store/cart.html",
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings, customer=g.customer,
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
         raw_cart_count=len(raw_cart),
+        cart_recommendations=cart_recs,
     )
 
 
