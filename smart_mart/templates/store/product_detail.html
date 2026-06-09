@@ -218,12 +218,14 @@ const maxQty = {{ avail }};
 function changeQty(delta) {
   const inp = document.getElementById('qty-input');
   const btn = document.getElementById('add-btn');
-  let v = Math.max(1, Math.min(parseInt(inp.value) + delta, maxQty));
+  const minusBtn = document.getElementById('qty-minus');
+  const plusBtn  = document.getElementById('qty-plus');
+  let v = Math.max(1, Math.min(parseInt(inp.value || 1) + delta, maxQty));
   inp.value = v;
   if (btn) btn.dataset.qty = v;
-  document.getElementById('qty-minus').disabled = v <= 1;
-  document.getElementById('qty-plus').disabled  = v >= maxQty;
+  if (minusBtn) minusBtn.disabled = v <= 1;
+  if (plusBtn)  plusBtn.disabled  = v >= maxQty;
 }
-document.getElementById('qty-minus')?.setAttribute('disabled', '1');
+document.getElementById('qty-minus') && (document.getElementById('qty-minus').disabled = true);
 </script>
 {% endblock %}
