@@ -54,6 +54,19 @@
   {% endfor %}
 </div>
 
+{# ── MOBILE SEARCH (hidden on sm+) ──────────────────────────────────── #}
+<div class="sc d-sm-none" style="padding-top:.75rem;padding-bottom:.25rem;">
+  <form method="get" action="{{ url_for('store.home') }}" role="search">
+    <div style="position:relative;">
+      <i class="bi bi-search" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:.85rem;pointer-events:none;"></i>
+      <input type="search" name="q" placeholder="Search products…"
+             value="{{ request.args.get('q','') }}"
+             style="width:100%;padding:.55rem 1rem .55rem 2.4rem;border:1.5px solid var(--border);border-radius:var(--r-full);background:var(--card-bg);font-family:inherit;font-size:.875rem;outline:none;"
+             autocomplete="off" aria-label="Search products">
+    </div>
+  </form>
+</div>
+
 {# ── PRODUCTS ─────────────────────────────────────────────────────── #}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:2.5rem;">
 
@@ -89,14 +102,9 @@
         <div class="product-card">
           <a href="{{ url_for('store.product_detail', product_id=product.id) }}" style="text-decoration:none;">
             <div class="product-img-wrap">
-              {% if product.image_filename %}
-                {% from 'store/_macros.html' import product_img ignore missing %}
-                {% if product_img is defined %}
-                  {{ product_img(product) }}
-                {% else %}
-                <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) if not product.image_filename.startswith('cld:') else url_for('static', filename='placeholder.jpg') }}"
+              {% if product.image_filename and not product.image_filename.startswith('cld:') %}
+                <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
                      alt="{{ product.name }}" loading="lazy">
-                {% endif %}
               {% else %}
               <div class="product-img-placeholder">
                 {% set icons=['🥜','🌰','🍇','🍑','🫘','🌿','✨','🥥'] %}
