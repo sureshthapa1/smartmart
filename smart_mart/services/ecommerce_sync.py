@@ -114,6 +114,11 @@ def expire_old_reservations(now: datetime | None = None) -> int:
     ).scalars().all()
     for row in rows:
         row.status = "expired"
+    if rows:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
     return len(rows)
 
 
