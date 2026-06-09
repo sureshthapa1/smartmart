@@ -97,7 +97,11 @@
 
         {% if orders %}
           {% for order in orders %}
-          {% set slabel, scolor = order.status_label %}
+          {% set _sl = order.status_label %}
+{% set slabel = _sl[0] %}
+{% set _raw_color = _sl[1] %}
+{% set _color_map = {'success':'success','danger':'danger','warning':'warning','info':'info','primary':'info','secondary':'muted'} %}
+{% set scolor = _color_map.get(_raw_color, 'muted') %}
           <div style="padding:1.1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
             <div style="display:flex;align-items:flex-start;gap:.85rem;flex-wrap:wrap;">
 
