@@ -781,7 +781,7 @@
       </div>
     </div>
     <div class="footer-copy">
-      © {{ now().year if now is defined else '2025' }} {{ settings.shop_name if settings else 'GoldKernel' }}. All rights reserved.
+      © {{ now.year if now is defined else '2025' }} {{ settings.shop_name if settings else 'GoldKernel' }}. All rights reserved.
       &nbsp;·&nbsp;
       <a href="{{ url_for('store.home') }}">Home</a>
       &nbsp;·&nbsp;
@@ -817,8 +817,10 @@ function updateCartBadge(count) {
 }
 
 // Fetch initial cart count
-fetch('{{ url_for("store.cart_count") }}')
-  .then(r => r.json()).then(d => updateCartBadge(d.count || 0)).catch(() => {});
+fetch('{{ url_for("store.cart_count") }}', {credentials: 'same-origin'})
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(d => updateCartBadge(d.count || 0))
+  .catch(() => {});
 
 // ── Toast ─────────────────────────────────────────────────────────────────
 let _toastTimer;
