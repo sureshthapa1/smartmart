@@ -36,7 +36,11 @@
   {% endif %}
 
   {% if order %}
-  {% set slabel, scolor = order.status_label %}
+  {% set _sl = order.status_label %}
+{% set slabel = _sl[0] %}
+{% set _raw_color = _sl[1] %}
+{% set _color_map = {'success':'success','danger':'danger','warning':'warning','info':'info','primary':'info','secondary':'muted'} %}
+{% set scolor = _color_map.get(_raw_color, 'muted') %}
   {% set flow = ['pending','confirmed','preparing','out_for_delivery','delivered'] %}
   {% set cur_idx = flow.index(order.status) if order.status in flow else -1 %}
   {% set step_pct = ([cur_idx / (flow|length-1) * 100, 100]|min) if cur_idx > 0 else 0 %}
