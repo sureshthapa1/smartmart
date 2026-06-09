@@ -82,7 +82,7 @@ def create_app(config_name="development"):
             "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; "
             "font-src 'self' fonts.gstatic.com cdn.jsdelivr.net; "
-            "img-src 'self' data: blob: https://res.cloudinary.com; "
+            "img-src 'self' data: blob: https://res.cloudinary.com https://images.pexels.com; "
             "connect-src 'self';"
         )
         return response
