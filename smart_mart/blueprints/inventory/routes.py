@@ -160,6 +160,18 @@ def create_product():
                     pass
         try:
             inventory_manager.create_product(data)
+            # Auto-fill description, image, pack_size via AI if missing
+            try:
+                from ...services.product_autofill import autofill_product as _autofill
+                from ...models.product import Product as _Product
+                from ...extensions import db as _db
+                _new_product = _db.session.execute(
+                    _db.select(_Product).order_by(_Product.id.desc()).limit(1)
+                ).scalar_one_or_none()
+                if _new_product and not data.get("image_filename"):
+                    _autofill(_new_product, force=False)
+            except Exception:
+                pass
             flash("Product created successfully.", "success")
             return redirect(url_for("inventory.list_products"))
         except ValueError as e:
@@ -204,6 +216,12 @@ def edit_product(product_id):
                     pass
         try:
             inventory_manager.update_product(product_id, data)
+            # Auto-fill any still-empty fields
+            try:
+                from ...services.product_autofill import autofill_product as _autofill
+                _autofill(product, force=False)
+            except Exception:
+                pass
             flash("Product updated successfully.", "success")
             return redirect(url_for("inventory.list_products"))
         except ValueError as e:
@@ -665,6 +683,25 @@ def bulk_upload():
 
     return render_template("inventory/bulk_upload.html")
 
+
+
+
+@inventory_bp.route("/autofill-all", methods=["POST"])
+@admin_required
+def autofill_all():
+    """Bulk-autofill all products missing description or image."""
+    limit = int(request.form.get("limit", 50))
+    try:
+        from ...services.product_autofill import autofill_all_empty
+        results = autofill_all_empty(limit=limit)
+        flash(
+            f"Bulk autofill complete — {results['updated']} products updated, "
+            f"{results['skipped']} skipped out of {results['total']} processed.",
+            "success"
+        )
+    except Exception as exc:
+        flash(f"Bulk autofill failed: {exc}", "danger")
+    return redirect(url_for("inventory.list_products"))
 
 @inventory_bp.route("/export-csv")
 @admin_required
