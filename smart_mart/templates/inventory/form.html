@@ -247,23 +247,40 @@
               <i class="bi bi-check-lg me-1"></i>{{ action }} Product
             </button>
             {% if product and product.id %}
-            <div class="d-flex gap-2">
-              <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
-                <input type="hidden" name="force" value="0">
-                <button type="submit" class="btn btn-outline-success"
-                        title="Auto-fill missing description, image and pack size based on product name"
-                        onclick="return confirm('Auto-fill missing fields for {{ product.name }}?\n\nThis will only fill empty fields (description, image, pack size).')">
-                  <i class="bi bi-stars me-1"></i> Auto-fill Missing
-                </button>
-              </form>
-              <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
-                <input type="hidden" name="force" value="1">
-                <button type="submit" class="btn btn-outline-warning"
-                        title="Force re-generate ALL auto-fill fields, overwriting existing values"
-                        onclick="return confirm('Force overwrite ALL auto-fill fields for {{ product.name }}?\n\nThis will replace existing description, image and pack size.')">
-                  <i class="bi bi-arrow-clockwise me-1"></i> Force Regenerate
-                </button>
-              </form>
+            <div style="background:linear-gradient(135deg,#fefce8,#fef3c7);border:1.5px solid #fde68a;border-radius:10px;padding:.85rem 1rem;width:100%;">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span style="font-size:1.1rem;">✨</span>
+                <div>
+                  <div style="font-weight:700;font-size:.85rem;color:#78350f;">AI Product Autofill</div>
+                  <div class="text-muted" style="font-size:.72rem;">Claude AI generates description, benefits, pack size &amp; downloads a product image.</div>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-1 mb-2">
+                {% if product.description %}<span class="badge bg-success-subtle text-success border border-success-subtle">✅ Description</span>{% else %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle">❌ No description</span>{% endif %}
+                {% if product.image_filename %}<span class="badge bg-success-subtle text-success border border-success-subtle">✅ Image</span>{% else %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle">❌ No image</span>{% endif %}
+                {% if product.pack_size %}<span class="badge bg-success-subtle text-success border border-success-subtle">✅ Pack size</span>{% else %}<span class="badge bg-warning-subtle text-warning border border-warning-subtle">⚠ No pack size</span>{% endif %}
+                {% if product.slug %}<span class="badge bg-success-subtle text-success border border-success-subtle">✅ SEO slug</span>{% else %}<span class="badge bg-warning-subtle text-warning border border-warning-subtle">⚠ No slug</span>{% endif %}
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" name="force" value="0" class="btn btn-sm btn-warning fw-semibold"
+                          onclick="return confirm('Fill empty fields for '{{ product.name }}' using AI?
+
+Only empty fields (description, image, pack size, slug) will be filled.')">
+                    <i class="bi bi-stars me-1"></i>Fill Empty Fields
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('inventory.autofill_product', product_id=product.id) }}" style="display:inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" name="force" value="1" class="btn btn-sm btn-outline-secondary"
+                          onclick="return confirm('Force refresh ALL fields for '{{ product.name }}' using AI?
+
+This will OVERWRITE existing description, image and pack size.')">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Force Refresh
+                  </button>
+                </form>
+              </div>
             </div>
             {% endif %}
             <a href="{{ url_for('inventory.list_products') }}" class="btn btn-outline-secondary">Cancel</a>
