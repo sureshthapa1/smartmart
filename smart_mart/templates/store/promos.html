@@ -1,0 +1,89 @@
+{% extends "store/base_store.html" %}
+{% block title %}Offers & Promo Codes — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block meta_desc %}Active discount offers and promo codes at {{ settings.shop_name if settings else 'GoldKernel' }}. Save on premium dry fruits delivered in Nepal.{% endblock %}
+{% block content %}
+<div class="sc" style="padding-top:1.75rem;padding-bottom:3rem;max-width:760px;">
+
+  <div class="fade-up" style="text-align:center;margin-bottom:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">🏷️</div>
+    <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.02em;margin-bottom:.4rem;">Offers &amp; Promo Codes</h1>
+    <p style="color:var(--muted);margin:0;">Active discounts you can use right now at checkout</p>
+  </div>
+
+  {% if promos %}
+  <div style="display:flex;flex-direction:column;gap:.85rem;" class="fade-up">
+    {% for promo in promos %}
+    <div style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);overflow:hidden;display:flex;flex-wrap:wrap;">
+      {# Left accent bar #}
+      <div style="width:6px;background:var(--brand-grad);flex-shrink:0;"></div>
+      <div style="flex:1;padding:1.1rem 1.25rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">
+        <div style="flex:1;min-width:180px;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;">
+            <span style="font-size:1rem;">
+              {% if promo.promo_type == 'percentage' %}💸
+              {% elif promo.promo_type == 'fixed' %}💵
+              {% elif promo.promo_type == 'bogo' %}🎁
+              {% else %}📦{% endif %}
+            </span>
+            <span style="font-weight:800;font-size:.95rem;">{{ promo.name }}</span>
+          </div>
+          {% if promo.description %}
+          <div style="font-size:.82rem;color:var(--muted);margin-bottom:.4rem;">{{ promo.description }}</div>
+          {% endif %}
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;font-size:.75rem;">
+            {% if promo.promo_type == 'percentage' %}
+            <span class="status-badge success">{{ promo.discount_value | int }}% OFF</span>
+            {% elif promo.promo_type == 'fixed' %}
+            <span class="status-badge success">NPR {{ promo.discount_value | int }} OFF</span>
+            {% elif promo.promo_type == 'bogo' %}
+            <span class="status-badge info">Buy {{ promo.buy_qty }} Get {{ promo.free_qty }} Free</span>
+            {% else %}
+            <span class="status-badge info">Bundle Deal</span>
+            {% endif %}
+            {% if promo.min_purchase %}
+            <span class="status-badge muted">Min. NPR {{ promo.min_purchase | int }}</span>
+            {% endif %}
+            <span class="status-badge warning">Ends {{ promo.end_date.strftime('%d %b') }}</span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <a href="{{ url_for('store.home') }}" class="btn-brand" style="padding:.5rem 1.1rem;font-size:.82rem;">
+            <i class="bi bi-bag-heart"></i> Shop Now
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state ui-card fade-up">
+    <div class="empty-icon">🏷️</div>
+    <h4>No active offers right now</h4>
+    <p>Check back soon — we regularly run discounts on dry fruits and grocery essentials.</p>
+    <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Browse Products</a>
+  </div>
+  {% endif %}
+
+  {# Always-on deals #}
+  <div class="fade-up" style="margin-top:2rem;">
+    <div class="section-title" style="margin-bottom:1rem;">🎁 Always-On Deals</div>
+    <div class="row g-3">
+      {% for icon, title, desc, badge in [
+        ('🚚','Free Delivery','On orders above NPR 2,000','Always active'),
+        ('💰','Bulk Discount','Buy 3+ items, ask us for a special price','Contact us'),
+        ('🎁','Gift Packaging','Free gift wrap on any order above NPR 500','Always active'),
+      ] %}
+      <div class="col-sm-4">
+        <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:1rem;text-align:center;height:100%;">
+          <div style="font-size:1.75rem;margin-bottom:.5rem;">{{ icon }}</div>
+          <div style="font-weight:800;font-size:.88rem;margin-bottom:.25rem;">{{ title }}</div>
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:.5rem;">{{ desc }}</div>
+          <span class="status-badge success" style="font-size:.7rem;">{{ badge }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
