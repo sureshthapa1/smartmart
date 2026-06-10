@@ -2,69 +2,72 @@
 {% block title %}FAQ — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block meta_desc %}Frequently asked questions about ordering dry fruits from GoldKernel Nepal — delivery, payment, returns, and more.{% endblock %}
 {% block content %}
-<div class="section-container py-5" style="max-width:720px;">
-  <div class="fade-up">
-    <div style="text-align:center;margin-bottom:2rem;">
-      <div style="font-size:2.5rem;margin-bottom:.75rem;">❓</div>
-      <h1 style="font-size:1.8rem;font-weight:900;margin-bottom:.5rem;">Frequently Asked Questions</h1>
-      <p style="color:var(--muted);">Everything you need to know about ordering from GoldKernel</p>
-    </div>
+<div class="sc" style="padding-top:1.75rem;padding-bottom:3rem;max-width:720px;">
 
-    {% set faqs = [
-      ('🚚', 'How long does delivery take?',
-       'Same-day delivery in Kathmandu Valley for orders placed before 2pm. Next-day delivery for Lalitpur and Bhaktapur. For other locations, delivery takes 2–3 business days. We deliver 7 days a week.'),
-      ('💵', 'What payment methods do you accept?',
-       'We accept Cash on Delivery (COD), eSewa, Khalti, and IME Pay. Cash on Delivery is available for all locations. For digital payments, follow the instructions shown after placing your order.'),
-      ('📦', 'What is your minimum order amount?',
-       'The minimum order is NPR 200. Orders above NPR 2,000 qualify for free delivery — otherwise a flat NPR 100 delivery charge applies.'),
-      ('🔄', 'What is your return policy?',
-       'We offer a 7-day return policy on all products. If you receive a damaged, expired, or incorrect item, contact us immediately with a photo and we will arrange a replacement or full refund.'),
-      ('⚖️', 'How are dry fruits weighed and packed?',
-       'All dry fruits are carefully weighed and sealed in airtight packaging to preserve freshness. Pack sizes are as listed (200g, 250g, 500g, 1kg). Actual weight may vary by ±2%.'),
-      ('🥜', 'Are your dry fruits organic?',
-       'We source the finest quality dry fruits available. While not all are certified organic, we carefully select trusted suppliers for quality, freshness, and safety. All products are food-grade and meet quality standards.'),
-      ('🗓️', 'How fresh are your products?',
-       'All products display best-before dates. Premium dry fruits typically have a shelf life of 6–12 months when stored in an airtight container in a cool, dry place. We only stock products with adequate remaining shelf life.'),
-      ('📱', 'Can I order via WhatsApp?',
-       'Yes! You can also send us your order via WhatsApp using the chat button on this page. Simply tell us which products you want and your delivery address.'),
-      ('🔑', 'Do I need an account to order?',
-       'No — you can checkout as a guest with just your name, phone number, and delivery address. Creating a free account lets you track your orders, view order history, and enjoy faster checkout next time.'),
-      ('❌', 'Can I cancel my order?',
-       'You can cancel a pending order directly from your account page before it is confirmed. Once confirmed or being prepared, cancellation is not possible online — please call us as soon as possible.'),
-      ('💳', 'Is it safe to pay online?',
-       'Yes. All digital payments are processed through Nepal\'s trusted payment providers — eSewa and Khalti. We never store your payment credentials. Look for the lock icon in your browser.'),
-      ('🏠', 'Do you deliver outside Kathmandu?',
-       'Yes! We deliver across Nepal. Delivery time and charges may vary for areas outside the Valley. Contact us for bulk orders or special delivery arrangements.'),
-    ] %}
+  <div class="fade-up" style="text-align:center;margin-bottom:2rem;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">❓</div>
+    <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.02em;margin-bottom:.4rem;">Frequently Asked Questions</h1>
+    <p style="color:var(--muted);margin:0;">Everything you need to know about ordering from GoldKernel</p>
+  </div>
 
-    <div style="display:flex;flex-direction:column;gap:.6rem;">
-      {% for icon, question, answer in faqs %}
-      <div style="background:#fff;border-radius:var(--radius-sm);border:1.5px solid var(--border);overflow:hidden;" class="faq-item">
-        <button onclick="toggleFaq(this)"
-                style="width:100%;text-align:left;background:none;border:none;padding:1rem 1.25rem;cursor:pointer;display:flex;align-items:center;gap:.75rem;font-weight:700;font-size:.9rem;color:var(--text);">
-          <span>{{ icon }}</span>
-          <span style="flex:1;">{{ question }}</span>
-          <i class="bi bi-plus-circle faq-chevron" style="font-size:1rem;color:var(--brand);flex-shrink:0;transition:transform .2s;"></i>
-        </button>
-        <div class="faq-answer" style="display:none;padding:.75rem 1.25rem 1.1rem 3.2rem;font-size:.88rem;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);">{{ answer }}</div>
+  {% set faqs = [
+    ('🚚','How long does delivery take?',
+     'Same-day delivery in Kathmandu Valley for orders placed before 2pm. Next-day for Lalitpur and Bhaktapur. Other locations take 2–3 business days. We deliver 7 days a week.'),
+    ('💵','What payment methods do you accept?',
+     'Cash on Delivery (COD), eSewa, Khalti, and IME Pay. COD is available for all locations. For digital payments, follow the instructions shown after placing your order.'),
+    ('📦','What is your minimum order amount?',
+     'The minimum order is NPR 200. Orders above NPR 2,000 qualify for free delivery — otherwise a flat NPR 100 delivery charge applies.'),
+    ('🔄','What is your return policy?',
+     'We offer a 7-day return policy. If you receive a damaged, expired, or incorrect item, contact us immediately with a photo and we will arrange a replacement or full refund.'),
+    ('⚖️','How are dry fruits weighed and packed?',
+     'All dry fruits are carefully weighed and sealed in airtight packaging. Pack sizes are as listed. Actual weight may vary by ±2%.'),
+    ('🥜','Are your dry fruits organic?',
+     'We source the finest quality dry fruits available. While not all are certified organic, we carefully select trusted suppliers for quality, freshness, and safety.'),
+    ('🗓️','How fresh are your products?',
+     'All products display best-before dates. Dry fruits typically have a shelf life of 6–12 months when stored in an airtight container in a cool, dry place.'),
+    ('📱','Can I order via WhatsApp?',
+     'Yes! You can also send your order via WhatsApp. Simply tell us which products you want and your delivery address.'),
+    ('🔑','Do I need an account to order?',
+     'No — you can checkout as a guest. Creating a free account lets you track orders, view order history, and enjoy faster checkout next time.'),
+    ('❌','Can I cancel my order?',
+     'You can cancel a pending order from your account page before it is confirmed. Once confirmed or being prepared, cancellation is not possible online — please call us immediately.'),
+    ('💳','Is it safe to pay online?',
+     'Yes. All digital payments are processed through Nepal's trusted providers — eSewa and Khalti. We never store your payment credentials.'),
+    ('🏠','Do you deliver outside Kathmandu?',
+     'Yes! We deliver across Nepal. Delivery time and charges may vary outside the Valley. Contact us for bulk orders or special arrangements.'),
+  ] %}
+
+  <div style="display:flex;flex-direction:column;gap:.5rem;" class="fade-up">
+    {% for icon, question, answer in faqs %}
+    <div class="faq-item" style="background:var(--card-bg);border-radius:var(--r);border:1.5px solid var(--border);overflow:hidden;">
+      <button onclick="toggleFaq(this)"
+              style="width:100%;text-align:left;background:none;border:none;padding:.9rem 1.1rem;cursor:pointer;display:flex;align-items:center;gap:.75rem;font-weight:700;font-size:.88rem;color:var(--text);">
+        <span style="font-size:1.1rem;flex-shrink:0;">{{ icon }}</span>
+        <span style="flex:1;">{{ question }}</span>
+        <i class="bi bi-plus-circle faq-chevron" style="font-size:.95rem;color:var(--brand);flex-shrink:0;transition:transform .2s;"></i>
+      </button>
+      <div class="faq-answer" style="display:none;padding:.6rem 1.1rem 1rem 3.1rem;font-size:.86rem;color:var(--muted);line-height:1.75;border-top:1px solid var(--border);">
+        {{ answer }}
       </div>
-      {% endfor %}
     </div>
+    {% endfor %}
+  </div>
 
-    <div style="text-align:center;margin-top:2rem;padding:1.75rem;background:#fff;border-radius:var(--radius);border:1.5px solid var(--border);">
-      <div style="font-size:1.5rem;margin-bottom:.5rem;">💬</div>
-      <h3 style="font-size:1rem;font-weight:800;margin-bottom:.4rem;">Still have questions?</h3>
-      <p style="color:var(--muted);font-size:.88rem;margin-bottom:1rem;">We're happy to help. Reach out to us directly.</p>
-      <div class="d-flex gap-2 justify-content-center flex-wrap">
-        <a href="{{ url_for('store.contact') }}" class="btn-brand" style="padding:.55rem 1.25rem;font-size:.88rem;">
-          <i class="bi bi-chat-dots"></i> Contact Us
-        </a>
-        {% if settings and settings.phone %}
-        <a href="https://wa.me/977{{ settings.phone | replace('+','') | replace('-','') | replace(' ','') }}" target="_blank" class="btn-outline-brand" style="padding:.5rem 1.25rem;font-size:.88rem;border-color:#25D366;color:#16a34a;">
-          <i class="bi bi-whatsapp"></i> WhatsApp
-        </a>
-        {% endif %}
-      </div>
+  <div class="fade-up" style="text-align:center;margin-top:2rem;padding:1.75rem;background:var(--card-bg);border-radius:var(--r-lg);border:1.5px solid var(--border);">
+    <div style="font-size:1.5rem;margin-bottom:.5rem;">💬</div>
+    <h3 style="font-size:1rem;font-weight:800;margin-bottom:.35rem;">Still have questions?</h3>
+    <p style="color:var(--muted);font-size:.875rem;margin-bottom:1rem;">We're happy to help. Reach out to us directly.</p>
+    <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap;">
+      <a href="{{ url_for('store.contact') }}" class="btn-brand" style="padding:.55rem 1.25rem;font-size:.875rem;">
+        <i class="bi bi-chat-dots"></i> Contact Us
+      </a>
+      {% if settings and settings.phone %}
+      <a href="https://wa.me/977{{ settings.phone | replace('+','') | replace('-','') | replace(' ','') }}"
+         target="_blank" rel="noopener"
+         class="btn-outline-brand" style="padding:.5rem 1.2rem;font-size:.875rem;border-color:#22c55e;color:#16a34a;">
+        <i class="bi bi-whatsapp"></i> WhatsApp
+      </a>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -74,19 +77,16 @@
 <script>
 function toggleFaq(btn) {
   const answer = btn.nextElementSibling;
-  const icon = btn.querySelector('.faq-chevron');
+  const icon   = btn.querySelector('.faq-chevron');
   const isOpen = answer.style.display === 'block';
-  // Close all
   document.querySelectorAll('.faq-answer').forEach(a => a.style.display = 'none');
   document.querySelectorAll('.faq-chevron').forEach(i => {
     i.className = 'bi bi-plus-circle faq-chevron';
     i.style.transform = '';
-    i.style.color = 'var(--brand)';
   });
   if (!isOpen) {
     answer.style.display = 'block';
     icon.className = 'bi bi-dash-circle faq-chevron';
-    icon.style.color = 'var(--brand-dark)';
   }
 }
 </script>
