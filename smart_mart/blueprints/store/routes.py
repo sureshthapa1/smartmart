@@ -262,6 +262,15 @@ def home():
 
     # AI: velocity + personalisation
     _fast_ids = _selling_fast_ids()
+
+    # FEATURE 6: Recently viewed products
+    _rv_ids = session.get("recently_viewed", [])
+    _recently_viewed = []
+    if _rv_ids:
+        _rv_map = {p.id: p for p in db.session.execute(
+            db.select(Product).where(Product.id.in_(_rv_ids), Product.is_active.isnot(False), Product.quantity > 0)
+        ).scalars().all()}
+        _recently_viewed = [_rv_map[pid] for pid in _rv_ids if pid in _rv_map][:6]
     cust_phone = g.customer.phone if g.customer else None
     _personalised = False
     if cust_phone:
@@ -299,6 +308,7 @@ def home():
         featured_products=featured_products,
         selling_fast_ids=_fast_ids,
         personalised=_personalised,
+        recently_viewed=_recently_viewed,
         settings=settings,
         q=q,
         selected_category=category,
@@ -358,6 +368,19 @@ def product_detail(product_id):
 
     cart_qty = _cart().get(str(product_id), 0)
 
+    # FEATURE 9: Estimated delivery date
+    from datetime import date as _date, timedelta as _td
+    _today = _date.today()
+    _dow = _today.weekday()  # 0=Mon..6=Sun
+    _days_to_add = 1 if _dow < 4 else (8 - _dow)  # next business day
+    est_delivery = _today + _td(days=_days_to_add)
+
+    # FEATURE 6: Recently viewed — store in session
+    rv = session.get("recently_viewed", [])
+    if product.id not in rv:
+        rv.insert(0, product.id)
+    session["recently_viewed"] = rv[:10]
+
     return render_template(
         "store/product_detail.html",
         product=product,
@@ -365,6 +388,7 @@ def product_detail(product_id):
         cart_qty=cart_qty,
         recommendations=recommendations,
         related=related,
+        est_delivery=est_delivery,
         settings=settings,
         customer=g.customer,
         max_qty=MAX_QTY_PER_ITEM,
@@ -694,8 +718,31 @@ def order_success(order_number):
         flash("Order placed successfully! Use your order number to track it.", "success")
         return redirect(url_for("store.track", order_number=order_number))
 
+    # FEATURE 2: Send order receipt email if customer provided one
+    if order.customer_email and not session.get(f"email_sent_{order_number}"):
+        try:
+            _send_order_receipt_email(order, settings)
+            session[f"email_sent_{order_number}"] = True
+        except Exception:
+            pass
+
+    # FEATURE 3: Build WhatsApp confirmation link
+    wa_link = None
+    if settings and settings.phone:
+        import urllib.parse as _up
+        wa_msg = (
+            f"Hi! I just placed order *{order.order_number}* on {settings.shop_name or 'GoldKernel'}. "
+            f"Total: NPR {float(order.grand_total):.0f}. "
+            f"Please confirm. Thank you!"
+        )
+        wa_num = re.sub(r"\D", "", settings.phone)
+        if not wa_num.startswith("977"):
+            wa_num = "977" + wa_num
+        wa_link = f"https://wa.me/{wa_num}?text={_up.quote(wa_msg)}"
+
     return render_template("store/order_success.html", order=order,
-                           settings=settings, customer=cust)
+                           settings=settings, customer=cust,
+                           wa_link=wa_link)
 
 
 # ── Order Tracking ────────────────────────────────────────────────────────────
@@ -1169,6 +1216,137 @@ def store_chat_api():
     reply = chatbot_reply(message, history=history, customer_name=cust_name)
     return jsonify({"ok": True, "reply": reply})
 
+
+
+# ── FEATURE 1: Active promo codes display ─────────────────────────────────────
+
+@store_bp.route("/promos")
+def promos():
+    """Show currently active promo codes."""
+    from datetime import date
+    from ...models.promotion import Promotion
+    settings = _settings()
+    today = date.today()
+    active = db.session.execute(
+        db.select(Promotion)
+        .where(
+            Promotion.is_active == True,
+            Promotion.start_date <= today,
+            Promotion.end_date >= today,
+        )
+        .order_by(Promotion.end_date)
+    ).scalars().all()
+    return render_template("store/promos.html", promos=active,
+                           settings=settings, customer=g.customer)
+
+
+# ── FEATURE 4: Product reviews ────────────────────────────────────────────────
+
+@store_bp.route("/product/<int:product_id>/review", methods=["POST"])
+@limiter.limit("5/hour")
+def submit_review(product_id):
+    """Submit a product review (requires login or verified order)."""
+    from ...models.product_review import ProductReview
+    product = db.get_or_404(Product, product_id)
+    rating  = int(request.form.get("rating", 0))
+    title   = request.form.get("title", "").strip()[:120]
+    body    = request.form.get("body", "").strip()[:1000]
+    order_number = request.form.get("order_number", "").strip().upper()
+
+    cust = g.customer
+    if not cust:
+        flash("Please sign in to leave a review.", "warning")
+        return redirect(url_for("store.product_detail", product_id=product_id))
+
+    if not (1 <= rating <= 5):
+        flash("Please select a rating between 1 and 5.", "danger")
+        return redirect(url_for("store.product_detail", product_id=product_id))
+
+    # Verify purchase if order number provided
+    if order_number:
+        order = db.session.execute(
+            db.select(OnlineOrder).where(
+                OnlineOrder.order_number == order_number,
+                OnlineOrder.customer_phone == cust.phone,
+            )
+        ).scalar_one_or_none()
+        if not order:
+            flash("Order number not found for your account.", "danger")
+            return redirect(url_for("store.product_detail", product_id=product_id))
+
+    try:
+        review = ProductReview(
+            product_id=product_id,
+            customer_phone=cust.phone,
+            customer_name=cust.name,
+            rating=rating,
+            title=title or None,
+            body=body or None,
+            order_number=order_number or None,
+        )
+        db.session.add(review)
+        db.session.commit()
+        flash("Thank you for your review! ⭐", "success")
+    except Exception:
+        db.session.rollback()
+        flash("You have already reviewed this product.", "info")
+
+    return redirect(url_for("store.product_detail", product_id=product_id) + "#reviews")
+
+
+# ── FEATURE 5: Wishlist ───────────────────────────────────────────────────────
+
+@store_bp.route("/wishlist/toggle", methods=["POST"])
+@limiter.limit("30/minute")
+def wishlist_toggle():
+    """Add or remove a product from the customer's wishlist."""
+    from ...models.wishlist_item import WishlistItem
+    cust = g.customer
+    if not cust:
+        return jsonify({"ok": False, "error": "Login required", "redirect": url_for("store.login")}), 401
+
+    product_id = int(request.form.get("product_id", 0) or request.json.get("product_id", 0) if request.is_json else request.form.get("product_id", 0))
+    if not product_id:
+        return jsonify({"ok": False, "error": "Missing product_id"}), 400
+
+    existing = db.session.execute(
+        db.select(WishlistItem).where(
+            WishlistItem.customer_phone == cust.phone,
+            WishlistItem.product_id == product_id,
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        return jsonify({"ok": True, "action": "removed", "wishlisted": False})
+    else:
+        item = WishlistItem(customer_phone=cust.phone, product_id=product_id)
+        db.session.add(item)
+        db.session.commit()
+        return jsonify({"ok": True, "action": "added", "wishlisted": True})
+
+
+@store_bp.route("/wishlist")
+def wishlist():
+    """View customer's wishlist."""
+    from ...models.wishlist_item import WishlistItem
+    settings = _settings()
+    cust = g.customer
+    if not cust:
+        flash("Please sign in to view your wishlist.", "info")
+        return redirect(url_for("store.login", next=url_for("store.wishlist")))
+    items = db.session.execute(
+        db.select(WishlistItem)
+        .where(WishlistItem.customer_phone == cust.phone)
+        .order_by(WishlistItem.created_at.desc())
+    ).scalars().all()
+    return render_template("store/wishlist.html", items=items,
+                           settings=settings, customer=cust)
+
+
+# ── FEATURE 10: Improved sitemap with image tags ──────────────────────────────
+
 @store_bp.route("/sitemap.xml")
 def sitemap():
     from datetime import date
@@ -1180,22 +1358,33 @@ def sitemap():
 
     base = request.url_root.rstrip("/")
     urls = [
-        f"<url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>",
-        f"<url><loc>{base}/store/track</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>",
-        f"<url><loc>{base}/store/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"<url><loc>{base}/store/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"<url><loc>{base}/store/contact</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>",
+        f'<url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>',
+        f'<url><loc>{base}/store/track</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>',
+        f'<url><loc>{base}/store/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>',
+        f'<url><loc>{base}/store/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>',
+        f'<url><loc>{base}/store/contact</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>',
+        f'<url><loc>{base}/store/promos</loc><changefreq>daily</changefreq><priority>0.6</priority></url>',
     ]
     for p in products:
         lastmod = p.updated_at.strftime("%Y-%m-%d") if p.updated_at else date.today().isoformat()
         loc = f"{base}/store/p/{p.slug}" if getattr(p, 'slug', None) else f"{base}/store/product/{p.id}"
+        # Image tag for Google image search
+        img_tag = ""
+        if p.image_filename and not p.image_filename.startswith("cld:"):
+            img_url = f"{base}/static/uploads/products/{p.image_filename}"
+            img_caption = (p.name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            img_tag = f'<image:image><image:loc>{img_url}</image:loc><image:caption>{img_caption}</image:caption></image:image>'
+        # Boost priority for featured or fast-selling products
+        priority = "0.9" if getattr(p, "is_featured", False) else "0.8"
         urls.append(
             f"<url><loc>{loc}</loc>"
             f"<lastmod>{lastmod}</lastmod>"
-            f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+            f"<changefreq>weekly</changefreq><priority>{priority}</priority>"
+            f"{img_tag}</url>"
         )
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+    xml += '  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
     xml += "\n".join(urls)
     xml += "\n</urlset>"
     return Response(xml, mimetype="application/xml")
