@@ -1,0 +1,74 @@
+{% extends "store/base_store.html" %}
+{% block title %}My Wishlist — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block content %}
+<div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
+
+  <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;" class="fade-up">
+    <div style="font-size:1.5rem;">❤️</div>
+    <div>
+      <h1 style="font-size:1.25rem;font-weight:900;margin:0;">My Wishlist</h1>
+      <div style="font-size:.82rem;color:var(--muted);">{{ items|length }} saved item{{ 's' if items|length != 1 }}</div>
+    </div>
+    <a href="{{ url_for('store.home') }}" class="btn-ghost ms-auto" style="font-size:.82rem;">
+      <i class="bi bi-plus"></i> Add More
+    </a>
+  </div>
+
+  {% if items %}
+  <div class="row g-3">
+    {% for item in items %}
+    {% set p = item.product %}
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
+      <div class="product-card" style="position:relative;">
+        {# Remove from wishlist #}
+        <form method="post" action="{{ url_for('store.wishlist_toggle') }}" style="position:absolute;top:.5rem;right:.5rem;z-index:10;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="product_id" value="{{ p.id }}">
+          <button type="submit" title="Remove from wishlist"
+                  style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.9);border:1.5px solid #fecaca;color:var(--danger);font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+            <i class="bi bi-heart-fill"></i>
+          </button>
+        </form>
+        <a href="{{ url_for('store.product_detail', product_id=p.id) }}" style="text-decoration:none;">
+          <div class="product-img-wrap">
+            {% if p.image_filename and not p.image_filename.startswith('cld:') %}
+            <img src="{{ url_for('static', filename='uploads/products/' + p.image_filename) }}" alt="{{ p.name }}" loading="lazy">
+            {% else %}
+            <div class="product-img-placeholder">🥜</div>
+            {% endif %}
+            {% if p.quantity == 0 %}
+            <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">
+              <span style="background:#fff;border-radius:var(--r-full);padding:.25em .75em;font-size:.72rem;font-weight:800;color:var(--danger);">Out of Stock</span>
+            </div>
+            {% endif %}
+          </div>
+          <div class="product-body">
+            {% if p.category %}<div class="product-category">{{ p.category }}</div>{% endif %}
+            <div class="product-name">{{ p.name }}</div>
+            <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(p.selling_price) }}</div>
+          </div>
+        </a>
+        <div class="product-footer">
+          {% if p.quantity > 0 %}
+          <button class="btn-add" data-add-cart data-pid="{{ p.id }}" data-name="{{ p.name }}" data-qty="1">
+            <i class="bi bi-cart-plus"></i> Add to Cart
+          </button>
+          {% else %}
+          <button class="btn-add" disabled><i class="bi bi-x-circle"></i> Out of Stock</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state ui-card fade-up">
+    <div class="empty-icon">❤️</div>
+    <h4>Your wishlist is empty</h4>
+    <p>Save products you love by tapping the heart icon on any product.</p>
+    <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Browse Products</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
