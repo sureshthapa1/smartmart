@@ -15,6 +15,12 @@
     <a href="{{ url_for('inventory.print_labels') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upc me-1"></i>Labels</a>
     <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-tags me-1"></i>Categories</a>
     <a href="{{ url_for('inventory.bulk_upload') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-cloud-upload me-1"></i>Bulk Upload</a>
+    <form method="post" action="{{ url_for('inventory.autofill_all') }}" style="display:inline;"
+          onsubmit="return confirm('Auto-fill descriptions and images for all products missing them?\n\nThis uses the Claude AI API and may take 1-2 minutes.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="limit" value="100">
+      <button type="submit" class="btn btn-outline-warning btn-sm"><i class="bi bi-stars me-1"></i>AI Autofill All</button>
+    </form>
     {% endif %}
     <a href="{{ url_for('inventory.export_csv') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Export CSV</a>
     <a href="{{ url_for('inventory.create_product') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Product</a>
