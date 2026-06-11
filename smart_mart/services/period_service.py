@@ -98,7 +98,7 @@ def export_period_csv(period: FinancialPeriod) -> str:
     """Export a closed period's P&L summary as CSV."""
     output = io.StringIO()
     w = csv.writer(output)
-    w.writerow(["Smart Mart — Accounting Export"])
+    w.writerow(["Goldkernel — Accounting Export"])
     w.writerow(["Period", period.label])
     w.writerow(["Status", period.status])
     w.writerow(["Closed At", period.closed_at.isoformat() if period.closed_at else ""])

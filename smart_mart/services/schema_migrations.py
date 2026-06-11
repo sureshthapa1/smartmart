@@ -293,7 +293,7 @@ def _migration_steps() -> list[MigrationStep]:
         ),
         (
             "2026_05_16_goldkernel_feature_pack_columns",
-            "Add GoldKernel feature pack columns for payments, loyalty, settings, and low stock.",
+            "Add Goldkernel feature pack columns for payments, loyalty, settings, and low stock.",
             lambda conn: (
                 _safe_add_column(conn, "products", "low_stock_threshold", "INTEGER DEFAULT 500"),
                 _safe_add_column(conn, "sales", "payment_method", "VARCHAR(20) DEFAULT 'cash'"),
@@ -301,7 +301,7 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "customers", "loyalty_points", "INTEGER DEFAULT 0"),
                 _safe_add_column(conn, "customers", "loyalty_tier", "VARCHAR(20) DEFAULT 'silver'"),
                 _safe_add_column(conn, "customers", "total_spent", "NUMERIC(12,2) DEFAULT 0"),
-                _safe_add_column(conn, "shop_settings", "name", "VARCHAR(120) DEFAULT 'GoldKernel Dry Fruits & Treats'"),
+                _safe_add_column(conn, "shop_settings", "name", "VARCHAR(120) DEFAULT 'Goldkernel Dryfruits and Treats'"),
                 _safe_add_column(conn, "shop_settings", "owner_name", "VARCHAR(120)"),
             ),
         ),

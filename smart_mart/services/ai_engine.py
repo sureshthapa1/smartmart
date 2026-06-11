@@ -452,7 +452,7 @@ def chatbot_query(message: str) -> str:
     # ── Greetings (only if message is JUST a greeting) ────────────────────
     if msg in ("hello", "hi", "hey", "namaste", "namaskar") or \
        (len(msg.split()) <= 2 and _has("hello", "hi", "hey", "namaste", "namaskar")):
-        return "👋 Namaste! I'm your Smart Mart AI assistant.\n\nAsk me anything about your business — sales, stock, profit, customers, forecasts. Type **help** to see all I can do."
+        return "👋 Namaste! I'm your Goldkernel AI assistant.\n\nAsk me anything about your business — sales, stock, profit, customers, forecasts. Type **help** to see all I can do."
 
     # ── Help ──────────────────────────────────────────────────────────────
     if _has("help", "what can you", "commands", "what do you know"):

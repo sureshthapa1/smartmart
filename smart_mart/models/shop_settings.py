@@ -5,8 +5,8 @@ class ShopSettings(db.Model):
     __tablename__ = "shop_settings"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), default="GoldKernel Dry Fruits & Treats")
-    shop_name = db.Column(db.String(120), default="Smart Mart")
+    name = db.Column(db.String(120), default="Goldkernel Dryfruits and Treats")
+    shop_name = db.Column(db.String(120), default="Goldkernel Dryfruits and Treats")
     pan_number = db.Column(db.String(50))
     address = db.Column(db.String(255))
     phone = db.Column(db.String(50))

@@ -42,7 +42,7 @@ def card_pdf(customer_id):
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
     tier = (customer.loyalty_tier or "silver").title()
-    shop_name = shop.name or shop.shop_name or "GoldKernel Dry Fruits & Treats"
+    shop_name = shop.name or shop.shop_name or "Goldkernel Dryfruits and Treats"
     table = Table([
         [Paragraph(f"<b>{shop_name}</b>", styles["Heading1"])],
         [Paragraph(f"Loyalty Card for {customer.name}", styles["Heading2"])],
@@ -57,7 +57,7 @@ def card_pdf(customer_id):
         ("TOPPADDING", (0, 0), (-1, -1), 10),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
     ]))
-    doc.build([table, Spacer(1, 12), Paragraph("Thank you for shopping at GoldKernel!", styles["Normal"])])
+    doc.build([table, Spacer(1, 12), Paragraph("Thank you for shopping at Goldkernel!", styles["Normal"])])
     return Response(
         buffer.getvalue(),
         mimetype="application/pdf",

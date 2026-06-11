@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Invoice {{ sale.invoice_number or sale.id }} — {{ shop.shop_name if shop else 'Smart Mart' }}</title>
+  <title>Invoice {{ sale.invoice_number or sale.id }} — {{ shop.shop_name if shop else 'Goldkernel' }}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1e293b; background: #fff; }
@@ -52,7 +52,7 @@
              alt="Logo" style="height:60px;width:auto;object-fit:contain;flex-shrink:0;">
         {% endif %}
         <div>
-          <div class="shop-name">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+          <div class="shop-name">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
           <div class="shop-meta">
             {% if shop and shop.address %}{{ shop.address }}<br>{% endif %}
             {% if shop and shop.phone %}Tel: {{ shop.phone }}<br>{% endif %}

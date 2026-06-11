@@ -1,4 +1,4 @@
-"""Website/POS integration logic for GoldKernel e-commerce."""
+"""Website/POS integration logic for Goldkernel e-commerce."""
 from __future__ import annotations
 
 import json

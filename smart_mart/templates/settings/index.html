@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings — Smart Mart{% endblock %}
+{% block title %}Settings — Goldkernel{% endblock %}
 {% block page_title %}Shop Settings{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Settings</li>{% endblock %}
 
@@ -185,7 +185,7 @@
                    alt="Logo" style="max-height:50px;max-width:120px;object-fit:contain">
               {% endif %}
               <div>
-                <div class="fw-bold fs-5" style="color:#0f172a;">{{ s.shop_name or 'Smart Mart' }}</div>
+                <div class="fw-bold fs-5" style="color:#0f172a;">{{ s.shop_name or 'Goldkernel' }}</div>
                 {% if s.address %}<div class="text-muted small">{{ s.address }}</div>{% endif %}
                 {% if s.phone %}<div class="text-muted small">Tel: {{ s.phone }}</div>{% endif %}
                 {% if s.pan_number %}<div class="text-muted small">PAN: {{ s.pan_number }}</div>{% endif %}

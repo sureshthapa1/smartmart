@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}AI Business Advisor — Smart Mart{% endblock %}
+{% block title %}AI Business Advisor — Goldkernel{% endblock %}
 {% block page_title %}AI Business Advisor{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Business Advisor</li>{% endblock %}
 {% block head %}
@@ -16,7 +16,7 @@
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
   <div>
     <div style="font-size:1.3rem;font-weight:800;color:#0f172a">AI Business Advisor</div>
-    <div class="text-muted small">Powered by Smart Mart Intelligence Engine &bull; Updated {{ report.generated_at[:16].replace('T',' ') }}</div>
+    <div class="text-muted small">Powered by Goldkernel Intelligence Engine &bull; Updated {{ report.generated_at[:16].replace('T',' ') }}</div>
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('advisor.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>

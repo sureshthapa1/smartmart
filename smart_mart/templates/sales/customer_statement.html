@@ -113,7 +113,7 @@
       <img src="{{ shop.logo_data if shop.logo_data else url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
            alt="Logo" style="max-height:50px;max-width:150px;object-fit:contain;margin-bottom:8px;">
       {% endif %}
-      <div style="font-size:1.1rem;font-weight:800;">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+      <div style="font-size:1.1rem;font-weight:800;">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
       {% if shop and shop.address %}<div style="font-size:.8rem;color:#64748b;">{{ shop.address }}</div>{% endif %}
       {% if shop and shop.phone %}<div style="font-size:.8rem;color:#64748b;">Tel: {{ shop.phone }}</div>{% endif %}
     </div>

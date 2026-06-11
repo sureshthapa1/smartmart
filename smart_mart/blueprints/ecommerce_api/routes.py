@@ -1,4 +1,4 @@
-"""REST API for GoldKernel website/POS integration."""
+"""REST API for Goldkernel website/POS integration."""
 from __future__ import annotations
 
 import os

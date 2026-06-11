@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Print Labels — Smart Mart{% endblock %}
+{% block title %}Print Labels — Goldkernel{% endblock %}
 {% block page_title %}Product Labels{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
@@ -112,7 +112,7 @@
           {% for item in label_data %}
           <div class="label-card">
             <div>
-              <div class="label-shop">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+              <div class="label-shop">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
               <div class="label-name">{{ item.name }}</div>
               <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
               <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>
@@ -144,7 +144,7 @@
     {% for item in label_data %}
     <div class="label-card">
       <div>
-        <div class="label-shop">{{ shop.shop_name if shop else 'Smart Mart' }}</div>
+        <div class="label-shop">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
         <div class="label-name">{{ item.name }}</div>
         <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
         <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>

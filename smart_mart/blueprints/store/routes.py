@@ -1,4 +1,4 @@
-"""Customer storefront routes for GoldKernel Dry Fruits."""
+"""Customer storefront routes for Goldkernel Dry Fruits."""
 from __future__ import annotations
 
 import base64

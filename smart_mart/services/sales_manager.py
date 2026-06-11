@@ -497,7 +497,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     buffer = BytesIO()
 
     # ── Shop settings ─────────────────────────────────────────────────────
-    shop_name = "Smart Mart"
+    shop_name = "Goldkernel Dryfruits and Treats"
     shop_pan = shop_address = shop_phone = shop_email = ""
     footer_note = "Thank you for your business!"
     shop_logo_path = None

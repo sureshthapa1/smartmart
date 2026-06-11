@@ -1,5 +1,5 @@
 {% extends "store/base_store.html" %}
-{% block title %}{{ product.name }} — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block title %}{{ product.name }} — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
 {% block meta_desc %}Buy {{ product.name }} online. {{ product.category or 'Premium dry fruit' }} at NPR {{ "%.0f"|format(product.selling_price) }} — delivered in Nepal.{% endblock %}
 {% block og_image %}{% if product.image_filename %}{{ url_for('static', filename='uploads/products/' + product.image_filename, _external=True) }}{% else %}{{ super() }}{% endif %}{% endblock %}
 {% block og_desc %}{{ product.description or (product.name + ' — ' + (product.category or 'Dry Fruit') + ' at NPR ' + '%.0f'|format(product.selling_price) + '. Delivered in Nepal.') }}{% endblock %}
@@ -14,13 +14,13 @@
   "description": "{{ (product.description or product.name) | e }}",
   "sku": "{{ product.sku | e }}",
   {% if product.image_filename %}"image": "{{ url_for('static', filename='uploads/products/' + product.image_filename, _external=True) }}",{% endif %}
-  "brand": { "@type": "Brand", "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}" },
+  "brand": { "@type": "Brand", "name": "{{ (settings.shop_name if settings else 'Goldkernel Dryfruits and Treats') | e }}" },
   "offers": {
     "@type": "Offer",
     "priceCurrency": "NPR",
     "price": "{{ '%.2f'|format(product.selling_price) }}",
     "availability": "{% if avail > 0 %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
-    "seller": { "@type": "Organization", "name": "{{ (settings.shop_name if settings else 'GoldKernel') | e }}" }
+    "seller": { "@type": "Organization", "name": "{{ (settings.shop_name if settings else 'Goldkernel Dryfruits and Treats') | e }}" }
   }
 }
 </script>

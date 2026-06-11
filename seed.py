@@ -136,8 +136,8 @@ def ensure_categories():
 
 def ensure_shop_settings():
     settings = ShopSettings.get()
-    settings.name = "GoldKernel Dry Fruits & Treats"
-    settings.shop_name = "GoldKernel Dry Fruits & Treats"
+    settings.name = "Goldkernel Dryfruits and Treats"
+    settings.shop_name = "Goldkernel Dryfruits and Treats"
     settings.address = "Dhangadhi, Sudurpashchim, Nepal"
     settings.phone = ""
     settings.pan_number = "TBD"
@@ -145,7 +145,7 @@ def ensure_shop_settings():
     settings.owner_name = settings.owner_name or ""
     settings.vat_enabled = True
     settings.vat_rate = Decimal("13.00")
-    settings.footer_note = "Thank you for shopping at GoldKernel!"
+    settings.footer_note = "Thank you for shopping at Goldkernel!"
     settings.loyalty_points_per_rupee = Decimal("0.10")
     settings.loyalty_rupee_per_point = Decimal("0.10")
     db.session.commit()

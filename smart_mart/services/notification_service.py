@@ -174,7 +174,7 @@ def get_notification_stats() -> dict:
 
 def notify_credit_overdue(customer_name: str, phone: str, amount: float, sale_id: int):
     msg = (f"Dear {customer_name}, your credit payment of NPR {amount:,.2f} "
-           f"(Sale #{sale_id}) at Smart Mart is overdue. Please clear at your earliest. Thank you.")
+           f"(Sale #{sale_id}) at Goldkernel Dryfruits and Treats is overdue. Please clear at your earliest. Thank you.")
     return send_notification(phone, msg)
 
 
@@ -186,10 +186,10 @@ def notify_order_status(customer_name: str, phone: str, order_number: str, statu
         "delivered": f"Your order {order_number} has been delivered. Thank you!",
         "cancelled": f"Your order {order_number} has been cancelled.",
     }
-    msg = f"Dear {customer_name}, {status_msgs.get(status, f'Order {order_number} status: {status}.')} - Smart Mart"
+    msg = f"Dear {customer_name}, {status_msgs.get(status, f'Order {order_number} status: {status}.')} - Goldkernel Dryfruits and Treats"
     return send_notification(phone, msg)
 
 
 def notify_low_stock(product_name: str, quantity: int, admin_phone: str):
-    msg = f"[Smart Mart Alert] Low stock: {product_name} has only {quantity} units left. Restock needed."
+    msg = f"[Goldkernel Alert] Low stock: {product_name} has only {quantity} units left. Restock needed."
     return send_notification(admin_phone, msg)

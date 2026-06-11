@@ -1,4 +1,4 @@
-# Smart Mart — Retail Management System
+# Goldkernel — Retail Management System
 
 A full-featured, AI-powered retail management system built with Python/Flask. Designed for small-to-medium retail shops in Nepal and South Asia.
 

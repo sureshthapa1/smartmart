@@ -25,7 +25,7 @@ def _claude_voice_reply(transcript: str) -> str | None:
             "model": "claude-haiku-4-5-20251001",
             "max_tokens": 150,
             "system": (
-                "You are Smart Mart's voice assistant for a Nepal retail shop. "
+                "You are Goldkernel's voice assistant for a Nepal retail shop. "
                 "Answer in 1-2 SHORT sentences only — the reply will be read aloud. "
                 "Use simple words. No markdown, no bullet points, no emojis. "
                 "Currency is NPR (Nepali Rupees). "

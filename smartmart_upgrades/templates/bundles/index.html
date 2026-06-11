@@ -1,0 +1,103 @@
+{# templates/bundles/index.html #}
+{% extends "base.html" %}
+{% block title %}Gift Bundles & Hampers{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-gift"></i> Gift Bundles & Hampers</h2>
+  <a href="{{ url_for('bundles.create') }}" class="btn btn-success">
+    <i class="bi bi-plus-circle"></i> New Bundle
+  </a>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endwith %}
+
+{# Season filter tabs #}
+<ul class="nav nav-tabs mb-3" id="seasonTab">
+  <li class="nav-item">
+    <a class="nav-link active" href="#" onclick="filterSeason('all')">All</a>
+  </li>
+  {% for s in season_choices %}
+  <li class="nav-item">
+    <a class="nav-link" href="#" onclick="filterSeason('{{ s }}')">{{ s }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="row g-3" id="bundleGrid">
+  {% for b in bundles %}
+  <div class="col-md-4 bundle-card" data-season="{{ b.season_tag or 'General' }}">
+    <div class="card h-100 {% if not b.is_active %}opacity-50{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <h5 class="card-title mb-1">{{ b.name }}</h5>
+          {% if b.season_tag %}
+            <span class="badge bg-warning text-dark">{{ b.season_tag }}</span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-2">{{ b.description or '' }}</p>
+
+        <table class="table table-sm table-borderless mb-2">
+          {% for item in b.items %}
+          <tr>
+            <td class="ps-0">{{ item.component.name }}</td>
+            <td class="text-end text-muted">{{ item.quantity }}g</td>
+          </tr>
+          {% endfor %}
+        </table>
+
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <strong class="text-success fs-5">NPR {{ "%.0f"|format(b.price) }}</strong>
+            <small class="text-muted ms-2">{{ b.margin_pct }}% margin</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer bg-transparent d-flex gap-2">
+        {# Sell form #}
+        <form method="POST" action="{{ url_for('bundles.sell', bundle_id=b.id) }}" class="d-flex gap-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="number" name="quantity" value="1" min="1" class="form-control form-control-sm" style="width:60px">
+          <button type="submit" class="btn btn-success btn-sm" {% if not b.is_active %}disabled{% endif %}>
+            <i class="bi bi-bag-check"></i> Sell
+          </button>
+        </form>
+        <a href="{{ url_for('bundles.edit', bundle_id=b.id) }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-pencil"></i>
+        </a>
+        <form method="POST" action="{{ url_for('bundles.toggle', bundle_id=b.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-{{ 'danger' if b.is_active else 'success' }} btn-sm">
+            {{ 'Deactivate' if b.is_active else 'Activate' }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-info">
+      No bundles yet. <a href="{{ url_for('bundles.create') }}">Create your first hamper!</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+function filterSeason(season) {
+  document.querySelectorAll('.bundle-card').forEach(card => {
+    card.style.display = (season === 'all' || card.dataset.season === season) ? '' : 'none';
+  });
+  document.querySelectorAll('#seasonTab .nav-link').forEach(a => {
+    a.classList.toggle('active', a.textContent.trim() === season || (season === 'all' && a.textContent.trim() === 'All'));
+  });
+}
+</script>
+{% endblock %}

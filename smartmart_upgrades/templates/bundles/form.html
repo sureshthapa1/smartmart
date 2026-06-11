@@ -1,0 +1,154 @@
+{# templates/bundles/form.html #}
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if bundle else 'Create' }} Bundle{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">
+  <i class="bi bi-gift"></i>
+  {{ 'Edit Bundle' if bundle else 'New Gift Bundle / Hamper' }}
+</h2>
+
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label fw-semibold">Bundle Name</label>
+      <input type="text" name="name" class="form-control"
+             value="{{ bundle.name if bundle else '' }}"
+             placeholder="e.g. Dashain Premium Hamper" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Sale Price (NPR)</label>
+      <input type="number" name="price" step="0.01" class="form-control"
+             value="{{ bundle.price if bundle else '' }}" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold">Season Tag</label>
+      <select name="season_tag" class="form-select">
+        <option value="">— General —</option>
+        {% for s in season_choices %}
+        <option value="{{ s }}" {{ 'selected' if bundle and bundle.season_tag == s else '' }}>
+          {{ s }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label fw-semibold">Description</label>
+      <textarea name="description" class="form-control" rows="2"
+                placeholder="What's inside this hamper?">{{ bundle.description if bundle else '' }}</textarea>
+    </div>
+    <div class="col-auto d-flex align-items-center gap-2">
+      <input type="checkbox" name="is_seasonal" id="is_seasonal" class="form-check-input"
+             {{ 'checked' if bundle and bundle.is_seasonal else '' }}>
+      <label for="is_seasonal" class="form-check-label">Seasonal / Festival Item</label>
+    </div>
+  </div>
+
+  <hr class="my-4">
+  <h5>Bundle Contents</h5>
+  <p class="text-muted small">Add the products and gram quantities that make up this bundle.</p>
+
+  <div id="items-container">
+    {% if bundle and bundle.items %}
+      {% for item in bundle.items %}
+      <div class="row g-2 mb-2 item-row">
+        <div class="col-md-7">
+          <select name="product_id[]" class="form-select" required>
+            <option value="">— Select Product —</option>
+            {% for p in products %}
+            <option value="{{ p.id }}" {{ 'selected' if p.id == item.product_id else '' }}>
+              {{ p.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <div class="input-group">
+            <input type="number" name="quantity[]" class="form-control"
+                   value="{{ item.quantity }}" placeholder="Quantity" step="0.001" min="0.001" required>
+            <span class="input-group-text">g</span>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <button type="button" class="btn btn-outline-danger w-100" onclick="removeRow(this)">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="row g-2 mb-2 item-row">
+      <div class="col-md-7">
+        <select name="product_id[]" class="form-select" required>
+          <option value="">— Select Product —</option>
+          {% for p in products %}
+          <option value="{{ p.id }}">{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <div class="input-group">
+          <input type="number" name="quantity[]" class="form-control"
+                 placeholder="Quantity" step="0.001" min="0.001" required>
+          <span class="input-group-text">g</span>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <button type="button" class="btn btn-outline-danger w-100" onclick="removeRow(this)">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addRow()">
+    <i class="bi bi-plus"></i> Add Component
+  </button>
+
+  <hr class="my-4">
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-success">
+      <i class="bi bi-check-circle"></i> {{ 'Save Changes' if bundle else 'Create Bundle' }}
+    </button>
+    <a href="{{ url_for('bundles.index') }}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+const productOptions = `{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}`;
+
+function addRow() {
+  const container = document.getElementById('items-container');
+  const row = document.createElement('div');
+  row.className = 'row g-2 mb-2 item-row';
+  row.innerHTML = `
+    <div class="col-md-7">
+      <select name="product_id[]" class="form-select" required>
+        <option value="">— Select Product —</option>
+        ${productOptions}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <div class="input-group">
+        <input type="number" name="quantity[]" class="form-control"
+               placeholder="Quantity" step="0.001" min="0.001" required>
+        <span class="input-group-text">g</span>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <button type="button" class="btn btn-outline-danger w-100" onclick="removeRow(this)">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`;
+  container.appendChild(row);
+}
+
+function removeRow(btn) {
+  const rows = document.querySelectorAll('.item-row');
+  if (rows.length > 1) btn.closest('.item-row').remove();
+}
+</script>
+{% endblock %}

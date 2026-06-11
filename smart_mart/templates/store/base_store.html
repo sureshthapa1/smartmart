@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}</title>
-  <meta name="description" content="{% block meta_desc %}Premium dry fruits delivered to your door in Nepal.{% endblock %}">
+  <title>{% block title %}Goldkernel Dryfruits and Treats — Dhangadhi, Nepal{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Goldkernel Dryfruits and Treats — Premium dry fruits delivered fast in Dhangadhi, Kailali and across Nepal. Almonds, cashews, walnuts, pistachios and more.{% endblock %}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥜</text></svg>">
   <link rel="sitemap" type="application/xml" href="{{ url_for('store.sitemap') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#92400e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="{{ settings.shop_name if settings else 'GoldKernel' }}">
+  <meta name="apple-mobile-web-app-title" content="{{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="{{ settings.shop_name if settings else 'GoldKernel' }}">
+  <meta property="og:site_name" content="{{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}">
   <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
   <meta property="og:description" content="{% block og_desc %}{{ self.meta_desc() }}{% endblock %}">
   <meta property="og:image" content="{% block og_image %}{{ url_for('static', filename='uploads/og-default.jpg', _external=True) }}{% endblock %}">
@@ -685,8 +685,8 @@
   <a href="{{ url_for('store.home') }}" class="nav-brand">
     <div class="nav-logo">🥜</div>
     <div>
-      <span class="nav-brand-name">{{ settings.shop_name if settings else 'GoldKernel' }}</span>
-      <span class="nav-brand-sub">Premium Dry Fruits</span>
+      <span class="nav-brand-name">{{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}</span>
+      <span class="nav-brand-sub">Fast Delivery – Dhangadhi & Beyond</span>
     </div>
   </a>
 
@@ -747,9 +747,9 @@
   <div class="store-footer-inner">
     <div class="row g-4">
       <div class="col-md-4">
-        <div class="footer-brand">🥜 {{ settings.shop_name if settings else 'GoldKernel' }}</div>
+        <div class="footer-brand">🥜 {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}</div>
         <p style="font-size:.82rem;line-height:1.65;margin-bottom:1rem;">
-          Nepal's trusted source for premium dry fruits. Quality you can taste, delivered to your door.
+          Dhangadhi's trusted source for premium dry fruits. Quality you can taste, delivered fast to your door.
         </p>
         {% if settings and settings.phone %}
         <a href="tel:{{ settings.phone }}" style="font-size:.85rem;font-weight:600;">
@@ -791,7 +791,7 @@
       </div>
     </div>
     <div class="footer-copy">
-      © {{ now.year if now is defined else '2025' }} {{ settings.shop_name if settings else 'GoldKernel' }}. All rights reserved.
+      © {{ now.year if now is defined else '2025' }} {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}. All rights reserved.
       &nbsp;·&nbsp;
       <a href="{{ url_for('store.home') }}">Home</a>
       &nbsp;·&nbsp;
