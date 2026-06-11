@@ -112,3 +112,5 @@ __all__ = [
     "OperatingExpense",
     "CategoryMarginRule",
 ]
+from .product_review import ProductReview  # noqa: F401
+from .wishlist_item import WishlistItem  # noqa: F401
