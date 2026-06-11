@@ -107,7 +107,7 @@
 
       {# Add to cart #}
       {% if avail > 0 %}
-      <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+      <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
         <div class="qty-control">
           <button type="button" id="qty-minus" onclick="changeQty(-1)">−</button>
           <input type="number" id="qty-input" value="1" min="1" max="{{ avail }}" readonly>
@@ -117,7 +117,22 @@
                 style="padding:.65rem 1.5rem;">
           <i class="bi bi-cart-plus"></i> Add to Cart
         </button>
+        {# FEATURE 5: Wishlist toggle #}
+        <button id="wishlist-btn" onclick="toggleWishlist({{ product.id }})"
+                title="Save to wishlist"
+                style="width:42px;height:42px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--card-bg);color:var(--muted);font-size:1.05rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--t-fast);"
+                data-wishlisted="{{ 'true' if wishlisted else 'false' }}">
+          <i class="bi bi-heart{% if wishlisted %}-fill{% endif %}" id="wishlist-icon" style="{% if wishlisted %}color:var(--danger);{% endif %}"></i>
+        </button>
       </div>
+
+      {# FEATURE 9: Estimated delivery #}
+      {% if est_delivery %}
+      <div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--success);font-weight:600;margin-bottom:1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--r);padding:.55rem .85rem;">
+        <i class="bi bi-truck" style="font-size:1rem;"></i>
+        <span>Estimated delivery: <strong>{{ est_delivery.strftime('%A, %d %b') }}</strong></span>
+      </div>
+      {% endif %}
       {% if cart_qty > 0 %}
       <div style="font-size:.8rem;color:var(--brand);margin-bottom:1rem;display:flex;align-items:center;gap:.4rem;">
         <i class="bi bi-bag-check"></i>
@@ -156,6 +171,19 @@
         </form>
       </div>
       {% endif %}
+
+      {# FEATURE 8: Share buttons #}
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <span style="font-size:.78rem;color:var(--muted);font-weight:600;">Share:</span>
+        <a id="wa-share-btn" href="#" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .75rem;border-radius:var(--r-full);background:#dcfce7;color:#16a34a;font-size:.78rem;font-weight:700;text-decoration:none;border:1px solid #bbf7d0;">
+          <i class="bi bi-whatsapp"></i> WhatsApp
+        </a>
+        <button onclick="copyProductLink()" id="copy-btn"
+                style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .75rem;border-radius:var(--r-full);background:var(--surface);color:var(--muted);font-size:.78rem;font-weight:700;border:1px solid var(--border);cursor:pointer;">
+          <i class="bi bi-link-45deg"></i> Copy Link
+        </button>
+      </div>
 
       {# Mini feature cards #}
       <div class="row g-2">
@@ -242,6 +270,139 @@
   {% endif %}
   {% endif %}
 
+  {# FEATURE 4: Reviews section #}
+  <div style="margin-top:3.5rem;" id="reviews">
+    <div class="section-head fade-up">
+      <div class="section-title">⭐ Customer <span>Reviews</span></div>
+      {% if reviews %}
+      <div style="font-size:.82rem;color:var(--muted);">
+        {{ avg_rating | round(1) }} / 5 &nbsp;·&nbsp; {{ reviews|length }} review{{ 's' if reviews|length != 1 }}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if reviews %}
+    {# Rating summary bar #}
+    <div style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:1.25rem;margin-bottom:1.25rem;" class="fade-up">
+      <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">
+        <div style="text-align:center;flex-shrink:0;">
+          <div style="font-size:2.75rem;font-weight:900;color:var(--brand-dark);line-height:1;">{{ avg_rating | round(1) }}</div>
+          <div style="color:#f59e0b;font-size:1.1rem;letter-spacing:.1em;">{{ '★' * (avg_rating | round | int) }}{{ '☆' * (5 - (avg_rating | round | int)) }}</div>
+          <div style="font-size:.72rem;color:var(--muted);">{{ reviews|length }} review{{ 's' if reviews|length != 1 }}</div>
+        </div>
+        <div style="flex:1;min-width:160px;">
+          {% for star in [5,4,3,2,1] %}
+          {% set cnt = reviews | selectattr('rating','eq', star) | list | length %}
+          {% set pct = ((cnt / reviews|length) * 100) | round | int %}
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;font-size:.78rem;">
+            <span style="width:12px;text-align:right;color:var(--muted);">{{ star }}</span>
+            <i class="bi bi-star-fill" style="color:#f59e0b;font-size:.7rem;"></i>
+            <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+              <div style="width:{{ pct }}%;height:100%;background:linear-gradient(90deg,#f59e0b,#f97316);border-radius:3px;"></div>
+            </div>
+            <span style="width:20px;color:var(--muted);">{{ cnt }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {# Reviews list #}
+    <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.5rem;">
+      {% for review in reviews[:8] %}
+      <div class="fade-up" style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.25rem;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:.65rem;">
+            <div style="width:34px;height:34px;border-radius:50%;background:var(--brand-grad);color:#fff;font-weight:900;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              {{ review.customer_name[0].upper() }}
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:.88rem;">{{ review.customer_name.split()[0] }}</div>
+              <div style="color:#f59e0b;font-size:.8rem;letter-spacing:.08em;">{{ '★' * review.rating }}{{ '☆' * (5 - review.rating) }}</div>
+            </div>
+          </div>
+          <div style="font-size:.72rem;color:var(--muted-2);">{{ review.created_at.strftime('%d %b %Y') }}</div>
+        </div>
+        {% if review.title %}
+        <div style="font-weight:700;font-size:.88rem;margin-bottom:.25rem;">{{ review.title }}</div>
+        {% endif %}
+        {% if review.body %}
+        <div style="font-size:.85rem;color:var(--muted);line-height:1.65;">{{ review.body }}</div>
+        {% endif %}
+        {% if review.order_number %}
+        <div style="margin-top:.5rem;font-size:.72rem;color:var(--success);display:flex;align-items:center;gap:.3rem;">
+          <i class="bi bi-check-circle-fill"></i> Verified Purchase
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:1.5rem;text-align:center;margin-bottom:1.25rem;" class="fade-up">
+      <div style="font-size:2rem;margin-bottom:.5rem;opacity:.4;">⭐</div>
+      <div style="font-weight:700;font-size:.9rem;margin-bottom:.2rem;">No reviews yet</div>
+      <div style="font-size:.82rem;color:var(--muted);">Be the first to review this product!</div>
+    </div>
+    {% endif %}
+
+    {# Review form #}
+    {% if customer %}
+    {% if not user_reviewed %}
+    <div class="ui-card fade-up">
+      <div class="ui-card-head">
+        <i class="bi bi-pencil-square text-brand"></i>
+        <span class="ui-card-head-title">Write a Review</span>
+      </div>
+      <div class="ui-card-body">
+        <form method="post" action="{{ url_for('store.submit_review', product_id=product.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div style="margin-bottom:1rem;">
+            <label class="field-label">Your Rating *</label>
+            <div id="star-picker" style="display:flex;gap:.35rem;font-size:1.75rem;cursor:pointer;">
+              {% for i in range(1,6) %}
+              <span class="star-opt" data-val="{{ i }}" style="color:#d1d5db;transition:color .1s;">★</span>
+              {% endfor %}
+            </div>
+            <input type="hidden" name="rating" id="rating-input" value="0" required>
+          </div>
+          <div style="margin-bottom:.85rem;">
+            <label class="field-label" for="rev-title">Review Title</label>
+            <input id="rev-title" type="text" name="title" placeholder="Summarise your experience"
+                   maxlength="120" class="field-input">
+          </div>
+          <div style="margin-bottom:.85rem;">
+            <label class="field-label" for="rev-body">Your Review</label>
+            <textarea id="rev-body" name="body" rows="3" placeholder="Tell others what you think about this product…"
+                      maxlength="1000" class="field-input" style="resize:vertical;"></textarea>
+          </div>
+          <div style="margin-bottom:1rem;">
+            <label class="field-label" for="rev-order">Order Number <span style="font-weight:400;">(optional — for verified badge)</span></label>
+            <div class="field-wrap">
+              <i class="bi bi-bag-check field-icon"></i>
+              <input id="rev-order" type="text" name="order_number" placeholder="GK-XXXXXXXX"
+                     maxlength="30" class="field-input has-icon" style="text-transform:uppercase;">
+            </div>
+          </div>
+          <button type="submit" class="btn-brand" style="padding:.6rem 1.5rem;">
+            <i class="bi bi-send"></i> Submit Review
+          </button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--r-lg);padding:1rem 1.25rem;font-size:.88rem;color:#166534;display:flex;align-items:center;gap:.6rem;" class="fade-up">
+      <i class="bi bi-check-circle-fill"></i>
+      <span>You have already reviewed this product. Thank you!</span>
+    </div>
+    {% endif %}
+    {% else %}
+    <div style="background:var(--brand-light);border:1.5px solid #fde68a;border-radius:var(--r-lg);padding:1rem 1.25rem;font-size:.88rem;color:var(--brand-dark);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;" class="fade-up">
+      <span><i class="bi bi-person-circle me-1"></i>Sign in to leave a review</span>
+      <a href="{{ url_for('store.login', next=request.path + '#reviews') }}" class="btn-brand" style="padding:.4rem 1rem;font-size:.8rem;">Sign In</a>
+    </div>
+    {% endif %}
+  </div>
+
 </div>
 {% endblock %}
 
@@ -260,5 +421,72 @@ function changeQty(delta) {
   if (plusBtn)  plusBtn.disabled  = v >= maxQty;
 }
 document.getElementById('qty-minus') && (document.getElementById('qty-minus').disabled = true);
+
+// FEATURE 8: Share buttons
+(function() {
+  const url  = encodeURIComponent(window.location.href);
+  const name = encodeURIComponent('{{ product.name }}');
+  const msg  = encodeURIComponent('Check out {{ product.name }} on GoldKernel — NPR {{ "%.0f"|format(product.selling_price) }}: ' + window.location.href);
+  const waBtn = document.getElementById('wa-share-btn');
+  if (waBtn) waBtn.href = 'https://wa.me/?text=' + msg;
+})();
+
+function copyProductLink() {
+  navigator.clipboard.writeText(window.location.href).then(function() {
+    const btn = document.getElementById('copy-btn');
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+    btn.style.background = '#f0fdf4'; btn.style.color = '#16a34a'; btn.style.borderColor = '#bbf7d0';
+    setTimeout(function() {
+      btn.innerHTML = '<i class="bi bi-link-45deg"></i> Copy Link';
+      btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+
+// FEATURE 5: Wishlist toggle
+function toggleWishlist(pid) {
+  const btn  = document.getElementById('wishlist-btn');
+  const icon = document.getElementById('wishlist-icon');
+  const fd   = new FormData();
+  fd.append('product_id', pid);
+  const csrf = document.querySelector('meta[name=csrf-token]')?.content || '';
+  if (csrf) fd.append('csrf_token', csrf);
+  fetch('{{ url_for("store.wishlist_toggle") }}', {method:'POST', body:fd, credentials:'same-origin'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        const wishlisted = d.wishlisted;
+        icon.className   = wishlisted ? 'bi bi-heart-fill' : 'bi bi-heart';
+        icon.style.color = wishlisted ? 'var(--danger)' : '';
+        btn.dataset.wishlisted = wishlisted ? 'true' : 'false';
+        showToast(wishlisted ? '❤️ Added to wishlist' : '🗑 Removed from wishlist');
+      } else if (d.redirect) {
+        window.location.href = d.redirect;
+      }
+    });
+}
+
+// FEATURE 4: Star picker
+document.querySelectorAll('.star-opt').forEach(function(star) {
+  star.addEventListener('mouseover', function() {
+    const val = parseInt(this.dataset.val);
+    document.querySelectorAll('.star-opt').forEach(function(s) {
+      s.style.color = parseInt(s.dataset.val) <= val ? '#f59e0b' : '#d1d5db';
+    });
+  });
+  star.addEventListener('click', function() {
+    const val = parseInt(this.dataset.val);
+    document.getElementById('rating-input').value = val;
+    document.querySelectorAll('.star-opt').forEach(function(s) {
+      s.style.color = parseInt(s.dataset.val) <= val ? '#f59e0b' : '#d1d5db';
+    });
+  });
+});
+document.getElementById('star-picker')?.addEventListener('mouseleave', function() {
+  const val = parseInt(document.getElementById('rating-input').value || 0);
+  document.querySelectorAll('.star-opt').forEach(function(s) {
+    s.style.color = parseInt(s.dataset.val) <= val ? '#f59e0b' : '#d1d5db';
+  });
+});
 </script>
 {% endblock %}
