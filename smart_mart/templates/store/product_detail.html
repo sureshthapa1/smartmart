@@ -1,7 +1,7 @@
-{% extends "store/base_store.html" %}
+﻿{% extends "store/base_store.html" %}
 {% block title %}{{ product.name }} — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
 {% block meta_desc %}Buy {{ product.name }} online. {{ product.category or 'Premium dry fruit' }} at NPR {{ "%.0f"|format(product.selling_price) }} — delivered in Nepal.{% endblock %}
-{% block og_image %}{% if product.image_filename %}{{ url_for('static', filename='uploads/products/' + product.image_filename, _external=True) }}{% else %}{{ super() }}{% endif %}{% endblock %}
+{% block og_image %}{% if product.image_filename %}{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}{% else %}{{ super() }}{% endif %}{% endblock %}
 {% block og_desc %}{{ product.description or (product.name + ' — ' + (product.category or 'Dry Fruit') + ' at NPR ' + '%.0f'|format(product.selling_price) + '. Delivered in Nepal.') }}{% endblock %}
 
 {% block head %}
@@ -13,7 +13,7 @@
   "name": "{{ product.name | e }}",
   "description": "{{ (product.description or product.name) | e }}",
   "sku": "{{ product.sku | e }}",
-  {% if product.image_filename %}"image": "{{ url_for('static', filename='uploads/products/' + product.image_filename, _external=True) }}",{% endif %}
+  {% if product.image_filename %}"image": "{{ url_for('static', filename='uploads/' + product.image_filename, _external=True) }}",{% endif %}
   "brand": { "@type": "Brand", "name": "{{ (settings.shop_name if settings else 'Goldkernel Dryfruits and Treats') | e }}" },
   "offers": {
     "@type": "Offer",
@@ -48,7 +48,7 @@
     <div class="col-md-5 fade-up">
       <div style="border-radius:var(--r-lg);overflow:hidden;aspect-ratio:1;background:linear-gradient(135deg,#fef9ee,#fde68a);display:flex;align-items:center;justify-content:center;border:1.5px solid var(--border);">
         {% if product.image_filename %}
-        <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
+        <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}"
              alt="{{ product.name }}" style="width:100%;height:100%;object-fit:cover;">
         {% else %}
         <div style="font-size:8rem;opacity:.6;">🥜</div>
@@ -229,7 +229,7 @@
           <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" style="text-decoration:none;">
             <div class="product-img-wrap">
               {% if rp.image_filename and not rp.image_filename.startswith('cld:') %}
-              <img src="{{ url_for('static', filename='uploads/products/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
+              <img src="{{ url_for('static', filename='uploads/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
               {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
             </div>
             <div class="product-body">
@@ -261,7 +261,7 @@
           <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" style="text-decoration:none;">
             <div class="product-img-wrap">
               {% if rp.image_filename %}
-              <img src="{{ url_for('static', filename='uploads/products/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
+              <img src="{{ url_for('static', filename='uploads/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
               {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
             </div>
             <div class="product-body">
@@ -280,7 +280,6 @@
       {% endfor %}
     </div>
   </div>
-  {% endif %}
   {% endif %}
 
   {# FEATURE 4: Reviews section #}
