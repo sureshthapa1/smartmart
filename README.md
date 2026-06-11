@@ -199,3 +199,4 @@ The following features are scaffolded but not yet active. Each shows a "coming s
 ## License
 
 MIT
+<!-- deploy: 2026-06-11 08:55 UTC — DB migrations + AI autofill for all products -->
