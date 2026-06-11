@@ -381,6 +381,27 @@ def product_detail(product_id):
         rv.insert(0, product.id)
     session["recently_viewed"] = rv[:10]
 
+    # Reviews data
+    from ...models.product_review import ProductReview
+    reviews = db.session.execute(
+        db.select(ProductReview)
+        .where(ProductReview.product_id == product.id, ProductReview.is_approved == True)
+        .order_by(ProductReview.created_at.desc())
+    ).scalars().all()
+    avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0
+    user_reviewed = any(r.customer_phone == (g.customer.phone if g.customer else "") for r in reviews)
+
+    # Wishlist status
+    wishlisted = False
+    if g.customer:
+        from ...models.wishlist_item import WishlistItem
+        wishlisted = db.session.execute(
+            db.select(WishlistItem).where(
+                WishlistItem.customer_phone == g.customer.phone,
+                WishlistItem.product_id == product.id,
+            )
+        ).scalar_one_or_none() is not None
+
     return render_template(
         "store/product_detail.html",
         product=product,
@@ -389,6 +410,10 @@ def product_detail(product_id):
         recommendations=recommendations,
         related=related,
         est_delivery=est_delivery,
+        reviews=reviews,
+        avg_rating=avg_rating,
+        user_reviewed=user_reviewed,
+        wishlisted=wishlisted,
         settings=settings,
         customer=g.customer,
         max_qty=MAX_QTY_PER_ITEM,
