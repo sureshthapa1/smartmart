@@ -70,6 +70,11 @@ with app.app_context():
             safe_add(conn, "products", "barcode", "VARCHAR(80)")
             safe_add(conn, "products", "max_discount_pct", "NUMERIC(5,2)")
             safe_add(conn, "products", "tax_category", "VARCHAR(20) DEFAULT 'standard'")
+            safe_add(conn, "products", "description", "TEXT")
+            safe_add(conn, "products", "pack_size", "VARCHAR(40)")
+            safe_add(conn, "products", "slug", "VARCHAR(160)")
+            safe_add(conn, "products", "is_featured", "BOOLEAN DEFAULT false")
+            safe_add(conn, "online_orders", "customer_email", "VARCHAR(120)")
 
             # ── Sales ─────────────────────────────────────────────────────
             safe_add(conn, "sales", "customer_id", "INTEGER REFERENCES customers(id)")
