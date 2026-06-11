@@ -461,4 +461,18 @@ def run_pending_migrations(app) -> list[str]:
             app.logger.exception("Schema migration %s failed: %s", migration_key, exc)
             raise
 
+    # ── Auto-fill product descriptions + images for empty products ─────────
+    # Runs after migrations — idempotent, only fills empty fields
+    if applied_now:  # Only run on first deploy or when new migrations applied
+        try:
+            from .product_autofill import autofill_all_empty
+            results = autofill_all_empty(limit=200)
+            if results.get("updated"):
+                app.logger.info(
+                    "AI autofill: %d products enriched on startup",
+                    results["updated"],
+                )
+        except Exception as exc:
+            app.logger.warning("AI autofill on startup failed (non-fatal): %s", exc)
+
     return applied_now
