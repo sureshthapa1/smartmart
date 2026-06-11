@@ -535,4 +535,40 @@
   });
 })();
 </script>
+
+{# ── FEATURE 6: Recently Viewed ──────────────────────────────────────── #}
+{% if recently_viewed and not q and not selected_category %}
+<div class="sc" style="padding-bottom:2.5rem;">
+  <div class="section-head fade-up">
+    <div class="section-title">👀 Recently <span>Viewed</span></div>
+    <a href="{{ url_for('store.home') }}" class="section-link">See all →</a>
+  </div>
+  <div class="row g-3">
+    {% for p in recently_viewed %}
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
+      <div class="product-card">
+        <a href="{{ url_for('store.product_detail', product_id=p.id) }}" style="text-decoration:none;">
+          <div class="product-img-wrap">
+            {% if p.image_filename and not p.image_filename.startswith('cld:') %}
+            <img src="{{ url_for('static', filename='uploads/products/' + p.image_filename) }}" alt="{{ p.name }}" loading="lazy">
+            {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
+          </div>
+          <div class="product-body">
+            {% if p.category %}<div class="product-category">{{ p.category }}</div>{% endif %}
+            <div class="product-name">{{ p.name }}</div>
+            <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(p.selling_price) }}</div>
+          </div>
+        </a>
+        <div class="product-footer">
+          <button class="btn-add" data-add-cart data-pid="{{ p.id }}" data-name="{{ p.name }}" data-qty="1">
+            <i class="bi bi-cart-plus"></i> Add
+          </button>
+          <a href="{{ url_for('store.product_detail', product_id=p.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}
