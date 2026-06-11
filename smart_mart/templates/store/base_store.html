@@ -701,6 +701,14 @@
     <a href="{{ url_for('store.track') }}" class="nav-icon-btn" title="Track order">
       <i class="bi bi-geo-alt"></i>
     </a>
+    <a href="{{ url_for('store.promos') }}" class="nav-icon-btn" title="Offers">
+      <i class="bi bi-tag"></i>
+    </a>
+    {% if customer %}
+    <a href="{{ url_for('store.wishlist') }}" class="nav-icon-btn" title="Wishlist">
+      <i class="bi bi-heart"></i>
+    </a>
+    {% endif %}
     {% if customer %}
     <a href="{{ url_for('store.my_account') }}" class="nav-icon-btn" title="My account">
       <i class="bi bi-person"></i>
