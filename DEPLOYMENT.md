@@ -185,3 +185,18 @@ Add to your web service environment:
 
 **Forgot admin password**
 → Go to the login page → "Forgot password?" → enter username `admin` → check the Render logs for the reset link.
+
+## New Tables (run after deploy)
+
+Two new tables added — auto-created on first startup if using `db.create_all()`:
+
+```
+product_reviews   — customer product ratings and reviews
+wishlist_items    — customer save-for-later wishlist
+```
+
+If using Alembic migrations, generate with:
+```bash
+flask db migrate -m "add product_reviews and wishlist_items"
+flask db upgrade
+```
