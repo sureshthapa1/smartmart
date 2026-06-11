@@ -277,6 +277,20 @@ def home():
         products = personalise_products(list(products), cust_phone)
         _personalised = True
 
+    # FEATURE 1: Active promo codes for banner
+    from datetime import date as _date2
+    try:
+        from ...models.promotion import Promotion as _Promo
+        _active_promos = db.session.execute(
+            db.select(_Promo).where(
+                _Promo.is_active == True,
+                _Promo.start_date <= _date2.today(),
+                _Promo.end_date >= _date2.today(),
+            ).limit(5)
+        ).scalars().all()
+    except Exception:
+        _active_promos = []
+
     # Featured products: is_featured first, then fall back to best sellers
     featured_products = db.session.execute(
         db.select(Product)
@@ -309,6 +323,7 @@ def home():
         selling_fast_ids=_fast_ids,
         personalised=_personalised,
         recently_viewed=_recently_viewed,
+        active_promos=_active_promos,
         settings=settings,
         q=q,
         selected_category=category,
@@ -334,6 +349,14 @@ def product_detail(product_id):
 
     settings = _settings()
     _maybe_expire_reservations()
+
+    # FEATURE 7: Cart abandonment recovery flash for returning visitors
+    if not session.get("cart_recovery_shown") and session.get("cart"):
+        _cart_data = {k: v for k, v in session["cart"].items()
+                      if str(v).isdigit() and int(v) > 0}
+        if _cart_data and not g.customer:
+            session["cart_recovery_shown"] = True
+            flash("👜 You left some items in your cart!", "info")
     avail = available_quantity(product)
 
     # Auto-populate slug if missing (Improvement 13)
