@@ -222,6 +222,15 @@ with app.app_context():
     except Exception as e:
         print(f"expense_sync backfill skipped: {e}")
 
+    # ── AI product autofill — fill descriptions + images for all products ─
+    try:
+        from smart_mart.services.product_autofill import autofill_all_empty
+        results = autofill_all_empty(limit=200)
+        print(f"AI autofill: {results['updated']} products enriched, "
+              f"{results['skipped']} already complete out of {results['total']} processed.")
+    except Exception as e:
+        print(f"AI autofill skipped (non-fatal): {e}")
+
     print("=== Database initialisation complete ===")
 
 PYEOF
