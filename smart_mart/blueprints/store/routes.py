@@ -1395,6 +1395,27 @@ def wishlist():
 
 # ── FEATURE 10: Improved sitemap with image tags ──────────────────────────────
 
+
+
+# ── Admin: Trigger bulk autofill for all existing products ────────────────────
+
+@store_bp.route("/api/autofill-all-products", methods=["POST"])
+def autofill_all_products():
+    """
+    Trigger AI autofill for all products missing description or image.
+    Protected by admin session — callable from admin panel or directly.
+    """
+    from flask_login import current_user
+    if not (current_user.is_authenticated and getattr(current_user, "role", "") in ("admin", "manager")):
+        return jsonify({"ok": False, "error": "Admin only"}), 403
+
+    try:
+        from ...services.product_autofill import autofill_all_empty
+        results = autofill_all_empty(limit=200)
+        return jsonify({"ok": True, "results": results})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
 @store_bp.route("/sitemap.xml")
 def sitemap():
     from datetime import date
