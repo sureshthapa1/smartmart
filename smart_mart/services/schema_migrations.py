@@ -366,6 +366,66 @@ def _migration_steps() -> list[MigrationStep]:
             "Ensure stock_notifications table exists for back-in-stock notifications.",
             lambda conn: None,  # db.create_all() handles this
         ),
+
+        (
+            "2026_06_11_product_reviews_table",
+            "Ensure product_reviews table exists for customer ratings.",
+            lambda conn: None,  # db.create_all() handles this via ProductReview model
+        ),
+        (
+            "2026_06_11_wishlist_items_table",
+            "Ensure wishlist_items table exists for customer save-for-later.",
+            lambda conn: None,  # db.create_all() handles this via WishlistItem model
+        ),
+        (
+            "2026_06_11_product_description_notnull",
+            "Ensure products.description TEXT column exists.",
+            lambda conn: _safe_add_column(conn, "products", "description", "TEXT"),
+        ),
+        (
+            "2026_06_11_product_pack_size",
+            "Ensure products.pack_size column exists.",
+            lambda conn: _safe_add_column(conn, "products", "pack_size", "VARCHAR(40)"),
+        ),
+        (
+            "2026_06_11_product_slug",
+            "Ensure products.slug column exists for SEO URLs.",
+            lambda conn: _safe_add_column(conn, "products", "slug", "VARCHAR(160)"),
+        ),
+        (
+            "2026_06_11_product_is_featured",
+            "Ensure products.is_featured flag exists.",
+            lambda conn: _safe_add_column(conn, "products", "is_featured", "BOOLEAN DEFAULT false"),
+        ),
+        (
+            "2026_06_11_product_slug_index",
+            "Add unique index on products.slug for fast slug lookups.",
+            lambda conn: _safe_exec(
+                conn,
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_products_slug ON products(slug) WHERE slug IS NOT NULL"
+            ),
+        ),
+        (
+            "2026_06_11_online_orders_customer_email",
+            "Add customer_email column to online_orders for receipt emails.",
+            lambda conn: _safe_add_column(conn, "online_orders", "customer_email", "VARCHAR(120)"),
+        ),
+        (
+            "2026_06_11_product_review_indexes",
+            "Add performance indexes on product_reviews.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_product_reviews_product_id ON product_reviews(product_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_product_reviews_phone ON product_reviews(customer_phone)"),
+            ),
+        ),
+        (
+            "2026_06_11_wishlist_indexes",
+            "Add performance indexes on wishlist_items.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_wishlist_phone ON wishlist_items(customer_phone)"),
+                _safe_exec(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ix_wishlist_unique ON wishlist_items(customer_phone, product_id)"),
+            ),
+        ),
     ]
 
 
