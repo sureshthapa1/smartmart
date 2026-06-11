@@ -192,6 +192,14 @@
 </div>
 {% endif %}
 
+{# ── PROMO BANNER (if promos exist) ──────────────────────────────── #}
+{% if active_promos %}
+<div style="background:linear-gradient(90deg,#92400e,#b45309,#d97706);padding:.55rem 1.25rem;text-align:center;color:#fff;font-size:.82rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap;">
+  <span>🏷️ Special offers available!</span>
+  <a href="{{ url_for('store.promos') }}" style="color:#fef3c7;font-weight:800;text-decoration:underline;">View Promo Codes →</a>
+</div>
+{% endif %}
+
 {# ── CATEGORY STRIP ───────────────────────────────────────────────── #}
 <div class="cat-strip" id="products">
   <a href="{{ url_for('store.home', q=q or '') }}"
