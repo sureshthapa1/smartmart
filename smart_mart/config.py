@@ -24,12 +24,25 @@ class Config:
     # Log level
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
+    # ── Flask-Caching ────────────────────────────────────────────────────────
+    # Overridden in subclasses based on REDIS_URL availability
+    CACHE_TYPE = "SimpleCache"
+    CACHE_DEFAULT_TIMEOUT = int(os.environ.get("DASHBOARD_CACHE_TTL", 180))
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
     SQLALCHEMY_DATABASE_URI = _fix_db_url(
         os.environ.get("DATABASE_URL")
     ) or "sqlite:///smart_mart_dev.db"
+
+    # Use Redis cache if available in dev, otherwise SimpleCache
+    _redis = os.environ.get("REDIS_URL", "")
+    if _redis:
+        CACHE_TYPE = "RedisCache"
+        CACHE_REDIS_URL = _redis
+    else:
+        CACHE_TYPE = "SimpleCache"
 
 
 class ProductionConfig(Config):
@@ -38,6 +51,26 @@ class ProductionConfig(Config):
         os.environ.get("DATABASE_URL")
     ) or "sqlite:///smart_mart.db"
     WTF_CSRF_ENABLED = True
+
+    # ── PostgreSQL connection pool — prevents Render idle connection drops ──
+    # PostgreSQL on Render's free tier closes idle connections after ~5 min.
+    # pool_recycle=280 ensures SQLAlchemy recycles connections before that.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_recycle": 280,
+        "pool_pre_ping": True,
+        "pool_timeout": 20,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "connect_args": {"connect_timeout": 10},
+    }
+
+    # ── Cache: Redis if available, fallback to SimpleCache ──────────────────
+    _redis = os.environ.get("REDIS_URL", "")
+    if _redis:
+        CACHE_TYPE = "RedisCache"
+        CACHE_REDIS_URL = _redis
+    else:
+        CACHE_TYPE = "SimpleCache"
 
     @classmethod
     def init_app(cls, app):
@@ -52,6 +85,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     LOGIN_DISABLED = False
+    CACHE_TYPE = "SimpleCache"
 
 
 config = {
