@@ -19,7 +19,7 @@ class ProductReview(db.Model):
     rating         = db.Column(db.Integer, nullable=False)   # 1-5
     title          = db.Column(db.String(120), nullable=True)
     body           = db.Column(db.Text, nullable=True)
-    is_approved    = db.Column(db.Boolean, nullable=False, default=True)  # auto-approve
+    is_approved    = db.Column(db.Boolean, nullable=False, default=False, index=True)  # requires admin approval
     order_number   = db.Column(db.String(30), nullable=True)  # verify purchase
     created_at     = db.Column(db.DateTime, nullable=False,
                                 default=lambda: datetime.now(timezone.utc))
