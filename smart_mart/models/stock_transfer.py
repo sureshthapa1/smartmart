@@ -15,6 +15,13 @@ class StockTransfer(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     completed_at = db.Column(db.DateTime, nullable=True)
 
+    __table_args__ = (
+        db.Index("ix_stock_transfers_from_branch_id", "from_branch_id"),
+        db.Index("ix_stock_transfers_to_branch_id", "to_branch_id"),
+        db.Index("ix_stock_transfers_created_by", "created_by"),
+        db.Index("ix_stock_transfers_status", "status"),
+    )
+
     from_branch = db.relationship("Branch", foreign_keys=[from_branch_id], backref="transfers_out")
     to_branch = db.relationship("Branch", foreign_keys=[to_branch_id], backref="transfers_in")
     creator = db.relationship("User", foreign_keys=[created_by])
@@ -32,6 +39,11 @@ class StockTransferItem(db.Model):
     transfer_id = db.Column(db.Integer, db.ForeignKey("stock_transfers.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
+
+    __table_args__ = (
+        db.Index("ix_stock_transfer_items_transfer_id", "transfer_id"),
+        db.Index("ix_stock_transfer_items_product_id", "product_id"),
+    )
 
     transfer = db.relationship("StockTransfer", back_populates="items")
     product = db.relationship("Product")
