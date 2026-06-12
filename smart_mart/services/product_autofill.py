@@ -311,7 +311,32 @@ def autofill_product(product, force: bool = False) -> dict:
             image_query = data.get("image_search") or name
             downloaded = _pexels_image(image_query, filename)
             if downloaded:
-                product.image_filename = filename
+                # Try Cloudinary upload for persistent storage (Render ephemeral FS fix)
+                final_identifier = filename
+                try:
+                    from .image_service import _cloudinary_available, _cloudinary
+                    if _cloudinary_available():
+                        cl = _cloudinary()
+                        if cl:
+                            local_path = os.path.join(_uploads_dir(), filename)
+                            if os.path.exists(local_path):
+                                result = cl.uploader.upload(
+                                    local_path,
+                                    folder="smartmart/products",
+                                    transformation=[
+                                        {"width": 800, "height": 800, "crop": "limit",
+                                         "quality": "auto:good"},
+                                    ],
+                                    resource_type="image",
+                                )
+                                final_identifier = "cld:" + result["public_id"]
+                                try:
+                                    os.remove(local_path)  # clean up local after cloud upload
+                                except Exception:
+                                    pass
+                except Exception:
+                    pass  # Keep local file if Cloudinary upload fails
+                product.image_filename = final_identifier
                 updated["image_filename"] = True
 
     # ── 5. Slug (always fill if missing) ────────────────────────────────────
