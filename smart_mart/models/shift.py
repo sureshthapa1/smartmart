@@ -18,6 +18,12 @@ class Shift(db.Model):
     ended_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), nullable=False, default="open")  # open|closed
 
+    __table_args__ = (
+        db.Index("ix_shifts_user_id", "user_id"),
+        db.Index("ix_shifts_status", "status"),
+        db.Index("ix_shifts_started_at", "started_at"),
+    )
+
     user = db.relationship("User", backref="shifts")
     cash_session = db.relationship("CashSession", backref=db.backref("shift", uselist=False))
 
