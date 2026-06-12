@@ -151,6 +151,12 @@ with app.app_context():
             safe_add(conn, "loyalty_wallet_transactions", "expires_at", "TIMESTAMP")
             safe_add(conn, "loyalty_wallet_transactions", "is_expired", "BOOLEAN DEFAULT false")
 
+            # ── Product reviews moderation ────────────────────────────────
+            safe_add(conn, "product_reviews", "is_approved", "BOOLEAN DEFAULT false")
+            # ── Wishlist CustomerAccount FK ───────────────────────────────────
+            safe_add(conn, "wishlist_items", "customer_account_id",
+                     "INTEGER REFERENCES customer_accounts(id) ON DELETE SET NULL")
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
