@@ -62,3 +62,11 @@ smart_mart/static/uploads/product_*.webp
 # Logs
 logs/
 *.log
+
+# Auto-generated product images (re-downloaded from Pexels / Cloudinary)
+smart_mart/static/uploads/products/
+
+
+# The project root contains a duplicate of the smartmart/ directory.
+# This is an artefact of a rename — the canonical source is smartmart/.
+# Do not commit files from the root-level smart_mart/ copy.
