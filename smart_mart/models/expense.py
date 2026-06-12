@@ -15,6 +15,12 @@ class Expense(db.Model):
     # Mirror row in bi_operating_expenses (kept in sync automatically)
     bi_opex_id = db.Column(db.Integer, db.ForeignKey("bi_operating_expenses.id"), nullable=True)
 
+    __table_args__ = (
+        db.Index("ix_expenses_created_by", "created_by"),
+        db.Index("ix_expenses_expense_date", "expense_date"),
+        db.Index("ix_expenses_expense_type", "expense_type"),
+    )
+
     # Relationships
     creator = db.relationship("User", back_populates="expenses")
 
