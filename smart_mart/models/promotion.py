@@ -31,6 +31,13 @@ class Promotion(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
+    __table_args__ = (
+        db.Index("ix_promotions_is_active", "is_active"),
+        db.Index("ix_promotions_start_date", "start_date"),
+        db.Index("ix_promotions_end_date", "end_date"),
+        db.Index("ix_promotions_created_by", "created_by"),
+    )
+
     creator = db.relationship("User", foreign_keys=[created_by])
 
     @property
