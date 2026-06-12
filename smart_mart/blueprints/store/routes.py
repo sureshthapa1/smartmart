@@ -1,4 +1,4 @@
-"""Customer storefront routes for Goldkernel Dry Fruits."""
+"""Customer storefront routes for GoldKernel Dry Fruits."""
 from __future__ import annotations
 
 import base64
@@ -981,12 +981,77 @@ def api_stock(product_id):
 
 # ── eSewa signature helper ────────────────────────────────────────────────────
 
-def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str = "EPAYTEST") -> str:
-    """Generate eSewa HMAC-SHA256 signature for sandbox."""
-    secret = "8gBm/:&EnhH.1/q"  # eSewa sandbox secret
+def _esewa_product_code() -> str:
+    """Return the eSewa product code from env (EPAYTEST for sandbox, live code for production)."""
+    import os as _os
+    return _os.environ.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
+
+
+def _esewa_secret() -> str:
+    """Return the eSewa secret key from env (sandbox default if not set)."""
+    import os as _os
+    return _os.environ.get("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
+
+
+def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str | None = None) -> str:
+    """Generate eSewa HMAC-SHA256 signature for payment initiation."""
+    if product_code is None:
+        product_code = _esewa_product_code()
+    secret = _esewa_secret()
     message = f"total_amount={total_amount},transaction_uuid={transaction_uuid},product_code={product_code}"
     sig = hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
     return base64.b64encode(sig).decode()
+
+
+def _verify_esewa_callback(args: dict) -> bool:
+    """
+    Verify eSewa v2 callback signature.
+    eSewa sends: transaction_code, status, total_amount, transaction_uuid,
+                 product_code, signed_field_names, signature
+    We recompute the HMAC over the signed fields and compare.
+    """
+    try:
+        signed_fields = args.get("signed_field_names", "")
+        if not signed_fields:
+            return False
+        field_names = [f.strip() for f in signed_fields.split(",")]
+        message = ",".join(f"{k}={args.get(k, '')}" for k in field_names)
+        secret = _esewa_secret()
+        expected = base64.b64encode(
+            hmac.new(secret.encode(), message.encode(), hashlib.sha256).digest()
+        ).decode()
+        received = args.get("signature", "")
+        return hmac.compare_digest(expected, received)
+    except Exception:
+        return False
+
+
+def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
+    """
+    Verify Khalti payment by calling Khalti's verification API.
+    amount_paisa is the expected amount in paisa (NPR * 100).
+    Returns True only if Khalti confirms the payment as Completed.
+    """
+    import os as _os, urllib.request as _req, json as _json
+    secret_key = _os.environ.get("KHALTI_SECRET_KEY", "")
+    if not secret_key:
+        # No Khalti key configured — log and fail secure
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "KHALTI_SECRET_KEY not configured — cannot verify Khalti payment"
+        )
+        return False
+    try:
+        verify_url = "https://khalti.ebanking.com.np/api/v2/payment/verify/"
+        payload = _json.dumps({"token": token, "amount": amount_paisa}).encode()
+        req = _req.Request(verify_url, data=payload, method="POST")
+        req.add_header("Authorization", f"Key {secret_key}")
+        req.add_header("Content-Type", "application/json")
+        with _req.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read())
+            return data.get("state", {}).get("name") == "Completed"
+    except Exception:
+        return False
 
 
 # ── Payment Pending (FIX 1) ───────────────────────────────────────────────────
@@ -1008,21 +1073,91 @@ def payment_pending(order_number):
     if not owns_order:
         return redirect(url_for("store.track", order_number=order_number))
     esewa_signature = _esewa_signature(
-        f"{order.grand_total:.2f}", order.order_number
+        f"{order.grand_total:.2f}", order.order_number, _esewa_product_code()
     )
+    esewa_product_code = _esewa_product_code()
     return render_template("store/payment_pending.html", order=order,
                            settings=settings, customer=cust,
-                           esewa_signature=esewa_signature)
+                           esewa_signature=esewa_signature,
+                           esewa_product_code=esewa_product_code)
 
 
 @store_bp.route("/payment/<order_number>/callback/<provider>")
 def payment_callback(order_number, provider):
-    """Handle payment gateway callback — mark order as paid."""
-    settings = _settings()
+    """
+    Handle payment gateway callback — VERIFY signature before marking order paid.
+
+    eSewa v2: verifies HMAC-SHA256 over signed_field_names.
+    Khalti:   calls Khalti's server-side verification API with the token.
+    COD/other: not routed here (COD goes straight to order_success).
+    """
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
     order = db.session.execute(
         db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
     ).scalar_one_or_none()
-    if order:
+
+    if not order:
+        flash("Order not found.", "danger")
+        return redirect(url_for("store.home"))
+
+    # Already paid — idempotent redirect
+    if order.payment_status == "paid":
+        return redirect(url_for("store.order_success", order_number=order_number))
+
+    args = request.args.to_dict()
+    verified = False
+    gateway_ref = ""
+
+    if provider == "esewa":
+        # eSewa v2 sends signed_field_names + signature
+        if "signed_field_names" in args and "signature" in args:
+            verified = _verify_esewa_callback(args)
+            gateway_ref = args.get("transaction_code", args.get("refId", ""))
+            if not verified:
+                _logger.warning(
+                    "eSewa signature mismatch for order %s. Args: %s",
+                    order_number, {k: v for k, v in args.items() if k != "signature"}
+                )
+        else:
+            # eSewa v1 fallback (sandbox) — accept only in non-production
+            import os as _os
+            if _os.environ.get("FLASK_ENV", "production") != "production":
+                verified = True
+                gateway_ref = args.get("refId", "")
+                _logger.warning(
+                    "eSewa v1 callback accepted in dev/sandbox for order %s", order_number
+                )
+            else:
+                _logger.error(
+                    "eSewa callback missing signed_field_names for order %s in production",
+                    order_number
+                )
+
+    elif provider == "khalti":
+        token = args.get("token") or args.get("pidx", "")
+        try:
+            amount_paisa = int(float(order.grand_total) * 100)
+        except Exception:
+            amount_paisa = 0
+        if token:
+            verified = _verify_khalti_callback(token, amount_paisa)
+            gateway_ref = token
+            if not verified:
+                _logger.warning(
+                    "Khalti verification failed for order %s (token=%s)",
+                    order_number, token[:8] + "..."
+                )
+        else:
+            _logger.warning("Khalti callback missing token for order %s", order_number)
+
+    elif provider in ("cod", "cash"):
+        # COD should not hit this route, but handle gracefully
+        verified = True
+        gateway_ref = "cod"
+
+    if verified:
         order.payment_status = "paid"
         from ...models.ecommerce import EcommercePayment
         payment = db.session.execute(
@@ -1030,13 +1165,36 @@ def payment_callback(order_number, provider):
         ).scalars().first()
         if payment:
             payment.status = "paid"
-            payment.gateway_reference = request.args.get("refId") or request.args.get("transaction_id", "")
+            payment.gateway_reference = gateway_ref
         db.session.commit()
-        flash(f"Payment successful! Order {order_number} confirmed.", "success")
         session["last_order"] = order_number
+        flash(f"Payment successful! Order {order_number} confirmed.", "success")
+        _logger.info("Payment verified for order %s via %s", order_number, provider)
+
+        # ── Notify admin of new paid online order ─────────────────────────
+        try:
+            from ...services.notification_service import send_notification
+            from ...models.shop_settings import ShopSettings
+            settings = ShopSettings.get()
+            admin_phone = getattr(settings, "phone", None) or getattr(settings, "contact_phone", None)
+            if admin_phone:
+                msg = (
+                    f"[GoldKernel] New order {order_number} PAID via {provider.upper()}. "
+                    f"Amount: NPR {order.grand_total:.0f}. "
+                    f"Customer: {order.customer_name} ({order.customer_phone})."
+                )
+                send_notification(admin_phone, msg)
+        except Exception:
+            pass  # Never block the payment confirmation on notification failure
+
+        return redirect(url_for("store.order_success", order_number=order_number))
     else:
-        flash("Order not found.", "danger")
-    return redirect(url_for("store.order_success", order_number=order_number))
+        flash(
+            "Payment verification failed. Your order has been saved — please try again "
+            "or contact us if the amount was deducted.",
+            "danger"
+        )
+        return redirect(url_for("store.payment_pending", order_number=order_number))
 
 
 @store_bp.route("/payment/<order_number>/failed")
@@ -1457,3 +1615,67 @@ def sitemap():
     xml += "\n".join(urls)
     xml += "\n</urlset>"
     return Response(xml, mimetype="application/xml")
+
+
+# ── SEO: sitemap.xml ──────────────────────────────────────────────────────────
+
+@store_bp.route("/sitemap.xml")
+def sitemap():
+    """Auto-generated sitemap for SEO crawlers."""
+    from flask import make_response
+    from datetime import date
+    products = db.session.execute(
+        db.select(Product)
+        .where(Product.is_active == True)  # noqa: E712
+        .order_by(Product.id)
+    ).scalars().all()
+
+    today = date.today().isoformat()
+    base = request.url_root.rstrip("/")
+
+    urls = [
+        f"  <url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>",
+        f"  <url><loc>{base}/store/products</loc><changefreq>daily</changefreq><priority>0.9</priority></url>",
+        f"  <url><loc>{base}/store/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"  <url><loc>{base}/store/contact</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"  <url><loc>{base}/store/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+    ]
+    for p in products:
+        slug = getattr(p, "slug", None) or str(p.id)
+        urls.append(
+            f"  <url><loc>{base}/store/product/{slug}</loc>"
+            f"<lastmod>{today}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
+        )
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>"
+    )
+    resp = make_response(xml, 200)
+    resp.headers["Content-Type"] = "application/xml"
+    return resp
+
+
+# ── SEO: robots.txt ───────────────────────────────────────────────────────────
+
+@store_bp.route("/robots.txt")
+def robots():
+    """robots.txt — allow crawlers, block private pages."""
+    from flask import make_response
+    base = request.url_root.rstrip("/")
+    content = f"""User-agent: *
+Allow: /store/
+Disallow: /store/checkout
+Disallow: /store/account
+Disallow: /store/cart
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Sitemap: {base}/store/sitemap.xml
+"""
+    resp = make_response(content, 200)
+    resp.headers["Content-Type"] = "text/plain"
+    return resp
