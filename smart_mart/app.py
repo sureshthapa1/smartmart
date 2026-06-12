@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, flash, redirect, url_for, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
-from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate
+from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate, cache
 from .services.schema_migrations import run_pending_migrations
 
 
@@ -48,6 +48,26 @@ def create_app(config_name="development"):
     bcrypt.init_app(app)
     csrf.init_app(app)
     migrate.init_app(app, db)
+    cache.init_app(app)
+
+    # ── Flask-Mail configuration from environment ─────────────────────────
+    import os as _os
+    app.config.setdefault("MAIL_SERVER",         _os.environ.get("MAIL_SERVER", ""))
+    app.config.setdefault("MAIL_PORT",           int(_os.environ.get("MAIL_PORT", 587)))
+    app.config.setdefault("MAIL_USE_TLS",        _os.environ.get("MAIL_USE_TLS", "true").lower() == "true")
+    app.config.setdefault("MAIL_USE_SSL",        False)
+    app.config.setdefault("MAIL_USERNAME",       _os.environ.get("MAIL_USERNAME", ""))
+    app.config.setdefault("MAIL_PASSWORD",       _os.environ.get("MAIL_PASSWORD", ""))
+    app.config.setdefault("MAIL_DEFAULT_SENDER", _os.environ.get("MAIL_DEFAULT_SENDER", "GoldKernel <noreply@goldkernel.com>"))
+    app.config.setdefault("MAIL_SUPPRESS_SEND",  not bool(_os.environ.get("MAIL_SERVER", "")))
+
+    # Init Flask-Mail (graceful — app runs fine without email configured)
+    try:
+        from flask_mail import Mail
+        mail = Mail(app)
+        app.extensions["mail"] = mail
+    except ImportError:
+        pass
     limiter.init_app(app)
 
     from . import models  # noqa: F401
@@ -338,12 +358,14 @@ def _register_blueprints(app):
     except Exception:
         pass
 
-    # Exempt the auth blueprint — login/logout/reset are protected by
-    # rate limiting; CSRF on the login form itself is redundant and causes
-    # "token expired" errors when the page sits open for a long time.
+    # Exempt only the login and logout routes — NOT change-password or reset.
+    # Rate limiting already protects login/logout; exempting the whole
+    # blueprint would leave change-password and reset routes CSRF-unprotected.
     try:
-        from .blueprints.auth.routes import auth_bp as _auth_bp
-        csrf.exempt(_auth_bp)
+        from .blueprints.auth.routes import login, logout, request_password_reset
+        csrf.exempt(login)
+        csrf.exempt(logout)
+        csrf.exempt(request_password_reset)
     except Exception:
         pass
 
