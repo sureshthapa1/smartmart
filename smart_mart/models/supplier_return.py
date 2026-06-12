@@ -25,6 +25,12 @@ class SupplierReturn(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     sent_at = db.Column(db.DateTime, nullable=True)
 
+    __table_args__ = (
+        db.Index("ix_supplier_returns_supplier_id", "supplier_id"),
+        db.Index("ix_supplier_returns_status", "status"),
+        db.Index("ix_supplier_returns_created_by", "created_by"),
+    )
+
     supplier = db.relationship("Supplier", backref=db.backref("supplier_returns", lazy="select"))
     purchase = db.relationship("Purchase", backref=db.backref("supplier_returns", lazy="select"))
     creator = db.relationship("User", foreign_keys=[created_by])
