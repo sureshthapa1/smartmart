@@ -1,4 +1,4 @@
-"""Website/POS integration logic for Goldkernel e-commerce."""
+"""Website/POS integration logic for GoldKernel e-commerce."""
 from __future__ import annotations
 
 import json
@@ -429,6 +429,48 @@ def create_order(payload: dict[str, Any], idempotency_key: str | None = None) ->
         response_payload=response,
     )
     db.session.commit()
+
+    # ── Send order confirmation email to customer ─────────────────────────
+    # Fires after commit so the order is safely persisted first.
+    # Failures are caught and logged — never block the order response.
+    try:
+        from .email_service import send_order_confirmation, send_admin_new_order_notification
+        from ..models.shop_settings import ShopSettings
+        order_items = [
+            {
+                "name": it.product_name,
+                "qty": it.quantity,
+                "unit_price": float(it.unit_price),
+                "subtotal": float(it.subtotal),
+            }
+            for it in order.items
+        ]
+        send_order_confirmation(order, order_items)
+
+        # ── Notify admin of new order ─────────────────────────────────────
+        settings = ShopSettings.get()
+        admin_email = getattr(settings, "email", None) or getattr(settings, "contact_email", None)
+        if admin_email:
+            send_admin_new_order_notification(order, admin_email)
+
+        # ── Admin SMS notification (fallback if no email) ─────────────────
+        elif not admin_email:
+            admin_phone = getattr(settings, "phone", None) or getattr(settings, "contact_phone", None)
+            if admin_phone:
+                from .notification_service import send_notification
+                msg = (
+                    f"[GoldKernel] New order {order.order_number}. "
+                    f"Amount: NPR {float(order.grand_total):.0f}. "
+                    f"{order.customer_name} ({order.customer_phone})."
+                )
+                send_notification(admin_phone, msg)
+    except Exception as _email_exc:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "Post-order notifications failed for %s: %s",
+            order.order_number, _email_exc
+        )
+
     return response, False
 
 
