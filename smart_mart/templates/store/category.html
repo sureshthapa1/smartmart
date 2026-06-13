@@ -1,0 +1,132 @@
+{% extends "base_store.html" %}
+{% block title %}{{ category_name }} | GoldKernel Dry Fruits{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  {# ── Breadcrumb ── #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('store.home') }}">Home</a></li>
+      <li class="breadcrumb-item active">{{ category_name }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-4">
+
+    {# ── Sidebar filters ── #}
+    <div class="col-lg-3">
+      <div class="ui-card p-3 mb-3">
+        <h6 class="fw-bold mb-3">Browse Categories</h6>
+        {% for cat in categories %}
+          {% set cat_slug = cat.lower().replace(' ', '-').replace('/', '-') %}
+          <a href="{{ url_for('store.category_browse', slug=cat_slug) }}"
+             class="d-block py-1 text-decoration-none
+                    {% if cat.lower() == category_name.lower() %}fw-bold text-primary{% else %}text-body{% endif %}">
+            {{ cat }}
+          </a>
+        {% endfor %}
+      </div>
+
+      <div class="ui-card p-3">
+        <h6 class="fw-bold mb-3">Filter by Price</h6>
+        <form method="GET">
+          <input type="hidden" name="sort" value="{{ sort }}">
+          <div class="mb-2">
+            <label class="form-label small">Min (NPR)</label>
+            <input type="number" name="min_price" class="field-input form-control form-control-sm"
+                   value="{{ min_price }}" placeholder="0">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Max (NPR)</label>
+            <input type="number" name="max_price" class="field-input form-control form-control-sm"
+                   value="{{ max_price }}" placeholder="5000">
+          </div>
+          <button class="btn btn-brand btn-sm w-100">Apply</button>
+        </form>
+      </div>
+    </div>
+
+    {# ── Product grid ── #}
+    <div class="col-lg-9">
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+          <h4 class="mb-0">{{ category_name }}</h4>
+          <p class="text-muted small mb-0">{{ total_products }} product{{ 's' if total_products != 1 }}</p>
+        </div>
+        <form method="GET" class="d-flex align-items-center gap-2">
+          <input type="hidden" name="min_price" value="{{ min_price }}">
+          <input type="hidden" name="max_price" value="{{ max_price }}">
+          <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="name"       {% if sort=='name'       %}selected{% endif %}>A–Z</option>
+            <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price ↑</option>
+            <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price ↓</option>
+            <option value="newest"     {% if sort=='newest'     %}selected{% endif %}>Newest</option>
+          </select>
+        </form>
+      </div>
+
+      {% if not products %}
+      <div class="text-center py-5 text-muted">
+        <p class="fs-5">No products found in this category.</p>
+        <a href="{{ url_for('store.home') }}" class="btn btn-brand">Browse All Products</a>
+      </div>
+      {% else %}
+      <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-3">
+        {% for product in products %}
+        <div class="col">
+          <div class="ui-card h-100 position-relative overflow-hidden product-card">
+            {% if product.id in selling_fast_ids %}
+            <span class="position-absolute top-0 start-0 badge bg-danger m-2" style="z-index:2">🔥 Selling Fast</span>
+            {% endif %}
+            <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="text-decoration-none">
+              <img src="{{ product.image_url or '/static/img/placeholder.png' }}"
+                   alt="{{ product.name }}" class="w-100"
+                   style="height:160px;object-fit:cover;border-radius:8px 8px 0 0">
+              <div class="p-3">
+                <p class="fw-semibold mb-1 text-body">{{ product.name }}</p>
+                <p class="text-muted small mb-1">{{ product.pack_size or '' }}</p>
+                <p class="fw-bold text-primary mb-0">NPR {{ "%.0f"|format(product.selling_price) }}</p>
+              </div>
+            </a>
+            <div class="px-3 pb-3">
+              <form method="POST" action="{{ url_for('store.add_to_cart') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="product_id" value="{{ product.id }}">
+                <input type="hidden" name="quantity" value="1">
+                <button class="btn btn-brand btn-sm w-100">Add to Cart</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Pagination #}
+      {% if total_products > per_page %}
+      {% set total_pages = ((total_products - 1) // per_page) + 1 %}
+      <nav class="mt-4" aria-label="Category pagination">
+        <ul class="pagination justify-content-center">
+          {% if page > 1 %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page-1 }}&sort={{ sort }}&min_price={{ min_price }}&max_price={{ max_price }}">‹ Prev</a>
+          </li>
+          {% endif %}
+          {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+          <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}&sort={{ sort }}&min_price={{ min_price }}&max_price={{ max_price }}">{{ p }}</a>
+          </li>
+          {% endfor %}
+          {% if page < total_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page+1 }}&sort={{ sort }}&min_price={{ min_price }}&max_price={{ max_price }}">Next ›</a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
