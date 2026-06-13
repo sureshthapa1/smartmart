@@ -1,184 +1,218 @@
 {% extends "store/base_store.html" %}
-{% block title %}My Account — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
+{% block title %}My Account — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
 
-  <!-- Profile header -->
-  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.75rem;flex-wrap:wrap;" class="fade-up">
-    <div style="width:52px;height:52px;border-radius:50%;background:var(--brand-grad);color:#fff;font-size:1.3rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:var(--brand-glow);flex-shrink:0;">
-      {{ customer.name[0].upper() }}
-    </div>
-    <div style="flex:1;">
-      <h1 style="font-size:1.25rem;font-weight:900;margin:0 0 .1rem;">{{ customer.name }}</h1>
-      <div style="font-size:.82rem;color:var(--muted);">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
-    </div>
-    <a href="{{ url_for('store.logout') }}" class="btn-ghost" style="font-size:.82rem;">
-      <i class="bi bi-box-arrow-right"></i> Sign Out
-    </a>
-  </div>
+  <nav class="bc"><a href="{{ url_for('store.home') }}">Home</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><span class="bc-cur">My Account</span></nav>
 
   <div class="row g-4">
 
-    <!-- LEFT: profile + password -->
-    <div class="col-lg-4">
-
-      <!-- Profile -->
-      <div class="ui-card fade-up" style="margin-bottom:1rem;">
-        <div class="ui-card-head">
-          <i class="bi bi-person text-brand"></i>
-          <span class="ui-card-head-title">Profile</span>
+    {# ── Sidebar ── #}
+    <div class="col-md-3 fu">
+      <div class="ucard" style="overflow:hidden;">
+        <div style="padding:1.5rem 1.25rem;background:var(--brand-grad);text-align:center;">
+          <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.25);border:3px solid rgba(255,255,255,.5);margin:0 auto .7rem;display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;color:#fff;">
+            {{ customer.name[0].upper() }}
+          </div>
+          <div style="font-weight:800;color:#fff;font-size:.95rem;">{{ customer.name }}</div>
+          <div style="font-size:.72rem;color:rgba(255,255,255,.75);margin-top:.2rem;">{{ customer.phone }}</div>
+          {% if customer.email %}<div style="font-size:.7rem;color:rgba(255,255,255,.65);">{{ customer.email }}</div>{% endif %}
         </div>
-        <div class="ui-card-body">
-          <form method="post" action="{{ url_for('store.account_update') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% for field, label, ph, ac, type in [
-              ('name','Full Name','Ramesh Sharma','name','text'),
-              ('email','Email (optional)','you@example.com','email','email'),
-              ('address','Delivery Address','House no., street…','street-address','text'),
-              ('area','Area / Zone','Lazimpat, Baneshwor…','off','text'),
-            ] %}
-            <div style="margin-bottom:.85rem;">
-              <label class="field-label" for="acc-{{ field }}">{{ label }}</label>
-              <input id="acc-{{ field }}" type="{{ type }}" name="{{ field }}"
-                     value="{{ customer | attr(field) or '' }}"
-                     placeholder="{{ ph }}" maxlength="{{ 120 if field in ('name','email') else 255 if field == 'address' else 80 }}"
-                     autocomplete="{{ ac }}" class="field-input">
-            </div>
-            {% endfor %}
-            <div style="margin-bottom:1rem;">
-              <label class="field-label">Phone</label>
-              <input type="text" value="{{ customer.phone }}" disabled class="field-input"
-                     style="background:var(--surface);color:var(--muted);">
-              <div class="field-hint">Phone cannot be changed</div>
-            </div>
-            <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.6rem;">
-              <i class="bi bi-check-lg"></i> Save Changes
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <!-- Password -->
-      <div class="ui-card fade-up fade-up-d1">
-        <div class="ui-card-head">
-          <i class="bi bi-shield-lock text-brand"></i>
-          <span class="ui-card-head-title">Change Password</span>
-        </div>
-        <div class="ui-card-body">
-          <form method="post" action="{{ url_for('store.account_change_password') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            {% for fname, label, ph, ac in [
-              ('current_password','Current Password','Your current password','current-password'),
-              ('new_password','New Password','Min 6 characters','new-password'),
-              ('confirm_password','Confirm New Password','Repeat new password','new-password'),
-            ] %}
-            <div style="margin-bottom:.85rem;">
-              <label class="field-label" for="pw-{{ fname }}">{{ label }}</label>
-              <input id="pw-{{ fname }}" type="password" name="{{ fname }}" placeholder="{{ ph }}"
-                     required maxlength="128" autocomplete="{{ ac }}" class="field-input">
-            </div>
-            {% endfor %}
-            <button type="submit" class="btn-outline-brand w-100 justify-content-center" style="padding:.6rem;">
-              <i class="bi bi-key"></i> Update Password
-            </button>
-          </form>
+        <div style="padding:.5rem 0;">
+          {% set tabs = [
+            ('orders','bi-bag-check','My Orders'),
+            ('profile','bi-person','Profile'),
+            ('wishlist','bi-heart','Wishlist'),
+            ('addresses','bi-geo-alt','Addresses'),
+          ] %}
+          {% for tab, icon, label in tabs %}
+          <a href="?tab={{ tab }}"
+             style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;text-decoration:none;font-size:.875rem;font-weight:{% if active_tab==tab %}700{% else %}500{% endif %};color:{% if active_tab==tab %}var(--brand-d){% else %}var(--text2){% endif %};background:{% if active_tab==tab %}var(--brand-l){% else %}transparent{% endif %};transition:all var(--t-f);">
+            <i class="bi {{ icon }}" style="font-size:1rem;flex-shrink:0;"></i>{{ label }}
+            {% if tab=='orders' and orders %}<span style="margin-left:auto;background:var(--brand-grad);color:#fff;font-size:.65rem;font-weight:800;padding:.15em .5em;border-radius:var(--r-f);">{{ orders|length }}</span>{% endif %}
+          </a>
+          {% endfor %}
+          <hr class="dv" style="margin:.4rem 0;">
+          <a href="{{ url_for('store.logout') }}"
+             style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:600;color:var(--danger);">
+            <i class="bi bi-box-arrow-right" style="font-size:1rem;"></i> Sign Out
+          </a>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT: orders -->
-    <div class="col-lg-8 fade-up fade-up-d1" id="orders">
-      <div class="ui-card">
-        <div class="ui-card-head">
-          <i class="bi bi-bag-check text-brand"></i>
-          <span class="ui-card-head-title">My Orders</span>
-          <a href="{{ url_for('store.track') }}" style="font-size:.8rem;color:var(--brand);text-decoration:none;font-weight:600;margin-left:auto;">Track an order →</a>
-        </div>
+    {# ── Main content ── #}
+    <div class="col-md-9 fu fu1">
 
+      {# ── ORDERS TAB ── #}
+      {% if active_tab == 'orders' or not active_tab %}
+      <div class="ucard">
+        <div class="ucard-head"><i class="bi bi-bag-check" style="color:var(--brand);"></i><span class="ucard-title">My Orders</span></div>
         {% if orders %}
+        <div>
           {% for order in orders %}
-          {% set _sl = order.status_label %}
-{% set slabel = _sl[0] %}
-{% set _raw_color = _sl[1] %}
-{% set _color_map = {'success':'success','danger':'danger','warning':'warning','info':'info','primary':'info','secondary':'muted'} %}
-{% set scolor = _color_map.get(_raw_color, 'muted') %}
+          {% set status_map = {'pending':('w','clock'),'confirmed':('i','check-circle'),'processing':('i','gear'),'shipped':('i','truck'),'delivered':('s','check-circle-fill'),'cancelled':('d','x-circle')} %}
+          {% set sc, si = status_map.get(order.status, ('m','circle')) %}
           <div style="padding:1.1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
-            <div style="display:flex;align-items:flex-start;gap:.85rem;flex-wrap:wrap;">
-
-              <!-- Status icon -->
-              <div style="width:44px;height:44px;border-radius:var(--r);flex-shrink:0;
-                background:{% if order.status=='delivered' %}#f0fdf4{% elif order.status=='cancelled' %}#fef2f2{% else %}#fffbeb{% endif %};
-                display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
-                {% if order.status=='delivered' %}📦
-                {% elif order.status=='cancelled' %}❌
-                {% elif order.status=='out_for_delivery' %}🚴
-                {% elif order.status=='preparing' %}🔧
-                {% elif order.status=='confirmed' %}✅
-                {% else %}⏳{% endif %}
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.65rem;">
+              <div>
+                <div style="font-weight:800;font-size:.9rem;color:var(--brand-d);font-family:monospace;">{{ order.order_number }}</div>
+                <div style="font-size:.75rem;color:var(--muted);margin-top:.1rem;">{{ order.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
               </div>
-
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem;">
-                  <span class="mono" style="font-size:.88rem;font-weight:800;">{{ order.order_number }}</span>
-                  <span class="status-badge {{ scolor }}">{{ slabel }}</span>
-                </div>
-                <div style="font-size:.8rem;color:var(--muted);margin-bottom:.25rem;">
-                  {{ order.items|length }} item{{ 's' if order.items|length != 1 }} ·
-                  <strong style="color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</strong> ·
-                  {% set pm_labels = {'cod':'COD','esewa':'eSewa','khalti':'Khalti','ime_pay':'IME Pay','online':'Online'} %}
-                  {{ pm_labels.get(order.payment_mode, order.payment_mode|upper) }}
-                </div>
-                <div style="font-size:.75rem;color:var(--muted-2);">
-                  {{ order.created_at | nst('%d %b %Y, %H:%M') if order.created_at else '' }}
-                </div>
-              </div>
-
-              <div style="display:flex;gap:.5rem;flex-shrink:0;">
-                <a href="{{ url_for('store.track', order_number=order.order_number) }}" class="btn-ghost" style="padding:.3rem .75rem;font-size:.78rem;">
-                  <i class="bi bi-geo-alt"></i> Track
-                </a>
-                {% if order.status == 'pending' %}
-                <form method="post" action="{{ url_for('store.cancel_order', order_number=order.order_number) }}"
-                      onsubmit="return confirm('Cancel order {{ order.order_number }}?')">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" style="padding:.3rem .75rem;font-size:.78rem;font-weight:600;color:var(--danger);background:none;border:1.5px solid #fecaca;border-radius:var(--r-full);cursor:pointer;">
-                    <i class="bi bi-x-circle"></i> Cancel
-                  </button>
-                </form>
-                {% endif %}
+              <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;">
+                <span class="sbadge {{ sc }}"><span class="sdot {{ sc }}"></span>{{ order.status | title }}</span>
+                <span style="font-weight:800;font-size:.95rem;color:var(--brand-d);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
               </div>
             </div>
-
-            <!-- Items preview -->
-            <div style="margin-top:.6rem;padding:.55rem .75rem;background:var(--surface);border-radius:var(--r-sm);font-size:.78rem;color:var(--muted);">
-              {{ order.items | map(attribute='product_name') | list | join(', ') | truncate(80) }}
+            {# Order items preview #}
+            <div style="margin-top:.65rem;display:flex;flex-wrap:wrap;gap:.35rem;">
+              {% for item in order.items[:3] %}
+              <span style="font-size:.73rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-f);padding:.2em .65em;color:var(--text2);">{{ item.product_name }} ×{{ item.quantity }}</span>
+              {% endfor %}
+              {% if order.items|length > 3 %}<span style="font-size:.73rem;color:var(--muted);">+{{ order.items|length - 3 }} more</span>{% endif %}
+            </div>
+            <div style="margin-top:.75rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+              <a href="{{ url_for('store.track', order_number=order.order_number) }}" class="btn-ghost" style="font-size:.75rem;padding:.3rem .75rem;">
+                <i class="bi bi-geo-alt"></i> Track
+              </a>
+              {% if order.payment_mode=='cod' and order.status in ['pending','confirmed'] %}
+              <span style="font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:.3rem;"><i class="bi bi-cash-coin"></i> Pay on delivery</span>
+              {% elif order.payment_status=='paid' %}
+              <span style="font-size:.75rem;color:var(--success);display:flex;align-items:center;gap:.3rem;"><i class="bi bi-check-circle-fill"></i> Paid</span>
+              {% endif %}
             </div>
           </div>
           {% endfor %}
-
-          {% if total_pages > 1 %}
-          <div style="padding:.85rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:center;gap:.4rem;flex-wrap:wrap;">
-            {% for p in range(1, total_pages+1) %}
-            <a href="{{ url_for('store.my_account', page=p) }}#orders"
-               style="padding:.3rem .75rem;border-radius:var(--r-full);font-size:.82rem;font-weight:600;text-decoration:none;
-               {% if p == page %}background:var(--brand-grad);color:#fff;{% else %}border:1.5px solid var(--border);color:var(--muted);{% endif %}">
-              {{ p }}
-            </a>
-            {% endfor %}
-          </div>
-          {% endif %}
-
-        {% else %}
-        <div class="empty-state">
-          <div class="empty-icon">🛒</div>
-          <h4>No orders yet</h4>
-          <p>Your order history will appear here after your first purchase.</p>
-          <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Start Shopping</a>
         </div>
+        {% else %}
+        <div class="empty"><div class="empty-icon">📦</div><h4>No orders yet</h4><p>You haven't placed any orders yet. Start shopping!</p><a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Shop Now</a></div>
         {% endif %}
       </div>
-    </div>
 
+      {# ── PROFILE TAB ── #}
+      {% elif active_tab == 'profile' %}
+      <div class="ucard">
+        <div class="ucard-head"><i class="bi bi-person" style="color:var(--brand);"></i><span class="ucard-title">Edit Profile</span></div>
+        <div class="ucard-body">
+          <form method="post" action="{{ url_for('store.update_profile') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="flabel" for="p-name">Full Name</label>
+                <input id="p-name" type="text" name="name" class="finput" value="{{ customer.name }}" required maxlength="120">
+              </div>
+              <div class="col-sm-6">
+                <label class="flabel" for="p-phone">Phone</label>
+                <div class="fwrap"><i class="bi bi-telephone fico"></i>
+                <input id="p-phone" type="tel" name="phone" class="finput has-ico" value="{{ customer.phone }}" required maxlength="15" readonly style="background:var(--surface);opacity:.7;cursor:not-allowed;">
+                </div>
+                <div class="fhint">Phone number cannot be changed</div>
+              </div>
+              <div class="col-12">
+                <label class="flabel" for="p-email">Email</label>
+                <div class="fwrap"><i class="bi bi-envelope fico"></i>
+                <input id="p-email" type="email" name="email" class="finput has-ico" value="{{ customer.email or '' }}" maxlength="120" placeholder="you@example.com">
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="flabel" for="p-addr">Default Address</label>
+                <textarea id="p-addr" name="address" class="finput" rows="2" maxlength="255">{{ customer.address or '' }}</textarea>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn-brand"><i class="bi bi-floppy2"></i> Save Changes</button>
+              </div>
+            </div>
+          </form>
+          <hr class="dv" style="margin:1.5rem 0;">
+          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:.75rem;">Change Password</div>
+          <form method="post" action="{{ url_for('store.change_password') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-3">
+              <div class="col-sm-6">
+                <label class="flabel" for="pw-cur">Current Password</label>
+                <input id="pw-cur" type="password" name="current_password" class="finput" required autocomplete="current-password">
+              </div>
+              <div class="col-sm-6">
+                <label class="flabel" for="pw-new">New Password</label>
+                <input id="pw-new" type="password" name="new_password" class="finput" required minlength="6" autocomplete="new-password">
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn-ob" style="font-size:.85rem;"><i class="bi bi-lock"></i> Update Password</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {# ── WISHLIST TAB ── #}
+      {% elif active_tab == 'wishlist' %}
+      <div class="ucard">
+        <div class="ucard-head"><i class="bi bi-heart" style="color:var(--brand);"></i><span class="ucard-title">My Wishlist <span style="font-size:.8rem;font-weight:500;color:var(--muted);">({{ wishlist_items|length if wishlist_items else 0 }} items)</span></span></div>
+        {% if wishlist_items %}
+        <div class="ucard-body">
+          <div class="row g-3">
+            {% for p in wishlist_items %}
+            {% set img_url = product_image_url(p.image_filename, 300) %}
+            <div class="col-6 col-sm-4 col-md-4">
+              <div class="pcard">
+                <div class="pimg">
+                  {% if img_url %}<img src="{{ img_url }}" alt="{{ p.name }}" loading="lazy">{% else %}<div class="pimg-ph">🥜</div>{% endif %}
+                </div>
+                <div class="pbody">
+                  {% if p.category %}<div class="pcat">{{ p.category }}</div>{% endif %}
+                  <div class="pname">{{ p.name }}</div>
+                  <div class="pprice"><span class="cur">NPR</span>{{ "%.0f"|format(p.selling_price) }}</div>
+                </div>
+                <div class="pfoot">
+                  {% if p.quantity > 0 %}
+                  <button class="btn-add" data-add-cart data-pid="{{ p.id }}" data-name="{{ p.name }}" data-qty="1">
+                    <i class="bi bi-cart-plus"></i> Add
+                  </button>
+                  {% else %}
+                  <button class="btn-add" disabled>Out of Stock</button>
+                  {% endif %}
+                  <form method="post" action="{{ url_for('store.wishlist_remove') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="product_id" value="{{ p.id }}">
+                    <button type="submit" class="btn-icon" title="Remove"><i class="bi bi-trash3"></i></button>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% else %}
+        <div class="empty"><div class="empty-icon">❤️</div><h4>Your wishlist is empty</h4><p>Save items you love — tap the heart icon on any product.</p><a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Browse Products</a></div>
+        {% endif %}
+      </div>
+
+      {# ── ADDRESSES TAB ── #}
+      {% elif active_tab == 'addresses' %}
+      <div class="ucard">
+        <div class="ucard-head"><i class="bi bi-geo-alt" style="color:var(--brand);"></i><span class="ucard-title">Saved Addresses</span></div>
+        <div class="ucard-body">
+          {% if customer.address %}
+          <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-l);padding:1rem 1.25rem;margin-bottom:.85rem;display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;">
+            <div>
+              <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--brand);margin-bottom:.2rem;"><i class="bi bi-house-fill me-1"></i>Default Address</div>
+              <div style="font-size:.9rem;font-weight:600;">{{ customer.name }}</div>
+              <div style="font-size:.82rem;color:var(--muted);">{{ customer.address }}</div>
+              <div style="font-size:.8rem;color:var(--muted);">{{ customer.phone }}</div>
+            </div>
+            <span style="background:var(--success);color:#fff;font-size:.65rem;font-weight:700;padding:.2em .55em;border-radius:var(--r-f);">Default</span>
+          </div>
+          {% endif %}
+          <div style="background:var(--brand-l);border:1.5px dashed #fde68a;border-radius:var(--r-l);padding:1.25rem;text-align:center;color:var(--muted);">
+            <i class="bi bi-plus-circle" style="font-size:1.5rem;margin-bottom:.4rem;display:block;color:var(--brand);"></i>
+            <div style="font-size:.82rem;">Multiple address management coming soon!</div>
+            <div style="font-size:.75rem;margin-top:.25rem;">Update your address in <a href="?tab=profile" style="color:var(--brand);font-weight:700;">Profile settings</a></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
   </div>
 </div>
 {% endblock %}
