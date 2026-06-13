@@ -406,3 +406,49 @@ def api_track(order_number):
         "items": [{"name": i.product_name, "qty": i.quantity,
                    "price": float(i.unit_price)} for i in order.items],
     })
+
+
+# ── Product Review Moderation Queue ──────────────────────────────────────────
+
+@online_orders_bp.route("/reviews")
+@admin_required
+def review_queue():
+    """Pending product reviews awaiting admin approval."""
+    from ...models.product_review import ProductReview
+    from ...models.product import Product
+    pending = db.session.execute(
+        db.select(ProductReview)
+        .where(ProductReview.is_approved == False)  # noqa: E712
+        .order_by(ProductReview.created_at.asc())
+    ).scalars().all()
+    approved_count = db.session.execute(
+        db.select(db.func.count(ProductReview.id))
+        .where(ProductReview.is_approved == True)  # noqa: E712
+    ).scalar() or 0
+    return render_template(
+        "online_orders/review_queue.html",
+        pending=pending,
+        approved_count=approved_count,
+    )
+
+
+@online_orders_bp.route("/reviews/<int:review_id>/approve", methods=["POST"])
+@admin_required
+def approve_review(review_id):
+    from ...models.product_review import ProductReview
+    review = db.get_or_404(ProductReview, review_id)
+    review.is_approved = True
+    db.session.commit()
+    flash("Review approved and published.", "success")
+    return redirect(url_for("online_orders.review_queue"))
+
+
+@online_orders_bp.route("/reviews/<int:review_id>/reject", methods=["POST"])
+@admin_required
+def reject_review(review_id):
+    from ...models.product_review import ProductReview
+    review = db.get_or_404(ProductReview, review_id)
+    db.session.delete(review)
+    db.session.commit()
+    flash("Review rejected and deleted.", "info")
+    return redirect(url_for("online_orders.review_queue"))
