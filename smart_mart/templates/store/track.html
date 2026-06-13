@@ -1,162 +1,167 @@
 {% extends "store/base_store.html" %}
-{% block title %}Track Order — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
+{% block title %}Track Order — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
-<div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;max-width:720px;">
+<div class="sc" style="max-width:620px;margin:0 auto;padding-top:2rem;padding-bottom:3rem;">
 
-  <div class="fade-up" style="margin-bottom:1.5rem;">
-    <h1 style="font-size:1.4rem;font-weight:900;margin-bottom:.3rem;">
-      <i class="bi bi-geo-alt text-brand"></i> Track Your Order
-    </h1>
-    <p style="color:var(--muted);font-size:.875rem;margin:0;">Enter your order number to see real-time delivery status.</p>
-  </div>
+  <nav class="bc"><a href="{{ url_for('store.home') }}">Home</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><span class="bc-cur">Track Order</span></nav>
 
-  <!-- Search -->
-  <form method="get" action="{{ url_for('store.track') }}" class="fade-up" style="margin-bottom:1.75rem;">
-    <div style="display:flex;gap:.65rem;flex-wrap:wrap;">
-      <div style="flex:1;min-width:220px;position:relative;">
-        <i class="bi bi-search" style="position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:.88rem;pointer-events:none;"></i>
-        <input type="text" name="order_number" value="{{ order_number or '' }}"
-               placeholder="e.g. GK-20260607-A1B2C3"
-               class="field-input has-icon" style="border-radius:var(--r-full);padding-left:2.4rem;">
-      </div>
-      <button type="submit" class="btn-brand" style="padding:.6rem 1.5rem;border-radius:var(--r-full);">
-        <i class="bi bi-search"></i> Track
-      </button>
+  {# Search form #}
+  <div class="ucard fu" style="margin-bottom:1.5rem;">
+    <div class="ucard-head"><i class="bi bi-geo-alt-fill" style="color:var(--brand);font-size:1.15rem;"></i><span class="ucard-title">Track Your Order</span></div>
+    <div class="ucard-body">
+      <form method="post" action="{{ url_for('store.track') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+          <div class="col-sm-8">
+            <label class="flabel" for="t-on">Order Number</label>
+            <div class="fwrap"><i class="bi bi-hash fico"></i>
+            <input id="t-on" type="text" name="order_number" class="finput has-ico" placeholder="GK-XXXXXXXX"
+                   value="{{ request.form.get('order_number', request.args.get('order_number','')) }}"
+                   maxlength="30" style="text-transform:uppercase;" autocomplete="off" autofocus>
+            </div>
+          </div>
+          <div class="col-sm-4" style="display:flex;align-items:flex-end;">
+            <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.6rem;">
+              <i class="bi bi-search"></i> Track
+            </button>
+          </div>
+        </div>
+        <div style="margin-top:.85rem;">
+          <div style="font-size:.75rem;color:var(--muted);margin-bottom:.4rem;">Or track by phone number:</div>
+          <div class="row g-2">
+            <div class="col-sm-8">
+              <div class="fwrap"><i class="bi bi-telephone fico"></i>
+              <input type="tel" name="phone" class="finput has-ico" placeholder="98XXXXXXXX" maxlength="15"
+                     value="{{ request.form.get('phone','') }}" autocomplete="tel">
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <button type="submit" class="btn-ob w-100 justify-content-center" style="padding:.6rem;">
+                Find Orders
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
     </div>
-  </form>
-
-  {% if order_number and not order %}
-  <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:var(--r-lg);padding:2rem;text-align:center;" class="fade-up">
-    <div style="font-size:2.5rem;margin-bottom:.5rem;">🔍</div>
-    <h4 style="font-weight:800;color:#991b1b;">Order Not Found</h4>
-    <p style="color:var(--danger);font-size:.875rem;margin:0;">
-      No order found for <strong>{{ order_number }}</strong>. Please check the number and try again.
-    </p>
   </div>
-  {% endif %}
 
+  {# Order result #}
   {% if order %}
-  {% set _sl = order.status_label %}
-{% set slabel = _sl[0] %}
-{% set _raw_color = _sl[1] %}
-{% set _color_map = {'success':'success','danger':'danger','warning':'warning','info':'info','primary':'info','secondary':'muted'} %}
-{% set scolor = _color_map.get(_raw_color, 'muted') %}
-  {% set flow = ['pending','confirmed','preparing','out_for_delivery','delivered'] %}
-  {% set cur_idx = flow.index(order.status) if order.status in flow else -1 %}
-  {% set step_pct = ([cur_idx / (flow|length-1) * 100, 100]|min) if cur_idx > 0 else 0 %}
-
-  <!-- Status header -->
-  <div class="ui-card fade-up" style="margin-bottom:1rem;overflow:hidden;">
-    <div style="background:var(--brand-grad);padding:1.75rem;text-align:center;color:#fff;">
-      <div style="font-size:2.5rem;margin-bottom:.5rem;">
-        {% if order.status == 'delivered' %}📦
-        {% elif order.status == 'cancelled' %}❌
-        {% elif order.status == 'out_for_delivery' %}🚴
-        {% elif order.status == 'preparing' %}🔧
-        {% elif order.status == 'confirmed' %}✅
-        {% else %}⏳{% endif %}
-      </div>
-      <div class="mono" style="font-size:1.15rem;font-weight:900;margin-bottom:.4rem;">{{ order.order_number }}</div>
-      <span class="status-badge {{ scolor }}" style="font-size:.8rem;padding:.3em .85em;">{{ slabel }}</span>
+  <div class="ucard fu fu1" style="overflow:hidden;">
+    {# Status header #}
+    {% set status_styles = {
+      'pending':   ('#fffbeb','#92400e','#f59e0b','bi-clock'),
+      'confirmed': ('#eff6ff','#1e40af','#3b82f6','bi-check-circle'),
+      'processing':('#f0fdf4','#14532d','#22c55e','bi-gear'),
+      'shipped':   ('#eff6ff','#1e3a8a','#2563eb','bi-truck'),
+      'delivered': ('#f0fdf4','#14532d','#16a34a','bi-check-circle-fill'),
+      'cancelled': ('#fef2f2','#991b1b','#dc2626','bi-x-circle'),
+    } %}
+    {% set bg,tc,ac,si = status_styles.get(order.status, ('#f5f5f4','#44403c','#78716c','bi-circle')) %}
+    <div style="padding:1.5rem 1.75rem;background:{{ bg }};border-bottom:1px solid {{ ac }}33;text-align:center;">
+      <i class="bi {{ si }}" style="font-size:2.2rem;color:{{ ac }};display:block;margin-bottom:.5rem;"></i>
+      <div style="font-size:1.05rem;font-weight:900;color:{{ tc }};">{{ order.status | title }}</div>
+      <div style="font-size:.8rem;color:{{ tc }};opacity:.75;margin-top:.2rem;font-family:monospace;">{{ order.order_number }}</div>
     </div>
 
-    {% if order.status not in ['cancelled','returned'] %}
-    <div style="padding:1.5rem 1.25rem;">
-      <div class="order-progress">
-        <div class="order-progress-fill" style="width:{{ step_pct }}%;"></div>
-        {% set steps = [('pending','⏳','Placed'),('confirmed','✅','Confirmed'),('preparing','🔧','Preparing'),('out_for_delivery','🚴','On the Way'),('delivered','📦','Delivered')] %}
-        {% for s, icon, label in steps %}
-        {% set si = loop.index0 %}
-        <div class="progress-step">
-          <div class="progress-step-icon {% if si <= cur_idx %}done{% else %}pending{% endif %}">{{ icon }}</div>
-          <div class="progress-step-label {% if si <= cur_idx %}done{% else %}pending{% endif %}">{{ label }}</div>
+    <div style="padding:1.5rem;">
+      {# Progress bar #}
+      {% set steps = ['pending','confirmed','processing','shipped','delivered'] %}
+      {% set cur_idx = steps.index(order.status) if order.status in steps else -1 %}
+      {% if order.status != 'cancelled' %}
+      <div class="oprg" style="margin-bottom:1.75rem;">
+        {% for step in steps %}
+        {% set i = loop.index0 %}
+        <div class="oprg-step {% if i < cur_idx %}done{% elif i == cur_idx %}active{% endif %}">
+          <div class="oprg-dot">{% if i < cur_idx %}<i class="bi bi-check-lg"></i>{% else %}{{ loop.index }}{% endif %}</div>
+          <div class="oprg-label">{{ step | title }}</div>
         </div>
         {% endfor %}
       </div>
-    </div>
-    {% endif %}
-  </div>
+      {% endif %}
 
-  <!-- Order details -->
-  <div class="row g-3 fade-up fade-up-d1">
-    <div class="col-md-7">
-      <div class="ui-card">
-        <div class="ui-card-head">
-          <span style="font-size:.95rem;">🛍️</span>
-          <span class="ui-card-head-title">Order Items</span>
+      {# Order details grid #}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.25rem;font-size:.86rem;">
+        {% for icon, label, value in [
+          ('👤','Customer', order.customer_name),
+          ('📞','Phone', order.customer_phone),
+          ('💳','Payment', order.payment_mode | upper),
+          ('📅','Placed', order.created_at.strftime('%d %b %Y')),
+        ] %}
+        <div style="background:var(--surface);border-radius:var(--r);padding:.65rem .85rem;">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.15rem;">{{ icon }} {{ label }}</div>
+          <div style="font-weight:700;color:var(--text);">{{ value }}</div>
         </div>
-        <div class="ui-card-body" style="padding-top:.75rem;padding-bottom:.75rem;">
-          {% for item in order.items %}
-          <div style="display:flex;justify-content:space-between;align-items:center;{% if not loop.last %}margin-bottom:.65rem;padding-bottom:.65rem;border-bottom:1px solid var(--border);{% endif %}">
-            <div>
-              <div style="font-size:.88rem;font-weight:600;">{{ item.product_name }}</div>
-              <div style="font-size:.75rem;color:var(--muted);">×{{ item.quantity }} @ NPR {{ "%.0f"|format(item.unit_price) }}</div>
-            </div>
-            <span style="font-size:.9rem;font-weight:700;color:var(--brand-dark);">NPR {{ "%.0f"|format(item.subtotal) }}</span>
-          </div>
-          {% endfor %}
-          <hr class="divider" style="margin:.75rem 0 .6rem;">
-          <div style="display:flex;justify-content:space-between;font-weight:800;font-size:.95rem;">
-            <span>Total</span>
-            <span style="color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
-          </div>
-        </div>
+        {% endfor %}
       </div>
-    </div>
 
-    <div class="col-md-5">
-      <div class="ui-card" style="margin-bottom:.75rem;">
-        <div class="ui-card-head">
-          <span>📍</span>
-          <span class="ui-card-head-title">Delivery Info</span>
+      <div style="background:var(--surface);border-radius:var(--r);padding:.7rem .85rem;margin-bottom:1.25rem;font-size:.86rem;">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:.2rem;">📍 Delivery Address</div>
+        <div style="font-weight:700;color:var(--text);">{{ order.delivery_address }}{% if order.delivery_area %}, {{ order.delivery_area }}{% endif %}</div>
+      </div>
+
+      {# Items #}
+      <div class="ucard" style="margin-bottom:1.1rem;">
+        <div class="ucard-head"><span class="ucard-title" style="font-size:.82rem;">Ordered Items</span></div>
+        {% for item in order.items %}
+        <div style="padding:.6rem 1rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}display:flex;justify-content:space-between;align-items:center;font-size:.84rem;gap:.5rem;">
+          <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ item.product_name }}</span>
+          <span style="color:var(--muted);flex-shrink:0;">×{{ item.quantity }}</span>
+          <span style="font-weight:700;flex-shrink:0;">NPR {{ "%.0f"|format(item.subtotal) }}</span>
         </div>
-        <div class="ui-card-body" style="font-size:.84rem;padding-top:.75rem;">
-          <div style="display:flex;gap:.6rem;margin-bottom:.5rem;"><i class="bi bi-person text-brand mt-1" style="flex-shrink:0;"></i><span>{{ order.customer_name.split()[0] }}</span></div>
-          <div style="display:flex;gap:.6rem;margin-bottom:.5rem;"><i class="bi bi-telephone text-brand mt-1" style="flex-shrink:0;"></i><span>****{{ order.customer_phone[-4:] }}</span></div>
-          <div style="display:flex;gap:.6rem;margin-bottom:.5rem;"><i class="bi bi-geo-alt text-brand mt-1" style="flex-shrink:0;"></i><span>{{ order.delivery_address }}</span></div>
-          {% if order.estimated_delivery %}
-          <div style="display:flex;gap:.6rem;margin-bottom:.5rem;"><i class="bi bi-clock text-brand mt-1" style="flex-shrink:0;"></i><span>Est: {{ order.estimated_delivery.strftime('%d %b %Y %H:%M') }}</span></div>
-          {% endif %}
-          {% if order.delivered_at %}
-          <div style="display:flex;gap:.6rem;color:var(--success);"><i class="bi bi-check-circle-fill mt-1" style="flex-shrink:0;"></i><span>Delivered {{ order.delivered_at.strftime('%d %b %Y') }}</span></div>
-          {% endif %}
+        {% endfor %}
+        <div style="padding:.7rem 1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-weight:800;">
+          <span>Total</span><span style="color:var(--brand-d);">NPR {{ "%.0f"|format(order.grand_total) }}</span>
         </div>
       </div>
 
-      <div class="ui-card">
-        <div class="ui-card-head">
-          <span>💳</span>
-          <span class="ui-card-head-title">Payment</span>
-        </div>
-        <div class="ui-card-body" style="font-size:.84rem;padding-top:.75rem;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;">
-            <span style="color:var(--muted);">Method</span>
-            <span style="font-weight:600;text-transform:uppercase;">{{ order.payment_mode }}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span style="color:var(--muted);">Status</span>
-            <span class="status-badge {% if order.payment_status == 'paid' %}success{% else %}warning{% endif %}">
-              {{ order.payment_status | capitalize }}
-            </span>
-          </div>
-        </div>
+      <div style="display:flex;gap:.65rem;flex-wrap:wrap;">
+        <a href="{{ url_for('store.home') }}" class="btn-ob" style="flex:1;justify-content:center;padding:.65rem;"><i class="bi bi-shop"></i> Continue Shopping</a>
+        {% if settings and settings.phone %}
+        <a href="https://wa.me/977{{ settings.phone | replace(' ','') | replace('-','') | replace('+','') | replace('977','') }}?text=Hi, I need help with order {{ order.order_number }}"
+           target="_blank" rel="noopener" class="btn-brand" style="flex:1;justify-content:center;padding:.65rem;">
+          <i class="bi bi-whatsapp"></i> Get Help
+        </a>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <div style="text-align:center;margin-top:1.5rem;" class="fade-up">
-    <a href="{{ url_for('store.track') }}" class="btn-ghost">
-      <i class="bi bi-arrow-left"></i> Track another order
-    </a>
+  {% elif orders %}
+  {# Multiple orders found by phone #}
+  <div class="ucard fu fu1">
+    <div class="ucard-head"><span class="ucard-title">Orders Found ({{ orders|length }})</span></div>
+    {% for o in orders %}
+    <div style="padding:1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+        <div>
+          <div style="font-weight:800;font-size:.9rem;font-family:monospace;color:var(--brand-d);">{{ o.order_number }}</div>
+          <div style="font-size:.73rem;color:var(--muted);">{{ o.created_at.strftime('%d %b %Y') }} · NPR {{ "%.0f"|format(o.grand_total) }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.6rem;">
+          <span class="sbadge {% if o.status=='delivered' %}s{% elif o.status=='cancelled' %}d{% else %}w{% endif %}">{{ o.status|title }}</span>
+          <form method="post" action="{{ url_for('store.track') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="order_number" value="{{ o.order_number }}">
+            <button type="submit" class="btn-ghost" style="font-size:.75rem;padding:.3rem .7rem;">Track →</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
   </div>
 
-  {% elif not order_number %}
-  <div class="ui-card fade-up fade-up-d1" style="padding:3.5rem;text-align:center;">
-    <div style="font-size:3.5rem;margin-bottom:1rem;opacity:.4;">📦</div>
-    <h4 style="font-weight:800;">Track your order</h4>
-    <p style="color:var(--muted);font-size:.88rem;max-width:280px;margin:0 auto;">
-      Enter your order number above to see real-time delivery status.
-    </p>
+  {% elif searched %}
+  <div class="ucard fu fu1">
+    <div class="empty">
+      <div class="empty-icon">📭</div>
+      <h4>No order found</h4>
+      <p>Double-check your order number or phone number and try again. <br>Need help? Contact us via WhatsApp.</p>
+      {% if settings and settings.phone %}
+      <a href="https://wa.me/977{{ settings.phone | replace(' ','') | replace('-','') }}" target="_blank" rel="noopener" class="btn-brand"><i class="bi bi-whatsapp"></i> Contact Support</a>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 
