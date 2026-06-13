@@ -202,49 +202,22 @@ def create_app(config_name="development"):
         return {"now": _dt.now(_tz.utc)}
 
     # ── Alert count context processor (sidebar badge) ────────────────────
+    # Returns cached values only — actual DB query is done by /api/alert-count
+    # (called via AJAX every 60s from base.html). This prevents a DB round-trip
+    # on every single page render for every logged-in user.
     @app.context_processor
     def inject_alert_count():
         try:
             from flask_login import current_user
             if current_user.is_authenticated:
-                from .services.cache_service import get as _cache_get, set as _cache_set
-                import logging as _logging
-                _log = _logging.getLogger(__name__)
-
-                cache_key = f"alert_count:u{current_user.id}"
-                cached = _cache_get(cache_key)
+                from .services.cache_service import get as _cache_get
+                cached = _cache_get(f"alert_count:u{current_user.id}")
                 if cached is not None:
                     return cached
-
-                try:
-                    from .services.alert_engine import get_low_stock_alerts, get_expiry_alerts
-                    from .models.dismissed_alert import DismissedAlert
-                    from .models.online_order import OnlineOrder
-                    dismissed = set(
-                        db.session.execute(
-                            db.select(DismissedAlert.alert_key)
-                            .where(DismissedAlert.user_id == current_user.id)
-                        ).scalars().all()
-                    )
-                    low_stock = [p for p in get_low_stock_alerts() if f"low_stock:{p.id}" not in dismissed]
-                    expiry = [p for p in get_expiry_alerts() if f"expiry:{p.id}" not in dismissed]
-                    count = len(low_stock) + len(expiry)
-                    # Pending online orders badge (admin only)
-                    pending_orders = 0
-                    if current_user.role == "admin":
-                        pending_orders = db.session.execute(
-                            db.select(db.func.count(OnlineOrder.id))
-                            .where(OnlineOrder.status == "pending")
-                        ).scalar() or 0
-                    result = {"global_alert_count": count, "pending_orders_count": pending_orders}
-                    # Cache for 60 seconds per user to avoid DB hit on every page
-                    _cache_set(cache_key, result, ttl=60)
-                    return result
-                except Exception as exc:
-                    _log.debug("inject_alert_count DB query failed: %s", exc)
-        except Exception as exc:
-            import logging as _logging
-            _logging.getLogger(__name__).debug("inject_alert_count failed: %s", exc)
+                # No cache yet — return zeros; AJAX endpoint will populate on first poll
+                return {"global_alert_count": 0, "pending_orders_count": 0}
+        except Exception:
+            pass
         return {"global_alert_count": 0, "pending_orders_count": 0}
 
     # ── Root redirect ─────────────────────────────────────────────────────
