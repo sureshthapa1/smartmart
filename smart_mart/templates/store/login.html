@@ -1,97 +1,62 @@
 {% extends "store/base_store.html" %}
-{% block title %}Sign In — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
+{% block title %}Sign In — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
-<div style="min-height:75vh;display:flex;align-items:center;justify-content:center;padding:2rem 1rem;">
-  <div style="width:100%;max-width:420px;" class="fade-up">
-
-    <div class="ui-card" style="overflow:hidden;box-shadow:var(--shadow-lg);">
-      <!-- Header -->
-      <div style="background:var(--brand-grad);padding:2rem;text-align:center;color:#fff;">
-        <div style="font-size:2.5rem;margin-bottom:.5rem;">🥜</div>
-        <h2 style="font-size:1.25rem;font-weight:900;margin:0 0 .25rem;">Welcome Back</h2>
-        <p style="color:rgba(255,255,255,.82);font-size:.84rem;margin:0;">Sign in to your account</p>
+<div class="sc" style="max-width:420px;margin:0 auto;padding-top:2rem;padding-bottom:3rem;">
+  <div class="ucard fu" style="overflow:hidden;">
+    <div style="padding:2rem 1.75rem 1.75rem;background:var(--brand-grad);text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:.4rem;">🥜</div>
+      <h2 style="color:#fff;font-size:1.2rem;font-weight:900;margin:0 0 .25rem;">Welcome Back!</h2>
+      <p style="color:rgba(255,255,255,.78);font-size:.82rem;margin:0;">Sign in to your GoldKernel account</p>
+    </div>
+    <div style="padding:1.75rem;">
+      <form method="post" action="{{ url_for('store.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <div style="margin-bottom:1rem;">
+          <label class="flabel" for="l-phone">Phone Number</label>
+          <div class="fwrap"><i class="bi bi-telephone fico"></i>
+          <input id="l-phone" type="tel" name="phone" class="finput has-ico" placeholder="98XXXXXXXX"
+                 required maxlength="15" autocomplete="tel" autofocus
+                 value="{{ request.form.get('phone','') }}">
+          </div>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+          <label class="flabel" for="l-pass">Password</label>
+          <div class="fwrap">
+            <i class="bi bi-lock fico"></i>
+            <input id="l-pass" type="password" name="password" class="finput has-ico" placeholder="Your password"
+                   required minlength="6" autocomplete="current-password" style="padding-right:2.6rem;">
+            <button type="button" onclick="togglePwd(this)" tabindex="-1"
+                    style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted2);cursor:pointer;font-size:.9rem;padding:0;line-height:1;">
+              <i class="bi bi-eye" id="pwd-icon"></i>
+            </button>
+          </div>
+          <div style="text-align:right;margin-top:.35rem;">
+            <a href="{{ url_for('store.forgot_password') }}" style="font-size:.75rem;color:var(--brand);text-decoration:none;font-weight:600;">Forgot password?</a>
+          </div>
+        </div>
+        <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.75rem;">
+          <i class="bi bi-box-arrow-in-right"></i> Sign In
+        </button>
+      </form>
+      <hr class="dv" style="margin:1.25rem 0;">
+      <div style="text-align:center;font-size:.85rem;color:var(--muted);">
+        Don't have an account?
+        <a href="{{ url_for('store.register_view') }}" style="color:var(--brand);font-weight:700;text-decoration:none;"> Create one free →</a>
       </div>
-
-      <div style="padding:1.75rem;">
-        <form method="post" action="{{ url_for('store.login', next=next) }}" novalidate>
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="next" value="{{ next }}">
-
-          {% if next and next != '/' and 'store' in next %}
-          <div class="flash-bar info" style="margin-bottom:1rem;">
-            <i class="bi bi-arrow-return-right"></i>
-            You'll be redirected back after signing in.
-          </div>
-          {% endif %}
-
-          <div style="margin-bottom:1rem;">
-            <label class="field-label" for="login-phone">Phone Number</label>
-            <div class="field-wrap">
-              <i class="bi bi-telephone field-icon"></i>
-              <input id="login-phone" type="tel" name="phone" placeholder="98XXXXXXXX"
-                     required autofocus maxlength="15" autocomplete="tel"
-                     class="field-input has-icon">
-            </div>
-          </div>
-
-          <div style="margin-bottom:1.5rem;">
-            <label class="field-label" for="login-pw">Password</label>
-            <div class="field-wrap">
-              <i class="bi bi-lock field-icon"></i>
-              <input type="password" name="password" id="login-pw" placeholder="Your password"
-                     required maxlength="128" autocomplete="current-password"
-                     class="field-input has-icon" style="padding-right:2.6rem;">
-              <button type="button" onclick="togglePw()" tabindex="-1"
-                      style="position:absolute;right:.8rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:.9rem;padding:0;line-height:1;">
-                <i class="bi bi-eye" id="pw-eye"></i>
-              </button>
-            </div>
-          </div>
-
-          <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.75rem;font-size:.95rem;">
-            <i class="bi bi-box-arrow-in-right"></i> Sign In
-          </button>
-        </form>
-
-        <div style="text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--muted);">
-          Don't have an account?
-          <a href="{{ url_for('store.register_view') }}" style="color:var(--brand);font-weight:700;text-decoration:none;">Create one →</a>
-        </div>
-
-        <div style="text-align:center;margin-top:.5rem;font-size:.78rem;color:var(--muted);">
-          Forgot password? Call
-          <a href="tel:{{ settings.phone if settings and settings.phone else '' }}" style="color:var(--brand);">
-            {{ settings.phone if settings and settings.phone else 'our store' }}
-          </a>
-        </div>
-
-        <div style="text-align:center;margin-top:.75rem;">
-          <a href="{{ url_for('store.home') }}" class="btn-ghost" style="font-size:.8rem;padding:.35rem .85rem;">
-            <i class="bi bi-arrow-left"></i> Continue without account
-          </a>
-        </div>
+      <div style="text-align:center;margin-top:.75rem;">
+        <a href="{{ url_for('store.track') }}" style="font-size:.78rem;color:var(--muted);text-decoration:none;"><i class="bi bi-geo-alt me-1"></i>Track order without account</a>
       </div>
     </div>
-
-    <!-- Benefits -->
-    <div style="display:flex;flex-direction:column;gap:.55rem;margin-top:1.25rem;padding:0 .25rem;">
-      {% for icon, text in [('🔄','View & manage your order history'),('📦','Track all your deliveries easily'),('⚡','Faster checkout with saved address')] %}
-      <div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;color:var(--muted);">
-        <span>{{ icon }}</span><span>{{ text }}</span>
-      </div>
-      {% endfor %}
-    </div>
-
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
-function togglePw() {
-  const inp = document.getElementById('login-pw');
-  const eye = document.getElementById('pw-eye');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-  eye.className = inp.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye';
+function togglePwd(btn){
+  const inp=document.getElementById('l-pass'), icon=document.getElementById('pwd-icon');
+  if(inp.type==='password'){inp.type='text';icon.className='bi bi-eye-slash';}
+  else{inp.type='password';icon.className='bi bi-eye';}
 }
 </script>
 {% endblock %}
