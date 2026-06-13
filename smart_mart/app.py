@@ -155,6 +155,16 @@ def create_app(config_name="development"):
     # Nepal Standard Time = UTC + 5:45
     _NST_OFFSET = _td(hours=5, minutes=45)
 
+    # ── product_image_url as Jinja2 global + filter ──────────────────────
+    try:
+        from .services.image_service import product_image_url as _piu
+        app.jinja_env.globals["product_image_url"] = _piu
+        app.jinja_env.filters["product_image_url"] = _piu
+    except Exception:
+        app.jinja_env.globals["product_image_url"] = lambda f, **kw: (
+            f"/static/uploads/products/{f}" if f and not f.startswith("cld:") else ""
+        )
+
     @app.template_filter("nst")
     def nst_filter(dt, fmt="%Y-%m-%d %H:%M"):
         """Convert a naive UTC datetime to Nepal Standard Time (UTC+5:45)."""
