@@ -1,180 +1,165 @@
 {% extends "store/base_store.html" %}
-{% block title %}Cart — {{ settings.shop_name if settings else 'GoldKernel' }}
-  {# ── AI: You may also like (cart recommendations) ──────────────────── #}
-  {% if cart_recommendations %}
-  <div class="sc fade-up" style="padding-bottom:2rem;">
-    <div class="section-head">
-      <div class="section-title">💡 You May Also <span>Like</span></div>
-      <a href="{{ url_for('store.home') }}" class="section-link">Shop all →</a>
-    </div>
-    <div class="row g-3">
-      {% for rp in cart_recommendations %}
-      <div class="col-6 col-sm-4 col-md-3">
-        <div class="product-card">
-          <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" style="text-decoration:none;">
-            <div class="product-img-wrap">
-              {% if rp.image_filename and not rp.image_filename.startswith('cld:') %}
-              <img src="{{ url_for('static', filename='uploads/products/' + rp.image_filename) }}" alt="{{ rp.name }}" loading="lazy">
-              {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
-            </div>
-            <div class="product-body">
-              <div class="product-name">{{ rp.name }}</div>
-              <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(rp.selling_price) }}</div>
-            </div>
-          </a>
-          <div class="product-footer">
-            <button class="btn-add" data-add-cart data-pid="{{ rp.id }}" data-name="{{ rp.name }}" data-qty="1">
-              <i class="bi bi-cart-plus"></i> Add
-            </button>
-            <a href="{{ url_for('store.product_detail', product_id=rp.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-{% endblock %}
+{% block title %}My Cart — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
 
-  <div style="margin-bottom:1rem;" class="fade-up">
-    <a href="{{ url_for('store.home') }}" class="btn-ghost" style="font-size:.82rem;">
-      <i class="bi bi-arrow-left"></i> Continue Shopping
-    </a>
+  <nav class="bc"><a href="{{ url_for('store.home') }}">Home</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><span class="bc-cur">Shopping Cart</span></nav>
+
+  {# Progress indicator #}
+  <div class="oprg mb-4 fu" style="max-width:560px;margin:0 auto 2rem;">
+    <div class="oprg-step active"><div class="oprg-dot"><i class="bi bi-bag"></i></div><div class="oprg-label">Cart</div></div>
+    <div class="oprg-step"><div class="oprg-dot">2</div><div class="oprg-label">Checkout</div></div>
+    <div class="oprg-step"><div class="oprg-dot">3</div><div class="oprg-label">Payment</div></div>
+    <div class="oprg-step"><div class="oprg-dot"><i class="bi bi-check-lg"></i></div><div class="oprg-label">Done</div></div>
   </div>
 
+  {% if items %}
   <div class="row g-4">
-    <div class="col-lg-8 fade-up">
-      <div class="ui-card">
-        <div class="ui-card-head">
-          <i class="bi bi-bag text-brand"></i>
-          <span class="ui-card-head-title">
-            Shopping Cart
-            {% if items %}<span style="font-size:.8rem;color:var(--muted);font-weight:500;"> ({{ items|length }} item{{ 's' if items|length != 1 }})</span>{% endif %}
-          </span>
+    {# Cart items #}
+    <div class="col-lg-8 fu">
+      <div class="ucard">
+        <div class="ucard-head">
+          <i class="bi bi-bag" style="color:var(--brand);"></i>
+          <span class="ucard-title">Shopping Cart <span style="font-size:.8rem;color:var(--muted);font-weight:500;">({{ items|length }} item{{ 's' if items|length != 1 }})</span></span>
+          <a href="{{ url_for('store.home') }}" class="btn-ghost" style="font-size:.75rem;margin-left:auto;padding:.3rem .7rem;">
+            <i class="bi bi-plus"></i> Add more
+          </a>
         </div>
 
-        {% if items %}
-          {% for item in items %}
-          <div style="padding:1.1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
-            <div style="display:flex;gap:.85rem;align-items:flex-start;">
-              <div style="width:74px;height:74px;flex-shrink:0;border-radius:var(--r);overflow:hidden;background:linear-gradient(135deg,#fef9ee,#fde68a);display:flex;align-items:center;justify-content:center;">
-                {% if item.product.image_filename %}
-                <img src="{{ url_for('static', filename='uploads/products/' + item.product.image_filename) }}"
-                     alt="{{ item.product.name }}" style="width:100%;height:100%;object-fit:cover;">
-                {% else %}
-                <span style="font-size:1.9rem;">🥜</span>
-                {% endif %}
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-weight:700;font-size:.93rem;margin-bottom:.15rem;">{{ item.product.name }}</div>
-                {% if item.product.category %}
-                <div class="product-category" style="margin-bottom:.3rem;">{{ item.product.category }}</div>
-                {% endif %}
-                <div style="font-size:.82rem;color:var(--muted);">NPR {{ "%.0f"|format(item.product.selling_price) }} each</div>
-              </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.6rem;flex-shrink:0;">
-                <div style="font-size:1.05rem;font-weight:800;color:var(--brand-dark);">NPR {{ "%.0f"|format(item.line_total) }}</div>
-                <form method="post" action="{{ url_for('store.cart_update') }}" style="display:flex;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                  <div class="qty-control">
-                    <button type="submit" name="qty" value="{{ [item.qty-1,0]|max }}" {% if item.qty <= 1 %}style="opacity:.4;"{% endif %}>−</button>
-                    <input type="number" value="{{ item.qty }}" readonly>
-                    <button type="submit" name="qty" value="{{ [item.qty+1,item.avail]|min }}" {% if item.qty >= item.avail %}disabled{% endif %}>+</button>
-                  </div>
-                </form>
-                <form method="post" action="{{ url_for('store.cart_remove') }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                  <button type="submit" style="background:none;border:none;color:var(--danger);font-size:.78rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;padding:0;">
-                    <i class="bi bi-trash3"></i> Remove
-                  </button>
-                </form>
-              </div>
+        {% for item in items %}
+        {% set img_url = product_image_url(item.product.image_filename, 200) %}
+        <div style="padding:1.1rem 1.25rem;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
+          <div style="display:flex;gap:.9rem;align-items:flex-start;">
+            {# Image #}
+            <a href="{{ url_for('store.product_detail', product_id=item.product.id) }}" style="flex-shrink:0;width:80px;height:80px;border-radius:var(--r);overflow:hidden;background:linear-gradient(135deg,#fef9ee,#fde68a);display:flex;align-items:center;justify-content:center;text-decoration:none;">
+              {% if img_url %}
+              <img src="{{ img_url }}" alt="{{ item.product.name }}" style="width:100%;height:100%;object-fit:cover;">
+              {% else %}
+              <span style="font-size:2rem;opacity:.6;">🥜</span>
+              {% endif %}
+            </a>
+            {# Details #}
+            <div style="flex:1;min-width:0;">
+              <a href="{{ url_for('store.product_detail', product_id=item.product.id) }}" style="text-decoration:none;color:inherit;">
+                <div style="font-weight:700;font-size:.93rem;margin-bottom:.15rem;line-height:1.35;">{{ item.product.name }}</div>
+              </a>
+              {% if item.product.category %}<div class="pcat" style="margin-bottom:.25rem;">{{ item.product.category }}</div>{% endif %}
+              {% if item.product.pack_size %}<div style="font-size:.72rem;color:var(--muted2);">{{ item.product.pack_size }}</div>{% endif %}
+              <div style="font-size:.82rem;color:var(--muted);margin-top:.2rem;">NPR {{ "%.0f"|format(item.product.selling_price) }} each</div>
+            </div>
+            {# Qty + price #}
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.55rem;flex-shrink:0;">
+              <div style="font-size:1.1rem;font-weight:800;color:var(--brand-d);">NPR {{ "%.0f"|format(item.line_total) }}</div>
+              <form method="post" action="{{ url_for('store.cart_update') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                <div class="qty">
+                  <button type="submit" name="qty" value="{{ [item.qty-1,0]|max }}" {% if item.qty<=1 %}style="opacity:.35;"{% endif %}>−</button>
+                  <input type="number" value="{{ item.qty }}" readonly>
+                  <button type="submit" name="qty" value="{{ [item.qty+1,item.avail]|min }}" {% if item.qty>=item.avail %}disabled{% endif %}>+</button>
+                </div>
+              </form>
+              <form method="post" action="{{ url_for('store.cart_remove') }}" style="margin-top:.1rem;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                <button type="submit" style="background:none;border:none;color:var(--danger);font-size:.75rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:.3rem;padding:0;">
+                  <i class="bi bi-trash3"></i> Remove
+                </button>
+              </form>
             </div>
           </div>
-          {% endfor %}
-
-        {% else %}
-          {% if raw_cart_count %}
-          <div style="padding:.85rem 1.25rem;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:.84rem;color:#92400e;display:flex;align-items:center;gap:.5rem;">
-            <i class="bi bi-exclamation-triangle"></i>
-            Some items were removed as they're no longer available.
-          </div>
-          {% endif %}
-          <div class="empty-state">
-            <div class="empty-icon">🛒</div>
-            <h4>Your cart is empty</h4>
-            <p>Add some delicious dry fruits to get started!</p>
-            <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Start Shopping</a>
-          </div>
-        {% endif %}
+        </div>
+        {% endfor %}
       </div>
+
+      {# Recommendations #}
+      {% if cart_recommendations %}
+      <div style="margin-top:2rem;">
+        <div class="sh fu"><div class="sh-title">💡 You May Also <em>Like</em></div><a href="{{ url_for('store.home') }}" class="sh-link">Browse all →</a></div>
+        <div class="row g-3">
+          {% for p in cart_recommendations %}
+          <div class="col-6 col-sm-4 col-md-3 fu" style="animation-delay:{{ loop.index0 * 0.06 }}s;">
+            {% set product = p %}{% include "store/_product_card.html" %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
     </div>
 
-    {% if items %}
-    <div class="col-lg-4 fade-up fade-up-d1">
-      <div class="ui-card" style="position:sticky;top:calc(var(--nav-h) + 1rem);">
-        <div class="ui-card-head">
-          <span class="ui-card-head-title">Order Summary</span>
-        </div>
-        <div class="ui-card-body">
-          <div style="display:flex;justify-content:space-between;margin-bottom:.6rem;font-size:.9rem;">
-            <span style="color:var(--muted);">Subtotal</span>
-            <span style="font-weight:600;">NPR {{ "%.0f"|format(subtotal) }}</span>
-          </div>
-
-          {% if subtotal > 0 and subtotal < 200 %}
-          <div style="font-size:.76rem;color:var(--danger);margin-bottom:.5rem;display:flex;align-items:center;gap:.3rem;">
-            <i class="bi bi-exclamation-circle"></i>
-            Minimum order NPR 200. Add NPR {{ "%.0f"|format(200-subtotal) }} more.
-          </div>
-          {% endif %}
-
-          <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;font-size:.9rem;">
-            <span style="color:var(--muted);">Delivery</span>
-            {% if delivery == 0 %}
-            <span style="font-weight:700;color:var(--success);">FREE 🎉</span>
-            {% else %}
-            <span style="font-weight:600;">NPR {{ "%.0f"|format(delivery) }}</span>
-            {% endif %}
+    {# Order summary #}
+    <div class="col-lg-4 fu fu1">
+      <div class="ucard" style="position:sticky;top:calc(var(--nav-h) + 1rem);">
+        <div class="ucard-head"><span class="ucard-title">Order Summary</span></div>
+        <div class="ucard-body">
+          <div style="display:flex;flex-direction:column;gap:.55rem;margin-bottom:1rem;font-size:.9rem;">
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Subtotal ({{ items|length }} items)</span><span style="font-weight:600;">NPR {{ "%.0f"|format(subtotal) }}</span></div>
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:var(--muted);">Delivery</span>
+              {% if delivery == 0 %}<span style="font-weight:700;color:var(--success);">FREE 🎉</span>
+              {% else %}<span style="font-weight:600;">NPR {{ "%.0f"|format(delivery) }}</span>{% endif %}
+            </div>
           </div>
 
           {% if delivery > 0 %}
-          <div style="font-size:.76rem;color:var(--muted);margin-bottom:.5rem;">
-            Add NPR {{ "%.0f"|format(free_delivery_threshold - subtotal) }} more for
-            <strong style="color:var(--success);">free delivery</strong>
+          <div style="background:var(--brand-l);border-radius:var(--r);padding:.65rem .85rem;font-size:.78rem;color:var(--brand-d);margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem;">
+            <i class="bi bi-truck"></i>
+            Add <strong>NPR {{ "%.0f"|format(free_delivery_threshold - subtotal) }}</strong> more for <strong>FREE delivery</strong>
           </div>
           {% else %}
-          <div style="font-size:.78rem;color:var(--success);margin-bottom:.5rem;display:flex;align-items:center;gap:.3rem;">
+          <div style="background:#f0fdf4;border-radius:var(--r);padding:.5rem .75rem;font-size:.78rem;color:var(--success);margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem;">
             <i class="bi bi-check-circle-fill"></i> You qualify for free delivery!
           </div>
           {% endif %}
 
-          <hr class="divider">
+          {% if subtotal > 0 and subtotal < 200 %}
+          <div style="background:#fef2f2;border-radius:var(--r);padding:.5rem .75rem;font-size:.78rem;color:var(--danger);margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem;">
+            <i class="bi bi-exclamation-circle"></i>
+            Minimum order is NPR 200. Add <strong>NPR {{ "%.0f"|format(200-subtotal) }}</strong> more.
+          </div>
+          {% endif %}
 
-          <div style="display:flex;justify-content:space-between;margin-bottom:1.25rem;font-size:1.05rem;font-weight:800;">
+          <hr class="dv">
+          <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:800;margin-bottom:1.25rem;">
             <span>Total</span>
-            <span style="color:var(--brand-dark);">NPR {{ "%.0f"|format(grand_total) }}</span>
+            <span style="color:var(--brand-d);">NPR {{ "%.0f"|format(grand_total) }}</span>
           </div>
 
-          <a href="{{ url_for('store.checkout') }}" class="btn-brand w-100 justify-content-center" style="padding:.7rem;">
-            <i class="bi bi-shield-check"></i> Proceed to Checkout
+          <a href="{{ url_for('store.checkout') }}" class="btn-brand w-100 justify-content-center" style="padding:.75rem;font-size:.9rem;">
+            <i class="bi bi-shield-lock-fill"></i> Secure Checkout
           </a>
 
-          <div style="display:flex;justify-content:center;gap:.5rem;margin-top:.85rem;flex-wrap:wrap;">
-            {% for label, icon in [('COD','💵'),('eSewa','📱'),('Khalti','💜')] %}
-            <span style="font-size:.7rem;background:var(--surface);border:1px solid var(--border);padding:.25em .65em;border-radius:var(--r-full);color:var(--muted);font-weight:600;">
-              {{ icon }} {{ label }}
-            </span>
+          <div style="display:flex;justify-content:center;align-items:center;gap:.5rem;margin-top:.85rem;flex-wrap:wrap;">
+            {% for icon, label in [('💵','COD'),('📱','eSewa'),('💜','Khalti')] %}
+            <span style="font-size:.68rem;background:var(--surface);border:1px solid var(--border);padding:.2em .55em;border-radius:var(--r-f);color:var(--muted);font-weight:600;">{{ icon }} {{ label }}</span>
             {% endfor %}
+          </div>
+
+          <div style="margin-top:1rem;text-align:center;">
+            <a href="{{ url_for('store.home') }}" class="btn-ghost" style="font-size:.78rem;"><i class="bi bi-arrow-left"></i> Continue Shopping</a>
           </div>
         </div>
       </div>
     </div>
-    {% endif %}
   </div>
+
+  {% else %}
+  {# Empty cart #}
+  <div class="ucard fu" style="max-width:480px;margin:2rem auto;">
+    {% if raw_cart_count %}
+    <div style="padding:.75rem 1.25rem;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:.84rem;color:#92400e;display:flex;align-items:center;gap:.5rem;">
+      <i class="bi bi-exclamation-triangle"></i>
+      Some items were removed (no longer available).
+    </div>
+    {% endif %}
+    <div class="empty">
+      <div class="empty-icon">🛒</div>
+      <h4>Your cart is empty</h4>
+      <p>Discover our premium dry fruits and add some to your cart!</p>
+      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-bag-heart"></i> Start Shopping</a>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
