@@ -897,3 +897,45 @@ def suggest_expense_category():
         return jsonify({"category": "", "label": "", "icon": "", "confidence": 0})
     result = categorize_expense(note, amount)
     return jsonify(result)
+
+
+# ── Alert count AJAX endpoint ────────────────────────────────────────────────
+# Called from base.html every 60 s (replaces the expensive context_processor
+# DB query that ran on every single page render for every logged-in user).
+
+@api_bp.route("/alert-count")
+@limiter.limit("60 per minute")
+@login_required
+def alert_count():
+    """Return sidebar badge counts: alert count + pending online orders."""
+    from ...services.cache_service import get as _cache_get, set as _cache_set
+    cache_key = f"alert_count:u{current_user.id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+    try:
+        from ...services.alert_engine import get_low_stock_alerts, get_expiry_alerts
+        from ...models.dismissed_alert import DismissedAlert
+        from ...models.online_order import OnlineOrder
+        dismissed = set(
+            db.session.execute(
+                db.select(DismissedAlert.alert_key)
+                .where(DismissedAlert.user_id == current_user.id)
+            ).scalars().all()
+        )
+        low_stock = [p for p in get_low_stock_alerts() if f"low_stock:{p.id}" not in dismissed]
+        expiry    = [p for p in get_expiry_alerts()   if f"expiry:{p.id}"    not in dismissed]
+        count     = len(low_stock) + len(expiry)
+        pending_orders = 0
+        if current_user.role == "admin":
+            pending_orders = db.session.execute(
+                db.select(db.func.count(OnlineOrder.id))
+                .where(OnlineOrder.status == "pending")
+            ).scalar() or 0
+        result = {"global_alert_count": count, "pending_orders_count": pending_orders}
+        _cache_set(cache_key, result, ttl=60)
+        return jsonify(result)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("alert_count endpoint error: %s", exc)
+        return jsonify({"global_alert_count": 0, "pending_orders_count": 0})
