@@ -1,0 +1,37 @@
+{# Shared product card partial. Expects: product, selling_fast_ids #}
+{% set img_url = product_image_url(product.image_filename, 400) if product.image_filename else None %}
+<div class="pcard" onclick="window.location='{{ url_for('store.product_detail', product_id=product.id) }}'">
+  <div class="pimg">
+    {% if img_url %}
+    <img src="{{ img_url }}" alt="{{ product.name }}" loading="lazy">
+    {% else %}
+    <div class="pimg-ph">🥜</div>
+    {% endif %}
+    {% if product.quantity > 0 and product.quantity <= 8 %}
+    <span class="badge-low">{{ product.quantity }} left</span>
+    {% endif %}
+    {% if selling_fast_ids is defined and product.id in selling_fast_ids %}
+    <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
+    {% endif %}
+  </div>
+  <div class="pbody">
+    {% if product.category %}<div class="pcat">{{ product.category }}</div>{% endif %}
+    <div class="pname">{{ product.name }}</div>
+    {% if product.pack_size %}<div class="psize">{{ product.pack_size }}</div>{% endif %}
+    <div class="pprice"><span class="cur">NPR</span>{{ "%.0f"|format(product.selling_price) }}</div>
+  </div>
+  <div class="pfoot">
+    {% if product.quantity > 0 %}
+    <button class="btn-add" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1"
+            onclick="event.stopPropagation()">
+      <i class="bi bi-cart-plus"></i> Add
+    </button>
+    {% else %}
+    <button class="btn-add" disabled>Out of Stock</button>
+    {% endif %}
+    <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="btn-icon"
+       onclick="event.stopPropagation()" title="View details">
+      <i class="bi bi-eye"></i>
+    </a>
+  </div>
+</div>
