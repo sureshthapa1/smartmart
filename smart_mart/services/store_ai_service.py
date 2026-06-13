@@ -27,21 +27,29 @@ from ..models.product import Product
 from ..models.online_order import OnlineOrder, OnlineOrderItem
 
 
-# ── Simple in-process cache (resets on restart — fine for Render free tier) ──
+# ── Use shared cache_service (single source of truth for all caching) ─────────
+# This replaces the old private _cache dict which was disconnected from the
+# dashboard cache and caused double memory usage with no shared invalidation.
 
-_cache: dict[str, tuple[float, object]] = {}
-_CACHE_TTL = 300.0  # 5 minutes
+_CACHE_TTL = 300  # 5 minutes (seconds, matching cache_service convention)
 
 
 def _cache_get(key: str):
-    entry = _cache.get(key)
-    if entry and time.monotonic() - entry[0] < _CACHE_TTL:
-        return entry[1]
-    return None
+    """Get from shared cache_service."""
+    try:
+        from .cache_service import get as _cs_get
+        return _cs_get(f"store_ai:{key}")
+    except Exception:
+        return None
 
 
 def _cache_set(key: str, value):
-    _cache[key] = (time.monotonic(), value)
+    """Set in shared cache_service."""
+    try:
+        from .cache_service import set as _cs_set
+        _cs_set(f"store_ai:{key}", value, ttl=_CACHE_TTL)
+    except Exception:
+        pass
     return value
 
 
