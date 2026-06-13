@@ -1,171 +1,30 @@
 {% extends "store/base_store.html" %}
-{% block title %}{{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }} — Premium Dry Fruits Nepal{% endblock %}
-
-{% block head %}
-<style>
-/* ── Search suggestion dropdown ────────────────────────────────────────── */
-.search-wrap { position:relative; }
-.suggestion-box {
-  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:9999;
-  background:var(--card-bg); border:1.5px solid var(--border);
-  border-radius:var(--r-lg); box-shadow:var(--shadow-lg);
-  overflow:hidden; display:none;
-}
-.suggestion-box.open { display:block; }
-.suggestion-item {
-  display:flex; align-items:center; gap:.75rem;
-  padding:.65rem 1rem; cursor:pointer; text-decoration:none;
-  color:var(--text); transition:background var(--t-fast);
-}
-.suggestion-item:hover { background:var(--brand-light); }
-.suggestion-thumb {
-  width:36px; height:36px; flex-shrink:0;
-  border-radius:var(--r-sm); overflow:hidden;
-  background:linear-gradient(135deg,#fef9ee,#fde68a);
-  display:flex; align-items:center; justify-content:center;
-  font-size:1.1rem;
-}
-.suggestion-thumb img { width:100%; height:100%; object-fit:cover; }
-.suggestion-name { font-size:.875rem; font-weight:600; flex:1; min-width:0;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.suggestion-cat  { font-size:.7rem; color:var(--muted); }
-.suggestion-price{ font-size:.8rem; font-weight:700; color:var(--brand-dark); flex-shrink:0; }
-.suggestion-footer {
-  padding:.55rem 1rem; background:var(--surface);
-  border-top:1px solid var(--border);
-  font-size:.78rem; color:var(--brand); font-weight:600; text-align:center;
-}
-
-/* ── Velocity badge ────────────────────────────────────────────────────── */
-.badge-hot {
-  position:absolute; top:.5rem; right:.5rem;
-  background:linear-gradient(135deg,#ef4444,#f97316);
-  color:#fff; font-size:.6rem; font-weight:800;
-  letter-spacing:.04em; padding:.2em .55em;
-  border-radius:var(--r-full); text-transform:uppercase;
-  display:flex; align-items:center; gap:.25rem;
-  box-shadow:0 2px 6px rgba(239,68,68,.35);
-}
-
-/* ── Personalisation banner ────────────────────────────────────────────── */
-.personal-banner {
-  background:linear-gradient(135deg,var(--brand-light),#fff);
-  border:1.5px solid #fde68a; border-radius:var(--r-lg);
-  padding:.75rem 1.1rem; display:flex; align-items:center; gap:.75rem;
-  font-size:.85rem; margin-bottom:1.25rem;
-}
-.personal-banner strong { color:var(--brand-dark); }
-
-/* ── Chatbot widget ─────────────────────────────────────────────────────── */
-#chat-fab {
-  position:fixed; bottom:1.5rem; right:1.5rem; z-index:8000;
-  width:56px; height:56px; border-radius:50%;
-  background:var(--brand-grad); color:#fff;
-  border:none; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  font-size:1.4rem; box-shadow:0 4px 20px rgba(180,83,9,.4);
-  transition:transform var(--t-fast), box-shadow var(--t-fast);
-}
-#chat-fab:hover { transform:scale(1.08); box-shadow:0 6px 28px rgba(180,83,9,.5); }
-#chat-fab .chat-badge {
-  position:absolute; top:-2px; right:-2px;
-  width:14px; height:14px; border-radius:50%;
-  background:#22c55e; border:2px solid #fff;
-}
-
-#chat-window {
-  position:fixed; bottom:4.5rem; right:1.5rem; z-index:8000;
-  width:340px; max-width:calc(100vw - 2rem);
-  background:var(--card-bg); border:1.5px solid var(--border);
-  border-radius:var(--r-xl); box-shadow:var(--shadow-lg);
-  display:flex; flex-direction:column; overflow:hidden;
-  transform:scale(.92) translateY(16px); opacity:0;
-  pointer-events:none;
-  transition:transform .25s cubic-bezier(.34,1.56,.64,1), opacity .2s ease;
-  max-height:520px;
-}
-#chat-window.open {
-  transform:scale(1) translateY(0); opacity:1; pointer-events:all;
-}
-.chat-head {
-  padding:.85rem 1rem; background:var(--brand-grad); color:#fff;
-  display:flex; align-items:center; gap:.65rem; flex-shrink:0;
-}
-.chat-head-avatar { font-size:1.3rem; }
-.chat-head-title { font-weight:800; font-size:.9rem; flex:1; }
-.chat-head-sub { font-size:.7rem; opacity:.82; }
-.chat-close {
-  background:none; border:none; color:#fff; font-size:1.1rem;
-  cursor:pointer; padding:.1rem; opacity:.8; line-height:1;
-}
-.chat-close:hover { opacity:1; }
-.chat-messages {
-  flex:1; overflow-y:auto; padding:.85rem 1rem;
-  display:flex; flex-direction:column; gap:.65rem;
-  min-height:200px;
-}
-.chat-msg {
-  max-width:84%; padding:.55rem .85rem;
-  border-radius:var(--r-lg); font-size:.84rem; line-height:1.5;
-}
-.chat-msg.bot {
-  background:var(--surface); border:1px solid var(--border);
-  border-bottom-left-radius:4px; align-self:flex-start; color:var(--text);
-}
-.chat-msg.user {
-  background:var(--brand-grad); color:#fff;
-  border-bottom-right-radius:4px; align-self:flex-end;
-}
-.chat-msg.typing { opacity:.55; font-style:italic; }
-.chat-quick {
-  display:flex; flex-wrap:wrap; gap:.4rem;
-  padding:.5rem 1rem; border-top:1px solid var(--border);
-}
-.chat-quick-btn {
-  padding:.28rem .7rem; border-radius:var(--r-full);
-  border:1.5px solid var(--border); background:var(--card-bg);
-  font-size:.72rem; font-weight:600; color:var(--text-2);
-  cursor:pointer; transition:all var(--t-fast);
-  white-space:nowrap;
-}
-.chat-quick-btn:hover { border-color:var(--brand); color:var(--brand); background:var(--brand-light); }
-.chat-input-row {
-  display:flex; gap:.5rem; padding:.65rem .85rem;
-  border-top:1px solid var(--border); flex-shrink:0;
-}
-.chat-input {
-  flex:1; padding:.5rem .75rem;
-  border:1.5px solid var(--border); border-radius:var(--r-full);
-  font-size:.84rem; font-family:inherit; outline:none;
-  transition:border-color var(--t-fast);
-}
-.chat-input:focus { border-color:var(--brand-dark); }
-.chat-send {
-  width:34px; height:34px; border-radius:50%;
-  background:var(--brand-grad); color:#fff;
-  border:none; cursor:pointer; display:flex;
-  align-items:center; justify-content:center;
-  font-size:.9rem; flex-shrink:0;
-  transition:opacity var(--t-fast);
-}
-.chat-send:hover { opacity:.88; }
-.chat-send:disabled { opacity:.45; cursor:not-allowed; }
-</style>
-{% endblock %}
+{% block title %}{{ settings.shop_name if settings else 'GoldKernel' }} — Premium Dry Fruits Nepal{% endblock %}
+{% block meta_desc %}Buy premium dry fruits online in Nepal. Fresh almonds, cashews, walnuts, pistachios & more — delivered to your door. COD · eSewa · Khalti.{% endblock %}
 
 {% block content %}
 
-{# ── HERO ─────────────────────────────────────────────────────────── #}
+{# ── Promo bar ── #}
+{% if active_promos %}
+<div class="promo-bar">
+  <i class="bi bi-tag-fill"></i>
+  <span>Special offers available!</span>
+  <a href="{{ url_for('store.promos') }}">View Promo Codes →</a>
+  <button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fef3c7;cursor:pointer;font-size:1rem;line-height:1;margin-left:.5rem;opacity:.7;">✕</button>
+</div>
+{% endif %}
+
+{# ── Hero ── #}
 {% if not q and not selected_category %}
 <section class="hero">
   <div class="sc">
-    <div class="hero-content fade-up">
-      <div class="hero-tag"><i class="bi bi-stars"></i> Dhangadhi's Premium Dry Fruits</div>
-      <h1>Nature's Finest<br><span>Dry Fruits</span> &amp; Treats</h1>
-      <p>Handpicked almonds, cashews, pistachios &amp; more — delivered fresh to your door in Dhangadhi, Kailali and across Dhangadhi, Kailali and Nepal.</p>
+    <div class="hero-inner fu">
+      <div class="hero-tag"><i class="bi bi-stars"></i> Nepal's #1 Dry Fruit Store</div>
+      <h1>Nature's Finest<br><em>Dry Fruits</em> & Treats</h1>
+      <p class="hero-sub">Handpicked almonds, cashews, pistachios & more — delivered fresh to your door anywhere in Nepal.</p>
       <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
-        <a href="#products" class="btn-brand"><i class="bi bi-bag-heart"></i> Shop Now</a>
-        <a href="{{ url_for('store.track') }}" class="btn-outline-brand" style="color:rgba(255,255,255,.9);border-color:rgba(255,255,255,.4);">
+        <a href="#products" class="btn-brand"><i class="bi bi-bag-heart-fill"></i> Shop Now</a>
+        <a href="{{ url_for('store.track') }}" class="btn-ob" style="color:rgba(255,255,255,.9);border-color:rgba(255,255,255,.45);">
           <i class="bi bi-geo-alt"></i> Track Order
         </a>
       </div>
@@ -174,403 +33,197 @@
   <div class="hero-decos">🥜<br>🌰<br>🍇</div>
 </section>
 
-{# ── TRUST STRIP ──────────────────────────────────────────────────── #}
-<div class="trust-strip">
-  <div class="trust-strip-inner">
+{# ── Trust strip ── #}
+<div class="tstrip">
+  <div class="tstrip-i">
     {% for icon, title, sub in [
-      ('🚚','Fast Delivery','Dhangadhi &amp; beyond'),
-      ('✅','100% Genuine','Handpicked quality'),
+      ('🚚','Free Delivery','On orders above NPR 2000'),
+      ('✅','100% Genuine','Handpicked & verified'),
       ('💳','Easy Payment','COD · eSewa · Khalti'),
       ('🔄','7-Day Returns','Hassle-free returns'),
+      ('📦','Fresh Stock','Direct from source'),
     ] %}
-    <div class="trust-item">
-      <span class="trust-icon">{{ icon }}</span>
-      <span><strong>{{ title }}</strong><br>{{ sub }}</span>
-    </div>
+    <div class="ti"><span>{{ icon }}</span><span><strong>{{ title }}</strong> — {{ sub }}</span></div>
     {% endfor %}
   </div>
 </div>
 {% endif %}
 
-{# ── PROMO BANNER (if promos exist) ──────────────────────────────── #}
-{% if active_promos %}
-<div style="background:linear-gradient(90deg,#92400e,#b45309,#d97706);padding:.55rem 1.25rem;text-align:center;color:#fff;font-size:.82rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:.6rem;flex-wrap:wrap;">
-  <span>🏷️ Special offers available!</span>
-  <a href="{{ url_for('store.promos') }}" style="color:#fef3c7;font-weight:800;text-decoration:underline;">View Promo Codes →</a>
-</div>
-{% endif %}
-
-{# ── CATEGORY STRIP ───────────────────────────────────────────────── #}
-<div class="cat-strip" id="products">
-  <a href="{{ url_for('store.home', q=q or '') }}"
-     class="cat-pill {% if not selected_category %}active{% endif %}">
-    <i class="bi bi-grid"></i> All
-  </a>
-  {% for cat in categories %}
-  <a href="{{ url_for('store.home', category=cat, q=q or '') }}"
-     class="cat-pill {% if selected_category == cat %}active{% endif %}">
-    {{ cat }}
-  </a>
-  {% endfor %}
-</div>
-
-{# ── MOBILE SEARCH (hidden on sm+) ──────────────────────────────────── #}
-<div class="sc d-sm-none" style="padding-top:.75rem;padding-bottom:.25rem;">
+{# ── Mobile search ── #}
+<div class="sc d-sm-none" style="padding-top:.75rem;padding-bottom:.1rem;">
   <form method="get" action="{{ url_for('store.home') }}" role="search">
     <div style="position:relative;">
-      <i class="bi bi-search" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:.85rem;pointer-events:none;"></i>
-      <input type="search" name="q" placeholder="Search products…"
-             value="{{ request.args.get('q','') }}"
-             style="width:100%;padding:.55rem 1rem .55rem 2.4rem;border:1.5px solid var(--border);border-radius:var(--r-full);background:var(--card-bg);font-family:inherit;font-size:.875rem;outline:none;"
+      <i class="bi bi-search" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:.85rem;pointer-events:none;"></i>
+      <input type="search" name="q" placeholder="Search dry fruits…" value="{{ request.args.get('q','') }}"
+             style="width:100%;padding:.55rem 1rem .55rem 2.4rem;border:1.5px solid var(--border);border-radius:var(--r-f);background:var(--card);font-family:inherit;font-size:.875rem;outline:none;"
              autocomplete="off" aria-label="Search products">
     </div>
   </form>
 </div>
 
-{# ── PRODUCTS ─────────────────────────────────────────────────────── #}
-<div class="sc" style="padding-top:1.5rem;padding-bottom:2.5rem;">
+{# ── Category strip ── #}
+<div class="cstrip" id="products">
+  <a href="{{ url_for('store.home', q=q or '') }}" class="cpill {% if not selected_category %}active{% endif %}">
+    <i class="bi bi-grid-fill"></i> All
+  </a>
+  {% for cat in categories %}
+  <a href="{{ url_for('store.home', category=cat, q=q or '') }}"
+     class="cpill {% if selected_category == cat %}active{% endif %}">
+    {{ cat }}
+  </a>
+  {% endfor %}
+</div>
 
-  {# ── Personalisation banner ────────────────────────────────────── #}
+{# ── Main product area ── #}
+<div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
+
+  {# Personalisation banner #}
   {% if customer and personalised and not q and not selected_category %}
-  <div class="personal-banner fade-up">
+  <div style="background:linear-gradient(135deg,var(--brand-l),#fff);border:1.5px solid #fde68a;border-radius:var(--r-l);padding:.75rem 1.1rem;display:flex;align-items:center;gap:.75rem;font-size:.85rem;margin-bottom:1.25rem;" class="fu">
     <span style="font-size:1.2rem;">👋</span>
-    <span>Welcome back, <strong>{{ customer.name.split()[0] }}</strong>! Showing your favourite categories first.</span>
+    <span>Welcome back, <strong style="color:var(--brand-d);">{{ customer.name.split()[0] }}</strong>! Showing your favourite categories first.</span>
   </div>
   {% endif %}
 
-  {# Sort + results header #}
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;" class="fade-up">
+  {# Sort + result count #}
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;" class="fu">
     <div style="font-size:.85rem;color:var(--muted);">
       {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> —
-      {% elif selected_category %}<strong class="text-brand">{{ selected_category }}</strong> —{% endif %}
+      {% elif selected_category %}<strong style="color:var(--brand);">{{ selected_category }}</strong> —{% endif %}
       <span style="color:var(--text);">{{ products|length }} product{{ 's' if products|length != 1 }}</span>
     </div>
-    <form method="get" action="" style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;">
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;">
       {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
       {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
-      <label style="color:var(--muted);font-weight:600;">Sort:</label>
-      <select name="sort" class="form-select form-select-sm"
-              style="width:auto;border-radius:var(--r-full);border-color:var(--border);font-size:.8rem;"
-              onchange="this.form.submit()">
+      <label style="color:var(--muted);font-weight:600;" for="sort-sel">Sort:</label>
+      <select id="sort-sel" name="sort" onchange="this.form.submit()"
+              style="padding:.35rem .7rem;border:1.5px solid var(--border);border-radius:var(--r-f);font-size:.8rem;font-family:inherit;background:var(--card);outline:none;cursor:pointer;">
         <option value="name"       {% if sort=='name'       %}selected{% endif %}>Name A–Z</option>
-        <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price: Low → High</option>
-        <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price: High → Low</option>
+        <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price ↑</option>
+        <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price ↓</option>
         <option value="newest"     {% if sort=='newest'     %}selected{% endif %}>Newest</option>
       </select>
     </form>
   </div>
 
   {% if products %}
-  {# Featured — only on unfiltered home #}
+
+  {# Featured section — only on unfiltered home #}
   {% if featured_products and not q and not selected_category %}
   <div style="margin-bottom:2.5rem;">
-    <div class="section-head fade-up">
-      <div class="section-title">⭐ Featured <span>Picks</span></div>
-    </div>
+    <div class="sh fu"><div class="sh-title">⭐ Featured <em>Picks</em></div></div>
     <div class="row g-3">
-      {% for product in featured_products %}
-      <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
-        <div class="product-card">
-          <a href="{{ url_for('store.product_detail', product_id=product.id) }}" style="text-decoration:none;">
-            <div class="product-img-wrap">
-              {% if product.image_filename and not product.image_filename.startswith('cld:') %}
-              <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
-                   alt="{{ product.name }}" loading="lazy">
-              {% else %}
-              <div class="product-img-placeholder">
-                {% set icons=['🥜','🌰','🍇','🍑','🫘','🌿','✨','🥥'] %}
-                {{ icons[loop.index0 % icons|length] }}
-              </div>
-              {% endif %}
-              {% if product.quantity <= 10 and product.quantity > 0 %}
-              <span class="badge-low-stock">Only {{ product.quantity }} left</span>
-              {% endif %}
-              {% if product.id in selling_fast_ids %}
-              <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
-              {% endif %}
-            </div>
-            <div class="product-body">
-              {% if product.category %}<div class="product-category">{{ product.category }}</div>{% endif %}
-              <div class="product-name">{{ product.name }}</div>
-              {% if product.pack_size %}<div style="font-size:.7rem;color:var(--muted-2);margin-top:.1rem;">{{ product.pack_size }}</div>{% endif %}
-              <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(product.selling_price) }}</div>
-            </div>
-          </a>
-          <div class="product-footer">
-            <button class="btn-add" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1">
-              <i class="bi bi-cart-plus"></i> Add
-            </button>
-            <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
-          </div>
-        </div>
+      {% for p in featured_products %}
+      <div class="col-6 col-sm-4 col-md-3 col-xl-2 fu" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
+        {% include "store/_product_card.html" %}
       </div>
       {% endfor %}
     </div>
-    <hr class="divider" style="margin:2rem 0;">
+    <hr class="dv" style="margin:2rem 0;">
   </div>
   {% endif %}
 
-  {# All products grid #}
+  {# Products grid #}
   {% if not q and not selected_category %}
-  <div class="section-head fade-up">
-    <div class="section-title">All <span>Products</span></div>
-  </div>
+  <div class="sh fu"><div class="sh-title">All <em>Products</em></div></div>
   {% endif %}
   <div class="row g-3">
-    {% for product in products %}
-    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ [loop.index0 * 0.03, 0.5]|min }}s;">
-      <div class="product-card">
-        <a href="{{ url_for('store.product_detail', product_id=product.id) }}" style="text-decoration:none;">
-          <div class="product-img-wrap">
-            {% if product.image_filename and not product.image_filename.startswith('cld:') %}
-            <img src="{{ url_for('static', filename='uploads/products/' + product.image_filename) }}"
-                 alt="{{ product.name }}" loading="lazy">
-            {% else %}
-            <div class="product-img-placeholder">
-              {% set icons=['🥜','🌰','🍇','🍑','🫘','🌿','✨','🥥'] %}
-              {{ icons[loop.index0 % icons|length] }}
-            </div>
-            {% endif %}
-            {% if product.quantity > 0 and product.quantity <= 10 %}
-            <span class="badge-low-stock">{{ product.quantity }} left</span>
-            {% endif %}
-            {% if product.id in selling_fast_ids %}
-            <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
-            {% endif %}
-          </div>
-          <div class="product-body">
-            {% if product.category %}<div class="product-category">{{ product.category }}</div>{% endif %}
-            <div class="product-name">{{ product.name }}</div>
-            {% if product.pack_size %}<div style="font-size:.7rem;color:var(--muted-2);margin-top:.1rem;">{{ product.pack_size }}</div>{% endif %}
-            <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(product.selling_price) }}</div>
-          </div>
-        </a>
-        <div class="product-footer">
-          <button class="btn-add" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1">
-            <i class="bi bi-cart-plus"></i> Add
-          </button>
-          <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
-        </div>
-      </div>
+    {% for p in products %}
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fu" style="animation-delay:{{ [loop.index0 * 0.03, 0.4]|min }}s;">
+      {% set product = p %}{% include "store/_product_card.html" %}
     </div>
     {% endfor %}
   </div>
 
+  {# Recently viewed #}
+  {% if recently_viewed and not q and not selected_category %}
+  <div style="margin-top:3rem;">
+    <div class="sh fu"><div class="sh-title">👀 Recently <em>Viewed</em></div></div>
+    <div class="row g-3">
+      {% for p in recently_viewed %}
+      <div class="col-6 col-sm-4 col-md-3 col-xl-2 fu" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
+        {% set product = p %}{% include "store/_product_card.html" %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% else %}
-  <div class="empty-state fade-up" style="background:var(--card-bg);border:1.5px solid var(--border);border-radius:var(--r-lg);margin-top:1rem;">
-    <div class="empty-icon">🔍</div>
-    <h4>No products found</h4>
-    <p>Try a different search term or browse all categories.</p>
-    <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All</a>
+  {# Empty state #}
+  <div class="ucard fu" style="margin-top:1rem;">
+    <div class="empty">
+      <div class="empty-icon">🔍</div>
+      <h4>No products found</h4>
+      <p>{% if q %}No results for "{{ q }}". Try different keywords or browse categories.{% else %}No products in this category yet.{% endif %}</p>
+      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All</a>
+    </div>
   </div>
   {% endif %}
 
 </div>
 
-{# ── AI CHATBOT WIDGET ─────────────────────────────────────────────── #}
-<button id="chat-fab" aria-label="Chat with us" title="Ask us anything">
+{# ── AI Chatbot widget ── #}
+<button id="cfab" aria-label="Chat with us" title="Ask us anything">
   <i class="bi bi-chat-heart-fill"></i>
-  <span class="chat-badge"></span>
+  <span class="cob"></span>
 </button>
-
-<div id="chat-window" role="dialog" aria-label="Customer support chat">
+<div id="cwin" role="dialog" aria-label="Customer support chat">
   <div class="chat-head">
-    <div class="chat-head-avatar">🥜</div>
+    <div style="font-size:1.3rem;">🥜</div>
     <div style="flex:1;">
-      <div class="chat-head-title">GoldKernel Assistant</div>
-      <div class="chat-head-sub">Ask me anything about our products</div>
+      <div style="font-weight:800;font-size:.9rem;">GoldKernel Assistant</div>
+      <div style="font-size:.7rem;opacity:.82;">Ask anything about our products</div>
     </div>
-    <button class="chat-close" id="chat-close-btn" aria-label="Close chat">✕</button>
+    <button id="cclosebtn" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;opacity:.8;line-height:1;" aria-label="Close">✕</button>
   </div>
-
-  <div class="chat-messages" id="chat-messages">
-    <div class="chat-msg bot">
-      Namaste! 👋 I'm here to help you find the perfect dry fruits. Ask me about products, delivery, gifting ideas, or anything else!
-    </div>
+  <div class="chat-msgs" id="cmsgs">
+    <div class="cmsg bot">Namaste! 👋 I'm here to help you find the perfect dry fruits. Ask me about products, delivery, gifting, or anything else!</div>
   </div>
-
-  <div class="chat-quick" id="chat-quick">
-    <button class="chat-quick-btn" data-q="What's popular right now?">🔥 Popular</button>
-    <button class="chat-quick-btn" data-q="Gift ideas under NPR 1000?">🎁 Gifting</button>
-    <button class="chat-quick-btn" data-q="How does delivery work?">🚚 Delivery</button>
-    <button class="chat-quick-btn" data-q="What payment methods do you accept?">💳 Payment</button>
+  <div class="cquick" id="cquick">
+    <button class="cqbtn" data-q="What's popular right now?">🔥 Popular</button>
+    <button class="cqbtn" data-q="Gift ideas under NPR 1000?">🎁 Gifting</button>
+    <button class="cqbtn" data-q="How does delivery work?">🚚 Delivery</button>
+    <button class="cqbtn" data-q="What payment methods do you accept?">💳 Payment</button>
   </div>
-
-  <div class="chat-input-row">
-    <input type="text" id="chat-input" class="chat-input"
-           placeholder="Type a message…" autocomplete="off" maxlength="300">
-    <button id="chat-send" class="chat-send" aria-label="Send message">
-      <i class="bi bi-send-fill"></i>
-    </button>
+  <div class="cinp-row">
+    <input type="text" id="cinp" class="cinp" placeholder="Type a message…" autocomplete="off" maxlength="300">
+    <button id="csend" class="csend" aria-label="Send"><i class="bi bi-send-fill"></i></button>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Live Search Suggestions ──────────────────────────────────────────────
-(function() {
-  const inputs = document.querySelectorAll('input[type=search][name=q]');
-  inputs.forEach(function(inp) {
-    const wrap = inp.closest('form');
-    if (!wrap) return;
-
-    const box = document.createElement('div');
-    box.className = 'suggestion-box';
-    inp.parentElement.style.position = 'relative';
-    inp.parentElement.appendChild(box);
-
-    let timer;
-    inp.addEventListener('input', function() {
-      clearTimeout(timer);
-      const q = this.value.trim();
-      if (q.length < 2) { box.classList.remove('open'); return; }
-      timer = setTimeout(function() { fetchSuggestions(q, box, inp); }, 200);
-    });
-
-    inp.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') box.classList.remove('open');
-    });
-
-    document.addEventListener('click', function(e) {
-      if (!inp.parentElement.contains(e.target)) box.classList.remove('open');
-    });
-  });
-
-  function fetchSuggestions(q, box, inp) {
-    fetch('{{ url_for("store.search_suggestions_api") }}?q=' + encodeURIComponent(q))
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        if (!d || !d.results || !d.results.length) { box.classList.remove('open'); return; }
-        box.innerHTML = d.results.map(function(p) {
-          const url = p.slug
-            ? '/store/p/' + p.slug
-            : '/store/product/' + p.id;
-          const img = p.image_filename && !p.image_filename.startsWith('cld:')
-            ? '<img src="/static/uploads/products/' + p.image_filename + '" alt="" loading="lazy">'
-            : '🥜';
-          return '<a href="' + url + '" class="suggestion-item">'
-            + '<div class="suggestion-thumb">' + img + '</div>'
-            + '<div style="flex:1;min-width:0;">'
-            + '<div class="suggestion-name">' + p.name + '</div>'
-            + (p.category ? '<div class="suggestion-cat">' + p.category + '</div>' : '')
-            + '</div>'
-            + '<div class="suggestion-price">NPR ' + Math.round(p.price) + '</div>'
-            + '</a>';
-        }).join('') + '<div class="suggestion-footer">Press Enter to search all results</div>';
-        box.classList.add('open');
-      })
-      .catch(function() { box.classList.remove('open'); });
+// ── Chatbot ───────────────────────────────────────────────────────────────
+(function(){
+  const fab=document.getElementById('cfab'), win=document.getElementById('cwin');
+  const msgs=document.getElementById('cmsgs'), inp=document.getElementById('cinp');
+  const send=document.getElementById('csend'), closeB=document.getElementById('cclosebtn');
+  const quick=document.getElementById('cquick');
+  let history=[], open=false;
+  function toggle(){open=!open;win.classList.toggle('open',open);if(open)inp.focus();}
+  fab.addEventListener('click',toggle);
+  closeB.addEventListener('click',function(e){e.stopPropagation();toggle();});
+  function addMsg(text,role){
+    const d=document.createElement('div');d.className='cmsg '+role;d.textContent=text;
+    msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return d;
   }
-})();
-
-// ── Chatbot Widget ───────────────────────────────────────────────────────
-(function() {
-  const fab    = document.getElementById('chat-fab');
-  const win    = document.getElementById('chat-window');
-  const msgs   = document.getElementById('chat-messages');
-  const input  = document.getElementById('chat-input');
-  const send   = document.getElementById('chat-send');
-  const closeB = document.getElementById('chat-close-btn');
-  const quick  = document.getElementById('chat-quick');
-
-  let history = [];
-  let open = false;
-
-  function toggleChat() {
-    open = !open;
-    win.classList.toggle('open', open);
-    if (open) { input.focus(); }
+  function sendMsg(text){
+    text=(text||inp.value).trim();if(!text)return;
+    inp.value='';send.disabled=true;quick.style.display='none';
+    addMsg(text,'user');const typing=addMsg('…','bot typing');
+    history.push({role:'user',content:text});
+    fetch('{{ url_for("store.store_chat_api") }}',{
+      method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
+      body:JSON.stringify({message:text,history:history.slice(-8)})
+    }).then(r=>r.ok?r.json():{reply:'Sorry, trouble connecting. Please try again!'})
+    .then(d=>{typing.remove();const rep=d.reply||'No response.';addMsg(rep,'bot');history.push({role:'assistant',content:rep});send.disabled=false;inp.focus();})
+    .catch(()=>{typing.remove();addMsg('Sorry, connection issue. Please try again!','bot');send.disabled=false;});
   }
-
-  fab.addEventListener('click', toggleChat);
-  closeB.addEventListener('click', function(e) { e.stopPropagation(); toggleChat(); });
-
-  function addMsg(text, role) {
-    const d = document.createElement('div');
-    d.className = 'chat-msg ' + role;
-    d.textContent = text;
-    msgs.appendChild(d);
-    msgs.scrollTop = msgs.scrollHeight;
-    return d;
-  }
-
-  function sendMessage(text) {
-    text = (text || input.value).trim();
-    if (!text) return;
-    input.value = '';
-    send.disabled = true;
-    quick.style.display = 'none';
-    addMsg(text, 'user');
-    const typing = addMsg('…', 'bot typing');
-    history.push({ role: 'user', content: text });
-
-    fetch('{{ url_for("store.store_chat_api") }}', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: history.slice(-8) }),
-      credentials: 'same-origin',
-    })
-    .then(function(r) { return r.ok ? r.json() : { ok: false, reply: 'Sorry, I had trouble connecting. Please try again!' }; })
-    .then(function(d) {
-      typing.remove();
-      const reply = d.reply || 'Sorry, I could not get a response.';
-      addMsg(reply, 'bot');
-      history.push({ role: 'assistant', content: reply });
-      send.disabled = false;
-      input.focus();
-    })
-    .catch(function() {
-      typing.remove();
-      addMsg('Sorry, I had trouble connecting. Please try again!', 'bot');
-      send.disabled = false;
-    });
-  }
-
-  send.addEventListener('click', function() { sendMessage(); });
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-
-  document.querySelectorAll('.chat-quick-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() { sendMessage(this.dataset.q); });
-  });
+  send.addEventListener('click',()=>sendMsg());
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}});
+  document.querySelectorAll('.cqbtn').forEach(b=>b.addEventListener('click',function(){sendMsg(this.dataset.q);}));
 })();
 </script>
-
-{# ── FEATURE 6: Recently Viewed ──────────────────────────────────────── #}
-{% if recently_viewed and not q and not selected_category %}
-<div class="sc" style="padding-bottom:2.5rem;">
-  <div class="section-head fade-up">
-    <div class="section-title">👀 Recently <span>Viewed</span></div>
-    <a href="{{ url_for('store.home') }}" class="section-link">See all →</a>
-  </div>
-  <div class="row g-3">
-    {% for p in recently_viewed %}
-    <div class="col-6 col-sm-4 col-md-3 col-xl-2 fade-up" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
-      <div class="product-card">
-        <a href="{{ url_for('store.product_detail', product_id=p.id) }}" style="text-decoration:none;">
-          <div class="product-img-wrap">
-            {% if p.image_filename and not p.image_filename.startswith('cld:') %}
-            <img src="{{ url_for('static', filename='uploads/products/' + p.image_filename) }}" alt="{{ p.name }}" loading="lazy">
-            {% else %}<div class="product-img-placeholder">🥜</div>{% endif %}
-          </div>
-          <div class="product-body">
-            {% if p.category %}<div class="product-category">{{ p.category }}</div>{% endif %}
-            <div class="product-name">{{ p.name }}</div>
-            <div class="product-price mt-2"><span class="currency">NPR</span>{{ "%.0f"|format(p.selling_price) }}</div>
-          </div>
-        </a>
-        <div class="product-footer">
-          <button class="btn-add" data-add-cart data-pid="{{ p.id }}" data-name="{{ p.name }}" data-qty="1">
-            <i class="bi bi-cart-plus"></i> Add
-          </button>
-          <a href="{{ url_for('store.product_detail', product_id=p.id) }}" class="btn-view"><i class="bi bi-eye"></i></a>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
 {% endblock %}
