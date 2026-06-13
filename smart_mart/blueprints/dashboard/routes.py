@@ -57,17 +57,44 @@ def index():
     except Exception:
         pass
 
-    # ── Today metrics ─────────────────────────────────────────────────────
-    today_sales_amount = db.session.execute(
-        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) == today)
-    ).scalar() or 0
-    today_sales_count = db.session.execute(
-        db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) == today)
-    ).scalar() or 0
+    # ── Combined Sales Aggregation — 1 query replaces 7 separate round-trips ─
+    # Uses CASE/WHEN to compute today / week / month / total in a single pass.
+    from sqlalchemy import case, literal_column
+    agg_row = db.session.execute(
+        db.select(
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) == today, Sale.total_amount), else_=0)
+            ), 0).label("today_amount"),
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) == today, 1), else_=0)
+            ), 0).label("today_count"),
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) >= week_start, Sale.total_amount), else_=0)
+            ), 0).label("weekly_amount"),
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) >= week_start, 1), else_=0)
+            ), 0).label("weekly_count"),
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) >= month_start, Sale.total_amount), else_=0)
+            ), 0).label("monthly_amount"),
+            func.coalesce(func.sum(
+                case((func.date(Sale.sale_date) >= month_start, 1), else_=0)
+            ), 0).label("monthly_count"),
+            func.count(Sale.id).label("total_count"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
+        )
+    ).one()
 
-    # Today profit = today sales - historical COGS (cost_price at time of sale)
+    today_sales_amount  = float(agg_row.today_amount)
+    today_sales_count   = int(agg_row.today_count)
+    weekly_sales_amount = float(agg_row.weekly_amount)
+    weekly_sales_count  = int(agg_row.weekly_count)
+    monthly_sales_amount = float(agg_row.monthly_amount)
+    monthly_sales_count  = int(agg_row.monthly_count)
+    total_sales_count   = int(agg_row.total_count)
+    total_revenue       = float(agg_row.total_revenue)
+
+    # ── Today COGS (separate join query — can't combine with above) ────────
     today_cogs = db.session.execute(
         db.select(
             func.coalesce(
@@ -81,35 +108,11 @@ def index():
     ).scalar() or 0
     today_profit = float(today_sales_amount) - float(today_cogs)
 
-    # ── Weekly / Monthly ──────────────────────────────────────────────────
-    weekly_sales_amount = db.session.execute(
-        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
-    ).scalar() or 0
-    weekly_sales_count = db.session.execute(
-        db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= week_start)
-    ).scalar() or 0
-
-    monthly_sales_amount = db.session.execute(
-        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= month_start)
-    ).scalar() or 0
-    monthly_sales_count = db.session.execute(
-        db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= month_start)
-    ).scalar() or 0
-
-    total_sales_count = db.session.execute(db.select(func.count(Sale.id))).scalar() or 0
-
-    # ── Cash Balance = total sales - total expenses ───────────────────────
-    total_revenue = db.session.execute(
-        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-    ).scalar() or 0
+    # ── Cash Balance: total revenue - total expenses (2 queries → 1) ──────
     total_expenses = db.session.execute(
         db.select(func.coalesce(func.sum(Expense.amount), 0))
     ).scalar() or 0
-    cash_balance = float(total_revenue) - float(total_expenses)
+    cash_balance = total_revenue - float(total_expenses)
 
     # ── Stock value ───────────────────────────────────────────────────────
     stock_value = db.session.execute(
