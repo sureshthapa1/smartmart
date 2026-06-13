@@ -337,6 +337,85 @@ def home():
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
     )
 
+# ── Category Browse ──────────────────────────────────────────────────────────
+
+@store_bp.route("/category/<slug>")
+def category_browse(slug: str):
+    """Dedicated category page — /store/category/dry-fruits etc."""
+    settings   = _settings()
+    sort       = request.args.get("sort", "name")
+    min_price  = request.args.get("min_price", "")
+    max_price  = request.args.get("max_price", "")
+    page       = max(1, int(request.args.get("page", 1)))
+    per_page   = 48
+
+    # Normalise slug back to a display name via the categories list
+    categories = _get_categories()
+    # Find the matching category name (case-insensitive, slug = name.lower().replace(" ", "-"))
+    category_name = None
+    for cat in categories:
+        cat_slug = cat.lower().replace(" ", "-").replace("/", "-")
+        if cat_slug == slug.lower() or cat.lower() == slug.lower():
+            category_name = cat
+            break
+    if category_name is None:
+        # Treat the slug directly as a category name if no match
+        category_name = slug.replace("-", " ").title()
+
+    stmt = (
+        db.select(Product)
+        .where(
+            Product.is_active.isnot(False),
+            Product.quantity > 0,
+            func.lower(func.coalesce(Product.category, "")) == category_name.lower(),
+        )
+    )
+    if min_price:
+        try: stmt = stmt.where(Product.selling_price >= float(min_price))
+        except ValueError: pass
+    if max_price:
+        try: stmt = stmt.where(Product.selling_price <= float(max_price))
+        except ValueError: pass
+
+    sort_map = {
+        "name":       Product.name.asc(),
+        "price_asc":  Product.selling_price.asc(),
+        "price_desc": Product.selling_price.desc(),
+        "newest":     Product.created_at.desc(),
+    }
+    stmt = stmt.order_by(sort_map.get(sort, Product.name.asc()))
+
+    total = db.session.execute(
+        db.select(func.count(Product.id))
+        .where(Product.is_active.isnot(False), Product.quantity > 0,
+               func.lower(func.coalesce(Product.category, "")) == category_name.lower())
+    ).scalar() or 0
+
+    products = db.session.execute(
+        stmt.limit(per_page).offset((page - 1) * per_page)
+    ).scalars().all()
+
+    _fast_ids = _selling_fast_ids()
+
+    return render_template(
+        "store/category.html",
+        products=products,
+        categories=categories,
+        category_name=category_name,
+        category_slug=slug,
+        selling_fast_ids=_fast_ids,
+        settings=settings,
+        sort=sort,
+        min_price=min_price,
+        max_price=max_price,
+        page=page,
+        per_page=per_page,
+        total_products=total,
+        customer=g.customer,
+        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+    )
+
+
 # ── Product Detail ────────────────────────────────────────────────────────────
 
 @store_bp.route("/product/<int:product_id>")
@@ -1492,7 +1571,7 @@ def submit_review(product_id):
         )
         db.session.add(review)
         db.session.commit()
-        flash("Thank you for your review! ⭐", "success")
+        flash("Thank you for your review! ⭐ It will appear after moderation.", "success")
     except Exception:
         db.session.rollback()
         flash("You have already reviewed this product.", "info")
