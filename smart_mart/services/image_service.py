@@ -125,14 +125,20 @@ def delete_product_image(identifier: Optional[str], app=None) -> None:
 
 def product_image_url(identifier: Optional[str], width: int = 400) -> Optional[str]:
     """
-    Return a browser-usable image URL.
+    Return a browser-usable image URL ready to drop into <img src="...">.
 
-    * Cloudinary identifiers (prefix "cld:") → optimised CDN URL.
-    * Local filenames → Flask static URL (caller must use url_for or prefix with /static/).
-    * None / empty → None  (template should show placeholder).
+    * Cloudinary identifiers (prefix "cld:") → optimised CDN URL with resize transform.
+    * HTTP/HTTPS URLs (e.g. Pexels direct links) → returned as-is.
+    * Local filenames → /static/uploads/products/<filename>  (absolute Flask static path).
+    * None / empty string → None  (template should show the 🥜 placeholder).
+
+    This function ALWAYS returns a full, browser-usable URL string or None.
+    Templates should NOT call url_for() on the result — just use it directly.
     """
     if not identifier:
         return None
+
+    # ── Cloudinary ────────────────────────────────────────────────────────────
     if identifier.startswith("cld:"):
         cl = _cloudinary()
         if cl:
@@ -146,9 +152,18 @@ def product_image_url(identifier: Optional[str], width: int = 400) -> Optional[s
                 )
             except Exception:
                 pass
-        return None  # Cloudinary config missing but ID looks like Cloudinary — skip
-    # Local: return relative path so templates can use it with url_for
-    return identifier  # caller does: url_for('static', filename='uploads/products/' + identifier)
+        # CLOUDINARY_URL not set or import failed — image not accessible
+        return None
+
+    # ── External HTTP/HTTPS URL (e.g. Pexels) ────────────────────────────────
+    if identifier.startswith("http://") or identifier.startswith("https://"):
+        return identifier
+
+    # ── Local file — return absolute Flask static URL ─────────────────────────
+    # Strip any accidental leading path components for security.
+    import os as _os
+    filename = _os.path.basename(identifier)
+    return f"/static/uploads/products/{filename}"
 
 
 def is_cloudinary_id(identifier: Optional[str]) -> bool:
