@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from 'macros/product_icon.html' import product_icon_cell, get_emoji %}
-{% block title %}Inventory — Goldkernel{% endblock %}
+{% block title %}Inventory — Smart Mart{% endblock %}
 {% block page_title %}Products{% endblock %}
 {% block breadcrumb %}<li class="breadcrumb-item active">Inventory</li>{% endblock %}
 {% block content %}
@@ -73,11 +73,12 @@
         <tr>
           <td>
             <div class="d-flex align-items-center gap-2">
-              {% if p.image_filename %}
-              <img src="{{ url_for('static', filename='uploads/products/' ~ p.image_filename) }}"
-                   alt="{{ p.name }}" style="width:34px;height:34px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #e2e8f0">
+              {%- set _img = product_image_url(p.image_filename, 80) if p.image_filename else None -%}
+              {% if _img %}
+              <img src="{{ _img }}" alt="{{ p.name }}" loading="lazy"
+                   style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,.08)">
               {% else %}
-              <div style="width:34px;height:34px;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">{{ get_emoji(p.name, p.category) }}</div>
+              <div style="width:40px;height:40px;background:linear-gradient(135deg,#fef9ee,#fde68a);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;border:1px solid #fde68a">{{ get_emoji(p.name, p.category) }}</div>
               {% endif %}
               <span class="fw-semibold" style="font-size:.875rem">{{ p.name }}</span>
               {% if p.id in price_alert_product_ids %}
