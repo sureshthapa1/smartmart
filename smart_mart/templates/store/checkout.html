@@ -56,7 +56,13 @@
               <div class="col-sm-6">
                 <label class="flabel" for="f-area">Area / Zone</label>
                 <input id="f-area" type="text" name="area" class="finput" placeholder="Lazimpat, Baneshwor…"
-                       value="{{ form_data.get('area', customer.area if customer else '') }}" maxlength="80">
+                       value="{{ form_data.get('area', customer.area if customer else '') }}"
+                       maxlength="80" list="nepal-areas" autocomplete="off">
+                <datalist id="nepal-areas">
+                  {% for a in ['Thamel','Lazimpat','Baneshwor','New Baneshwor','Koteshwor','Balaju','Kalanki','Chabahil','Bouddha','Maharajgunj','Naxal','Battisputali','Kirtipur','Patan / Lalitpur','Bhaktapur','Thimi','Ekantakuna','Sanepa','Jhamsikhel','Kupondol','Jawalakhel','Kumaripati','Imadol','Lubhu','Satdobato','Gwarko','Godawari','Budhanilkantha','Tokha','Gongabu','Samakhushi','Anamnagar','Putalisadak','Minbhawan','Old Baneshwor','Sinamangal','Naya Thimi'] %}
+                  <option value="{{ a }}">
+                  {% endfor %}
+                </datalist>
               </div>
               <div class="col-12">
                 <label class="flabel" for="f-notes">Order Notes <span style="font-weight:400;">(optional)</span></label>
@@ -104,6 +110,20 @@
               </label>
               {% endfor %}
             </div>
+          </div>
+        </div>
+
+        {# Gift wrapping option #}
+        <div style="background:linear-gradient(135deg,#fef9ee,#fef3c7);border:1.5px solid #fde68a;border-radius:var(--r-l);padding:.9rem 1.1rem;margin-bottom:1rem;">
+          <label style="display:flex;align-items:center;gap:.75rem;cursor:pointer;">
+            <input type="checkbox" name="gift_wrap" value="1" style="width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;">
+            <div>
+              <div style="font-weight:700;font-size:.9rem;color:var(--text);">🎁 Add Gift Wrapping <span style="color:var(--brand-d);">+NPR 50</span></div>
+              <div style="font-size:.74rem;color:var(--muted);margin-top:.1rem;">Beautiful packaging — perfect for Dashain, Tihar & special occasions</div>
+            </div>
+          </label>
+          <div id="gift-msg-wrap" style="margin-top:.75rem;display:none;">
+            <input type="text" name="gift_message" class="finput" placeholder="Gift message (optional)…" maxlength="150">
           </div>
         </div>
 
@@ -165,6 +185,14 @@
 
 {% block scripts %}
 <script>
+// Gift wrap toggle
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.name === 'gift_wrap') {
+    const wrap = document.getElementById('gift-msg-wrap');
+    if (wrap) wrap.style.display = e.target.checked ? 'block' : 'none';
+  }
+});
+
 function selectPM(val){
   document.querySelectorAll('.pm-opt').forEach(o=>{
     const v=o.querySelector('input').value;
