@@ -429,6 +429,69 @@
   <span id="ctoast-msg">Added to cart</span>
 </div>
 
+<!-- ── Mobile Bottom Navigation ─────────────────────────────────────────── -->
+<nav class="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
+  <a href="{{ url_for('store.home') }}" class="mbn-item {% if request.endpoint == 'store.home' %}active{% endif %}">
+    <i class="bi bi-house-fill"></i><span>Home</span>
+  </a>
+  <a href="{{ url_for('store.home') }}?focus=search" class="mbn-item" id="mbn-search">
+    <i class="bi bi-search"></i><span>Search</span>
+  </a>
+  <a href="{{ url_for('store.cart') }}" class="mbn-item {% if request.endpoint == 'store.cart' %}active{% endif %}" style="position:relative;">
+    <i class="bi bi-bag"></i>
+    <span class="mbn-badge" id="mbn-cart-badge" style="display:none;">0</span>
+    <span>Cart</span>
+  </a>
+  <a href="{{ url_for('store.my_account') if customer else url_for('store.login') }}"
+     class="mbn-item {% if request.endpoint in ['store.my_account','store.login'] %}active{% endif %}">
+    <i class="bi bi-person-circle"></i><span>Account</span>
+  </a>
+</nav>
+
+<!-- ── Back to Top ────────────────────────────────────────────────────────── -->
+<button id="btt" aria-label="Back to top" title="Back to top">
+  <i class="bi bi-chevron-up"></i>
+</button>
+
+<style>
+  /* Mobile bottom nav */
+  .mobile-bottom-nav {
+    display:none;position:fixed;bottom:0;left:0;right:0;z-index:850;
+    background:rgba(255,251,245,.97);backdrop-filter:blur(20px);
+    border-top:1px solid var(--border);
+    display:none;align-items:stretch;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  @media(max-width:767px){ .mobile-bottom-nav{display:flex;} body{padding-bottom:56px;} }
+  .mbn-item {
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:.15rem;padding:.45rem 0 .35rem;color:var(--muted);text-decoration:none;
+    font-size:.6rem;font-weight:600;letter-spacing:.02em;
+    transition:color var(--t-f);position:relative;
+  }
+  .mbn-item i{font-size:1.2rem;line-height:1;}
+  .mbn-item.active,.mbn-item:hover{color:var(--brand);}
+  .mbn-item.active i{color:var(--brand);}
+  .mbn-badge{
+    position:absolute;top:.25rem;right:calc(50% - 16px);
+    min-width:16px;height:16px;border-radius:var(--r-f);
+    background:var(--brand);color:#fff;font-size:.58rem;font-weight:800;
+    line-height:16px;text-align:center;padding:0 3px;
+    border:2px solid #fffbf5;
+  }
+  /* Back to top */
+  #btt{
+    position:fixed;bottom:4.5rem;right:1rem;z-index:840;
+    width:40px;height:40px;border-radius:50%;border:1.5px solid var(--border);
+    background:var(--card);color:var(--text2);cursor:pointer;
+    display:none;align-items:center;justify-content:center;font-size:1rem;
+    box-shadow:var(--sh-s);transition:all var(--t-f);
+  }
+  #btt.visible{display:flex;}
+  #btt:hover{background:var(--brand-grad);border-color:transparent;color:#fff;box-shadow:var(--brand-glow);}
+  @media(min-width:768px){#btt{bottom:1.5rem;}}
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmQON0vR0FTnKJ0mBMbBMP6Hv/h" crossorigin="anonymous"></script>
 <script>
 // ── Image URL helper: handles cld: prefix ─────────────────────────────────
@@ -448,6 +511,37 @@ function updateCartBadge(n){
 }
 fetch('{{ url_for("store.cart_count") }}',{credentials:'same-origin'})
   .then(r=>r.ok?r.json():null).then(d=>{if(d)updateCartBadge(d.count||0);}).catch(()=>{});
+
+// ── Sync mobile bottom nav cart badge ──────────────────────────────────────
+function updateCartBadge(n){
+  // top nav
+  const b = document.getElementById('nav-cart-count');
+  if(b){if(n>0){b.textContent=n>99?'99+':n;b.style.display='flex';}else{b.style.display='none';}}
+  // mobile bottom nav
+  const mb = document.getElementById('mbn-cart-badge');
+  if(mb){if(n>0){mb.textContent=n>99?'99+':n;mb.style.display='block';}else{mb.style.display='none';}}
+}
+
+// ── Back to top ─────────────────────────────────────────────────────────────
+const btt = document.getElementById('btt');
+if(btt){
+  window.addEventListener('scroll',function(){
+    btt.classList.toggle('visible', window.scrollY > 320);
+  },{passive:true});
+  btt.addEventListener('click',function(){
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+}
+
+// ── Mobile search shortcut ───────────────────────────────────────────────────
+document.getElementById('mbn-search')?.addEventListener('click',function(e){
+  const inp = document.querySelector('.snav-search input');
+  if(inp){
+    e.preventDefault();
+    window.scrollTo({top:0,behavior:'smooth'});
+    setTimeout(()=>inp.focus(),300);
+  }
+});
 
 // ── Toast ─────────────────────────────────────────────────────────────────
 let _tt;
