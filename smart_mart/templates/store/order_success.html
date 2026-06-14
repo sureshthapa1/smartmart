@@ -100,4 +100,37 @@
 
   </div>
 </div>
+{% block scripts %}
+<style>
+@keyframes confetti-fall {
+  0%   { transform: translateY(-60px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+.conf-piece {
+  position: fixed; top: -10px; width: 10px; height: 10px; border-radius: 2px;
+  animation: confetti-fall linear forwards; z-index: 9999; pointer-events: none;
+}
+</style>
+<script>
+(function() {
+  const colors = ['#f59e0b','#10b981','#3b82f6','#f97316','#a855f7','#ec4899','#22c55e'];
+  const n = 80;
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('div');
+    el.className = 'conf-piece';
+    el.style.cssText = [
+      `left:${Math.random()*100}vw`,
+      `background:${colors[i % colors.length]}`,
+      `width:${6+Math.random()*8}px`,
+      `height:${6+Math.random()*8}px`,
+      `animation-duration:${2.2+Math.random()*2}s`,
+      `animation-delay:${Math.random()*1.2}s`,
+      `border-radius:${Math.random()>.5?'50%':'3px'}`,
+      `opacity:${0.7+Math.random()*0.3}`,
+    ].join(';');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+})();
+</script>
 {% endblock %}
