@@ -161,9 +161,15 @@ def create_app(config_name="development"):
         app.jinja_env.globals["product_image_url"] = _piu
         app.jinja_env.filters["product_image_url"] = _piu
     except Exception:
-        app.jinja_env.globals["product_image_url"] = lambda f, **kw: (
-            f"/static/uploads/products/{f}" if f and not f.startswith("cld:") else ""
-        )
+        import os as _os
+        def _fallback_img_url(f, width=400):
+            if not f:
+                return None
+            if f.startswith("cld:") or f.startswith("http"):
+                return f if f.startswith("http") else None
+            return f"/static/uploads/products/{_os.path.basename(f)}"
+        app.jinja_env.globals["product_image_url"] = _fallback_img_url
+        app.jinja_env.filters["product_image_url"] = _fallback_img_url
 
     @app.template_filter("nst")
     def nst_filter(dt, fmt="%Y-%m-%d %H:%M"):
