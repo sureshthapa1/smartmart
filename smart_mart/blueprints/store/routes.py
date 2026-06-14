@@ -684,10 +684,15 @@ def checkout():
         email   = request.form.get("email", "").strip()
         address = request.form.get("address", "").strip()
         area    = request.form.get("area", "").strip()
-        method  = request.form.get("payment_method", "cod")
+        method  = request.form.get("payment_mode", "cod")
         if method not in VALID_PAYMENT_METHODS:
             method = "cod"
-        notes   = request.form.get("notes", "").strip()
+        notes        = request.form.get("notes", "").strip()
+        gift_wrap    = request.form.get("gift_wrap") == "1"
+        gift_message = request.form.get("gift_message", "").strip()
+        if gift_wrap:
+            gift_note = f"🎁 GIFT WRAP REQUESTED. Message: {gift_message}" if gift_message else "🎁 GIFT WRAP REQUESTED"
+            notes = f"{gift_note}. {notes}".strip(". ")
 
         errors = []
         if not name:
@@ -745,7 +750,8 @@ def checkout():
             except Exception:
                 pass  # promo system not available
 
-        grand_total = subtotal + delivery - discount_amount
+        gift_wrap_charge = 50.0 if gift_wrap else 0.0
+        grand_total = subtotal + delivery + gift_wrap_charge - discount_amount
 
         payload = {
             "customer": {"name": name, "phone": phone, "email": email,
@@ -874,22 +880,43 @@ def order_success(order_number):
 
 # ── Order Tracking ────────────────────────────────────────────────────────────
 
-@store_bp.route("/track", methods=["GET"])
+@store_bp.route("/track", methods=["GET", "POST"])
 def track():
-    settings = _settings()
-    order    = None
-    order_number = (
-        request.args.get("order_number") or ""
-    ).strip().upper()
+    settings     = _settings()
+    order        = None
+    orders       = []
+    searched     = False
+    order_number = ""
 
-    if order_number:
-        order = db.session.execute(
-            db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
-        ).scalar_one_or_none()
+    if request.method == "POST":
+        searched     = True
+        order_number = request.form.get("order_number", "").strip().upper()
+        phone        = request.form.get("phone", "").strip()
+
+        if order_number:
+            order = db.session.execute(
+                db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+            ).scalar_one_or_none()
+        elif phone:
+            clean_phone = _validate_phone(phone)
+            if clean_phone:
+                orders = db.session.execute(
+                    db.select(OnlineOrder)
+                    .where(OnlineOrder.customer_phone == clean_phone)
+                    .order_by(OnlineOrder.created_at.desc())
+                    .limit(10)
+                ).scalars().all()
+    elif request.args.get("order_number"):
+        order_number = request.args.get("order_number", "").strip().upper()
+        if order_number:
+            order = db.session.execute(
+                db.select(OnlineOrder).where(OnlineOrder.order_number == order_number)
+            ).scalar_one_or_none()
 
     return render_template(
         "store/track.html",
-        order=order, order_number=order_number,
+        order=order, orders=orders, searched=searched,
+        order_number=order_number,
         settings=settings, customer=g.customer,
     )
 
@@ -1614,19 +1641,25 @@ def wishlist_toggle():
 
 @store_bp.route("/wishlist")
 def wishlist():
-    """View customer's wishlist."""
+    """View customer's wishlist — returns Product objects for the template."""
     from ...models.wishlist_item import WishlistItem
     settings = _settings()
     cust = g.customer
     if not cust:
         flash("Please sign in to view your wishlist.", "info")
         return redirect(url_for("store.login", next=url_for("store.wishlist")))
-    items = db.session.execute(
-        db.select(WishlistItem)
+    # Join Product so template can access p.name, p.selling_price, p.image_filename etc.
+    rows = db.session.execute(
+        db.select(WishlistItem, Product)
+        .join(Product, Product.id == WishlistItem.product_id)
         .where(WishlistItem.customer_phone == cust.phone)
         .order_by(WishlistItem.created_at.desc())
-    ).scalars().all()
+    ).all()
+    # Pass Product objects directly — template iterates `for p in items`
+    items = [row.Product for row in rows]
+    selling_fast_ids = _selling_fast_ids()
     return render_template("store/wishlist.html", items=items,
+                           selling_fast_ids=selling_fast_ids,
                            settings=settings, customer=cust)
 
 
@@ -1698,48 +1731,6 @@ def sitemap():
 
 # ── SEO: sitemap.xml ──────────────────────────────────────────────────────────
 
-@store_bp.route("/sitemap.xml")
-def sitemap():
-    """Auto-generated sitemap for SEO crawlers."""
-    from flask import make_response
-    from datetime import date
-    products = db.session.execute(
-        db.select(Product)
-        .where(Product.is_active == True)  # noqa: E712
-        .order_by(Product.id)
-    ).scalars().all()
-
-    today = date.today().isoformat()
-    base = request.url_root.rstrip("/")
-
-    urls = [
-        f"  <url><loc>{base}/store/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>",
-        f"  <url><loc>{base}/store/products</loc><changefreq>daily</changefreq><priority>0.9</priority></url>",
-        f"  <url><loc>{base}/store/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"  <url><loc>{base}/store/contact</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"  <url><loc>{base}/store/faq</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-    ]
-    for p in products:
-        slug = getattr(p, "slug", None) or str(p.id)
-        urls.append(
-            f"  <url><loc>{base}/store/product/{slug}</loc>"
-            f"<lastmod>{today}</lastmod>"
-            f"<changefreq>weekly</changefreq><priority>0.8</priority></url>"
-        )
-
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "\n".join(urls)
-        + "\n</urlset>"
-    )
-    resp = make_response(xml, 200)
-    resp.headers["Content-Type"] = "application/xml"
-    return resp
-
-
-# ── SEO: robots.txt ───────────────────────────────────────────────────────────
-
 @store_bp.route("/robots.txt")
 def robots():
     """robots.txt — allow crawlers, block private pages."""
@@ -1761,196 +1752,3 @@ Sitemap: {base}/store/sitemap.xml
 
 
 # ── Cart count API (for nav badge) ───────────────────────────────────────────
-@store_bp.route("/cart/count")
-def cart_count():
-    cart = session.get("cart", {})
-    return jsonify({"count": sum(int(v) for v in cart.values())})
-
-
-# ── Cart AJAX add (returns JSON for JS handler) ───────────────────────────────
-@store_bp.route("/cart/add", methods=["POST"])
-def cart_add():
-    csrf.protect()
-    product_id = request.form.get("product_id") or request.json and request.json.get("product_id")
-    qty = max(1, int(request.form.get("qty", 1)))
-    if not product_id:
-        return jsonify({"ok": False, "error": "No product specified"})
-    product = db.session.get(Product, int(product_id))
-    if not product or not product.is_active:
-        return jsonify({"ok": False, "error": "Product not found"})
-    if product.quantity < qty:
-        return jsonify({"ok": False, "error": f"Only {product.quantity} available"})
-    cart = session.get("cart", {})
-    key = str(product_id)
-    new_qty = cart.get(key, 0) + qty
-    if new_qty > product.quantity:
-        return jsonify({"ok": False, "error": f"Only {product.quantity} available"})
-    cart[key] = new_qty
-    session["cart"] = cart
-    session.modified = True
-    total_count = sum(int(v) for v in cart.values())
-    return jsonify({"ok": True, "cart_count": total_count, "product_name": product.name})
-
-
-# ── Search suggestions API ────────────────────────────────────────────────────
-@store_bp.route("/search/suggestions")
-def search_suggestions_api():
-    q = request.args.get("q", "").strip()
-    if len(q) < 2:
-        return jsonify({"results": []})
-    products = db.session.execute(
-        db.select(Product)
-        .where(Product.is_active.isnot(False), Product.quantity > 0)
-        .where(db.or_(
-            Product.name.ilike(f"%{q}%"),
-            Product.category.ilike(f"%{q}%"),
-            Product.description.ilike(f"%{q}%"),
-        ))
-        .order_by(Product.name)
-        .limit(8)
-    ).scalars().all()
-    results = []
-    for p in products:
-        img_url = product_image_url(p.image_filename, 100) if p.image_filename else None
-        results.append({
-            "id": p.id,
-            "name": p.name,
-            "category": p.category or "",
-            "price": float(p.selling_price),
-            "image_filename": p.image_filename or "",
-            "image_url": img_url or "",
-        })
-    return jsonify({"results": results})
-
-
-# ── Apply promo code API ──────────────────────────────────────────────────────
-@store_bp.route("/promo/apply", methods=["POST"])
-def apply_promo():
-    data = request.get_json(silent=True) or {}
-    code = (data.get("code") or request.form.get("promo_code", "")).strip().upper()
-    if not code:
-        return jsonify({"ok": False, "message": "Please enter a promo code."})
-    try:
-        from ...models.promotion import Promotion
-        from datetime import date
-        promo = db.session.execute(
-            db.select(Promotion).where(
-                Promotion.code == code,
-                Promotion.is_active == True,  # noqa: E712
-                db.or_(Promotion.start_date == None, Promotion.start_date <= date.today()),
-                db.or_(Promotion.end_date == None, Promotion.end_date >= date.today()),
-            )
-        ).scalar_one_or_none()
-        if not promo:
-            return jsonify({"ok": False, "message": "Invalid or expired promo code."})
-        disc = float(promo.discount_value or 0)
-        if getattr(promo, "discount_type", "flat") == "percent":
-            msg = f"Code applied! {disc:.0f}% discount."
-        else:
-            msg = f"Code applied! NPR {disc:.0f} off."
-        session["promo_code"] = code
-        session.modified = True
-        return jsonify({"ok": True, "message": msg, "discount": disc})
-    except Exception:
-        return jsonify({"ok": False, "message": "Could not apply promo code."})
-
-
-# ── Notify when back in stock ─────────────────────────────────────────────────
-@store_bp.route("/product/<int:product_id>/notify", methods=["POST"])
-def notify_stock(product_id):
-    phone = request.form.get("phone", "").strip()
-    name = request.form.get("name", "Customer").strip()
-    product = db.session.get(Product, product_id)
-    if not product:
-        flash("Product not found.", "danger")
-        return redirect(url_for("store.home"))
-    # Log notification request (simple flash for now — extend with NotifyStockRequest model)
-    try:
-        from ...services.notification_service import send_notification
-        send_notification(
-            phone,
-            f"[GoldKernel] Hi {name}! We'll SMS you when '{product.name}' is back in stock."
-        )
-    except Exception:
-        pass
-    flash(f"✅ We'll notify you at {phone} when {product.name} is available!", "success")
-    return redirect(url_for("store.product_detail", product_id=product_id))
-
-
-# ── Wishlist toggle (AJAX) ────────────────────────────────────────────────────
-@store_bp.route("/wishlist/toggle", methods=["POST"])
-def wishlist_toggle():
-    from ...models.wishlist_item import WishlistItem
-    if not g.customer:
-        phone = session.get("store_customer_phone")
-        if not phone:
-            return jsonify({"ok": False, "redirect": url_for("store.login")})
-    else:
-        phone = g.customer.phone
-    product_id = int(request.form.get("product_id", 0))
-    if not product_id:
-        return jsonify({"ok": False, "error": "No product"})
-    existing = db.session.execute(
-        db.select(WishlistItem).where(
-            WishlistItem.customer_phone == phone,
-            WishlistItem.product_id == product_id,
-        )
-    ).scalar_one_or_none()
-    if existing:
-        db.session.delete(existing)
-        db.session.commit()
-        return jsonify({"ok": True, "wishlisted": False})
-    else:
-        item = WishlistItem(customer_phone=phone, product_id=product_id)
-        if g.customer:
-            item.customer_account_id = g.customer.id
-        db.session.add(item)
-        db.session.commit()
-        return jsonify({"ok": True, "wishlisted": True})
-
-
-# ── Wishlist remove (form POST) ───────────────────────────────────────────────
-@store_bp.route("/wishlist/remove", methods=["POST"])
-def wishlist_remove():
-    from ...models.wishlist_item import WishlistItem
-    phone = g.customer.phone if g.customer else session.get("store_customer_phone", "")
-    product_id = int(request.form.get("product_id", 0))
-    if phone and product_id:
-        item = db.session.execute(
-            db.select(WishlistItem).where(
-                WishlistItem.customer_phone == phone,
-                WishlistItem.product_id == product_id,
-            )
-        ).scalar_one_or_none()
-        if item:
-            db.session.delete(item)
-            db.session.commit()
-    flash("Removed from wishlist.", "info")
-    return redirect(request.referrer or url_for("store.wishlist"))
-
-
-# ── Forgot password (store customer) ─────────────────────────────────────────
-@store_bp.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
-    if request.method == "POST":
-        phone = request.form.get("phone", "").strip()
-        from ...models.customer_account import CustomerAccount
-        acc = db.session.execute(
-            db.select(CustomerAccount).where(CustomerAccount.phone == phone)
-        ).scalar_one_or_none()
-        if acc:
-            # Simple reset — send temp password via SMS
-            import secrets as _sec
-            tmp = _sec.token_hex(3).upper()
-            from ...services.notification_service import send_notification
-            try:
-                send_notification(phone, f"[GoldKernel] Your temp password: {tmp}  — Login and change it immediately.")
-                from ...extensions import bcrypt
-                acc.password_hash = bcrypt.generate_password_hash(tmp).decode()
-                db.session.commit()
-            except Exception:
-                pass
-        flash("If your number is registered, you'll receive an SMS shortly.", "info")
-        return redirect(url_for("store.login"))
-    settings = _settings()
-    return render_template("store/forgot_password.html", settings=settings)
