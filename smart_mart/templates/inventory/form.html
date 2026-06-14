@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ action }} Product — Goldkernel{% endblock %}
+{% block title %}{{ action }} Product — Smart Mart{% endblock %}
 {% block page_title %}{{ action }} Product{% endblock %}
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}">Products</a></li>
@@ -205,7 +205,7 @@
                 <!-- Current image preview -->
                 {% if product and product.image_filename %}
                 <div class="text-center" id="currentImageBox">
-                  <img src="{{ url_for('static', filename='uploads/products/' ~ product.image_filename) }}"
+                  <img src="{{ (product_image_url(product.image_filename, 300) or url_for('static', filename='uploads/products/' ~ product.image_filename)) }}"
                        alt="{{ product.name }}" id="imagePreview"
                        style="width:80px;height:80px;object-fit:cover;border-radius:10px;border:2px solid #e2e8f0;">
                   <div class="mt-1">
@@ -423,7 +423,35 @@ This will OVERWRITE existing description, image and pack size.')">
       reader.readAsDataURL(file);
     });
   }
-  </script>
+    // Live image preview when user picks a file
+  const fileInput = document.querySelector('input[name="product_image"]');
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      if (!this.files || !this.files[0]) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        let prev = document.getElementById('imgPreview');
+        if (!prev) {
+          prev = document.createElement('img');
+          prev.id = 'imgPreview';
+          prev.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;';
+          fileInput.parentElement.insertBefore(prev, fileInput);
+        }
+        if (prev.tagName === 'IMG') {
+          prev.src = e.target.result;
+        } else {
+          // Replace placeholder div with img
+          const img = document.createElement('img');
+          img.id = 'imgPreview';
+          img.src = e.target.result;
+          img.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;margin-bottom:.5rem;display:block;';
+          prev.replaceWith(img);
+        }
+      };
+      reader.readAsDataURL(this.files[0]);
+    });
+  }
+</script>
 {% endblock %}
 
 {% block scripts %}
@@ -559,5 +587,33 @@ This will OVERWRITE existing description, image and pack size.')">
       reader.readAsDataURL(file);
     });
   }
-  </script>
+    // Live image preview when user picks a file
+  const fileInput = document.querySelector('input[name="product_image"]');
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      if (!this.files || !this.files[0]) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        let prev = document.getElementById('imgPreview');
+        if (!prev) {
+          prev = document.createElement('img');
+          prev.id = 'imgPreview';
+          prev.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;';
+          fileInput.parentElement.insertBefore(prev, fileInput);
+        }
+        if (prev.tagName === 'IMG') {
+          prev.src = e.target.result;
+        } else {
+          // Replace placeholder div with img
+          const img = document.createElement('img');
+          img.id = 'imgPreview';
+          img.src = e.target.result;
+          img.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;margin-bottom:.5rem;display:block;';
+          prev.replaceWith(img);
+        }
+      };
+      reader.readAsDataURL(this.files[0]);
+    });
+  }
+</script>
 {% endblock %}
