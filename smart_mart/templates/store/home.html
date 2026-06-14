@@ -66,10 +66,19 @@
   <a href="{{ url_for('store.home', q=q or '') }}" class="cpill {% if not selected_category %}active{% endif %}">
     <i class="bi bi-grid-fill"></i> All
   </a>
+  {% set cat_emojis = {
+    'Almonds':'🥜','Cashews':'🌰','Pistachios':'🫘','Walnuts':'🪨',
+    'Raisins':'🍇','Dried Fruits':'🍒','Dates':'🌴','Figs':'🟤',
+    'Seeds':'🌻','Pumpkin Seeds':'🎃','Sunflower Seeds':'🌻',
+    'Chocolates':'🍫','Mixed':'🎁','Peanuts':'🥜','Macadamia':'🟡',
+    'Hazelnuts':'🌰','Apricots':'🍑','Cranberries':'🍓','Blueberries':'🫐',
+    'Prunes':'🟣','Coconut':'🥥','Gift Sets':'🎁','Combos':'📦',
+  } %}
   {% for cat in categories %}
+  {% set emoji = cat_emojis.get(cat, '') %}
   <a href="{{ url_for('store.home', category=cat, q=q or '') }}"
      class="cpill {% if selected_category == cat %}active{% endif %}">
-    {{ cat }}
+    {% if emoji %}<span style="margin-right:.25rem;">{{ emoji }}</span>{% endif %}{{ cat }}
   </a>
   {% endfor %}
 </div>
