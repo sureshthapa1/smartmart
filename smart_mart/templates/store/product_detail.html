@@ -146,6 +146,18 @@
         </button>
       </div>
 
+      {# WhatsApp Order button #}
+      {% if settings and settings.phone %}
+      <a id="wa-order-btn"
+         href="https://wa.me/977{{ settings.phone | replace(' ','') | replace('-','') | replace('+977','') | replace('+','') }}?text={{ ('Hi! I want to order: ' ~ product.name ~ ' (NPR ' ~ (product.selling_price | int | string) ~ '). Please confirm availability.') | urlencode }}"
+         target="_blank" rel="noopener"
+         style="display:flex;align-items:center;gap:.65rem;padding:.62rem 1.25rem;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border-radius:var(--r-f);font-weight:700;font-size:.875rem;text-decoration:none;box-shadow:0 4px 16px rgba(34,197,94,.28);margin-bottom:.65rem;transition:opacity .15s;">
+        <i class="bi bi-whatsapp" style="font-size:1.1rem;"></i>
+        Order via WhatsApp
+        <span style="margin-left:auto;font-size:.7rem;opacity:.82;font-weight:600;">Quick response</span>
+      </a>
+      {% endif %}
+
       {# Cart qty note #}
       {% if cart_qty > 0 %}
       <div style="font-size:.8rem;color:var(--brand);margin-bottom:.85rem;display:flex;align-items:center;gap:.4rem;">
@@ -361,6 +373,10 @@ function changeQty(d){
 const shareMsg=encodeURIComponent('Check out {{ product.name }} on GoldKernel — NPR {{ "%.0f"|format(product.selling_price) }}: '+window.location.href);
 const waBtn=document.getElementById('wa-share');
 if(waBtn) waBtn.href='https://wa.me/?text='+shareMsg;
+// WhatsApp order button — product-specific
+const waOrderBtn=document.getElementById('wa-order-btn');
+// URL is already server-rendered; just ensure it opens correctly
+
 
 function copyLink(){
   navigator.clipboard.writeText(window.location.href).then(()=>{
