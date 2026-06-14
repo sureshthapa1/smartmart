@@ -186,7 +186,7 @@
             <td>
               <div class="d-flex align-items-center gap-2">
                 {% if p.image_filename %}
-                <img src="{{ url_for('static', filename='uploads/products/' ~ p.image_filename) }}"
+                <img src="{{ (product_image_url(p.image_filename, 80) or url_for('static', filename='uploads/products/' ~ p.image_filename)) }}"
                      style="width:30px;height:30px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid #e2e8f0">
                 {% else %}
                 <div style="width:30px;height:30px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">📦</div>
