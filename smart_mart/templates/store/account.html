@@ -94,7 +94,7 @@
       <div class="ucard">
         <div class="ucard-head"><i class="bi bi-person" style="color:var(--brand);"></i><span class="ucard-title">Edit Profile</span></div>
         <div class="ucard-body">
-          <form method="post" action="{{ url_for('store.update_profile') }}">
+          <form method="post" action="{{ url_for('store.account_update') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
               <div class="col-sm-6">
@@ -125,7 +125,7 @@
           </form>
           <hr class="dv" style="margin:1.5rem 0;">
           <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:.75rem;">Change Password</div>
-          <form method="post" action="{{ url_for('store.change_password') }}">
+          <form method="post" action="{{ url_for('store.account_change_password') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
               <div class="col-sm-6">
