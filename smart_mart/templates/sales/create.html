@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>New Sale — Goldkernel</title>
+  <title>New Sale — Smart Mart</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,7 +41,7 @@
     </a>
     <div class="d-flex align-items-center gap-2 ms-2">
       <div style="width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#fff"><i class="bi bi-shop"></i></div>
-      <span style="color:#fff;font-weight:700;font-size:.95rem">Goldkernel</span>
+      <span style="color:#fff;font-weight:700;font-size:.95rem">Smart Mart</span>
     </div>
     <div class="d-flex gap-2 ms-auto">
       <a href="{{ url_for('inventory.list_products') }}" class="btn btn-sm" style="background:#1e293b;color:#94a3b8;border:none;border-radius:8px">
@@ -324,6 +324,37 @@
 
         </div>
       </div>
+      <!-- ── Quick Product Picker ─────────────────────────────────────── -->
+      <div class="card shadow-sm mb-3" id="quickPickerCard">
+        <div class="card-header d-flex align-items-center gap-2 py-2"
+             onclick="togglePicker()" style="cursor:pointer;user-select:none;">
+          <i class="bi bi-grid-fill text-primary"></i>
+          <span class="fw-semibold">Quick Add Products</span>
+          <span class="text-muted small ms-1">click to add to sale</span>
+          <i class="bi bi-chevron-down ms-auto" id="pickerChevron" style="transition:transform .2s;"></i>
+        </div>
+        <div class="card-body p-2" id="pickerBody">
+          <div id="catPills" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.55rem;padding:.1rem .1rem;">
+            <button type="button" class="cat-pill active" onclick="filterCat(this,'')">All</button>
+          </div>
+          <div id="prodGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.4rem;max-height:300px;overflow-y:auto;padding:.1rem;"></div>
+        </div>
+      </div>
+      <style>
+        .cat-pill{padding:.2rem .65rem;border-radius:999px;border:1.5px solid #e2e8f0;background:transparent;font-size:.7rem;font-weight:600;color:#64748b;cursor:pointer;transition:all .14s;}
+        .cat-pill:hover,.cat-pill.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-color:transparent;color:#fff;}
+        .ppick{border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;padding:.4rem .3rem .45rem;cursor:pointer;text-align:center;transition:all .16s;position:relative;display:flex;flex-direction:column;align-items:center;gap:.18rem;overflow:hidden;}
+        .ppick:hover{border-color:#6366f1;box-shadow:0 2px 12px rgba(99,102,241,.18);transform:translateY(-2px);}
+        .ppick-img{width:56px;height:56px;object-fit:cover;border-radius:7px;display:block;}
+        .ppick-ph{width:56px;height:56px;border-radius:7px;background:linear-gradient(135deg,#fef9ee,#fde68a);display:flex;align-items:center;justify-content:center;font-size:1.45rem;}
+        .ppick-name{font-size:.64rem;font-weight:700;color:#1e293b;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%;margin-top:.05rem;}
+        .ppick-price{font-size:.68rem;font-weight:800;color:#6366f1;}
+        .ppick-stock{position:absolute;top:.2rem;right:.2rem;font-size:.52rem;font-weight:800;padding:.1em .38em;border-radius:4px;}
+        .ppick-add{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:.62rem;font-weight:700;padding:.16rem 0;opacity:0;transition:opacity .16s;}
+        .ppick:hover .ppick-add{opacity:1;}
+        .ppick.oos{opacity:.42;cursor:not-allowed;pointer-events:none;}
+      </style>
+
       <div class="card shadow-sm mb-3">
         <div class="card-header d-flex align-items-center gap-2 py-3">
           <i class="bi bi-cart3 text-primary"></i>
@@ -454,9 +485,79 @@
   <script>
     const PRODUCTS = [
       {% for p in products %}
-      { id: {{ p.id }}, name: {{ p.name | tojson }}, sku: {{ p.sku | tojson }}, barcode: {{ (p.barcode or '') | tojson }}, price: {{ p.selling_price | float }}, stock: {{ p.quantity }} }{% if not loop.last %},{% endif %}
+      {
+        id: {{ p.id }},
+        name: {{ p.name | tojson }},
+        sku: {{ p.sku | tojson }},
+        barcode: {{ (p.barcode or '') | tojson }},
+        price: {{ p.selling_price | float }},
+        stock: {{ p.quantity }},
+        category: {{ (p.category or '') | tojson }},
+        img: {{ (product_image_url(p.image_filename, 80) or '') | tojson }}
+      }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
+
+    // Quick-lookup by id
+    const PRODUCT_MAP = {};
+    PRODUCTS.forEach(p => { PRODUCT_MAP[p.id] = p; });
+
+    // ── Quick Product Picker ──────────────────────────────────────────────
+    let pickerOpen = true;
+    let activeCat = '';
+
+    function togglePicker() {
+      pickerOpen = !pickerOpen;
+      document.getElementById('pickerBody').style.display = pickerOpen ? '' : 'none';
+      document.getElementById('pickerChevron').style.transform = pickerOpen ? '' : 'rotate(-90deg)';
+    }
+
+    function filterCat(btn, cat) {
+      activeCat = cat;
+      document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      renderGrid();
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('prodGrid');
+      const filtered = activeCat ? PRODUCTS.filter(p => p.category === activeCat) : PRODUCTS;
+      grid.innerHTML = filtered.map(p => {
+        const oos = p.stock <= 0;
+        const low = p.stock > 0 && p.stock <= 5;
+        const stockBadge = oos
+          ? `<span class="ppick-stock" style="background:#fee2e2;color:#dc2626;">OUT</span>`
+          : (low ? `<span class="ppick-stock" style="background:#fef3c7;color:#92400e;">${p.stock} left</span>` : '');
+        const imgHtml = p.img
+          ? `<img src="${p.img}" alt="${p.name.replace(/"/g,'')}" loading="lazy" onerror="this.outerHTML='<div class=\'ppick-ph\'>🥜</div>'">`
+          : `<div class="ppick-ph">🥜</div>`;
+        return `<div class="ppick${oos ? ' oos' : ''}" onclick="${oos ? '' : `addRow(${p.id},1,${p.price})`}" title="${p.name} — NPR ${p.price}">
+          ${imgHtml}
+          ${stockBadge}
+          <div class="ppick-name">${p.name}</div>
+          <div class="ppick-price">NPR ${p.price.toFixed(0)}</div>
+          ${oos ? '' : '<div class="ppick-add"><i class="bi bi-plus-lg"></i> Add</div>'}
+        </div>`;
+      }).join('');
+    }
+
+    function buildCatPills() {
+      const cats = [...new Set(PRODUCTS.map(p => p.category).filter(Boolean))].sort();
+      const pills = document.getElementById('catPills');
+      cats.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cat-pill';
+        btn.dataset.cat = cat;
+        btn.textContent = cat;
+        btn.onclick = function() { filterCat(this, cat); };
+        pills.appendChild(btn);
+      });
+    }
+
+    // Init picker on page load
+    buildCatPills();
+    renderGrid();
 
     let rowIndex = 0;
 
@@ -466,12 +567,59 @@
         const sel = p.id === selectedId ? ' selected' : '';
         const outOfStock = p.stock <= 0;
         const lowStock = p.stock > 0 && p.stock <= 5;
-        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (only ${p.stock} left)` : ` (stock: ${p.stock})`);
+        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (only ${p.stock} left)` : ` (${p.stock} in stock)`);
         const disabled = outOfStock ? ' disabled' : '';
         const style = outOfStock ? ' style="color:#ef4444"' : (lowStock ? ' style="color:#f97316"' : '');
-        html += `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}">${p.name}${stockLabel}</option>`;
+        html += `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}" data-img="${p.img || ''}" data-category="${p.category || ''}">${p.name}${stockLabel}</option>`;
       });
       return html;
+    }
+
+    // Show product thumbnail + info when a product is selected in a row
+    function onProductSelected(selectEl) {
+      const opt = selectEl.options[selectEl.selectedIndex];
+      if (!opt || !opt.value) return;
+      const tr = selectEl.closest('tr');
+      if (!tr) return;
+      const pid = parseInt(opt.value);
+      const prod = PRODUCT_MAP[pid];
+      if (!prod) return;
+      // Update price input
+      const priceInput = tr.querySelector('.price-input');
+      if (priceInput && (!priceInput.dataset.manuallyEdited)) {
+        priceInput.value = prod.price.toFixed(2);
+      }
+      // Update/create product thumb in the row
+      let thumb = tr.querySelector('.pos-thumb');
+      if (!thumb) {
+        const nameCell = tr.querySelector('td:first-child');
+        if (nameCell) {
+          thumb = document.createElement('div');
+          thumb.className = 'pos-thumb';
+          thumb.style.cssText = 'width:36px;height:36px;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#fef9ee,#fde68a);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;border:1px solid #fde68a;margin-bottom:4px;';
+          nameCell.insertBefore(thumb, nameCell.firstChild);
+        }
+      }
+      if (thumb) {
+        if (prod.img) {
+          thumb.innerHTML = `<img src="${prod.img}" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy" onerror="this.parentElement.innerHTML='🥜'">`;
+        } else {
+          thumb.textContent = '🥜';
+        }
+      }
+      // Show category chip
+      let catChip = tr.querySelector('.pos-cat');
+      if (!catChip && prod.category) {
+        const nameCell = tr.querySelector('td:first-child');
+        if (nameCell) {
+          catChip = document.createElement('div');
+          catChip.className = 'pos-cat';
+          catChip.style.cssText = 'font-size:.62rem;color:#64748b;font-weight:600;margin-top:2px;';
+          nameCell.appendChild(catChip);
+        }
+      }
+      if (catChip) catChip.textContent = prod.category || '';
+      recalcRow(tr);
     }
 
     // Client-side stock check — warn before submit if qty > available stock
@@ -542,9 +690,13 @@
 
       sel.addEventListener('change', () => {
         const opt = sel.options[sel.selectedIndex];
-        if (opt && opt.dataset.price) price.value = parseFloat(opt.dataset.price).toFixed(2);
+        if (opt && opt.dataset.price && !price.dataset.manuallyEdited) {
+          price.value = parseFloat(opt.dataset.price).toFixed(2);
+        }
+        onProductSelected(sel);
         updateRowSubtotal(tr); recalcTotal();
       });
+      price.addEventListener('focus', () => { price.dataset.manuallyEdited = '1'; });
       qty.addEventListener('input', () => { updateRowSubtotal(tr); recalcTotal(); });
       price.addEventListener('input', () => { updateRowSubtotal(tr); recalcTotal(); });
       removeBtn.addEventListener('click', () => { tr.remove(); recalcTotal(); });
