@@ -171,6 +171,43 @@ def create_app(config_name="development"):
         app.jinja_env.globals["product_image_url"] = _fallback_img_url
         app.jinja_env.filters["product_image_url"] = _fallback_img_url
 
+    # ── Markdown filter for product descriptions ─────────────────────────
+    def _make_md_filter():
+        try:
+            import markdown as _md
+            def _md_filter(text):
+                if not text:
+                    return ""
+                return _md.markdown(text, extensions=["nl2br", "sane_lists"], output_format="html")
+            return _md_filter
+        except ImportError:
+            import re as _re2
+            def _md_fallback(text):
+                if not text:
+                    return ""
+                t = _re2.sub(r"[*][*](.+?)[*][*]", r"<strong></strong>", text)
+                t = _re2.sub(r"[*](.+?)[*]", r"<em></em>", t)
+                parts = []
+                in_ul = False
+                for line in t.split("\n"):
+                    s = line.strip()
+                    if s.startswith("- ") or s.startswith("* "):
+                        if not in_ul:
+                            parts.append("<ul>")
+                            in_ul = True
+                        parts.append("<li>" + s[2:] + "</li>")
+                    else:
+                        if in_ul:
+                            parts.append("</ul>")
+                            in_ul = False
+                        if s:
+                            parts.append("<p>" + s + "</p>")
+                if in_ul:
+                    parts.append("</ul>")
+                return "\n".join(parts)
+            return _md_fallback
+    app.jinja_env.filters["markdown"] = _make_md_filter()
+
     @app.template_filter("nst")
     def nst_filter(dt, fmt="%Y-%m-%d %H:%M"):
         """Convert a naive UTC datetime to Nepal Standard Time (UTC+5:45)."""
@@ -317,7 +354,6 @@ def _register_blueprints(app):
         (".blueprints.ai_chat", "ai_chat_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
-        (".blueprints.mcp", "mcp_bp"),
     ]
 
     for module_path, bp_name in blueprints:
@@ -345,33 +381,6 @@ def _register_blueprints(app):
     try:
         from .blueprints.ecommerce_api import ecommerce_api_bp as _ecommerce_api_bp
         csrf.exempt(_ecommerce_api_bp)
-    except Exception:
-        pass
-
-    try:
-        from .blueprints.mcp import mcp_bp as _mcp_bp
-        csrf.exempt(_mcp_bp)
-    except Exception:
-        pass
-
-    # Exempt public API endpoints called by JS from store pages
-    try:
-        from .blueprints.api.routes import (
-            cart_recommendations, product_recommendations,
-            rag_search, rag_index_stats,
-        )
-        csrf.exempt(cart_recommendations)
-        csrf.exempt(product_recommendations)
-        csrf.exempt(rag_search)
-        csrf.exempt(rag_index_stats)
-    except Exception:
-        pass
-
-    # Exempt store chatbot (called via fetch from base_store.html widget)
-    try:
-        from .blueprints.store.routes import store_chat_api, store_chat_stream
-        csrf.exempt(store_chat_api)
-        csrf.exempt(store_chat_stream)
     except Exception:
         pass
 
