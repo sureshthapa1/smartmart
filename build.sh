@@ -157,6 +157,14 @@ with app.app_context():
             safe_add(conn, "wishlist_items", "customer_account_id",
                      "INTEGER REFERENCES customer_accounts(id) ON DELETE SET NULL")
 
+            # ── ShopSettings — social media + website URL fields ─────────────────
+            safe_add(conn, "shop_settings", "facebook_url",    "VARCHAR(255)")
+            safe_add(conn, "shop_settings", "instagram_url",   "VARCHAR(255)")
+            safe_add(conn, "shop_settings", "twitter_url",     "VARCHAR(255)")
+            safe_add(conn, "shop_settings", "tiktok_url",      "VARCHAR(255)")
+            safe_add(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)")
+            safe_add(conn, "shop_settings", "website_url",     "VARCHAR(255)")
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
