@@ -89,6 +89,7 @@
       {% endfor %}
     </div>
     <div class="d-flex align-items-end gap-2 p-2" style="border:1.5px solid #e2e8f0;border-radius:12px;background:#f8fafc">
+      <input type="hidden" id="convId" value="">
       <textarea class="chat-input" id="messageInput" rows="1"
                 placeholder="Ask about your business..." autocomplete="off"
                 {% if not api_key_configured %}disabled{% endif %}></textarea>
@@ -138,20 +139,72 @@ async function ask(message) {
   addMsg('user', message);
   history.push({role:'user', content:message});
   sendBtn.disabled = true;
-  const bubble = addMsg('assistant', '', true);
+
+  // Add streaming bubble
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  row.innerHTML = '<div class="avatar-bot">🤖</div>';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble bot';
+  bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  row.appendChild(bubble);
+  chatBox.appendChild(row);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  let fullReply = '';
+  const convIdInput = document.getElementById('convId');
+  const convId = convIdInput ? convIdInput.value : null;
+
   try {
-    const res = await fetch('/ai/chat/ask', {
+    const resp = await fetch('/ai/chat/stream', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message, history: history.slice(-10)})
+      body: JSON.stringify({message, history: history.slice(-10), conversation_id: convId || null})
     });
-    const data = await res.json();
-    const reply = data.reply || data.error || 'Sorry, I could not get a response.';
-    bubble.innerHTML = md(reply);
-    history.push({role:'assistant', content:reply});
+    if (!resp.ok || !resp.body) throw new Error('stream unavailable');
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    bubble.innerHTML = '';
+
+    while(true) {
+      const {done, value} = await reader.read();
+      if(done) break;
+      const chunk = decoder.decode(value, {stream:true});
+      for(const line of chunk.split('\n')) {
+        if(!line.startsWith('data:')) continue;
+        try {
+          const evt = JSON.parse(line.slice(5).trim());
+          if(evt.token) {
+            fullReply += evt.token;
+            bubble.innerHTML = md(fullReply);
+            chatBox.scrollTop = chatBox.scrollHeight;
+          }
+          if(evt.done && evt.conversation_id && convIdInput) {
+            convIdInput.value = evt.conversation_id;
+          }
+          if(evt.error) { bubble.innerHTML = '<span class="text-danger">Error: '+evt.error+'</span>'; }
+        } catch(e) {}
+      }
+    }
   } catch(e) {
-    bubble.innerHTML = '<span class="text-danger">AI Advisor is unavailable right now. Please try again.</span>';
+    // Fallback to non-streaming
+    try {
+      const res = await fetch('/ai/chat/ask', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({message, history: history.slice(-10), conversation_id: convId || null})
+      });
+      const data = await res.json();
+      fullReply = data.reply || data.error || 'Sorry, I could not get a response.';
+      bubble.innerHTML = md(fullReply);
+      if(data.conversation_id && convIdInput) convIdInput.value = data.conversation_id;
+    } catch(e2) {
+      bubble.innerHTML = '<span class="text-danger">AI Advisor is unavailable right now.</span>';
+    }
   }
+
+  if(fullReply) history.push({role:'assistant', content:fullReply});
   chatBox.scrollTop = chatBox.scrollHeight;
   sendBtn.disabled = false;
   msgInput.focus();

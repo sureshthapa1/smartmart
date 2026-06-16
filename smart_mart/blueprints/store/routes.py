@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
+import os
 import re
 import time
 import uuid
@@ -12,7 +14,7 @@ from urllib.parse import urlparse
 
 from flask import (
     Blueprint, Response, jsonify, redirect, render_template,
-    request, session, url_for, flash, g
+    request, session, url_for, flash, g, stream_with_context
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -1530,6 +1532,108 @@ def store_chat_api():
     from ...services.store_ai_service import chatbot_reply
     reply = chatbot_reply(message, history=history, customer_name=cust_name)
     return jsonify({"ok": True, "reply": reply})
+
+
+@store_bp.route("/api/chat/stream", methods=["POST"])
+@limiter.limit("20/minute")
+def store_chat_stream():
+    """
+    SSE streaming endpoint for the store chatbot widget.
+    Streams Claude reply tokens progressively — no waiting for full response.
+
+    SSE events:
+      data: {"token": "..."}         — partial text
+      data: {"done": true}           — stream finished
+      data: {"error": "..."}         — error
+    """
+    data    = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    history = data.get("history") or []
+    if not message:
+        return jsonify({"ok": False, "error": "Empty message"}), 400
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        # No API key — return keyword reply as a single SSE event (non-streaming)
+        from ...services.store_ai_service import _keyword_chatbot_reply
+        reply = _keyword_chatbot_reply(message)
+        def _fallback():
+            yield f"data: {json.dumps({'token': reply})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        return Response(stream_with_context(_fallback()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    cust_name = g.customer.name if g.customer else None
+
+    # Build RAG-grounded system prompt
+    try:
+        from ...services.rag_service import rag_context_for_query
+        rag_ctx = rag_context_for_query(message, top_k=6)
+    except Exception:
+        from ...services.store_ai_service import _build_product_context, CHATBOT_SYSTEM
+        rag_ctx = _build_product_context()
+
+    from ...services.store_ai_service import CHATBOT_SYSTEM
+    system = CHATBOT_SYSTEM.format(product_context=rag_ctx)
+    if cust_name:
+        system += f"\n\nThe customer's name is {cust_name}. Address them occasionally."
+
+    messages = []
+    for turn in (history or [])[-6:]:
+        role    = turn.get("role", "user")
+        content = turn.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": message})
+
+    import json as _json
+    import urllib.request as _req
+
+    def generate():
+        try:
+            body = _json.dumps({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 300,
+                "stream": True,
+                "system": system,
+                "messages": messages,
+            }).encode()
+            req = _req.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=body, method="POST",
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+            )
+            with _req.urlopen(req, timeout=30) as resp:
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data_str = line[5:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        event = _json.loads(data_str)
+                    except Exception:
+                        continue
+                    if event.get("type") == "content_block_delta":
+                        delta = event.get("delta", {})
+                        if delta.get("type") == "text_delta":
+                            token = delta.get("text", "")
+                            if token:
+                                yield f"data: {_json.dumps({'token': token})}\n\n"
+                    elif event.get("type") == "message_stop":
+                        break
+        except Exception as exc:
+            yield f"data: {_json.dumps({'error': str(exc)})}\n\n"
+            return
+        yield f"data: {_json.dumps({'done': True})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 

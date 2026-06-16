@@ -17,7 +17,7 @@ from .user_permissions import UserPermissions
 from .user_activity import UserActivity
 from .customer import Customer
 from .product_icon_map import ProductIconMap
-from .ai_memory import AIModelVersion, AIRecommendation, AIAlert, AIRetrainingLog, AIFeedbackLog
+from .ai_memory import AIModelVersion, AIRecommendation, AIAlert, AIRetrainingLog, AIFeedbackLog, ChatConversation, ChatMessage
 from .online_order import OnlineOrder, OnlineOrderItem
 from .ecommerce import StockReservation, EcommercePayment, SyncLog
 from .ai_enhancements import (
@@ -77,6 +77,7 @@ __all__ = [
     "Expense", "StockMovement", "ShopSettings",
     "UserPermissions", "UserActivity", "Customer", "ProductIconMap",
     "AIModelVersion", "AIRecommendation", "AIAlert", "AIRetrainingLog", "AIFeedbackLog",
+    "ChatConversation", "ChatMessage",
     "OnlineOrder", "OnlineOrderItem",
     "StockReservation", "EcommercePayment", "SyncLog",
     "LoyaltyWallet", "LoyaltyWalletTransaction", "CustomerDuplicateFlag",

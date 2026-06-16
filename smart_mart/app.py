@@ -369,8 +369,9 @@ def _register_blueprints(app):
 
     # Exempt store chatbot (called via fetch from base_store.html widget)
     try:
-        from .blueprints.store.routes import store_chat_api
+        from .blueprints.store.routes import store_chat_api, store_chat_stream
         csrf.exempt(store_chat_api)
+        csrf.exempt(store_chat_stream)
     except Exception:
         pass
 

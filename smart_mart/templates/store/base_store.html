@@ -696,24 +696,68 @@ document.addEventListener('click',function(e){
     if(qr) qr.style.display = 'none';
     inp.value = '';
     send.disabled = true;
-    const ti = typingIndicator();
+
+    // Add streaming bot bubble
+    const botBubble = document.createElement('div');
+    botBubble.className = 'cmsg bot';
+    botBubble.textContent = '…';
+    msgs.appendChild(botBubble);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    let fullReply = '';
     try {
       const csrf = document.querySelector('meta[name=csrf-token]')?.content || '';
-      const resp = await fetch('/store/api/chat', {
+      const resp = await fetch('/store/api/chat/stream', {
         method:'POST',
         headers:{'Content-Type':'application/json', 'X-CSRFToken': csrf},
         credentials:'same-origin',
         body: JSON.stringify({message: text, history: history.slice(-8)}),
       });
-      const data = await resp.json();
-      const reply = data.reply || data.error || 'Sorry, I could not get a response right now.';
-      ti.remove();
-      const rb = addMsg('bot', reply);
-      history.push({role:'assistant', content:reply});
+
+      if (!resp.ok || !resp.body) throw new Error('Stream unavailable');
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      botBubble.textContent = '';
+
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, {stream: true});
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          try {
+            const evt = JSON.parse(line.slice(5).trim());
+            if (evt.token) {
+              fullReply += evt.token;
+              botBubble.textContent = fullReply;
+              msgs.scrollTop = msgs.scrollHeight;
+            }
+            if (evt.done) break;
+            if (evt.error) { botBubble.textContent = 'Sorry, something went wrong.'; break; }
+          } catch(e) {}
+        }
+      }
     } catch(e) {
-      ti.remove();
-      addMsg('bot', 'Connection error. Please try again.');
+      // Fallback to non-streaming
+      try {
+        const csrf = document.querySelector('meta[name=csrf-token]')?.content || '';
+        const r = await fetch('/store/api/chat', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-CSRFToken':csrf},
+          credentials:'same-origin',
+          body: JSON.stringify({message: text, history: history.slice(-8)}),
+        });
+        const d = await r.json();
+        fullReply = d.reply || d.error || 'Sorry, I could not get a response.';
+        botBubble.textContent = fullReply;
+      } catch(e2) {
+        botBubble.textContent = 'Connection error. Please try again.';
+      }
     }
+
+    if (fullReply) history.push({role:'assistant', content:fullReply});
     send.disabled = false;
     inp.focus();
   }

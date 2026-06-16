@@ -219,6 +219,27 @@ def _title_case(s: str) -> str:
     return " ".join(result)
 
 
-def batch_analyze_images(filenames: list[str]) -> list[dict]:
-    """Analyze multiple product images at once."""
-    return [analyze_product_image(f) for f in filenames]
+def recognize_from_filename(filename: str) -> dict:
+    """Analyze a product image by filename — tries Claude vision if file exists."""
+    import os
+    from flask import current_app
+    image_path = None
+    try:
+        upload_dir = os.path.join(current_app.static_folder, "uploads", "products")
+        candidate = os.path.join(upload_dir, filename)
+        if os.path.exists(candidate):
+            image_path = candidate
+    except Exception:
+        pass
+
+    if image_path:
+        vision_result = _claude_vision_analyze(image_path)
+        if vision_result:
+            return vision_result
+
+    return analyze_product_image(filename)
+
+
+def recognize_from_text(text: str) -> dict:
+    """Analyze a product by text/name description."""
+    return analyze_product_image(text + ".jpg")

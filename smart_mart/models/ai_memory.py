@@ -76,3 +76,34 @@ class AIRetrainingLog(db.Model):
     new_accuracy = db.Column(db.Float, nullable=True)
     improvement = db.Column(db.Float, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
+
+
+class ChatConversation(db.Model):
+    """Persistent conversation history for the AI Business Advisor chat."""
+    __tablename__ = "chat_conversations"
+
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    title       = db.Column(db.String(120), nullable=True)   # auto-generated from first message
+    created_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at  = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                             onupdate=lambda: datetime.now(timezone.utc))
+    is_archived = db.Column(db.Boolean, default=False)
+
+    messages = db.relationship(
+        "ChatMessage", back_populates="conversation",
+        cascade="all, delete-orphan", order_by="ChatMessage.created_at"
+    )
+
+
+class ChatMessage(db.Model):
+    """Individual message in a ChatConversation."""
+    __tablename__ = "chat_messages"
+
+    id              = db.Column(db.Integer, primary_key=True)
+    conversation_id = db.Column(db.Integer, db.ForeignKey("chat_conversations.id"), nullable=False)
+    role            = db.Column(db.String(10), nullable=False)   # "user" | "assistant"
+    content         = db.Column(db.Text, nullable=False)
+    created_at      = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    conversation = db.relationship("ChatConversation", back_populates="messages")
