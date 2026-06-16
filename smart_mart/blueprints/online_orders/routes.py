@@ -223,13 +223,21 @@ def update_status(order_id):
 
     # SMS customer if phone available and provider configured
     try:
-        if order.customer_phone and new_status in ("confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"):
+        SMS_STATUSES = {"confirmed","preparing","shipped","out_for_delivery","delivered","cancelled","processing"}
+        if order.customer_phone and new_status in SMS_STATUSES:
             from ...services.notification_service import notify_order_status
+            from ...models.shop_settings import ShopSettings
+            _s = ShopSettings.get()
+            _shop = getattr(_s, "shop_name", "GoldKernel") or "GoldKernel"
+            _app_url = getattr(_s, "website_url", "") or ""
+            _track_url = f"{_app_url.rstrip('/')}/store/track?order_number={order.order_number}" if _app_url else ""
             notify_order_status(
                 customer_name=order.customer_name or "Customer",
                 phone=order.customer_phone,
                 order_number=order.order_number,
                 status=new_status,
+                shop_name=_shop,
+                track_url=_track_url,
             )
     except Exception:
         pass  # SMS failure must never block the status update
