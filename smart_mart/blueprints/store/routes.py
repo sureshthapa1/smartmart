@@ -4,8 +4,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import json
-import os
 import re
 import time
 import uuid
@@ -14,7 +12,7 @@ from urllib.parse import urlparse
 
 from flask import (
     Blueprint, Response, jsonify, redirect, render_template,
-    request, session, url_for, flash, g, stream_with_context
+    request, session, url_for, flash, g
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -94,6 +92,41 @@ def _slugify(text: str) -> str:
     return text[:120]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _build_product_stmt(q="", category="", min_price="", max_price=""):
+    """DRY helper: build a product SELECT with common filters. Used by home() for
+    both the product query and the count — avoids duplicating 40 lines of filter logic."""
+    from sqlalchemy import or_ as _or_
+    stmt = db.select(Product).where(
+        Product.is_active.isnot(False),
+        Product.quantity > 0,
+    )
+    if q:
+        expanded = SEARCH_ALIASES.get(q.lower(), q)
+        terms = list({q.lower(), expanded.lower()})
+        conds = []
+        for t in terms:
+            conds += [
+                Product.name.ilike(f"%{t}%"),
+                Product.category.ilike(f"%{t}%"),
+                Product.description.ilike(f"%{t}%"),
+                Product.sku.ilike(f"%{t}%"),
+            ]
+        stmt = stmt.where(_or_(*conds))
+    if category:
+        stmt = stmt.where(Product.category == category)
+    if min_price:
+        try:
+            stmt = stmt.where(Product.selling_price >= float(min_price))
+        except ValueError:
+            pass
+    if max_price:
+        try:
+            stmt = stmt.where(Product.selling_price <= float(max_price))
+        except ValueError:
+            pass
+    return stmt
+
 
 def _settings():
     try:
@@ -226,37 +259,12 @@ def home():
     page = max(1, int(request.args.get("page", 1)))
     per_page = 48
 
-    # Count total for pagination
-    count_stmt = db.select(func.count(Product.id)).where(
-        Product.is_active.isnot(False), Product.quantity > 0
-    )
-    if q:
-        q_expanded = SEARCH_ALIASES.get(q.lower(), q)
-        term = f"%{q_expanded.lower()}%"
-        term_orig = f"%{q.lower()}%"
-        count_stmt = count_stmt.where(db.or_(
-            func.lower(Product.name).like(term),
-            func.lower(Product.name).like(term_orig),
-            func.lower(func.coalesce(Product.category, "")).like(term),
-            func.lower(func.coalesce(Product.category, "")).like(term_orig),
-            func.lower(func.coalesce(Product.sku, "")).like(term_orig),
-            func.lower(func.coalesce(Product.description, "")).like(term_orig),
-        ))
-    if category:
-        count_stmt = count_stmt.where(
-            func.lower(func.coalesce(Product.category, "")) == category.lower()
-        )
-    if min_price:
-        try:
-            count_stmt = count_stmt.where(Product.selling_price >= float(min_price))
-        except ValueError:
-            pass
-    if max_price:
-        try:
-            count_stmt = count_stmt.where(Product.selling_price <= float(max_price))
-        except ValueError:
-            pass
-    total_products = db.session.execute(count_stmt).scalar() or 0
+    # Count total using same base stmt (before sort/limit/offset are applied)
+    # Re-use _build_product_stmt helper to avoid duplicating filter logic
+    _base_for_count = _build_product_stmt(q, category, min_price, max_price)
+    total_products = db.session.execute(
+        db.select(func.count()).select_from(_base_for_count.subquery())
+    ).scalar() or 0
 
     offset = (page - 1) * per_page
     products   = db.session.execute(stmt.limit(per_page).offset(offset)).scalars().all()
@@ -431,13 +439,16 @@ def product_detail(product_id):
     settings = _settings()
     _maybe_expire_reservations()
 
-    # FEATURE 7: Cart abandonment recovery flash for returning visitors
+    # Cart abandonment recovery flash — only if cart is 30+ min old
     if not session.get("cart_recovery_shown") and session.get("cart"):
-        _cart_data = {k: v for k, v in session["cart"].items()
-                      if str(v).isdigit() and int(v) > 0}
-        if _cart_data and not g.customer:
-            session["cart_recovery_shown"] = True
-            flash("👜 You left some items in your cart!", "info")
+        import time as _time
+        cart_ts = session.get("cart_created_at", _time.time())
+        if (_time.time() - cart_ts) > 1800:   # 30 minutes
+            _cart_data = {k: v for k, v in session["cart"].items()
+                          if str(v).isdigit() and int(v) > 0}
+            if _cart_data:
+                session["cart_recovery_shown"] = True
+                flash("👜 You left some items in your cart — they're waiting for you!", "info")
     avail = available_quantity(product)
 
     # Auto-populate slug if missing (Improvement 13)
@@ -453,12 +464,9 @@ def product_detail(product_id):
             except Exception:
                 db.session.rollback()
 
-    # AI recommendations (co-purchase affinity + collaborative filtering, falls back to same-category)
-    from ...services.recommendation_service import get_product_recommendations
-    from ...services.store_ai_service import selling_fast_ids as _sfi
-    from flask_login import current_user as _cu
-    _phone = g.customer.phone if g.customer else None
-    recommendations = get_product_recommendations(product.id, customer_phone=_phone, limit=4)
+    # AI recommendations (co-purchase affinity, falls back to same-category)
+    from ...services.store_ai_service import get_recommendations, selling_fast_ids as _sfi
+    recommendations = get_recommendations(product.id, limit=4)
 
     # Fallback related (same category) for the elif in template
     related = db.session.execute(
@@ -498,6 +506,23 @@ def product_detail(product_id):
     avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0
     user_reviewed = any(r.customer_phone == (g.customer.phone if g.customer else "") for r in reviews)
 
+    # Social proof: orders count this month
+    from datetime import date as _dt2, timedelta as _td2
+    _month_ago = _dt2.today() - _td2(days=30)
+    sold_count = 0
+    try:
+        sold_count = db.session.execute(
+            db.select(func.sum(OnlineOrderItem.quantity))
+            .join(OnlineOrder, OnlineOrder.id == OnlineOrderItem.order_id)
+            .where(
+                OnlineOrderItem.product_id == product.id,
+                OnlineOrder.created_at >= _month_ago,
+                OnlineOrder.status.notin_(["cancelled"]),
+            )
+        ).scalar() or 0
+    except Exception:
+        sold_count = 0
+
     # Wishlist status
     wishlisted = False
     if g.customer:
@@ -521,9 +546,11 @@ def product_detail(product_id):
         avg_rating=avg_rating,
         user_reviewed=user_reviewed,
         wishlisted=wishlisted,
+        sold_count=int(sold_count),
         settings=settings,
         customer=g.customer,
         max_qty=MAX_QTY_PER_ITEM,
+        selling_fast_ids=_sfi(),
     )
 
 
@@ -555,9 +582,9 @@ def cart():
     delivery    = _calc_delivery(subtotal)
     grand_total = subtotal + delivery
 
-    # AI: cart recommendations (advanced co-purchase + collab)
+    # AI: cart recommendations
     _cart_pids = [int(pid) for pid in raw_cart.keys() if str(pid).isdigit()]
-    from ...services.recommendation_service import get_cart_recommendations
+    from ...services.store_ai_service import get_cart_recommendations
     cart_recs = get_cart_recommendations(_cart_pids, limit=4) if items else []
 
     return render_template(
@@ -742,16 +769,22 @@ def checkout():
                         Promotion.is_active == True,
                     )
                 ).scalar_one_or_none()
-                if promo is None:
-                    flash(f"Promo code '{promo_code}' is not valid.", "warning")
-                elif hasattr(promo, 'end_date') and promo.end_date and promo.end_date < date.today():
-                    flash(f"Promo code '{promo_code}' has expired.", "warning")
-                elif hasattr(promo, 'discount_pct') and promo.discount_pct:
-                    discount_amount = round(float(subtotal) * float(promo.discount_pct) / 100, 2)
-                    flash(f"Code '{promo_code}' applied: {promo.discount_pct}% off", "success")
-                elif hasattr(promo, 'discount_amount') and promo.discount_amount:
-                    discount_amount = min(float(promo.discount_amount), float(subtotal))
-                    flash(f"Code '{promo_code}' applied: NPR {discount_amount:.0f} off", "success")
+                if promo is None or not promo.is_currently_active:
+                    flash(f"Promo code '{promo_code}' is not valid or has expired.", "warning")
+                else:
+                    # Use model's calculate_discount() — handles percentage, fixed, bogo, bundle
+                    discount_amount = promo.calculate_discount(subtotal)
+                    if discount_amount > 0:
+                        if promo.promo_type == "percentage":
+                            flash(f"✅ Code '{promo_code}' applied: {float(promo.discount_value):.0f}% off (−NPR {discount_amount:.0f})", "success")
+                        else:
+                            flash(f"✅ Code '{promo_code}' applied: −NPR {discount_amount:.0f}", "success")
+                    else:
+                        min_req = float(promo.min_purchase or 0)
+                        if min_req > 0 and subtotal < min_req:
+                            flash(f"Code '{promo_code}' requires minimum order of NPR {min_req:.0f}.", "warning")
+                        else:
+                            flash(f"Code '{promo_code}' applied but no discount for this order.", "info")
             except Exception:
                 pass  # promo system not available
 
@@ -817,12 +850,30 @@ def checkout():
                      "email": cust.email or "", "address": cust.address or "",
                      "area": cust.area or ""}
 
+    # Loyalty wallet for checkout
+    loyalty_pts = 0
+    loyalty_npr = 0.0
+    try:
+        if cust:
+            from ...services.loyalty_wallet_service import get_or_create_wallet, wallet_snapshot
+            _w = get_or_create_wallet(cust.name, cust.phone)
+            if _w:
+                _snap = wallet_snapshot(_w)
+                loyalty_pts = int(_snap.get("points_balance", 0))
+                _rpp = float(getattr(settings, "loyalty_rupee_per_point", 1.0) or 1.0)
+                loyalty_npr = round(loyalty_pts * _rpp, 2)
+    except Exception:
+        pass
+
     return render_template(
         "store/checkout.html",
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings,
         form_data=form_data, customer=cust,
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        loyalty_pts=loyalty_pts,
+        loyalty_npr=loyalty_npr,
+        discount=0.0,
     )
 
 
@@ -1024,10 +1075,26 @@ def my_account():
         .where(OnlineOrder.customer_phone == cust.phone)
     ).scalar() or 0
     total_pages = (total_orders + per_page - 1) // per_page
+    # Loyalty wallet balance
+    loyalty_pts  = 0
+    loyalty_npr  = 0.0
+    try:
+        from ...services.loyalty_wallet_service import get_or_create_wallet, wallet_snapshot
+        _w = get_or_create_wallet(cust.name, cust.phone)
+        if _w:
+            _snap = wallet_snapshot(_w)
+            loyalty_pts = int(_snap.get("points_balance", 0))
+            _rpp = float(getattr(settings, "loyalty_rupee_per_point", 1.0) or 1.0)
+            loyalty_npr = round(loyalty_pts * _rpp, 2)
+    except Exception:
+        pass
+
     return render_template("store/account.html", settings=settings,
                            customer=cust, orders=orders,
                            page=page, total_pages=total_pages,
-                           total_orders=total_orders)
+                           total_orders=total_orders,
+                           loyalty_pts=loyalty_pts,
+                           loyalty_npr=loyalty_npr)
 
 
 @store_bp.route("/account/update", methods=["POST"])
@@ -1169,6 +1236,9 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
 
 @store_bp.route("/order/<order_number>/payment")
 def payment_pending(order_number):
+    # Fetch reservation expiry for countdown timer
+    from ...models.ecommerce import StockReservation
+    import datetime as _dt
     settings = _settings()
     last_order = session.get("last_order", "")
     owns_order = (last_order == order_number)
@@ -1187,10 +1257,25 @@ def payment_pending(order_number):
         f"{order.grand_total:.2f}", order.order_number, _esewa_product_code()
     )
     esewa_product_code = _esewa_product_code()
+    # Reservation countdown
+    from ...models.ecommerce import StockReservation as _SR
+    reservation_expires_at = None
+    try:
+        _res = db.session.execute(
+            db.select(_SR)
+            .where(_SR.order_id == order.id, _SR.status == "active")
+            .order_by(_SR.expires_at.asc()).limit(1)
+        ).scalar_one_or_none()
+        if _res and _res.expires_at:
+            reservation_expires_at = _res.expires_at.isoformat()
+    except Exception:
+        pass
+
     return render_template("store/payment_pending.html", order=order,
                            settings=settings, customer=cust,
                            esewa_signature=esewa_signature,
-                           esewa_product_code=esewa_product_code)
+                           esewa_product_code=esewa_product_code,
+                           reservation_expires_at=reservation_expires_at)
 
 
 @store_bp.route("/payment/<order_number>/callback/<provider>")
@@ -1534,108 +1619,6 @@ def store_chat_api():
     return jsonify({"ok": True, "reply": reply})
 
 
-@store_bp.route("/api/chat/stream", methods=["POST"])
-@limiter.limit("20/minute")
-def store_chat_stream():
-    """
-    SSE streaming endpoint for the store chatbot widget.
-    Streams Claude reply tokens progressively — no waiting for full response.
-
-    SSE events:
-      data: {"token": "..."}         — partial text
-      data: {"done": true}           — stream finished
-      data: {"error": "..."}         — error
-    """
-    data    = request.get_json(silent=True) or {}
-    message = (data.get("message") or "").strip()
-    history = data.get("history") or []
-    if not message:
-        return jsonify({"ok": False, "error": "Empty message"}), 400
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        # No API key — return keyword reply as a single SSE event (non-streaming)
-        from ...services.store_ai_service import _keyword_chatbot_reply
-        reply = _keyword_chatbot_reply(message)
-        def _fallback():
-            yield f"data: {json.dumps({'token': reply})}\n\n"
-            yield f"data: {json.dumps({'done': True})}\n\n"
-        return Response(stream_with_context(_fallback()), mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-    cust_name = g.customer.name if g.customer else None
-
-    # Build RAG-grounded system prompt
-    try:
-        from ...services.rag_service import rag_context_for_query
-        rag_ctx = rag_context_for_query(message, top_k=6)
-    except Exception:
-        from ...services.store_ai_service import _build_product_context, CHATBOT_SYSTEM
-        rag_ctx = _build_product_context()
-
-    from ...services.store_ai_service import CHATBOT_SYSTEM
-    system = CHATBOT_SYSTEM.format(product_context=rag_ctx)
-    if cust_name:
-        system += f"\n\nThe customer's name is {cust_name}. Address them occasionally."
-
-    messages = []
-    for turn in (history or [])[-6:]:
-        role    = turn.get("role", "user")
-        content = turn.get("content", "")
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": message})
-
-    import json as _json
-    import urllib.request as _req
-
-    def generate():
-        try:
-            body = _json.dumps({
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 300,
-                "stream": True,
-                "system": system,
-                "messages": messages,
-            }).encode()
-            req = _req.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=body, method="POST",
-                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                         "content-type": "application/json"},
-            )
-            with _req.urlopen(req, timeout=30) as resp:
-                for raw_line in resp:
-                    line = raw_line.decode("utf-8").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data_str = line[5:].strip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        event = _json.loads(data_str)
-                    except Exception:
-                        continue
-                    if event.get("type") == "content_block_delta":
-                        delta = event.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            token = delta.get("text", "")
-                            if token:
-                                yield f"data: {_json.dumps({'token': token})}\n\n"
-                    elif event.get("type") == "message_stop":
-                        break
-        except Exception as exc:
-            yield f"data: {_json.dumps({'error': str(exc)})}\n\n"
-            return
-        yield f"data: {_json.dumps({'done': True})}\n\n"
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
 
 # ── FEATURE 1: Active promo codes display ─────────────────────────────────────
 
@@ -1777,7 +1760,11 @@ def wishlist():
 # ── Admin: Trigger bulk autofill for all existing products ────────────────────
 
 @store_bp.route("/api/autofill-all-products", methods=["POST"])
+@login_required
 def autofill_all_products():
+    from flask_login import current_user
+    if not current_user.is_authenticated or getattr(current_user, "role", "") != "admin":
+        return jsonify({"error": "Admin access required"}), 403
     """
     Trigger AI autofill for all products missing description or image.
     Protected by admin session — callable from admin panel or directly.
@@ -1836,21 +1823,26 @@ def sitemap():
     return Response(xml, mimetype="application/xml")
 
 
-# ── SEO: robots.txt ───────────────────────────────────────────────────────────
+# ── SEO: sitemap.xml ──────────────────────────────────────────────────────────
 
 @store_bp.route("/robots.txt")
 def robots():
     """robots.txt — allow crawlers, block private pages."""
+    from flask import make_response
     base = request.url_root.rstrip("/")
-    content = (
-        "User-agent: *\n"
-        "Allow: /store/\n"
-        "Disallow: /store/checkout\n"
-        "Disallow: /store/account\n"
-        "Disallow: /store/cart\n"
-        "Disallow: /dashboard/\n"
-        "Disallow: /admin/\n"
-        "Disallow: /api/\n"
-        f"Sitemap: {base}/store/sitemap.xml\n"
-    )
-    return Response(content, mimetype="text/plain")
+    content = f"""User-agent: *
+Allow: /store/
+Disallow: /store/checkout
+Disallow: /store/account
+Disallow: /store/cart
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Sitemap: {base}/store/sitemap.xml
+"""
+    resp = make_response(content, 200)
+    resp.headers["Content-Type"] = "text/plain"
+    return resp
+
+
+# ── Cart count API (for nav badge) ───────────────────────────────────────────
