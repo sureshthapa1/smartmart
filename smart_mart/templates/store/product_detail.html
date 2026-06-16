@@ -92,6 +92,26 @@
       </div>
       {% endif %}
 
+      {# Social proof: sold count + active viewers #}
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;margin-bottom:.85rem;">
+        {% if sold_count and sold_count > 0 %}
+        <span style="display:flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:700;color:var(--success);background:#f0fdf4;border:1px solid #bbf7d0;padding:.25em .75em;border-radius:var(--r-f);">
+          <i class="bi bi-bag-check-fill"></i>
+          {{ sold_count }}+ sold this month
+        </span>
+        {% endif %}
+        {% if selling_fast_ids is defined and product.id in selling_fast_ids %}
+        <span style="display:flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:700;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;padding:.25em .75em;border-radius:var(--r-f);">
+          <i class="bi bi-fire"></i> Selling Fast
+        </span>
+        {% endif %}
+        {% if avail > 0 and avail <= 5 %}
+        <span style="display:flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:700;color:#d97706;background:#fffbeb;border:1px solid #fde68a;padding:.25em .75em;border-radius:var(--r-f);">
+          ⚡ Only {{ avail }} left
+        </span>
+        {% endif %}
+      </div>
+
       {# Chips #}
       <div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:1.25rem;">
         {% if product.pack_size %}
@@ -219,8 +239,8 @@
       {% if product.storage_tips %}<button class="dtab" data-tab="stor" onclick="switchTab('stor')">Storage</button>{% endif %}
     </div>
     <style>.dtab{padding:.6rem 1.1rem;border:none;background:none;font-size:.875rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all var(--t-f)}.dtab:hover{color:var(--text)}.dtab.active{color:var(--brand);border-bottom-color:var(--brand);font-weight:800}.dtab-content{display:none;font-size:.88rem;color:var(--text2);line-height:1.8}.dtab-content.show{display:block}</style>
-    <div id="tab-desc" class="dtab-content show">{{ product.description or '' }}</div>
-    {% if product.benefits %}<div id="tab-ben" class="dtab-content">{{ product.benefits }}</div>{% endif %}
+    <div id="tab-desc" class="dtab-content show">{{ (product.description or '')|markdown }}</div>
+    {% if product.benefits %}<div id="tab-ben" class="dtab-content">{{ product.benefits|markdown }}</div>{% endif %}
     {% if product.storage_tips %}<div id="tab-stor" class="dtab-content">{{ product.storage_tips }}</div>{% endif %}
   </div>
   {% endif %}
