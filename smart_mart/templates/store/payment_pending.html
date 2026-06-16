@@ -1,83 +1,133 @@
 {% extends "store/base_store.html" %}
-{% block title %}Complete Payment — {{ settings.shop_name if settings else 'Goldkernel Dryfruits and Treats' }}{% endblock %}
+{% block title %}Complete Payment — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
 <div class="sc" style="padding-top:2rem;padding-bottom:4rem;">
   <div style="max-width:520px;margin:0 auto;">
-    <div class="ui-card fade-up" style="overflow:hidden;">
+    <div class="ucard fu" style="overflow:hidden;">
 
-      <!-- Header — warm brand gradient (consistent with rest of site) -->
       <div style="background:var(--brand-grad);padding:2rem;text-align:center;color:#fff;">
         {% set pm_icons = {'esewa':'📱','khalti':'💜','ime_pay':'🏦'} %}
         {% set pm_names = {'esewa':'eSewa','khalti':'Khalti','ime_pay':'IME Pay'} %}
         <div style="font-size:2.5rem;margin-bottom:.6rem;">{{ pm_icons.get(order.payment_mode,'💳') }}</div>
         <h2 style="font-size:1.2rem;font-weight:900;margin:0 0 .3rem;">Complete Your Payment</h2>
-        <p style="color:rgba(255,255,255,.82);font-size:.875rem;margin:0;">Order placed! Pay to confirm.</p>
+        <p style="color:rgba(255,255,255,.82);font-size:.875rem;margin:0;">Order placed! Pay to confirm your items.</p>
       </div>
 
       <div style="padding:1.5rem 1.75rem;">
-        <!-- Order number + amount -->
-        <div style="display:flex;gap:.75rem;align-items:center;background:var(--brand-light);border:1.5px solid #fde68a;border-radius:var(--r-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;">
+
+        {# ── Reservation countdown timer ── #}
+        {% if reservation_expires_at %}
+        <div id="countdown-wrap" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:var(--r-l);padding:.9rem 1.1rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:.55rem;font-size:.85rem;font-weight:700;color:#dc2626;">
+            <i class="bi bi-clock-fill"></i>
+            Items reserved for:
+          </div>
+          <div id="countdown-timer" style="font-size:1.5rem;font-weight:900;color:#dc2626;font-variant-numeric:tabular-nums;font-family:monospace;">
+            --:--
+          </div>
+        </div>
+        <div id="countdown-expired" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:var(--r-l);padding:.9rem 1.1rem;margin-bottom:1.25rem;display:none;text-align:center;">
+          <div style="font-weight:800;color:#dc2626;margin-bottom:.3rem;">⏰ Reservation Expired</div>
+          <div style="font-size:.82rem;color:#991b1b;">Your items may no longer be available.</div>
+          <a href="{{ url_for('store.cart') }}" class="btn-brand" style="margin-top:.75rem;padding:.5rem 1rem;font-size:.82rem;display:inline-flex;">Go to Cart</a>
+        </div>
+        {% endif %}
+
+        {# ── Order number + amount ── #}
+        <div style="display:flex;gap:.75rem;align-items:center;background:var(--brand-l);border:1.5px solid #fde68a;border-radius:var(--r-l);padding:1rem 1.25rem;margin-bottom:1.25rem;">
           <div style="flex:1;">
-            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Order</div>
-            <div class="mono" style="font-size:1.1rem;font-weight:900;color:var(--brand-dark);">{{ order.order_number }}</div>
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Order</div>
+            <div style="font-size:1.1rem;font-weight:900;color:var(--brand-d);font-family:monospace;">{{ order.order_number }}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Amount</div>
-            <div style="font-size:1.35rem;font-weight:900;color:var(--brand-dark);">NPR {{ "%.0f"|format(order.grand_total) }}</div>
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.15rem;">Amount</div>
+            <div style="font-size:1.35rem;font-weight:900;color:var(--brand-d);">NPR {{ "%.0f"|format(order.grand_total) }}</div>
           </div>
         </div>
 
-        <!-- Payment instructions -->
+        {# ── Payment instructions ── #}
         <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:1.25rem;">
           <div style="font-weight:700;font-size:.88rem;color:#1e40af;margin-bottom:.65rem;">
             <i class="bi bi-info-circle me-1"></i>
             How to pay with {{ pm_names.get(order.payment_mode, order.payment_mode|upper) }}:
           </div>
           {% if order.payment_mode == 'esewa' %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.9;">
             <li>Open your <strong>eSewa</strong> app</li>
             <li>Tap <strong>Send Money</strong></li>
             <li>eSewa ID: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
             <li>Amount: <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
             <li>Remarks: <strong>{{ order.order_number }}</strong></li>
-            <li>Screenshot &amp; call us to confirm</li>
+            <li>Screenshot &amp; <a href="{{ url_for('store.contact') }}" style="color:#1e40af;font-weight:700;">contact us</a> to confirm</li>
           </ol>
           {% elif order.payment_mode == 'khalti' %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.9;">
             <li>Open your <strong>Khalti</strong> app</li>
             <li>Tap <strong>Send Money</strong></li>
             <li>Khalti number: <strong>{{ settings.phone if settings and settings.phone else '98XXXXXXXX' }}</strong></li>
             <li>Amount: <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
             <li>Remarks: <strong>{{ order.order_number }}</strong></li>
-            <li>Send screenshot to confirm</li>
+            <li>Send screenshot to <a href="{{ url_for('store.contact') }}" style="color:#1e40af;font-weight:700;">confirm payment</a></li>
           </ol>
           {% else %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.8;">
+          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.9;">
             <li>Open <strong>IME Pay</strong> app</li>
             <li>Transfer <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
             <li>Reference: <strong>{{ order.order_number }}</strong></li>
+            <li>Send confirmation screenshot to us</li>
           </ol>
           {% endif %}
         </div>
 
+        {# ── WhatsApp confirm ── #}
         {% if settings and settings.phone %}
-        <a href="tel:{{ settings.phone }}" class="btn-brand w-100 justify-content-center" style="padding:.7rem;margin-bottom:.65rem;">
-          <i class="bi bi-telephone"></i> Call to Confirm Payment
+        <a href="https://wa.me/977{{ settings.phone | replace(' ','') | replace('-','') | replace('+977','') | replace('+','') }}?text={{ ('Payment sent for order ' ~ order.order_number ~ ' — NPR ' ~ (order.grand_total | int | string) ~ '. Screenshot attached.') | urlencode }}"
+           target="_blank" rel="noopener"
+           style="display:flex;align-items:center;justify-content:center;gap:.6rem;width:100%;padding:.75rem;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border-radius:var(--r-f);font-weight:700;font-size:.9rem;text-decoration:none;margin-bottom:.75rem;box-shadow:0 4px 14px rgba(34,197,94,.3);">
+          <i class="bi bi-whatsapp" style="font-size:1.1rem;"></i> Send Payment Confirmation on WhatsApp
         </a>
         {% endif %}
 
-        <div style="display:flex;gap:.6rem;">
-          <a href="{{ url_for('store.track', order_number=order.order_number) }}"
-             class="btn-outline-brand flex-fill justify-content-center" style="padding:.6rem;">
-            <i class="bi bi-geo-alt"></i> Track Order
-          </a>
-          <a href="{{ url_for('store.home') }}"
-             class="btn-ghost flex-fill justify-content-center" style="padding:.6rem;">
-            <i class="bi bi-shop"></i> Continue
+        <div style="text-align:center;margin-top:.75rem;">
+          <a href="{{ url_for('store.track', order_number=order.order_number) }}" style="font-size:.8rem;color:var(--muted);text-decoration:none;">
+            <i class="bi bi-geo-alt me-1"></i> Track your order
           </a>
         </div>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if reservation_expires_at %}
+<script>
+(function() {
+  const expiresAt = new Date("{{ reservation_expires_at }}");
+  const timer = document.getElementById('countdown-timer');
+  const wrap = document.getElementById('countdown-wrap');
+  const expired = document.getElementById('countdown-expired');
+
+  function update() {
+    const now = new Date();
+    const diff = expiresAt - now;
+    if (diff <= 0) {
+      if (wrap) wrap.style.display = 'none';
+      if (expired) expired.style.display = 'block';
+      return;
+    }
+    const m = Math.floor(diff / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    if (timer) timer.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    // Urgent red flash under 5 min
+    if (m < 5 && wrap) {
+      wrap.style.animation = 'none';
+      timer.style.color = '#dc2626';
+    }
+    setTimeout(update, 1000);
+  }
+  update();
+})();
+</script>
+{% endif %}
 {% endblock %}
