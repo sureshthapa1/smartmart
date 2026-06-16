@@ -89,9 +89,28 @@
           </div>
         </div>
 
-        {# Step 3: Payment #}
+        {# Step 3: Loyalty Points #}
+        {% if loyalty_pts is defined and loyalty_pts > 0 %}
+        <div class="ucard" style="margin-bottom:1.25rem;">
+          <div class="ucard-head"><span class="stepn">3</span><span class="ucard-title">Loyalty Points <span style="font-size:.75rem;font-weight:400;color:var(--muted);">Optional</span></span></div>
+          <div class="ucard-body">
+            <div style="background:linear-gradient(135deg,var(--brand-l),#fff7e6);border:1.5px solid #fde68a;border-radius:var(--r);padding:.9rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+              <div>
+                <div style="font-weight:800;font-size:.9rem;color:var(--brand-d);">🪙 You have {{ loyalty_pts }} loyalty points</div>
+                <div style="font-size:.78rem;color:var(--muted);margin-top:.15rem;">Worth <strong style="color:var(--brand-d);">NPR {{ "%.0f"|format(loyalty_npr) }}</strong> — redeem to reduce your total</div>
+              </div>
+              <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;flex-shrink:0;">
+                <input type="checkbox" name="use_loyalty" value="1" id="use-loyalty-cb"
+                       style="width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;">
+                <span style="font-weight:700;font-size:.85rem;color:var(--brand-d);">Use points</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {# Step 4: Payment #}
         <div class="ucard" style="margin-bottom:1.5rem;">
-          <div class="ucard-head"><span class="stepn">3</span><span class="ucard-title">Payment Method</span></div>
+          <div class="ucard-head"><span class="stepn">4</span><span class="ucard-title">Payment Method</span></div>
           <div class="ucard-body">
             <div class="pm-opts" id="pm-opts">
               {% for val, icon, label, desc in [
