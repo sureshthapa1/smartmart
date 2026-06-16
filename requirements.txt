@@ -22,3 +22,11 @@ cloudinary>=1.36.0
 # Optional: Redis for shared rate-limiting and caching across Gunicorn workers
 # Uncomment when you add a Redis service to render.yaml
 # redis>=5.0.0
+
+# ── AI / RAG / MCP additions ─────────────────────────────────────────────────
+# sentence-transformers: dense vector embeddings for RAG semantic search.
+# Install for significantly better search quality (22 MB model auto-downloads).
+# Falls back to TF-IDF if not installed — app works fine either way.
+# sentence-transformers==3.3.1
+# torch==2.5.1         # required by sentence-transformers (CPU build)
+# numpy>=1.26.0        # required by sentence-transformers

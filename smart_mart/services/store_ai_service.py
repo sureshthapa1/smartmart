@@ -369,6 +369,7 @@ def chatbot_reply(
 ) -> str:
     """
     Generate a Claude-powered reply for the store chatbot.
+    Uses RAG (semantic product search) to ground responses.
     Falls back to a keyword reply if ANTHROPIC_API_KEY is not set.
 
     Args:
@@ -387,8 +388,20 @@ def chatbot_reply(
     if not api_key:
         return _keyword_chatbot_reply(message)
 
-    product_ctx = _build_product_context()
-    system = CHATBOT_SYSTEM.format(product_context=product_ctx)
+    # ── RAG: retrieve semantically relevant products ───────────────────────
+    rag_context = ""
+    try:
+        from .rag_service import rag_context_for_query
+        rag_context = rag_context_for_query(message, top_k=6)
+    except Exception:
+        pass  # fall back to full catalogue context
+
+    if rag_context:
+        system = CHATBOT_SYSTEM.format(product_context=rag_context)
+    else:
+        product_ctx = _build_product_context()
+        system = CHATBOT_SYSTEM.format(product_context=product_ctx)
+
     if customer_name:
         system += f"\n\nThe customer's name is {customer_name}. Address them by name occasionally."
 
@@ -405,7 +418,7 @@ def chatbot_reply(
     try:
         payload = json.dumps({
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 200,
+            "max_tokens": 300,
             "system": system,
             "messages": messages,
         }).encode()

@@ -451,9 +451,12 @@ def product_detail(product_id):
             except Exception:
                 db.session.rollback()
 
-    # AI recommendations (co-purchase affinity, falls back to same-category)
-    from ...services.store_ai_service import get_recommendations, selling_fast_ids as _sfi
-    recommendations = get_recommendations(product.id, limit=4)
+    # AI recommendations (co-purchase affinity + collaborative filtering, falls back to same-category)
+    from ...services.recommendation_service import get_product_recommendations
+    from ...services.store_ai_service import selling_fast_ids as _sfi
+    from flask_login import current_user as _cu
+    _phone = g.customer.phone if g.customer else None
+    recommendations = get_product_recommendations(product.id, customer_phone=_phone, limit=4)
 
     # Fallback related (same category) for the elif in template
     related = db.session.execute(
@@ -550,9 +553,9 @@ def cart():
     delivery    = _calc_delivery(subtotal)
     grand_total = subtotal + delivery
 
-    # AI: cart recommendations
+    # AI: cart recommendations (advanced co-purchase + collab)
     _cart_pids = [int(pid) for pid in raw_cart.keys() if str(pid).isdigit()]
-    from ...services.store_ai_service import get_cart_recommendations
+    from ...services.recommendation_service import get_cart_recommendations
     cart_recs = get_cart_recommendations(_cart_pids, limit=4) if items else []
 
     return render_template(
@@ -1729,26 +1732,21 @@ def sitemap():
     return Response(xml, mimetype="application/xml")
 
 
-# ── SEO: sitemap.xml ──────────────────────────────────────────────────────────
+# ── SEO: robots.txt ───────────────────────────────────────────────────────────
 
 @store_bp.route("/robots.txt")
 def robots():
     """robots.txt — allow crawlers, block private pages."""
-    from flask import make_response
     base = request.url_root.rstrip("/")
-    content = f"""User-agent: *
-Allow: /store/
-Disallow: /store/checkout
-Disallow: /store/account
-Disallow: /store/cart
-Disallow: /dashboard/
-Disallow: /admin/
-Disallow: /api/
-Sitemap: {base}/store/sitemap.xml
-"""
-    resp = make_response(content, 200)
-    resp.headers["Content-Type"] = "text/plain"
-    return resp
-
-
-# ── Cart count API (for nav badge) ───────────────────────────────────────────
+    content = (
+        "User-agent: *\n"
+        "Allow: /store/\n"
+        "Disallow: /store/checkout\n"
+        "Disallow: /store/account\n"
+        "Disallow: /store/cart\n"
+        "Disallow: /dashboard/\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        f"Sitemap: {base}/store/sitemap.xml\n"
+    )
+    return Response(content, mimetype="text/plain")

@@ -630,6 +630,15 @@ def run_all_bots(user_id: int = 1) -> dict:
         logger.exception("Loyalty expiry cron failed: %s", e)
         results["loyalty_expiry"] = {"error": str(e)}
 
+    # ── AI Agent pipeline (new) ───────────────────────────────────────────
+    try:
+        from .ai_agent_runner import run_all_agents
+        agent_results = run_all_agents(user_id=user_id)
+        results["ai_agents"] = agent_results
+    except Exception as e:
+        logger.exception("AI agent pipeline failed: %s", e)
+        results["ai_agents"] = {"error": str(e)}
+
     return {
         "ran_at": datetime.now(timezone.utc).isoformat(),
         "results": results,

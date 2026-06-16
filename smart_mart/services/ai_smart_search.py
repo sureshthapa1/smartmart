@@ -61,12 +61,38 @@ def _parse_query_with_claude(query: str) -> dict | None:
 
 
 def smart_search(query: str) -> dict:
-    """Execute a natural language search and return structured results."""
+    """Execute a natural language search and return structured results.
+
+    For product queries, RAG semantic search is tried first (more accurate),
+    then Claude NLP intent parsing, then keyword fallback.
+    """
     from ..models.product import Product
     from ..models.sale import Sale
     from ..models.customer import Customer
     from ..models.expense import Expense
     from ..models.supplier import Supplier
+
+    # ── RAG-powered product search ────────────────────────────────────────
+    # Try RAG first for short-to-medium product queries
+    if len(query.split()) <= 8:
+        try:
+            from .rag_service import rag_search
+            rag_results = rag_search(query, top_k=5, in_stock_only=False)
+            if rag_results:
+                results = []
+                for r in rag_results:
+                    results.append({
+                        "type": "product", "icon": "bi-box-seam", "color": "#6366f1",
+                        "label": r["name"],
+                        "sub": f"{r['category']} | NPR {r['price']:,.0f} | "
+                               f"{'In stock' if r['in_stock'] else 'Out of stock'}",
+                        "url": f"/inventory/{r['product_id']}/edit",
+                        "score": r["score"],
+                    })
+                if results:
+                    return {"results": results, "intent": {"type": "product", "method": "rag"}, "query": query}
+        except Exception:
+            pass  # fall through to intent-based search
 
     results = []
     intent = _parse_query_with_claude(query)

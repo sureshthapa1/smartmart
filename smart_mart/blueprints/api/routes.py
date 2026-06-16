@@ -939,3 +939,153 @@ def alert_count():
         import logging
         logging.getLogger(__name__).warning("alert_count endpoint error: %s", exc)
         return jsonify({"global_alert_count": 0, "pending_orders_count": 0})
+
+
+# ── RAG Semantic Search ───────────────────────────────────────────────────────
+
+@api_bp.route("/rag/search")
+@login_required
+@limiter.limit("30 per minute")
+def rag_search():
+    """
+    Semantic product search using RAG (dense or TF-IDF embeddings).
+    Returns ranked products most relevant to a natural-language query.
+
+    GET /api/rag/search?q=sugar-free+gift+box&top_k=5&in_stock=true
+    """
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify({"ok": False, "error": "Query too short"}), 400
+
+    top_k    = min(int(request.args.get("top_k", 5)), 20)
+    in_stock = request.args.get("in_stock", "true").lower() != "false"
+
+    try:
+        from ...services.rag_service import rag_search as _rag_search
+        results = _rag_search(q, top_k=top_k, in_stock_only=in_stock)
+        return jsonify({"ok": True, "query": q, "results": results})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@api_bp.route("/rag/index/stats")
+@login_required
+def rag_index_stats():
+    """Return RAG index health stats."""
+    try:
+        from ...services.rag_service import index_stats
+        return jsonify({"ok": True, **index_stats()})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@api_bp.route("/rag/index/rebuild", methods=["POST"])
+@admin_required
+def rag_rebuild():
+    """Force-rebuild the RAG product index. Admin only."""
+    try:
+        from ...services.rag_service import build_index
+        count = build_index(force=True)
+        return jsonify({"ok": True, "products_indexed": count})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ── Advanced Recommendations ──────────────────────────────────────────────────
+
+@api_bp.route("/products/<int:product_id>/recommendations")
+@limiter.limit("60 per minute")
+def product_recommendations(product_id):
+    """
+    Get product recommendations using co-purchase + collaborative filtering + LLM.
+    Public endpoint — used on product detail and cart pages.
+
+    GET /api/products/1/recommendations?phone=98XXXXXXXX&limit=5
+    """
+    phone = request.args.get("phone", "").strip() or None
+    limit = min(int(request.args.get("limit", 5)), 10)
+
+    try:
+        from ...services.recommendation_service import get_product_recommendations
+        recs = get_product_recommendations(product_id, customer_phone=phone, limit=limit)
+        return jsonify({
+            "ok": True,
+            "product_id": product_id,
+            "recommendations": [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "category": p.category or "",
+                    "price": float(p.selling_price),
+                    "quantity": p.quantity,
+                    "slug": p.slug or "",
+                    "image": p.image_filename or "",
+                }
+                for p in recs
+            ],
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@api_bp.route("/cart/recommendations", methods=["POST"])
+@limiter.limit("30 per minute")
+def cart_recommendations():
+    """
+    Recommendations for the cart page.
+    POST body: {"product_ids": [1, 2, 3], "limit": 4}
+    """
+    data = request.get_json(silent=True) or {}
+    pids = [int(i) for i in (data.get("product_ids") or []) if str(i).isdigit()]
+    limit = min(int(data.get("limit", 4)), 8)
+
+    if not pids:
+        return jsonify({"ok": False, "error": "product_ids required"}), 400
+
+    try:
+        from ...services.recommendation_service import get_cart_recommendations
+        recs = get_cart_recommendations(pids, limit=limit)
+        return jsonify({
+            "ok": True,
+            "recommendations": [
+                {
+                    "id": p.id, "name": p.name, "category": p.category or "",
+                    "price": float(p.selling_price), "quantity": p.quantity,
+                    "slug": p.slug or "", "image": p.image_filename or "",
+                }
+                for p in recs
+            ],
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ── AI Agent Manual Trigger ────────────────────────────────────────────────────
+
+@api_bp.route("/agents/run/<agent_name>", methods=["POST"])
+@admin_required
+def run_single_agent(agent_name):
+    """
+    Manually trigger a single AI agent.
+    POST /api/agents/run/rag_index
+    POST /api/agents/run/daily_nlg
+    POST /api/agents/run/auto_restock
+    """
+    try:
+        from ...services.ai_agent_runner import run_agent
+        result = run_agent(agent_name, user_id=current_user.id)
+        return jsonify({"ok": True, "agent": agent_name, "result": result})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@api_bp.route("/agents/run", methods=["POST"])
+@admin_required
+def run_all_agents():
+    """Run all AI agents immediately. Admin only."""
+    try:
+        from ...services.ai_agent_runner import run_all_agents as _run
+        result = _run(user_id=current_user.id)
+        return jsonify({"ok": True, "result": result})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500

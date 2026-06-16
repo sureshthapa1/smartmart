@@ -317,6 +317,7 @@ def _register_blueprints(app):
         (".blueprints.ai_chat", "ai_chat_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
+        (".blueprints.mcp", "mcp_bp"),
     ]
 
     for module_path, bp_name in blueprints:
@@ -344,6 +345,32 @@ def _register_blueprints(app):
     try:
         from .blueprints.ecommerce_api import ecommerce_api_bp as _ecommerce_api_bp
         csrf.exempt(_ecommerce_api_bp)
+    except Exception:
+        pass
+
+    try:
+        from .blueprints.mcp import mcp_bp as _mcp_bp
+        csrf.exempt(_mcp_bp)
+    except Exception:
+        pass
+
+    # Exempt public API endpoints called by JS from store pages
+    try:
+        from .blueprints.api.routes import (
+            cart_recommendations, product_recommendations,
+            rag_search, rag_index_stats,
+        )
+        csrf.exempt(cart_recommendations)
+        csrf.exempt(product_recommendations)
+        csrf.exempt(rag_search)
+        csrf.exempt(rag_index_stats)
+    except Exception:
+        pass
+
+    # Exempt store chatbot (called via fetch from base_store.html widget)
+    try:
+        from .blueprints.store.routes import store_chat_api
+        csrf.exempt(store_chat_api)
     except Exception:
         pass
 
