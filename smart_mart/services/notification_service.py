@@ -174,22 +174,38 @@ def get_notification_stats() -> dict:
 
 def notify_credit_overdue(customer_name: str, phone: str, amount: float, sale_id: int):
     msg = (f"Dear {customer_name}, your credit payment of NPR {amount:,.2f} "
-           f"(Sale #{sale_id}) at Goldkernel Dryfruits and Treats is overdue. Please clear at your earliest. Thank you.")
+           f"(Sale #{sale_id}) at Smart Mart is overdue. Please clear at your earliest. Thank you.")
     return send_notification(phone, msg)
 
 
-def notify_order_status(customer_name: str, phone: str, order_number: str, status: str):
+def notify_order_status(
+    customer_name: str,
+    phone: str,
+    order_number: str,
+    status: str,
+    shop_name: str = "GoldKernel",
+    track_url: str = "",
+) -> "NotificationLog":
+    """Send SMS to customer when admin updates order status."""
+    first_name = (customer_name or "Customer").split()[0]
+    track_suffix = f" Track: {track_url}" if track_url else ""
     status_msgs = {
-        "confirmed": f"Your order {order_number} has been confirmed.",
-        "preparing": f"Your order {order_number} is being prepared.",
-        "out_for_delivery": f"Your order {order_number} is out for delivery!",
-        "delivered": f"Your order {order_number} has been delivered. Thank you!",
-        "cancelled": f"Your order {order_number} has been cancelled.",
+        "confirmed":        f"Hi {first_name}! Your order {order_number} is confirmed. We'll prepare it shortly.{track_suffix}",
+        "preparing":        f"Hi {first_name}! Your order {order_number} is being packed and will be shipped soon.{track_suffix}",
+        "shipped":          f"Hi {first_name}! Your order {order_number} has been shipped.{track_suffix}",
+        "out_for_delivery": f"Hi {first_name}! 🚚 Your order {order_number} is out for delivery today. Be ready!{track_suffix}",
+        "delivered":        f"Hi {first_name}! ✅ Your order {order_number} has been delivered. Enjoy! Rate us: {track_url}" if track_url else f"Hi {first_name}! Your order {order_number} has been delivered. Thank you!",
+        "cancelled":        f"Hi {first_name}, your order {order_number} has been cancelled. Contact us if this is a mistake.",
+        "processing":       f"Hi {first_name}! Your order {order_number} is being processed.{track_suffix}",
     }
-    msg = f"Dear {customer_name}, {status_msgs.get(status, f'Order {order_number} status: {status}.')} - Goldkernel Dryfruits and Treats"
+    msg_body = status_msgs.get(
+        status,
+        f"Hi {first_name}, your order {order_number} status: {status}.{track_suffix}"
+    )
+    msg = f"[{shop_name}] {msg_body}"
     return send_notification(phone, msg)
 
 
 def notify_low_stock(product_name: str, quantity: int, admin_phone: str):
-    msg = f"[Goldkernel Alert] Low stock: {product_name} has only {quantity} units left. Restock needed."
+    msg = f"[Smart Mart Alert] Low stock: {product_name} has only {quantity} units left. Restock needed."
     return send_notification(admin_phone, msg)
