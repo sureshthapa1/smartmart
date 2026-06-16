@@ -5,8 +5,8 @@ class ShopSettings(db.Model):
     __tablename__ = "shop_settings"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), default="Goldkernel Dryfruits and Treats")
-    shop_name = db.Column(db.String(120), default="Goldkernel Dryfruits and Treats")
+    name = db.Column(db.String(120), default="GoldKernel Dry Fruits & Treats")
+    shop_name = db.Column(db.String(120), default="Smart Mart")
     pan_number = db.Column(db.String(50))
     address = db.Column(db.String(255))
     phone = db.Column(db.String(50))
@@ -26,6 +26,13 @@ class ShopSettings(db.Model):
     # Loyalty programme settings
     loyalty_points_per_rupee = db.Column(db.Numeric(8, 4), default=0.01)   # pts earned per NPR spent (0.01 = 1pt per NPR 100)
     loyalty_rupee_per_point = db.Column(db.Numeric(8, 4), default=1.00)    # NPR discount per point redeemed
+    # Social media links (used in store footer)
+    facebook_url     = db.Column(db.String(255), nullable=True)
+    instagram_url    = db.Column(db.String(255), nullable=True)
+    twitter_url      = db.Column(db.String(255), nullable=True)
+    tiktok_url       = db.Column(db.String(255), nullable=True)
+    whatsapp_number  = db.Column(db.String(30),  nullable=True)   # e.g. 9841234567 (no + or spaces)
+    website_url      = db.Column(db.String(255), nullable=True)   # full URL e.g. https://goldkernel.com
 
     @classmethod
     def get(cls):
