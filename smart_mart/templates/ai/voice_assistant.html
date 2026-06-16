@@ -6,153 +6,363 @@
 <li class="breadcrumb-item active">Voice Assistant</li>
 {% endblock %}
 
+{% block head %}
+<style>
+  .voice-wrap{max-width:680px;margin:0 auto;}
+  .mic-ring{
+    position:relative;width:110px;height:110px;margin:0 auto 1.25rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .mic-ring::before{
+    content:'';position:absolute;inset:-6px;border-radius:50%;
+    border:3px solid transparent;transition:all .3s;
+  }
+  .mic-ring.listening::before{
+    border-color:#ef4444;animation:pulse-ring 1s ease-in-out infinite;
+  }
+  @keyframes pulse-ring{
+    0%,100%{transform:scale(1);opacity:.8;}
+    50%{transform:scale(1.12);opacity:.4;}
+  }
+  #micBtn{
+    width:96px;height:96px;border-radius:50%;font-size:2.2rem;
+    border:none;cursor:pointer;transition:all .25s;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;
+    box-shadow:0 6px 24px rgba(99,102,241,.4);position:relative;z-index:1;
+  }
+  #micBtn:disabled{background:#9ca3af;box-shadow:none;cursor:not-allowed;}
+  #micBtn.listening{background:linear-gradient(135deg,#ef4444,#f97316);
+    box-shadow:0 6px 24px rgba(239,68,68,.4);}
+  #micBtn:hover:not(:disabled):not(.listening){transform:scale(1.05);}
+  .wave{display:none;gap:4px;align-items:center;height:30px;}
+  .wave.active{display:flex;}
+  .wave-bar{
+    width:4px;border-radius:2px;background:#6366f1;
+    animation:wave-anim 0.8s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(1){animation-delay:0s;height:10px;}
+  .wave-bar:nth-child(2){animation-delay:.1s;height:20px;}
+  .wave-bar:nth-child(3){animation-delay:.2s;height:28px;}
+  .wave-bar:nth-child(4){animation-delay:.1s;height:20px;}
+  .wave-bar:nth-child(5){animation-delay:0s;height:10px;}
+  @keyframes wave-anim{
+    0%,100%{transform:scaleY(.5);}50%{transform:scaleY(1);}
+  }
+  .bubble{
+    border-radius:14px;padding:.8rem 1rem;font-size:.9rem;line-height:1.6;
+    margin-bottom:.5rem;
+  }
+  .bubble.user{background:#ede9fe;color:#3730a3;border-bottom-right-radius:4px;}
+  .bubble.ai{background:#f0fdf4;color:#14532d;border-bottom-left-radius:4px;}
+  .badge-https{
+    display:inline-flex;align-items:center;gap:.4rem;
+    background:#fef3c7;color:#92400e;border:1px solid #fde68a;
+    border-radius:8px;padding:.35rem .75rem;font-size:.78rem;font-weight:600;
+  }
+  .shortcut{background:#f1f5f9;border-radius:6px;padding:.15rem .45rem;
+    font-size:.72rem;font-family:monospace;color:#475569;}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-7">
+<div class="voice-wrap">
 
-    <div id="notSupported" class="alert alert-warning d-flex gap-2 align-items-center" style="display:none!important;">
-      <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-      <div>
-        <strong>Voice input is not supported in this browser.</strong><br>
-        Please use <strong>Chrome</strong> or <strong>Edge</strong> for voice features.
-        You can still use the <a href="{{ url_for('ai.chatbot') }}">text chatbot</a>.
-      </div>
+  {# ── HTTPS / browser support banner ─────────────────────────────────── #}
+  <div id="httpsBanner" style="display:none;" class="alert alert-warning d-flex gap-2 mb-3" role="alert">
+    <i class="bi bi-shield-lock-fill fs-5 mt-1 flex-shrink-0"></i>
+    <div>
+      <strong>Microphone requires a secure connection.</strong><br>
+      <span class="text-muted small">
+        Access this page via <code>http://<strong>localhost</strong>:5000/ai/voice</code> instead of
+        the network IP address. Or deploy with HTTPS for full voice support.<br>
+        <strong>Text input below still works fully.</strong>
+      </span>
     </div>
-
-    <div id="voiceApp">
-      <div class="card shadow-sm mb-3">
-        <div class="card-body text-center py-5">
-          <button id="micBtn" class="btn btn-primary rounded-circle"
-                  style="width:80px;height:80px;font-size:2rem;" title="Click to speak">
-            <i class="bi bi-mic-fill"></i>
-          </button>
-          <p class="text-muted small mt-3 mb-0" id="micStatus">Click the mic and speak</p>
-        </div>
-      </div>
-
-      <div id="transcript" class="card shadow-sm mb-3" style="display:none;">
-        <div class="card-body">
-          <div class="text-muted small mb-1">You said:</div>
-          <div id="transcriptText" class="fw-medium"></div>
-        </div>
-      </div>
-
-      <div id="replyCard" class="card shadow-sm" style="display:none;">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <i class="bi bi-robot text-primary"></i>
-            <span class="fw-semibold small">AI Response</span>
-            <button id="speakBtn" class="btn btn-sm btn-outline-secondary ms-auto">
-              <i class="bi bi-volume-up me-1"></i>Speak
-            </button>
-          </div>
-          <div id="replyText"></div>
-        </div>
-      </div>
-    </div>
-
   </div>
+
+  <div id="noBrowserBanner" class="alert alert-warning d-flex gap-2 mb-3" style="display:none;" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-5 mt-1 flex-shrink-0"></i>
+    <div>
+      <strong>Voice not supported in this browser.</strong><br>
+      <span class="text-muted small">Use Chrome or Edge. Text input works in all browsers.</span>
+      <a href="{{ url_for('ai.chatbot') }}" class="ms-2 btn btn-sm btn-outline-secondary">Open Text Chat</a>
+    </div>
+  </div>
+
+  {# ── Main voice card ─────────────────────────────────────────────────── #}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-4 text-center">
+
+      <div class="mic-ring" id="micRing">
+        <button id="micBtn" title="Click to speak (or press Space)">
+          <i class="bi bi-mic-fill" id="micIcon"></i>
+        </button>
+      </div>
+
+      {# Animated wave bars shown while listening #}
+      <div class="wave justify-content-center mb-2" id="waveAnim">
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div><div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+
+      <p id="micStatus" class="text-muted small mb-2">Click the mic or press <span class="shortcut">Space</span> to speak</p>
+
+      <div id="permHelp" style="display:none;" class="mt-2">
+        <span class="badge-https">
+          <i class="bi bi-lock-fill"></i>
+          Mic blocked — <a href="#textFallback" class="ms-1" style="color:#b45309;">use text input below</a>
+          or open via <code>localhost</code>
+        </span>
+      </div>
+
+      {# Language selector #}
+      <div class="d-flex justify-content-center gap-2 mt-3">
+        <select id="langSelect" class="form-select form-select-sm" style="width:auto;">
+          <option value="en-US">English</option>
+          <option value="ne-NP">नेपाली (Nepali)</option>
+          <option value="hi-IN">हिंदी (Hindi)</option>
+        </select>
+        <button id="speakLastBtn" class="btn btn-sm btn-outline-secondary" disabled title="Re-read last response">
+          <i class="bi bi-volume-up me-1"></i>Re-read
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# ── Conversation history ─────────────────────────────────────────────── #}
+  <div id="history" class="mb-3" style="display:none;"></div>
+
+  {# ── Text fallback input ──────────────────────────────────────────────── #}
+  <div class="card shadow-sm" id="textFallback">
+    <div class="card-header py-2 d-flex align-items-center gap-2">
+      <i class="bi bi-keyboard text-muted"></i>
+      <span class="small fw-semibold text-muted">Type your question (fallback / alternative)</span>
+    </div>
+    <div class="card-body pb-3">
+      <div class="d-flex gap-2">
+        <input type="text" id="textInput" class="form-control form-control-sm"
+               placeholder="e.g. What were today's sales? Low stock products?"
+               autocomplete="off" maxlength="300">
+        <button id="textSend" class="btn btn-primary btn-sm px-3">
+          <i class="bi bi-send-fill"></i>
+        </button>
+      </div>
+      <div class="mt-2 d-flex flex-wrap gap-1" id="quickQuestions">
+        {% for q in ["Today's sales?","Low stock items?","Top products this month?",
+                     "Profit this month?","Customers at risk?","Pending orders?"] %}
+        <button class="btn btn-outline-secondary btn-sm py-0 quick-q" style="font-size:.72rem;">{{ q }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const notSupported = document.getElementById('notSupported');
-  const voiceApp = document.getElementById('voiceApp');
-  const micBtn = document.getElementById('micBtn');
-  const micStatus = document.getElementById('micStatus');
-  const transcriptCard = document.getElementById('transcript');
-  const transcriptText = document.getElementById('transcriptText');
-  const replyCard = document.getElementById('replyCard');
-  const replyText = document.getElementById('replyText');
-  const speakBtn = document.getElementById('speakBtn');
+// ── Elements ──────────────────────────────────────────────────────────────────
+const micBtn       = document.getElementById('micBtn');
+const micIcon      = document.getElementById('micIcon');
+const micRing      = document.getElementById('micRing');
+const micStatus    = document.getElementById('micStatus');
+const waveAnim     = document.getElementById('waveAnim');
+const permHelp     = document.getElementById('permHelp');
+const historyEl    = document.getElementById('history');
+const langSelect   = document.getElementById('langSelect');
+const speakLastBtn = document.getElementById('speakLastBtn');
+const textInput    = document.getElementById('textInput');
+const textSend     = document.getElementById('textSend');
+const httpsBanner  = document.getElementById('httpsBanner');
+const noBrowserBanner = document.getElementById('noBrowserBanner');
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    notSupported.style.display = 'flex';
-    voiceApp.style.display = 'none';
-  } else {
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    let lastReply = '';
+let lastTTS = '';
+let recognition = null;
+let isListening = false;
 
-    // Check mic permission on load and show guidance if denied
-    if (navigator.permissions) {
-      navigator.permissions.query({name: 'microphone'}).then(result => {
-        if (result.state === 'denied') {
-          micStatus.textContent = '🔒 Microphone blocked. Click the 🔒 icon in your browser address bar → allow microphone → refresh this page.';
-          micBtn.disabled = true;
-          micBtn.classList.remove('btn-primary');
-          micBtn.classList.add('btn-secondary');
-        }
-        result.onchange = () => {
-          if (result.state === 'granted') {
-            micStatus.textContent = 'Click the mic and speak';
-            micBtn.disabled = false;
-            micBtn.classList.add('btn-primary');
-            micBtn.classList.remove('btn-secondary');
-          }
-        };
-      }).catch(() => {});
+// ── Browser / HTTPS detection ─────────────────────────────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+if (!SpeechRecognition) {
+  noBrowserBanner.style.display = 'flex';
+  micBtn.disabled = true;
+}
+
+if (SpeechRecognition && !isSecure) {
+  httpsBanner.style.display = 'flex';
+  micBtn.disabled = true;
+  permHelp.style.display = 'block';
+  micStatus.textContent = 'Voice requires localhost or HTTPS — use text input below';
+}
+
+// ── Mic permission check ──────────────────────────────────────────────────────
+if (SpeechRecognition && isSecure && navigator.permissions) {
+  navigator.permissions.query({name: 'microphone'}).then(p => {
+    if (p.state === 'denied') showPermDenied();
+    p.onchange = () => { if (p.state === 'granted') resetMicUI(); };
+  }).catch(() => {});
+}
+
+function showPermDenied() {
+  micBtn.disabled = true;
+  micBtn.style.background = '#9ca3af';
+  permHelp.style.display = 'block';
+  micStatus.textContent = 'Microphone access denied — use text input below';
+}
+function resetMicUI() {
+  micBtn.disabled = false;
+  micBtn.style.background = '';
+  permHelp.style.display = 'none';
+  micStatus.textContent = 'Click the mic or press Space to speak';
+}
+
+// ── Speech recognition setup ──────────────────────────────────────────────────
+if (SpeechRecognition && isSecure) {
+  recognition = new SpeechRecognition();
+  recognition.interimResults = true;   // show live transcript
+  recognition.maxAlternatives = 1;
+
+  micBtn.addEventListener('click', toggleListen);
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body && !micBtn.disabled) {
+      e.preventDefault();
+      toggleListen();
     }
+  });
 
-    micBtn.addEventListener('click', () => {
-      micStatus.textContent = 'Listening…';
-      micBtn.classList.add('btn-danger');
-      micBtn.classList.remove('btn-primary');
-      recognition.start();
+  recognition.onstart = () => {
+    isListening = true;
+    micBtn.classList.add('listening');
+    micRing.classList.add('listening');
+    micIcon.className = 'bi bi-stop-fill';
+    waveAnim.classList.add('active');
+    micStatus.textContent = '🎙️ Listening… (click again to stop)';
+  };
+
+  recognition.onresult = async (event) => {
+    let interim = '';
+    let final = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) final += event.results[i][0].transcript;
+      else interim += event.results[i][0].transcript;
+    }
+    if (interim) micStatus.textContent = '🎙️ ' + interim;
+    if (final) {
+      stopListening();
+      await sendQuery(final.trim());
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopListening();
+    const msgs = {
+      'not-allowed':         '🔒 Mic denied — use text input below, or allow mic and refresh.',
+      'no-speech':           '🔇 No speech detected — try again or use text input.',
+      'audio-capture':       '🎙️ No microphone found.',
+      'network':             '🌐 Network error.',
+      'aborted':             'Stopped.',
+      'service-not-allowed': '🔒 Mic blocked (requires HTTPS or localhost).',
+    };
+    micStatus.textContent = msgs[e.error] || `Error: ${e.error}`;
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      micBtn.disabled = true;
+      permHelp.style.display = 'block';
+    }
+  };
+
+  recognition.onend = () => { stopListening(); };
+}
+
+function toggleListen() {
+  if (!recognition) return;
+  if (isListening) { recognition.stop(); return; }
+  recognition.lang = langSelect.value;
+  recognition.start();
+}
+
+function stopListening() {
+  isListening = false;
+  micBtn.classList.remove('listening');
+  micRing.classList.remove('listening');
+  micIcon.className = 'bi bi-mic-fill';
+  waveAnim.classList.remove('active');
+  if (!micBtn.disabled) micStatus.textContent = 'Click the mic or press Space to speak';
+}
+
+// ── Text input fallback ───────────────────────────────────────────────────────
+textSend.addEventListener('click', () => {
+  const q = textInput.value.trim();
+  if (q) { textInput.value = ''; sendQuery(q); }
+});
+textInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const q = textInput.value.trim(); if (q) { textInput.value = ''; sendQuery(q); } }
+});
+document.querySelectorAll('.quick-q').forEach(btn =>
+  btn.addEventListener('click', () => sendQuery(btn.textContent.trim()))
+);
+
+// ── Query → API → response ────────────────────────────────────────────────────
+async function sendQuery(text) {
+  if (!text) return;
+  addBubble('user', text);
+  micStatus.textContent = '⏳ Thinking…';
+  textSend.disabled = true;
+
+  // Add loading bubble
+  const loadBubble = document.createElement('div');
+  loadBubble.className = 'bubble ai';
+  loadBubble.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing…';
+  historyEl.appendChild(loadBubble);
+  historyEl.style.display = 'block';
+  historyEl.scrollTop = historyEl.scrollHeight;
+
+  try {
+    const res = await fetch('/ai/api/voice/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({transcript: text}),
     });
+    const data = await res.json();
+    const reply = data.reply || 'Sorry, I could not get a response.';
+    lastTTS = data.tts_text || reply;
+    loadBubble.innerHTML = reply.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    speakLastBtn.disabled = false;
 
-    recognition.onresult = async (event) => {
-      const text = event.results[0][0].transcript;
-      transcriptText.textContent = text;
-      transcriptCard.style.display = '';
-      micStatus.textContent = 'Processing…';
-      try {
-        const res = await fetch('/ai/api/voice/query', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({transcript: text}),
-        });
-        const data = await res.json();
-        lastReply = data.tts_text || data.reply || '';
-        replyText.innerHTML = (data.reply || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-        replyCard.style.display = '';
-        micStatus.textContent = 'Click the mic and speak';
-      } catch(e) {
-        micStatus.textContent = 'Error — please try again';
-      }
-      micBtn.classList.remove('btn-danger');
-      micBtn.classList.add('btn-primary');
-    };
-
-    recognition.onerror = (e) => {
-      const messages = {
-        'not-allowed':    '🔒 Microphone access denied. Click the 🔒 icon in your browser address bar and allow microphone, then refresh.',
-        'no-speech':      '🔇 No speech detected. Please speak clearly and try again.',
-        'audio-capture':  '🎙️ No microphone found. Please connect a microphone and try again.',
-        'network':        '🌐 Network error. Check your internet connection and try again.',
-        'aborted':        'Cancelled. Click the mic to try again.',
-        'service-not-allowed': '🔒 Microphone blocked. This feature requires HTTPS and microphone permission.',
-      };
-      micStatus.textContent = messages[e.error] || `Error: ${e.error}. Try again.`;
-      micBtn.classList.remove('btn-danger');
-      micBtn.classList.add('btn-primary');
-    };
-
-    recognition.onend = () => {
-      micBtn.classList.remove('btn-danger');
-      micBtn.classList.add('btn-primary');
-    };
-
-    speakBtn.addEventListener('click', () => {
-      if (!lastReply) return;
-      const utt = new SpeechSynthesisUtterance(lastReply);
-      utt.lang = 'en-US';
+    // Auto-speak if voice was used
+    if (isListening === false && SpeechRecognition && isSecure && window.speechSynthesis) {
+      const utt = new SpeechSynthesisUtterance(lastTTS);
+      utt.lang = langSelect.value;
+      utt.rate = 0.95;
       window.speechSynthesis.speak(utt);
-    });
+    }
+    micStatus.textContent = 'Click the mic or press Space to speak';
+  } catch(e) {
+    loadBubble.innerHTML = '<span class="text-danger">Error — please try again.</span>';
+    micStatus.textContent = 'Error. Try again.';
   }
+  textSend.disabled = false;
+  historyEl.scrollTop = historyEl.scrollHeight;
+}
+
+function addBubble(role, text) {
+  const d = document.createElement('div');
+  d.className = `bubble ${role}`;
+  d.innerHTML = (role === 'user' ? '🧑 ' : '🤖 ') +
+    text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  historyEl.appendChild(d);
+  historyEl.style.display = 'block';
+}
+
+// ── Re-read last response ──────────────────────────────────────────────────────
+speakLastBtn.addEventListener('click', () => {
+  if (!lastTTS || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(lastTTS);
+  utt.lang = langSelect.value;
+  utt.rate = 0.95;
+  window.speechSynthesis.speak(utt);
+});
 </script>
 {% endblock %}
