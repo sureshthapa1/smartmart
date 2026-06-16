@@ -19,6 +19,7 @@
           {% if customer.email %}<div style="font-size:.7rem;color:rgba(255,255,255,.65);">{{ customer.email }}</div>{% endif %}
         </div>
         <div style="padding:.5rem 0;">
+          {% set _tab = active_tab if active_tab is defined else request.args.get('tab','orders') %}
           {% set tabs = [
             ('orders','bi-bag-check','My Orders'),
             ('profile','bi-person','Profile'),
@@ -27,12 +28,24 @@
           ] %}
           {% for tab, icon, label in tabs %}
           <a href="?tab={{ tab }}"
-             style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;text-decoration:none;font-size:.875rem;font-weight:{% if active_tab==tab %}700{% else %}500{% endif %};color:{% if active_tab==tab %}var(--brand-d){% else %}var(--text2){% endif %};background:{% if active_tab==tab %}var(--brand-l){% else %}transparent{% endif %};transition:all var(--t-f);">
+             style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;text-decoration:none;font-size:.875rem;font-weight:{% if _tab==tab %}700{% else %}500{% endif %};color:{% if _tab==tab %}var(--brand-d){% else %}var(--text2){% endif %};background:{% if _tab==tab %}var(--brand-l){% else %}transparent{% endif %};transition:all var(--t-f);">
             <i class="bi {{ icon }}" style="font-size:1rem;flex-shrink:0;"></i>{{ label }}
             {% if tab=='orders' and orders %}<span style="margin-left:auto;background:var(--brand-grad);color:#fff;font-size:.65rem;font-weight:800;padding:.15em .5em;border-radius:var(--r-f);">{{ orders|length }}</span>{% endif %}
           </a>
           {% endfor %}
           <hr class="dv" style="margin:.4rem 0;">
+          {% if loyalty_pts is defined and loyalty_pts > 0 %}
+          <div style="margin:.4rem .75rem;background:var(--brand-l);border:1.5px solid #fde68a;border-radius:var(--r);padding:.65rem .9rem;">
+            <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--brand-d);margin-bottom:.2rem;">
+              🪙 Loyalty Points
+            </div>
+            <div style="font-size:1.05rem;font-weight:900;color:var(--brand-d);">
+              {{ loyalty_pts }} pts
+              <span style="font-size:.72rem;font-weight:600;color:var(--muted);">= NPR {{ "%.0f"|format(loyalty_npr) }}</span>
+            </div>
+            <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem;">Redeemable at checkout</div>
+          </div>
+          {% endif %}
           <a href="{{ url_for('store.logout') }}"
              style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:600;color:var(--danger);">
             <i class="bi bi-box-arrow-right" style="font-size:1rem;"></i> Sign Out
@@ -45,7 +58,7 @@
     <div class="col-md-9 fu fu1">
 
       {# ── ORDERS TAB ── #}
-      {% if active_tab == 'orders' or not active_tab %}
+      {% if _tab == 'orders' %}
       <div class="ucard">
         <div class="ucard-head"><i class="bi bi-bag-check" style="color:var(--brand);"></i><span class="ucard-title">My Orders</span></div>
         {% if orders %}
@@ -90,7 +103,7 @@
       </div>
 
       {# ── PROFILE TAB ── #}
-      {% elif active_tab == 'profile' %}
+      {% elif _tab == 'profile' %}
       <div class="ucard">
         <div class="ucard-head"><i class="bi bi-person" style="color:var(--brand);"></i><span class="ucard-title">Edit Profile</span></div>
         <div class="ucard-body">
@@ -145,7 +158,7 @@
       </div>
 
       {# ── WISHLIST TAB ── #}
-      {% elif active_tab == 'wishlist' %}
+      {% elif _tab == 'wishlist' %}
       <div class="ucard">
         <div class="ucard-head"><i class="bi bi-heart" style="color:var(--brand);"></i><span class="ucard-title">My Wishlist <span style="font-size:.8rem;font-weight:500;color:var(--muted);">({{ wishlist_items|length if wishlist_items else 0 }} items)</span></span></div>
         {% if wishlist_items %}
@@ -188,7 +201,7 @@
       </div>
 
       {# ── ADDRESSES TAB ── #}
-      {% elif active_tab == 'addresses' %}
+      {% elif _tab == 'addresses' %}
       <div class="ucard">
         <div class="ucard-head"><i class="bi bi-geo-alt" style="color:var(--brand);"></i><span class="ucard-title">Saved Addresses</span></div>
         <div class="ucard-body">
