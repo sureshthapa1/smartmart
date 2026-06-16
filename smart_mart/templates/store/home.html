@@ -144,6 +144,37 @@
     {% endfor %}
   </div>
 
+  {# ── Pagination ── #}
+  {% if total_products > per_page %}
+  {% set total_pages = ((total_products - 1) // per_page) + 1 %}
+  <nav aria-label="Product pagination" style="margin-top:2rem;display:flex;justify-content:center;align-items:center;gap:.4rem;flex-wrap:wrap;" class="fu">
+    {% if page > 1 %}
+    <a href="?page={{ page-1 }}{% if q %}&q={{ q }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}&sort={{ sort }}"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-f);color:var(--muted);text-decoration:none;font-size:.8rem;font-weight:600;background:var(--card);transition:all var(--t-f);"
+       onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+      ‹ Prev
+    </a>
+    {% endif %}
+    {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+    <a href="?page={{ p }}{% if q %}&q={{ q }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}&sort={{ sort }}"
+       style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--r-f);text-decoration:none;font-size:.82rem;font-weight:700;transition:all var(--t-f);
+       {% if p == page %}background:var(--brand-grad);color:#fff;border:1.5px solid transparent;box-shadow:var(--brand-glow);{% else %}border:1.5px solid var(--border);color:var(--muted);background:var(--card);{% endif %}">
+      {{ p }}
+    </a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="?page={{ page+1 }}{% if q %}&q={{ q }}{% endif %}{% if selected_category %}&category={{ selected_category }}{% endif %}&sort={{ sort }}"
+       style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-f);color:var(--muted);text-decoration:none;font-size:.8rem;font-weight:600;background:var(--card);transition:all var(--t-f);"
+       onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+      Next ›
+    </a>
+    {% endif %}
+    <span style="font-size:.75rem;color:var(--muted);margin-left:.5rem;">{{ total_products }} total</span>
+  </nav>
+  {% endif %}
+
   {# Recently viewed #}
   {% if recently_viewed and not q and not selected_category %}
   <div style="margin-top:3rem;">
@@ -159,13 +190,18 @@
   {% endif %}
 
   {% else %}
-  {# Empty state #}
+  {# Empty state with suggestions #}
   <div class="ucard fu" style="margin-top:1rem;">
     <div class="empty">
       <div class="empty-icon">🔍</div>
       <h4>No products found</h4>
-      <p>{% if q %}No results for "{{ q }}". Try different keywords or browse categories.{% else %}No products in this category yet.{% endif %}</p>
-      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All</a>
+      <p>{% if q %}No results for "<strong>{{ q }}</strong>". Try different keywords or browse a category below.{% else %}No products in this category yet.{% endif %}</p>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.1rem;">
+        {% for cat in (categories or [])[:5] %}
+        <a href="{{ url_for('store.home', category=cat) }}" class="btn-ghost" style="font-size:.8rem;">{{ cat }}</a>
+        {% endfor %}
+      </div>
+      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All Products</a>
     </div>
   </div>
   {% endif %}
