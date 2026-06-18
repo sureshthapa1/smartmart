@@ -113,6 +113,15 @@ def create_app(config_name="development"):
             db.create_all()
         except Exception as exc:
             app.logger.warning("db.create_all() failed: %s", exc)
+
+        # Seed knowledge base FAQ articles (once, if table empty)
+        try:
+            from .services.knowledge_base_seed import seed_knowledge_base
+            _n = seed_knowledge_base()
+            if _n:
+                app.logger.info("Knowledge base seeded: %d default articles", _n)
+        except Exception as _kb_exc:
+            app.logger.debug("KB seed skipped: %s", _kb_exc)
         # Run safe column migrations so new columns are always present
         try:
             _run_startup_migrations(app)
