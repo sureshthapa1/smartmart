@@ -195,7 +195,45 @@ def run_reorder_bot(user_id: int = 1) -> dict:
                                grp["supplier_name"], e)
 
         logger.info("reorder_bot: %d POs created", len(pos_created))
-        return {"task": "reorder_bot", "pos_created": len(pos_created), "details": pos_created}
+        # Festival RAG + Claude narrative
+        _festival_ctx = ''
+        _claude_summ  = ''
+        try:
+            from .nepal_festivals import get_festival_context_for_ai
+            _festival_ctx = get_festival_context_for_ai(45)
+            import os as _os2, json as _json2, urllib.request as _ureq2
+            _ak = _os2.environ.get('ANTHROPIC_API_KEY', '')
+            if _ak and pos_created:
+                _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
+                _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
+                _pl = _json2.dumps({"model":"claude-haiku-4-5-20251001","max_tokens":150,"messages":[{"role":"user","content":_pr}]}).encode()
+                _rq = _ureq2.Request('https://api.anthropic.com/v1/messages',data=_pl,method='POST',headers={"x-api-key":_ak,"anthropic-version":"2023-06-01","content-type":"application/json"})
+                with _ureq2.urlopen(_rq, timeout=12) as _rs:
+                    _claude_summ = _json2.loads(_rs.read())['content'][0]['text'].strip()
+        except Exception:
+            pass
+
+        # Festival RAG + Claude narrative
+        _festival_ctx = ''
+        _claude_summ  = ''
+        try:
+            from .nepal_festivals import get_festival_context_for_ai
+            _festival_ctx = get_festival_context_for_ai(45)
+            import os as _os2, json as _json2, urllib.request as _ureq2
+            _ak = _os2.environ.get('ANTHROPIC_API_KEY', '')
+            if _ak and pos_created:
+                _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
+                _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
+                _pl = _json2.dumps({"model":"claude-haiku-4-5-20251001","max_tokens":150,"messages":[{"role":"user","content":_pr}]}).encode()
+                _rq = _ureq2.Request('https://api.anthropic.com/v1/messages',data=_pl,method='POST',headers={"x-api-key":_ak,"anthropic-version":"2023-06-01","content-type":"application/json"})
+                with _ureq2.urlopen(_rq, timeout=12) as _rs:
+                    _claude_summ = _json2.loads(_rs.read())['content'][0]['text'].strip()
+        except Exception:
+            pass
+
+        return {"task": "reorder_bot", "pos_created": len(pos_created),
+                "details": pos_created, "festival_context": _festival_ctx,
+                "claude_summary": _claude_summ}
     except Exception as e:
         logger.warning("reorder_bot failed: %s", e)
         return {"task": "reorder_bot", "pos_created": 0, "error": str(e)}
@@ -630,14 +668,14 @@ def run_all_bots(user_id: int = 1) -> dict:
         logger.exception("Loyalty expiry cron failed: %s", e)
         results["loyalty_expiry"] = {"error": str(e)}
 
-    # ── AI Agent pipeline (new) ───────────────────────────────────────────
-    try:
-        from .ai_agent_runner import run_all_agents
-        agent_results = run_all_agents(user_id=user_id)
-        results["ai_agents"] = agent_results
-    except Exception as e:
-        logger.exception("AI agent pipeline failed: %s", e)
-        results["ai_agents"] = {"error": str(e)}
+    # Win-back agent — runs on Sundays or when FORCE_WINBACK env var set
+    import os as _os_wb
+    if datetime.now(timezone.utc).weekday() == 6 or _os_wb.environ.get("FORCE_WINBACK"):
+        try:
+            results["winback_bot"] = run_winback_bot()
+        except Exception as e:
+            logger.exception("Win-back bot failed: %s", e)
+            results["winback_bot"] = {"task": "winback_bot", "error": str(e)}
 
     return {
         "ran_at": datetime.now(timezone.utc).isoformat(),
@@ -646,3 +684,115 @@ def run_all_bots(user_id: int = 1) -> dict:
             r.get("notifications_created", 0) for r in results.values()
         ),
     }
+
+# ── 12. Customer Win-Back Agent ───────────────────────────────────────────────
+
+def run_winback_bot(inactive_days: int = 45) -> dict:
+    """
+    AI-powered customer win-back agent.
+    Identifies customers inactive for `inactive_days`, drafts personalised
+    SMS messages using Claude, and sends via the notification service.
+    """
+    from datetime import date, timedelta
+    from ..models.online_order import OnlineOrder
+    from ..models.customer_account import CustomerAccount
+    from ..models.shop_settings import ShopSettings
+    from ..services.notification_service import send_notification
+    import os, json, urllib.request as _ureq
+
+    settings = ShopSettings.get()
+    cutoff   = date.today() - timedelta(days=inactive_days)
+    api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    try:
+        # Find customers with last order before cutoff
+        from sqlalchemy import func
+        subq = (
+            db.session.query(
+                OnlineOrder.customer_phone,
+                func.max(OnlineOrder.created_at).label("last_order"),
+                func.count(OnlineOrder.id).label("order_count"),
+                func.group_concat(OnlineOrder.id).label("order_ids"),
+            )
+            .filter(OnlineOrder.status != "cancelled")
+            .group_by(OnlineOrder.customer_phone)
+            .subquery()
+        )
+        inactive = db.session.query(subq).filter(
+            subq.c.last_order < cutoff
+        ).order_by(subq.c.last_order).limit(30).all()
+
+        sent_count = 0
+        details    = []
+
+        for row in inactive:
+            phone       = row.customer_phone
+            order_count = row.order_count
+
+            # Get the customer's top product category from order history
+            from ..models.online_order import OnlineOrderItem
+            top_items = db.session.execute(
+                db.select(OnlineOrderItem.product_name)
+                .join(OnlineOrder, OnlineOrder.id == OnlineOrderItem.order_id)
+                .where(OnlineOrder.customer_phone == phone)
+                .order_by(OnlineOrderItem.created_at.desc())
+                .limit(5)
+            ).scalars().all()
+            fav_products = ", ".join(top_items[:2]) if top_items else "dry fruits"
+
+            # Loyalty balance for personalised offer
+            loyalty_text = ""
+            try:
+                from ..services.loyalty_wallet_service import get_or_create_wallet, wallet_snapshot
+                _w = get_or_create_wallet("Customer", phone)
+                if _w:
+                    snap  = wallet_snapshot(_w)
+                    pts   = int(snap.get("points_balance", 0))
+                    if pts > 0:
+                        _rpp  = float(getattr(settings, "loyalty_rupee_per_point", 1.0) or 1.0)
+                        loyalty_text = f"You also have {pts} loyalty points worth NPR {pts*_rpp:.0f}!"
+            except Exception:
+                pass
+
+            # Generate personalised message
+            if api_key:
+                try:
+                    prompt = (
+                        f"Write a friendly 1-sentence WhatsApp/SMS win-back message "
+                        f"for a customer who last bought {fav_products} from GoldKernel Dry Fruits, Nepal. "
+                        f"They've been away for {inactive_days}+ days. "
+                        f"{'They have loyalty points: ' + loyalty_text if loyalty_text else ''} "
+                        f"Mention their favourite product. Warm, not pushy. Max 160 chars including shop name."
+                    )
+                    payload = json.dumps({
+                        "model": "claude-haiku-4-5-20251001", "max_tokens": 80,
+                        "messages": [{"role": "user", "content": prompt}],
+                    }).encode()
+                    req = _ureq.Request(
+                        "https://api.anthropic.com/v1/messages", data=payload, method="POST",
+                        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                                 "content-type": "application/json"},
+                    )
+                    with _ureq.urlopen(req, timeout=10) as resp:
+                        msg = json.loads(resp.read())["content"][0]["text"].strip()
+                except Exception:
+                    shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+                    msg  = f"[{shop}] We miss you! Your favourite {fav_products} are waiting. {loyalty_text} Visit us: goldkernel.com/store"
+            else:
+                shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+                msg  = f"[{shop}] We miss you! Your favourite {fav_products} are waiting. {loyalty_text} Visit: goldkernel.com/store"
+
+            # Send SMS (respects NOTIFICATION_PROVIDER env var)
+            try:
+                send_notification(phone, msg)
+                sent_count += 1
+                details.append({"phone": phone[-4:] + "****", "products": fav_products})
+            except Exception as e:
+                logger.warning("winback_bot: SMS failed for %s: %s", phone[-4:], e)
+
+        logger.info("winback_bot: %d messages sent", sent_count)
+        return {"task": "winback_bot", "sent": sent_count, "details": details}
+
+    except Exception as e:
+        logger.warning("winback_bot failed: %s", e)
+        return {"task": "winback_bot", "sent": 0, "error": str(e)}
