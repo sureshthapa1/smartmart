@@ -165,6 +165,24 @@ with app.app_context():
             safe_add(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)")
             safe_add(conn, "shop_settings", "website_url",     "VARCHAR(255)")
 
+            # ── Knowledge base articles table (chatbot RAG) ──────────────────────
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS knowledge_articles (
+                        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title      VARCHAR(200) NOT NULL,
+                        category   VARCHAR(80)  NOT NULL DEFAULT 'general',
+                        keywords   TEXT,
+                        body       TEXT NOT NULL,
+                        is_active  BOOLEAN NOT NULL DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.commit()
+            except Exception:
+                pass   # Table already exists on PostgreSQL
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
