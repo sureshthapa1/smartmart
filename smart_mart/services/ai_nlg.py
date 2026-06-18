@@ -1,13 +1,12 @@
 """AI Feature 5: Natural Language Report Generation
 
-Uses Claude to generate rich, contextual business narratives.
-Falls back to template-based generation when API key not set.
+Converts business data into plain English summaries.
+No external NLP library needed — uses template-based generation
+with dynamic data insertion and conditional logic.
 """
 
 from __future__ import annotations
 
-import json
-import os
 from datetime import date, timedelta
 
 from sqlalchemy import func
@@ -137,11 +136,20 @@ def generate_daily_report() -> dict:
             f"⚠️ **{low_stock_count} product(s)** are running low on stock. Consider restocking."
         )
 
+    data = {
+        "today_sales": float(today_sales),
+        "today_count": today_count,
+        "today_profit": round(today_profit, 2),
+        "yesterday_sales": float(yesterday_sales),
+        "top_product": top_today[0].name if top_today else "N/A",
+        "low_stock_count": low_stock_count,
+        "week_sales": float(week_sales) if 'week_sales' in dir() else 0.0,
+    }
     return {
         "type": "daily",
         "date": str(today),
         "title": f"Daily Business Report — {today.strftime('%B %d, %Y')}",
-        "narrative": "\n\n".join(paragraphs),
+        "narrative": _claude_daily_narrative(data, "\n\n".join(paragraphs)),
         "paragraphs": paragraphs,
         "data": {
             "today_sales": float(today_sales),
@@ -315,80 +323,43 @@ def generate_smart_summary() -> dict:
         "weekly": weekly["data"],
     }
 
-
-# ── Claude-enhanced NLG ───────────────────────────────────────────────────────
-
-def _claude_enhance_report(raw_data: dict, report_type: str) -> str | None:
-    """
-    Use Claude to turn raw metrics into a rich natural language narrative.
-    Falls back to template narrative on failure.
-    """
+def _claude_daily_narrative(data: dict, fallback: str = "") -> str:
+    """Generate a genuine Claude-powered 3-bullet daily business briefing."""
+    import os, json
+    import urllib.request as _req
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return None
+        return fallback
+
+    prompt = (
+        "You are a sharp business analyst for GoldKernel Dry Fruits, Nepal. "
+        "Write exactly 3 bullet points (use • symbol, one sentence each) as a daily briefing for the owner.\n\n"
+        f"DATA: Sales NPR {float(data.get('today_sales',0)):,.0f} "
+        f"({data.get('today_count',0)} txns), "
+        f"yesterday NPR {float(data.get('yesterday_sales',0)):,.0f}, "
+        f"profit NPR {float(data.get('today_profit',0)):,.0f}, "
+        f"top product: {data.get('top_product','N/A')}, "
+        f"low stock: {data.get('low_stock_count',0)} items, "
+        f"week-to-date NPR {float(data.get('week_sales',0)):,.0f}.\n\n"
+        "Cover: (1) performance vs yesterday with insight, (2) action item or opportunity, "
+        "(3) stock/ops note. Be specific and direct. Vary bullet openings."
+    )
     try:
-        data_summary = json.dumps(raw_data, indent=2)[:1200]
-        system = (
-            "You are a business analyst for GoldKernel, a premium dry fruits retail shop in Nepal. "
-            "Write a concise, insightful business narrative in plain English. "
-            "Currency is NPR. Use emoji sparingly (1-2 max). Be factual and actionable. "
-            "Keep it under 120 words. No markdown headers. Natural paragraph style."
-        )
-        prompt = (
-            f"Generate a {report_type} business summary for the shop owner based on this data:\n\n"
-            f"{data_summary}\n\n"
-            "Highlight the key takeaway, one positive or concerning trend, and one action to consider."
-        )
         payload = json.dumps({
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 250,
-            "system": system,
+            "max_tokens": 220,
             "messages": [{"role": "user", "content": prompt}],
         }).encode()
-        import urllib.request as _req
         req = _req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            method="POST",
+            "https://api.anthropic.com/v1/messages", data=payload, method="POST",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
         )
         with _req.urlopen(req, timeout=12) as resp:
             result = json.loads(resp.read())
         return result["content"][0]["text"].strip()
     except Exception:
-        return None
-
-
-def generate_smart_summary() -> dict:
-    """Generate a concise smart summary — Claude-enhanced if API key available."""
-    daily  = generate_daily_report()
-    weekly = generate_weekly_report()
-
-    # Try Claude for a richer summary
-    combined_data = {**daily["data"], **{f"weekly_{k}": v for k, v in weekly["data"].items()}}
-    ai_narrative = _claude_enhance_report(combined_data, "daily + weekly")
-    narrative = ai_narrative or "\n\n".join(daily["paragraphs"][:2] + weekly["paragraphs"][:1])
-
-    return {
-        "type": "smart_summary",
-        "title": "Smart Business Summary",
-        "narrative": narrative,
-        "paragraphs": narrative.split("\n\n"),
-        "daily": daily["data"],
-        "weekly": weekly["data"],
-        "ai_enhanced": bool(ai_narrative),
-    }
-
-
-def generate_claude_daily_report() -> dict:
-    """Daily report with Claude-generated narrative (full version)."""
-    base = generate_daily_report()
-    ai_narrative = _claude_enhance_report(base["data"], "daily")
-    if ai_narrative:
-        base["narrative"] = ai_narrative
-        base["paragraphs"] = ai_narrative.split("\n\n")
-        base["ai_enhanced"] = True
-    else:
-        base["ai_enhanced"] = False
-    return base
+        return fallback
