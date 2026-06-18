@@ -343,24 +343,84 @@ def _build_product_context() -> str:
     return _cache_set(key, result)
 
 
-CHATBOT_SYSTEM = """You are the helpful shopping assistant for GoldKernel Dry Fruits & Treats, \
-a premium dry fruits store in Nepal. You help customers find the right products, answer questions \
-about ingredients, nutrition, gifting, and delivery.
+CHATBOT_SYSTEM = """You are the helpful shopping assistant for GoldKernel Dry Fruits & Treats,
+a premium dry fruits store in Nepal. You help customers find products, answer nutrition
+and gifting questions, and assist with orders and delivery.
 
 RULES:
-- Answer in 2-4 SHORT sentences. Be friendly and helpful.
-- Currency is NPR (Nepali Rupees). Free delivery above NPR 2000, NPR 100 below.
-- Delivery is available across Nepal. COD, eSewa, Khalti, IME Pay accepted.
-- If asked about a specific product, reference the catalogue below.
-- If a product is not in the catalogue, say it's currently unavailable.
-- Do NOT make up prices or availability. Use only what's in the catalogue.
+- Reply in 2-4 SHORT sentences. Be warm, friendly, knowledgeable.
+- Currency is NPR (Nepali Rupees). Free delivery above NPR 2000, NPR 100 flat below.
+- Delivery across all Nepal. COD, eSewa, Khalti, IME Pay accepted. 7-day returns.
+- Only reference products shown in RELEVANT PRODUCTS — do NOT invent prices or stock.
+- If asked about a product not in the list, say "Browse /store/products for our full range."
 - Reply in the same language the customer writes in (Nepali or English).
-- Keep replies concise — this is a chat widget, not an essay.
+- For health/nutrition questions, give accurate helpful info about dry fruits.
+- Keep replies concise — this is a mobile chat widget.
 
-LIVE PRODUCT CATALOGUE:
+{customer_context}
+RELEVANT PRODUCTS (retrieved for this query):
 {product_context}
 """
 
+
+def _retrieve_relevant_products(message: str, limit: int = 6) -> str:
+    """RAG: retrieve the most semantically relevant products for this query."""
+    key = f"rag:{message[:40]}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    try:
+        # Expand Nepali aliases
+        aliases = {
+            "badam":"almond","kaju":"cashew","okhar":"walnut","kismis":"raisin",
+            "pista":"pistachio","akhrot":"walnut","anjir":"fig","khajur":"date",
+            "nariyal":"coconut","til":"sesame","sunflower":"sunflower seeds",
+        }
+        expanded = aliases.get(message.lower().strip(), message)
+        terms = list({message.lower(), expanded.lower()})
+
+        from sqlalchemy import or_
+        conds = []
+        for t in terms:
+            conds += [
+                Product.name.ilike(f"%{t}%"),
+                Product.category.ilike(f"%{t}%"),
+                Product.description.ilike(f"%{t}%"),
+                Product.benefits.ilike(f"%{t}%"),
+            ]
+
+        products = db.session.execute(
+            db.select(Product)
+            .where(Product.is_active.isnot(False), Product.quantity > 0)
+            .where(or_(*conds))
+            .order_by(Product.selling_price)
+            .limit(limit)
+        ).scalars().all()
+
+        if not products:
+            # Generic fallback: return top-6 popular products
+            products = db.session.execute(
+                db.select(Product)
+                .where(Product.is_active.isnot(False), Product.quantity > 0)
+                .order_by(Product.name)
+                .limit(limit)
+            ).scalars().all()
+
+        lines = []
+        for p in products:
+            extra = (p.benefits or p.description or "")[:80].replace("\n", " ")
+            lines.append(
+                f"• {p.name} | {p.category or 'General'} | NPR {float(p.selling_price):.0f}"
+                f" | {p.pack_size or '-'} | Stock:{p.quantity}"
+                + (f" | {extra}" if extra else "")
+            )
+        result = "\n".join(lines) or "No products currently available."
+    except Exception:
+        result = _build_product_context()
+
+    _cache_set(key, result, ttl=300)
+    return result
 
 def chatbot_reply(
     message: str,
@@ -369,7 +429,6 @@ def chatbot_reply(
 ) -> str:
     """
     Generate a Claude-powered reply for the store chatbot.
-    Uses RAG (semantic product search) to ground responses.
     Falls back to a keyword reply if ANTHROPIC_API_KEY is not set.
 
     Args:
@@ -388,22 +447,49 @@ def chatbot_reply(
     if not api_key:
         return _keyword_chatbot_reply(message)
 
-    # ── RAG: retrieve semantically relevant products ───────────────────────
-    rag_context = ""
-    try:
-        from .rag_service import rag_context_for_query
-        rag_context = rag_context_for_query(message, top_k=6)
-    except Exception:
-        pass  # fall back to full catalogue context
+    # RAG: retrieve relevant products for this specific query
+    product_ctx = _retrieve_relevant_products(message)
 
-    if rag_context:
-        system = CHATBOT_SYSTEM.format(product_context=rag_context)
-    else:
-        product_ctx = _build_product_context()
-        system = CHATBOT_SYSTEM.format(product_context=product_ctx)
-
+    # Customer context (order history if available)
+    customer_ctx = ""
     if customer_name:
-        system += f"\n\nThe customer's name is {customer_name}. Address them by name occasionally."
+        customer_ctx = f"CUSTOMER: {customer_name} (logged in).\n"
+    if customer_phone := (
+        history[-1].get("customer_phone") if history else None
+    ):
+        try:
+            from ..models.online_order import OnlineOrder
+            recent_orders = db.session.execute(
+                db.select(OnlineOrder)
+                .where(OnlineOrder.customer_phone == customer_phone)
+                .order_by(OnlineOrder.created_at.desc())
+                .limit(3)
+            ).scalars().all()
+            if recent_orders:
+                order_lines = [
+                    f"  - {o.order_number} on {o.created_at.strftime('%d %b')}: "
+                    f"NPR {float(o.grand_total):.0f} ({o.status})"
+                    for o in recent_orders
+                ]
+                customer_ctx += "RECENT ORDERS:\n" + "\n".join(order_lines) + "\n"
+        except Exception:
+            pass
+
+    # Knowledge base RAG: retrieve relevant FAQ/policy articles
+    kb_context = ""
+    try:
+        from ..models.knowledge_article import KnowledgeArticle
+        kb_articles = KnowledgeArticle.search(message, limit=2)
+        if kb_articles:
+            kb_lines = [f"  [{a.category.upper()}] {a.title}: {a.body}" for a in kb_articles]
+            kb_context = "\nSTORE POLICIES & FAQ (use these for policy questions):\n" + "\n".join(kb_lines)
+    except Exception:
+        pass
+
+    system = CHATBOT_SYSTEM.format(
+        product_context=product_ctx,
+        customer_context=customer_ctx + kb_context,
+    )
 
     # Build message list — last 6 turns of history
     messages = []
@@ -418,7 +504,7 @@ def chatbot_reply(
     try:
         payload = json.dumps({
             "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 300,
+            "max_tokens": 200,
             "system": system,
             "messages": messages,
         }).encode()
