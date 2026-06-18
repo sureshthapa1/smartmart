@@ -1686,9 +1686,52 @@ def submit_review(product_id):
             body=body or None,
             order_number=order_number or None,
         )
+        # AI Review Classification — auto-approve genuine reviews, flag suspicious ones
+        try:
+            import os as _os3, json as _json3, urllib.request as _ureq3
+            _ak = _os3.environ.get("ANTHROPIC_API_KEY", "")
+            if _ak and (review.body or review.title):
+                _review_text = f"Rating: {review.rating}/5\nTitle: {review.title or ''}\nBody: {review.body or ''}"
+                _prompt = (
+                    "Classify this product review for a Nepal dry fruits store.\n\n"
+                    "REVIEW:\n" + _review_text + "\n\n"
+                    'Reply with JSON only: {"classification": "genuine" | "spam" | "toxic", '
+                    '"confidence": 0.0-1.0, "auto_approve": true | false, '
+                    '"reason": "one sentence"}\n'
+                    "Auto-approve if: genuine, rating 4-5, confidence > 0.85, no suspicious patterns."
+                )
+                _pl = _json3.dumps({
+                    "model": "claude-haiku-4-5-20251001", "max_tokens": 120,
+                    "messages": [{"role": "user", "content": _prompt}],
+                }).encode()
+                _rq = _ureq3.Request(
+                    "https://api.anthropic.com/v1/messages", data=_pl, method="POST",
+                    headers={"x-api-key": _ak, "anthropic-version": "2023-06-01",
+                             "content-type": "application/json"},
+                )
+                with _ureq3.urlopen(_rq, timeout=10) as _rs:
+                    _res = _json3.loads(_rs.read())
+                _raw = _res["content"][0]["text"].strip()
+                # Strip markdown code fences if present
+                if _raw.startswith("```"):
+                    _raw = _raw.split("```")[1].strip()
+                    if _raw.startswith("json"):
+                        _raw = _raw[4:].strip()
+                _cls = _json3.loads(_raw)
+                if _cls.get("classification") == "toxic":
+                    flash("Your review contains inappropriate content and could not be submitted.", "danger")
+                    return redirect(url_for("store.product_detail", product_id=product_id))
+                if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
+                    review.is_approved = True   # Auto-approve high-confidence genuine reviews
+        except Exception:
+            pass  # Classification failure → review goes to manual queue as normal
+
         db.session.add(review)
         db.session.commit()
-        flash("Thank you for your review! ⭐ It will appear after moderation.", "success")
+        if review.is_approved:
+            flash("Thank you for your review! ⭐ It's now live.", "success")
+        else:
+            flash("Thank you for your review! ⭐ It will appear after moderation.", "success")
     except Exception:
         db.session.rollback()
         flash("You have already reviewed this product.", "info")
@@ -1779,6 +1822,58 @@ def autofill_all_products():
         return jsonify({"ok": True, "results": results})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# ── AI Price Justifier (cached 24h per product) ──────────────────────────────
+
+@store_bp.route("/api/price-justify/<int:product_id>")
+def price_justify(product_id: int):
+    """Return a 1-sentence price justification. Cached 24h — same call all day."""
+    cache_key = f"pj:{product_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify({"ok": True, "text": cached})
+
+    product = db.session.get(Product, product_id)
+    if not product:
+        return jsonify({"ok": False, "text": ""})
+
+    import os as _os4, json as _json4, urllib.request as _ureq4
+    api_key = _os4.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        # Fallback: build from product fields
+        parts = []
+        if product.origin:
+            parts.append(f"Sourced from {product.origin}")
+        if product.pack_size:
+            parts.append(f"available in {product.pack_size}")
+        text = (", ".join(parts) + ".") if parts else ""
+        _cache_set(cache_key, text, ttl=86400)
+        return jsonify({"ok": True, "text": text})
+
+    try:
+        benefits = (product.benefits or "")[:100]
+        prompt = (
+            f"Write ONE sentence (max 18 words) explaining why {product.name} "
+            f"(NPR {float(product.selling_price):.0f}"
+            + (f", from {product.origin}" if product.origin else "")
+            + f") is worth its price for a Nepal customer. "
+            f"Focus on quality, origin, or nutrition. Be specific."
+            + (f" Key benefits: {benefits}" if benefits else "")
+        )
+        payload = _json4.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 60,
+            "messages": [{"role": "user", "content": prompt}]}).encode()
+        req = _ureq4.Request("https://api.anthropic.com/v1/messages",
+            data=payload, method="POST",
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"})
+        with _ureq4.urlopen(req, timeout=8) as resp:
+            text = _json4.loads(resp.read())["content"][0]["text"].strip()
+        _cache_set(cache_key, text, ttl=86400)
+        return jsonify({"ok": True, "text": text})
+    except Exception:
+        return jsonify({"ok": True, "text": ""})
+
 
 @store_bp.route("/sitemap.xml")
 def sitemap():
