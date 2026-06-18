@@ -31,53 +31,65 @@ def _get_mail():
         return None
 
 
-def send_order_confirmation(order, items: list) -> bool:
-    """
-    Send order confirmation email to the customer.
-    Returns True if sent (or logged), False on error.
+def _claude_personalised_email_section(items: list) -> str:
+    """Generate personalised product tips + upsell using Claude Haiku."""
+    import os, json, urllib.request as _ureq
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key or not items:
+        return ""
+    try:
+        product_names = ", ".join(i.get("name", "") for i in items[:4])
+        prompt = (
+            f"A customer in Nepal just ordered: {product_names}\n\n"
+            f"Write 2-3 short sentences (no bullets) for an order confirmation email:\n"
+            f"1. A specific health/nutrition tip for one of their products\n"
+            f"2. A serving suggestion or recipe idea\n"
+            f"3. (Optional) One complementary product they might enjoy next time\n\n"
+            f"Keep it warm, helpful, and specific to dry fruits. No generic text."
+        )
+        payload = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 160,
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode()
+        req = _ureq.Request(
+            "https://api.anthropic.com/v1/messages", data=payload, method="POST",
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+        )
+        with _ureq.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())["content"][0]["text"].strip()
+    except Exception:
+        return ""
 
-    order: OnlineOrder instance
-    items: list of dicts with keys: name, qty, unit_price, subtotal
-    """
+
+def send_order_confirmation(order, items: list) -> bool:
+    """Send personalised order confirmation email — Claude generates product tips."""
     customer_email = getattr(order, "customer_email", None)
     if not customer_email:
-        logger.info(
-            "No customer email for order %s — skipping confirmation email",
-            order.order_number
-        )
+        logger.info("No customer email for order %s", order.order_number)
         return False
-
     if not _mail_configured():
-        logger.info(
-            "[EMAIL NO-OP] Order confirmation for %s to %s (MAIL_SERVER not configured)",
-            order.order_number, customer_email
-        )
+        logger.info("[EMAIL NO-OP] Order confirmation for %s (MAIL_SERVER not configured)", order.order_number)
         return True
-
     mail = _get_mail()
     if not mail:
-        logger.warning("Flask-Mail not initialised — cannot send order confirmation")
+        logger.warning("Flask-Mail not initialised")
         return False
-
     try:
         from flask_mail import Message
+        # Generate Claude personalisation (non-blocking — empty string if fails)
+        personalised_tips = _claude_personalised_email_section(items)
         subject = f"Order Confirmed — {order.order_number} | GoldKernel Dry Fruits"
-        html_body = _order_confirmation_html(order, items)
+        html_body = _order_confirmation_html(order, items, personalised_tips)
         text_body = _order_confirmation_text(order, items)
-        msg = Message(
-            subject=subject,
-            recipients=[customer_email],
-            html=html_body,
-            body=text_body,
-        )
+        msg = Message(subject=subject, recipients=[customer_email],
+                      html=html_body, body=text_body)
         mail.send(msg)
         logger.info("Order confirmation email sent: %s → %s", order.order_number, customer_email)
         return True
     except Exception as exc:
-        logger.error(
-            "Failed to send order confirmation for %s: %s",
-            order.order_number, exc
-        )
+        logger.error("Failed to send order confirmation for %s: %s", order.order_number, exc)
         return False
 
 
@@ -151,7 +163,7 @@ def send_password_reset_email(user, reset_url: str) -> bool:
 
 # ── HTML templates ────────────────────────────────────────────────────────────
 
-def _order_confirmation_html(order, items: list) -> str:
+def _order_confirmation_html(order, items: list, personalised_tips: str = "") -> str:
     items_rows = "".join(
         f"""<tr>
           <td style="padding:8px;border-bottom:1px solid #eee">{it.get('name','')}</td>
@@ -204,6 +216,7 @@ def _order_confirmation_html(order, items: list) -> str:
         <p><strong>Payment:</strong> {payment_badge}</p>
         <p><strong>Delivery Address:</strong> {getattr(order,'delivery_address','')}, {getattr(order,'delivery_area','')}</p>
 
+        {("<div style=\"background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;margin:12px 0\">" + personalised_tips + "</div>") if personalised_tips else ""}
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px;margin:16px 0">
           <p style="margin:0">📦 Track your order at <strong>goldkernel.com/store/track</strong> using order number <strong>{order.order_number}</strong></p>
         </div>
