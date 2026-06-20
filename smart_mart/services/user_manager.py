@@ -9,7 +9,8 @@ from ..models.user import User
 from . import authenticator
 
 
-def create_user(username: str, password: str, role: str) -> User:
+def create_user(username: str, password: str, role: str,
+                commission_rate: float = 0.0, email: str | None = None) -> User:
     """Create a new user with a hashed password.
     Staff users automatically get minimal default permissions.
     Raises ValueError if the username already exists.
@@ -18,6 +19,8 @@ def create_user(username: str, password: str, role: str) -> User:
         username=username,
         password_hash=authenticator.hash_password(password),
         role=role,
+        commission_rate=commission_rate,
+        email=email or None,
     )
     db.session.add(user)
     try:
@@ -45,6 +48,12 @@ def update_user(user_id: int, data: dict) -> User:
         user.username = data["username"]
     if "role" in data:
         user.role = data["role"]
+    if "commission_rate" in data:
+        user.commission_rate = data["commission_rate"]
+    if "email" in data:
+        user.email = data["email"] or None
+    if "is_active" in data:
+        user.is_active = bool(data["is_active"])
 
     try:
         db.session.commit()

@@ -427,6 +427,11 @@ def _migration_steps() -> list[MigrationStep]:
             ),
         ),
         (
+            "2026_06_20_user_email_column",
+            "Add optional email column to users table (for password reset emails).",
+            lambda conn: _safe_add_column(conn, "users", "email", "VARCHAR(120)"),
+        ),
+        (
             "2026_06_20_product_perf_indexes",
             "Add product name, is_active, and composite active+qty indexes for store query performance.",
             lambda conn: (

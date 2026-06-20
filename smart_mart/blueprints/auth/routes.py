@@ -104,14 +104,24 @@ def request_password_reset():
                 "Reset URL (valid 30 min): %s",
                 user.username, user.id, reset_url,
             )
+            # Try to send password reset email if user has an email on file
+            email_sent = False
+            user_email = getattr(user, "email", None)
+            if user_email:
+                try:
+                    from ...services.email_service import send_password_reset_email
+                    email_sent = send_password_reset_email(user, reset_url)
+                except Exception as _email_exc:
+                    current_app.logger.warning("Password reset email failed: %s", _email_exc)
+
             # If the requesting user is already an authenticated admin,
             # show the reset link directly on screen so they can relay it
             # without needing server-log access.
             if _cu.is_authenticated and getattr(_cu, "role", "") == "admin":
-                flash(
-                    f"Reset link for '{user.username}' (valid 30 min): {reset_url}",
-                    "info",
-                )
+                msg = f"Reset link for '{user.username}' (valid 30 min): {reset_url}"
+                if email_sent:
+                    msg += " (also emailed to user)"
+                flash(msg, "info")
                 return redirect(url_for("auth.request_password_reset"))
 
         flash(

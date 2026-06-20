@@ -322,6 +322,40 @@ def create_app(config_name="development"):
         """Root sitemap redirect to the store sitemap."""
         return redirect(url_for("store.sitemap", _external=False))
 
+    # ── Health check (Render / uptime monitors) ───────────────────────────
+    @app.route("/health")
+    def health_check():
+        """Lightweight health-check endpoint. Returns 200 when the app and DB are up."""
+        import json as _json
+        from datetime import datetime as _dt, timezone as _tz
+        status = {"status": "ok", "timestamp": _dt.now(_tz.utc).isoformat()}
+        http_code = 200
+        # Quick DB ping
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            status["db"] = "ok"
+        except Exception as _db_exc:
+            status["db"] = "error"
+            status["db_error"] = str(_db_exc)[:80]
+            status["status"] = "degraded"
+            http_code = 503
+        # Redis ping (if configured)
+        try:
+            import os as _os2
+            if _os2.environ.get("REDIS_URL"):
+                import redis as _redis
+                _r = _redis.from_url(_os2.environ["REDIS_URL"], socket_connect_timeout=2)
+                _r.ping()
+                status["redis"] = "ok"
+        except Exception:
+            status["redis"] = "unavailable"
+        from flask import Response
+        return Response(
+            _json.dumps(status, indent=2),
+            status=http_code,
+            mimetype="application/json",
+        )
+
     # ── Global error handlers ─────────────────────────────────────────────
     @app.errorhandler(403)
     def forbidden(e):

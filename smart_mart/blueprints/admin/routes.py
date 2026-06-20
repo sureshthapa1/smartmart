@@ -25,7 +25,9 @@ def create_user():
         role = request.form.get("role", "staff")
         try:
             commission_rate = float(request.form.get("commission_rate", 0) or 0)
-            user_manager.create_user(username, password, role, commission_rate=commission_rate)
+            email = request.form.get("email", "").strip() or None
+            user_manager.create_user(username, password, role,
+                                     commission_rate=commission_rate, email=email)
             flash(f"User '{username}' created successfully.", "success")
             return redirect(url_for("admin.users"))
         except ValueError as e:
@@ -52,6 +54,8 @@ def edit_user(user_id):
         try:
             commission_rate = float(request.form.get("commission_rate", 0) or 0)
             data["commission_rate"] = min(max(commission_rate, 0), 100)
+            email = request.form.get("email", "").strip() or None
+            data["email"] = email
             user_manager.update_user(user_id, data)
             flash(f"User '{username}' updated successfully.", "success")
             return redirect(url_for("admin.users"))

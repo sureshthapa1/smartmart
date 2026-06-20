@@ -2,10 +2,11 @@ services:
   - type: web
     name: smart-mart
     runtime: python
+    healthCheckPath: /health
     buildCommand: bash build.sh && flask --app run.py db upgrade
-    # Single worker with 8 threads until Redis is configured.
-    # With Redis (REDIS_URL set), switch to: --workers 2 --threads 4
-    startCommand: gunicorn "smart_mart.app:create_app('production')" --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -
+    # Workers auto-scale: 2 workers × 4 threads when REDIS_URL is set (shared rate-limit + cache)
+    # Without Redis: 1 worker × 8 threads (safe, no shared-state needed)
+    startCommand: bash -c 'if [ -n "$REDIS_URL" ]; then exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -; else exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -; fi'
     envVars:
       - key: FLASK_ENV
         value: production
@@ -66,10 +67,18 @@ services:
       - key: CLOUDINARY_URL
         sync: false
 
-      # ── Redis (recommended for multi-worker rate limiting + caching) ─────
-      # Add a Redis service in Render, then set REDIS_URL and increase workers.
+      # ── Redis (shared rate-limiting + caching across workers) ─────────────
+      # Linked automatically when a Redis service is added to this blueprint.
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: smart-mart-redis
+          type: redis
+          property: connectionString
+        optional: true
+
+      # ── App URL (used by the daily cron bot) ────────────────────────────
+      - key: APP_URL
+        sync: false   # e.g. https://smart-mart.onrender.com
 
       # Optional: override the admin username (default: admin)
       - key: ADMIN_USERNAME
@@ -97,3 +106,10 @@ services:
         sync: false   # Set to your Render web service URL e.g. https://smart-mart.onrender.com
       - key: BOT_SECRET
         sync: false   # Must match the BOT_SECRET on the web service
+
+  # Redis — shared rate-limiting + caching across Gunicorn workers
+  # Free tier: 25 MB, persistent. Upgrade as traffic grows.
+  - type: redis
+    name: smart-mart-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru

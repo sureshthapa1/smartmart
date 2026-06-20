@@ -1632,6 +1632,52 @@ def store_chat_api():
 
 
 
+
+# ── AJAX promo code validation (called from checkout JS applyPromo()) ─────────
+
+@store_bp.route("/apply-promo", methods=["POST"])
+@limiter.limit("10/minute")
+def apply_promo():
+    """Validate a promo code via AJAX and return discount info as JSON.
+    The actual discount is applied during full checkout POST via promo_code field.
+    This endpoint only validates & previews the discount.
+    """
+    from datetime import date
+    from ...models.promotion import Promotion
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or request.form.get("code", "")).strip().upper()
+    if not code:
+        return jsonify({"ok": False, "message": "Please enter a promo code."})
+    today = date.today()
+    cart = _cart()
+    subtotal = sum(
+        float(v.get("price", 0)) * int(v.get("qty", 0)) for v in cart.values()
+    )
+    try:
+        promo = db.session.execute(
+            db.select(Promotion).where(
+                Promotion.code == code,
+                Promotion.is_active == True,
+                Promotion.start_date <= today,
+                Promotion.end_date >= today,
+            )
+        ).scalar_one_or_none()
+        if not promo:
+            return jsonify({"ok": False, "message": f"Code \u2018{code}\u2019 is invalid or has expired."})
+        min_req = float(promo.min_purchase or 0)
+        if subtotal < min_req:
+            return jsonify({"ok": False,
+                            "message": f"Minimum order NPR {min_req:.0f} required (cart: NPR {subtotal:.0f})."})
+        discount = promo.calculate_discount(subtotal)
+        if promo.promo_type == "percentage":
+            msg = f"Code \u2018{code}\u2019 applied \u2014 {float(promo.discount_value):.0f}% off (\u2212NPR {discount:.0f})"
+        else:
+            msg = f"Code \u2018{code}\u2019 applied \u2014 \u2212NPR {discount:.0f} off"
+        return jsonify({"ok": True, "message": msg, "discount": round(discount, 2)})
+    except Exception:
+        return jsonify({"ok": False, "message": "Could not validate promo code."})
+
+
 # ── FEATURE 1: Active promo codes display ─────────────────────────────────────
 
 @store_bp.route("/promos")

@@ -23,3 +23,5 @@ cloudinary>=1.36.0
 # Uncomment when you add a Redis service to render.yaml
 # redis>=5.0.0
 Markdown==3.7
+# Redis client — required when REDIS_URL is set (shared cache + rate limiting)
+redis>=5.0.0

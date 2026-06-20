@@ -143,18 +143,55 @@ def send_password_reset_email(user, reset_url: str) -> bool:
 
     try:
         from flask_mail import Message
+        html_body = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+        <body style="margin:0;padding:0;background:#fffbf5;font-family:'Helvetica Neue',Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#fffbf5;padding:32px 16px;">
+            <tr><td align="center">
+              <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;border:1px solid #e8e0d4;overflow:hidden;">
+                <!-- Header -->
+                <tr><td style="background:linear-gradient(135deg,#92400e,#b45309);padding:28px 32px;text-align:center;">
+                  <div style="font-size:28px;font-weight:900;color:#fef3c7;letter-spacing:-0.5px;">🥜 GoldKernel</div>
+                  <div style="font-size:12px;color:#fde68a;margin-top:4px;text-transform:uppercase;letter-spacing:1px;">Premium Dry Fruits · Nepal</div>
+                </td></tr>
+                <!-- Body -->
+                <tr><td style="padding:36px 32px;">
+                  <h2 style="margin:0 0 12px;font-size:20px;color:#1c1917;">Password Reset Request</h2>
+                  <p style="color:#44403c;line-height:1.6;margin:0 0 20px;">Hello <strong>{user.username}</strong>,<br>
+                  We received a request to reset your password. Click the button below — this link is valid for <strong>30 minutes</strong>.</p>
+                  <div style="text-align:center;margin:28px 0;">
+                    <a href="{reset_url}" style="background:linear-gradient(135deg,#92400e,#b45309);color:#fff;text-decoration:none;padding:14px 32px;border-radius:9999px;font-weight:700;font-size:15px;display:inline-block;">Reset My Password</a>
+                  </div>
+                  <p style="color:#78716c;font-size:13px;line-height:1.5;">If the button doesn’t work, copy and paste this link into your browser:<br>
+                  <a href="{reset_url}" style="color:#b45309;word-break:break-all;">{reset_url}</a></p>
+                  <hr style="border:none;border-top:1px solid #e8e0d4;margin:24px 0;">
+                  <p style="color:#a8a29e;font-size:12px;margin:0;">If you didn’t request a password reset, you can safely ignore this email. Your password won’t change.</p>
+                </td></tr>
+                <!-- Footer -->
+                <tr><td style="background:#fef9ee;padding:16px 32px;text-align:center;border-top:1px solid #e8e0d4;">
+                  <p style="margin:0;font-size:12px;color:#a8a29e;">© GoldKernel Dry Fruits · Dhangadhi, Kailali, Nepal</p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </body></html>
+        """
+        text_body = (
+            f"Hello {user.username},\n\n"
+            f"Click the link below to reset your password (valid 30 min):\n{reset_url}\n\n"
+            f"If you didn't request this, ignore this email.\n\n"
+            f"\u2014 GoldKernel Team"
+        )
         msg = Message(
-            subject="Reset Your SmartMart Password",
+            subject="Reset Your GoldKernel Password",
             recipients=[user_email],
-            html=f"""
-            <p>Hello {user.username},</p>
-            <p>Click the link below to reset your password (valid for 30 minutes):</p>
-            <p><a href="{reset_url}">{reset_url}</a></p>
-            <p>If you did not request this, please ignore this email.</p>
-            <p>— SmartMart Team</p>
-            """,
+            html=html_body,
+            body=text_body,
         )
         mail.send(msg)
+        logger.info("Password reset email sent to %s", user_email)
         return True
     except Exception as exc:
         logger.error("Failed to send password reset email: %s", exc)

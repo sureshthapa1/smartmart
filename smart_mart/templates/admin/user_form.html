@@ -23,6 +23,13 @@
               <input type="text" class="form-control" name="username" value="{{ user.username if user else '' }}" required autofocus placeholder="Enter username">
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">Email <span class="text-muted small">(for password reset)</span></label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-envelope text-muted"></i></span>
+              <input type="email" class="form-control" name="email" value="{{ user.email if user and user.email else '' }}" placeholder="staff@example.com">
+            </div>
+          </div>
           {% if not user %}
           <div class="mb-3">
             <label class="form-label">Password <span class="text-danger">*</span></label>
