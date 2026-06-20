@@ -83,9 +83,8 @@ def create_app(config_name="development"):
 
     _register_blueprints(app)
 
-    # ── Jinja globals ─────────────────────────────────────────────────────
+    # now is injected via inject_now context processor below
     from datetime import datetime as _dt
-    app.jinja_env.globals['now'] = _dt.utcnow
 
 
     # ── HTTP Security Headers ─────────────────────────────────────────────
@@ -96,14 +95,17 @@ def create_app(config_name="development"):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        # Prevent admin/API pages from being indexed by search engines
+        if request.path.startswith(("/admin", "/api", "/dashboard", "/auth")):
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
         # Allow CDN resources used by the app
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; "
             "font-src 'self' fonts.gstatic.com cdn.jsdelivr.net; "
             "img-src 'self' data: blob: https://res.cloudinary.com https://images.pexels.com; "
-            "connect-src 'self';"
+            "connect-src 'self' rc-epay.esewa.com.np uat.esewa.com.np khalti.com;"
         )
         return response
 
@@ -194,8 +196,8 @@ def create_app(config_name="development"):
             def _md_fallback(text):
                 if not text:
                     return ""
-                t = _re2.sub(r"[*][*](.+?)[*][*]", r"<strong></strong>", text)
-                t = _re2.sub(r"[*](.+?)[*]", r"<em></em>", t)
+                t = _re2.sub(r"[*][*](.+?)[*][*]", r"<strong>\1</strong>", text)
+                t = _re2.sub(r"[*](.+?)[*]", r"<em>\1</em>", t)
                 parts = []
                 in_ul = False
                 for line in t.split("\n"):
@@ -287,6 +289,32 @@ def create_app(config_name="development"):
     def index():
         return redirect(url_for("auth.login"))
 
+    # ── Root-level SEO endpoints (search engines read these at /) ─────────
+    @app.route("/robots.txt")
+    def robots_global():
+        """Root robots.txt so all crawlers find it at the canonical path."""
+        from flask import make_response
+        base = request.url_root.rstrip("/")
+        content = (
+            "User-agent: *\n"
+            "Allow: /store/\n"
+            "Disallow: /store/checkout\n"
+            "Disallow: /store/account\n"
+            "Disallow: /store/cart\n"
+            "Disallow: /dashboard/\n"
+            "Disallow: /admin/\n"
+            "Disallow: /api/\n"
+            f"Sitemap: {base}/store/sitemap.xml\n"
+        )
+        resp = make_response(content, 200)
+        resp.headers["Content-Type"] = "text/plain"
+        return resp
+
+    @app.route("/sitemap.xml")
+    def sitemap_global():
+        """Root sitemap redirect to the store sitemap."""
+        return redirect(url_for("store.sitemap", _external=False))
+
     # ── Global error handlers ─────────────────────────────────────────────
     @app.errorhandler(403)
     def forbidden(e):
@@ -361,6 +389,7 @@ def _register_blueprints(app):
         (".blueprints.targets", "targets_bp"),
         (".blueprints.loyalty", "loyalty_bp"),
         (".blueprints.ai_chat", "ai_chat_bp"),
+        (".blueprints.mcp", "mcp_bp"),
         (".bi.routes", "bi_bp"),
         (".bi.routes", "bi_dashboard_bp"),
     ]

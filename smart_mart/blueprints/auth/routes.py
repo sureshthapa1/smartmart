@@ -52,8 +52,11 @@ def change_password():
         if not bcrypt.check_password_hash(user.password_hash, current_pw):
             flash("Current password is incorrect.", "danger")
             return render_template("auth/change_password.html")
-        if len(new_pw) < 8:
-            flash("New password must be at least 8 characters.", "danger")
+        from ...services.authenticator import validate_password_strength
+        pw_errors = validate_password_strength(new_pw)
+        if pw_errors:
+            for err in pw_errors:
+                flash(err, "danger")
             return render_template("auth/change_password.html")
         if new_pw != confirm_pw:
             flash("New passwords do not match.", "danger")
@@ -138,8 +141,11 @@ def reset_password_confirm(token: str):
         new_pw = request.form.get("new_password", "")
         confirm_pw = request.form.get("confirm_password", "")
 
-        if len(new_pw) < 8:
-            flash("Password must be at least 8 characters.", "danger")
+        from ...services.authenticator import validate_password_strength
+        pw_errors = validate_password_strength(new_pw)
+        if pw_errors:
+            for err in pw_errors:
+                flash(err, "danger")
             return render_template("auth/reset_password.html", token=token)
         if new_pw != confirm_pw:
             flash("Passwords do not match.", "danger")

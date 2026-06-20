@@ -1,7 +1,8 @@
-// Smart Mart Service Worker v2 — PWA install + offline support
-const CACHE = 'smartmart-v2';
+// Smart Mart Service Worker v3 — PWA install + offline support
+// Bump cache name whenever precache URLs change to force update.
+const CACHE = 'smartmart-v3';
 const PRECACHE_URLS = [
-  '/auth/login',
+  '/store/',
   '/static/manifest.json',
 ];
 
@@ -21,18 +22,19 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Network first, cache fallback, offline page for navigation requests
+// Network first, cache fallback
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
-  // For navigation (HTML pages), try network then show cached login page
+  // For navigation (HTML pages), try network then serve cached store home
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() =>
-        caches.match('/auth/login').then(r =>
-          r || new Response('<h2>You are offline. Please reconnect.</h2>', {
-            headers: { 'Content-Type': 'text/html' }
-          })
+        caches.match('/store/').then(r =>
+          r || new Response(
+            '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline — GoldKernel</title><style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fffbf5;color:#1c1917;text-align:center;padding:2rem}.ico{font-size:4rem;margin-bottom:1rem}h1{font-size:1.5rem;margin:.5rem 0}p{color:#78716c}</style></head><body><div><div class="ico">📦</div><h1>You are offline</h1><p>Please check your internet connection and try again.</p></div></body></html>',
+            { headers: { 'Content-Type': 'text/html' } }
+          )
         )
       )
     );

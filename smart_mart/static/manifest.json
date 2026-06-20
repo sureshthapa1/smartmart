@@ -7,11 +7,37 @@
   "background_color": "#fffbf5",
   "theme_color": "#b45309",
   "orientation": "portrait-primary",
+  "categories": ["shopping", "food"],
+  "lang": "en-NP",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23b45309'/><text y='.9em' font-size='70' x='15'>🥜</text></svg>",
+      "src": "/static/img/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Shop Now",
+      "short_name": "Shop",
+      "description": "Browse all products",
+      "url": "/store/",
+      "icons": [{"src": "/static/img/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "Track Order",
+      "short_name": "Track",
+      "description": "Track your order",
+      "url": "/store/track",
+      "icons": [{"src": "/static/img/icon-192.png", "sizes": "192x192"}]
     }
   ]
 }

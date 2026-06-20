@@ -107,3 +107,18 @@ def hash_password(plaintext: str) -> str:
 
 def check_password(plaintext: str, hashed: str) -> bool:
     return bcrypt.check_password_hash(hashed, plaintext)
+
+
+PASSWORD_MIN_LENGTH = 8
+
+
+def validate_password_strength(password: str) -> list[str]:
+    """Return a list of unmet password requirements (empty = valid)."""
+    errors: list[str] = []
+    if len(password) < PASSWORD_MIN_LENGTH:
+        errors.append(f"At least {PASSWORD_MIN_LENGTH} characters.")
+    if not any(c.isupper() for c in password):
+        errors.append("At least one uppercase letter.")
+    if not any(c.isdigit() for c in password):
+        errors.append("At least one digit (0–9).")
+    return errors
