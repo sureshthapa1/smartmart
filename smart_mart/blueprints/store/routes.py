@@ -10,6 +10,7 @@ import uuid
 from functools import wraps
 from urllib.parse import urlparse
 
+from flask_login import login_required
 from flask import (
     Blueprint, Response, jsonify, redirect, render_template,
     request, session, url_for, flash, g
@@ -1941,3 +1942,4 @@ Sitemap: {base}/store/sitemap.xml
 
 
 # ── Cart count API (for nav badge) ───────────────────────────────────────────
+
