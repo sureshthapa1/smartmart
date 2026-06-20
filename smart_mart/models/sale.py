@@ -50,8 +50,8 @@ class Sale(db.Model):
 
     # Relationships
     user = db.relationship("User", back_populates="sales")
-    items = db.relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
-    returns = db.relationship("SaleReturn", back_populates="sale", cascade="all, delete-orphan")
+    items = db.relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan", lazy="selectin")
+    returns = db.relationship("SaleReturn", back_populates="sale", cascade="all, delete-orphan", lazy="selectin")
     customer = db.relationship("Customer", foreign_keys=[customer_id])
     promotion = db.relationship("Promotion", foreign_keys=[promotion_id])
 
@@ -76,7 +76,7 @@ class SaleItem(db.Model):
 
     # Relationships
     sale = db.relationship("Sale", back_populates="items")
-    product = db.relationship("Product", back_populates="sale_items")
+    product = db.relationship("Product", back_populates="sale_items", lazy="selectin")
     return_items = db.relationship(
         "SaleReturnItem", back_populates="sale_item", cascade="all, delete-orphan"
     )

@@ -47,8 +47,8 @@ class OnlineOrder(db.Model):
 
     # Relationships
     items = db.relationship("OnlineOrderItem", back_populates="order",
-                            cascade="all, delete-orphan")
-    creator = db.relationship("User", foreign_keys=[created_by])
+                            cascade="all, delete-orphan", lazy="selectin")
+    creator = db.relationship("User", foreign_keys=[created_by], lazy="select")
 
     STATUS_FLOW = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
     STATUS_LABELS = {
@@ -89,4 +89,4 @@ class OnlineOrderItem(db.Model):
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)
 
     order = db.relationship("OnlineOrder", back_populates="items")
-    product = db.relationship("Product")
+    product = db.relationship("Product", lazy="selectin")
