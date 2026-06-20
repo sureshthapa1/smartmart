@@ -8,6 +8,9 @@ class Product(db.Model):
         db.Index("ix_product_sku", "sku"),
         db.Index("ix_product_quantity", "quantity"),
         db.Index("ix_product_category", "category"),
+        db.Index("ix_product_name", "name"),           # search / ORDER BY name
+        db.Index("ix_product_is_active", "is_active"),  # every store query filters this
+        db.Index("ix_product_active_qty", "is_active", "quantity"),  # composite: active + in-stock
         db.CheckConstraint("quantity >= 0", name="ck_product_quantity_non_negative"),
     )
 

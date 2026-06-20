@@ -4,6 +4,11 @@ from ..extensions import db
 
 class StockMovement(db.Model):
     __tablename__ = "stock_movements"
+    __table_args__ = (
+        db.Index("ix_stock_movement_product_id", "product_id"),
+        db.Index("ix_stock_movement_timestamp", "timestamp"),
+        db.Index("ix_stock_movement_type", "change_type"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)

@@ -426,6 +426,24 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ix_wishlist_unique ON wishlist_items(customer_phone, product_id)"),
             ),
         ),
+        (
+            "2026_06_20_product_perf_indexes",
+            "Add product name, is_active, and composite active+qty indexes for store query performance.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_product_name ON products(name)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_product_is_active ON products(is_active)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_product_active_qty ON products(is_active, quantity)"),
+            ),
+        ),
+        (
+            "2026_06_20_stock_movement_indexes",
+            "Add product_id, timestamp, and change_type indexes on stock_movements.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movement_product_id ON stock_movements(product_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movement_timestamp ON stock_movements(timestamp)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movement_type ON stock_movements(change_type)"),
+            ),
+        ),
     ]
 
 

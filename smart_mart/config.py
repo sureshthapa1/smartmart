@@ -52,6 +52,14 @@ class ProductionConfig(Config):
     ) or "sqlite:///smart_mart.db"
     WTF_CSRF_ENABLED = True
 
+    # ── Secure session cookies (HTTPS only) ──────────────────────────────
+    SESSION_COOKIE_SECURE   = True   # only sent over HTTPS
+    SESSION_COOKIE_HTTPONLY = True   # no JS access to session cookie
+    SESSION_COOKIE_SAMESITE = "Lax"  # CSRF mitigation
+    REMEMBER_COOKIE_SECURE   = True
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+
     # ── PostgreSQL connection pool — prevents Render idle connection drops ──
     # PostgreSQL on Render's free tier closes idle connections after ~5 min.
     # pool_recycle=280 ensures SQLAlchemy recycles connections before that.

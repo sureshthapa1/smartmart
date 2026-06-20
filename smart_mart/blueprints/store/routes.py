@@ -1028,6 +1028,17 @@ def register_view():
             return render_template("store/register.html", settings=settings,
                                    form_data=request.form, customer=None)
 
+        # Validate email format if provided
+        if email and ("@" not in email or "." not in email.split("@")[-1]):
+            flash("Please enter a valid email address.", "danger")
+            return render_template("store/register.html", settings=settings,
+                                   form_data=request.form, customer=None)
+
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "danger")
+            return render_template("store/register.html", settings=settings,
+                                   form_data=request.form, customer=None)
+
         if password != confirm:
             flash("Passwords do not match.", "danger")
             return render_template("store/register.html", settings=settings,
@@ -1934,6 +1945,8 @@ Disallow: /store/cart
 Disallow: /dashboard/
 Disallow: /admin/
 Disallow: /api/
+Disallow: /mcp/
+Disallow: /bi/
 Sitemap: {base}/store/sitemap.xml
 """
     resp = make_response(content, 200)
