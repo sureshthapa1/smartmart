@@ -4,7 +4,7 @@
 {% block content %}
 <div class="sc" style="padding-top:1.75rem;padding-bottom:3rem;max-width:720px;">
 
-  <div class="fade-up" style="text-align:center;margin-bottom:2rem;">
+  <div class="fu" style="text-align:center;margin-bottom:2rem;">
     <div style="font-size:2.5rem;margin-bottom:.75rem;">❓</div>
     <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.02em;margin-bottom:.4rem;">Frequently Asked Questions</h1>
     <p style="color:var(--muted);margin:0;">Everything you need to know about ordering from GoldKernel</p>
@@ -37,7 +37,7 @@
      'Yes! We deliver across Nepal. Delivery time and charges may vary outside the Valley. Contact us for bulk orders or special arrangements.'),
   ] %}
 
-  <div style="display:flex;flex-direction:column;gap:.5rem;" class="fade-up">
+  <div style="display:flex;flex-direction:column;gap:.5rem;" class="fu">
     {% for icon, question, answer in faqs %}
     <div class="faq-item" style="background:var(--card-bg);border-radius:var(--r);border:1.5px solid var(--border);overflow:hidden;">
       <button onclick="toggleFaq(this)"
@@ -53,7 +53,7 @@
     {% endfor %}
   </div>
 
-  <div class="fade-up" style="text-align:center;margin-top:2rem;padding:1.75rem;background:var(--card-bg);border-radius:var(--r-lg);border:1.5px solid var(--border);">
+  <div class="fu" style="text-align:center;margin-top:2rem;padding:1.75rem;background:var(--card-bg);border-radius:var(--r-l);border:1.5px solid var(--border);">
     <div style="font-size:1.5rem;margin-bottom:.5rem;">💬</div>
     <h3 style="font-size:1rem;font-weight:800;margin-bottom:.35rem;">Still have questions?</h3>
     <p style="color:var(--muted);font-size:.875rem;margin-bottom:1rem;">We're happy to help. Reach out to us directly.</p>
@@ -64,7 +64,7 @@
       {% if settings and settings.phone %}
       <a href="https://wa.me/977{{ settings.phone | replace('+','') | replace('-','') | replace(' ','') }}"
          target="_blank" rel="noopener"
-         class="btn-outline-brand" style="padding:.5rem 1.2rem;font-size:.875rem;border-color:#22c55e;color:#16a34a;">
+         class="btn-ob" style="padding:.5rem 1.2rem;font-size:.875rem;border-color:#22c55e;color:#16a34a;">
         <i class="bi bi-whatsapp"></i> WhatsApp
       </a>
       {% endif %}
