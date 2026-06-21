@@ -107,6 +107,7 @@
             </div>
           </div>
         </div>
+        {% endif %}
 
         {# Step 4: Payment #}
         <div class="ucard" style="margin-bottom:1.5rem;">
@@ -242,7 +243,6 @@ document.getElementById('checkout-form').addEventListener('submit',function(){
   const btn=document.getElementById('submit-btn');
   btn.disabled=true;btn.innerHTML='<i class="bi bi-hourglass-split"></i> Placing Order…';
 });
-</script>
 
 // Price justifications for checkout items
 document.querySelectorAll('.co-item[data-pid]').forEach(function(el) {
@@ -253,4 +253,5 @@ document.querySelectorAll('.co-item[data-pid]').forEach(function(el) {
     .then(function(d){ if (d && d.text) tip.textContent = '✓ ' + d.text; })
     .catch(function(){});
 });
+</script>
 {% endblock %}
