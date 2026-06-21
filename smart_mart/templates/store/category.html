@@ -1,48 +1,46 @@
-{% extends "base_store.html" %}
-{% block title %}{{ category_name }} | GoldKernel Dry Fruits{% endblock %}
+{% extends "store/base_store.html" %}
+{% block title %}{{ category_name }} | {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block meta_desc %}Shop {{ category_name }} online in Nepal. Fast delivery, COD available.{% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
 
   {# ── Breadcrumb ── #}
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{{ url_for('store.home') }}">Home</a></li>
-      <li class="breadcrumb-item active">{{ category_name }}</li>
-    </ol>
+  <nav class="bc" aria-label="breadcrumb">
+    <a href="{{ url_for('store.home') }}">Home</a>
+    <span class="bc-sep"><i class="bi bi-chevron-right"></i></span>
+    <span class="bc-cur">{{ category_name }}</span>
   </nav>
 
   <div class="row g-4">
 
     {# ── Sidebar filters ── #}
     <div class="col-lg-3">
-      <div class="ui-card p-3 mb-3">
+      <div class="ucard p-3 mb-3">
         <h6 class="fw-bold mb-3">Browse Categories</h6>
         {% for cat in categories %}
           {% set cat_slug = cat.lower().replace(' ', '-').replace('/', '-') %}
           <a href="{{ url_for('store.category_browse', slug=cat_slug) }}"
-             class="d-block py-1 text-decoration-none
-                    {% if cat.lower() == category_name.lower() %}fw-bold text-primary{% else %}text-body{% endif %}">
+             class="d-block py-1 text-decoration-none {% if cat.lower() == category_name.lower() %}fw-bold{% endif %}"
+             style="color:{% if cat.lower() == category_name.lower() %}var(--brand-d){% else %}var(--text2){% endif %};">
             {{ cat }}
           </a>
         {% endfor %}
       </div>
 
-      <div class="ui-card p-3">
+      <div class="ucard p-3">
         <h6 class="fw-bold mb-3">Filter by Price</h6>
         <form method="GET">
           <input type="hidden" name="sort" value="{{ sort }}">
           <div class="mb-2">
-            <label class="form-label small">Min (NPR)</label>
-            <input type="number" name="min_price" class="field-input form-control form-control-sm"
-                   value="{{ min_price }}" placeholder="0">
+            <label class="flabel" for="cf-min">Min (NPR)</label>
+            <input id="cf-min" type="number" name="min_price" class="finput" value="{{ min_price }}" placeholder="0">
           </div>
           <div class="mb-3">
-            <label class="form-label small">Max (NPR)</label>
-            <input type="number" name="max_price" class="field-input form-control form-control-sm"
-                   value="{{ max_price }}" placeholder="5000">
+            <label class="flabel" for="cf-max">Max (NPR)</label>
+            <input id="cf-max" type="number" name="max_price" class="finput" value="{{ max_price }}" placeholder="5000">
           </div>
-          <button class="btn btn-brand btn-sm w-100">Apply</button>
+          <button class="btn-brand sm w-100 justify-content-center">Apply</button>
         </form>
       </div>
     </div>
@@ -57,7 +55,7 @@
         <form method="GET" class="d-flex align-items-center gap-2">
           <input type="hidden" name="min_price" value="{{ min_price }}">
           <input type="hidden" name="max_price" value="{{ max_price }}">
-          <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+          <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto;">
             <option value="name"       {% if sort=='name'       %}selected{% endif %}>A–Z</option>
             <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price ↑</option>
             <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price ↓</option>
@@ -67,37 +65,19 @@
       </div>
 
       {% if not products %}
-      <div class="text-center py-5 text-muted">
-        <p class="fs-5">No products found in this category.</p>
-        <a href="{{ url_for('store.home') }}" class="btn btn-brand">Browse All Products</a>
+      <div class="ucard">
+        <div class="empty">
+          <div class="empty-icon">🔍</div>
+          <h4>No products found</h4>
+          <p>No products in <strong>{{ category_name }}</strong> match your filters right now.</p>
+          <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All Products</a>
+        </div>
       </div>
       {% else %}
-      <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-3">
+      <div class="row g-3">
         {% for product in products %}
-        <div class="col">
-          <div class="ui-card h-100 position-relative overflow-hidden product-card">
-            {% if product.id in selling_fast_ids %}
-            <span class="position-absolute top-0 start-0 badge bg-danger m-2" style="z-index:2">🔥 Selling Fast</span>
-            {% endif %}
-            <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="text-decoration-none">
-              <img src="{{ product.image_url or '/static/img/placeholder.png' }}"
-                   alt="{{ product.name }}" class="w-100"
-                   style="height:160px;object-fit:cover;border-radius:8px 8px 0 0">
-              <div class="p-3">
-                <p class="fw-semibold mb-1 text-body">{{ product.name }}</p>
-                <p class="text-muted small mb-1">{{ product.pack_size or '' }}</p>
-                <p class="fw-bold text-primary mb-0">NPR {{ "%.0f"|format(product.selling_price) }}</p>
-              </div>
-            </a>
-            <div class="px-3 pb-3">
-              <form method="POST" action="{{ url_for('store.add_to_cart') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="product_id" value="{{ product.id }}">
-                <input type="hidden" name="quantity" value="1">
-                <button class="btn btn-brand btn-sm w-100">Add to Cart</button>
-              </form>
-            </div>
-          </div>
+        <div class="col-6 col-sm-4 col-md-3">
+          {% include "store/_product_card.html" %}
         </div>
         {% endfor %}
       </div>
