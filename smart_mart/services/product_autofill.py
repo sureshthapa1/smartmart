@@ -278,11 +278,14 @@ def autofill_product(product, force: bool = False) -> dict:
     updated = {}
 
     # ── 1. Get content data ──────────────────────────────────────────────────
-    need_description = force or not product.description
-    need_pack_size   = force or not getattr(product, "pack_size", None)
-    need_image       = force or not product.image_filename
+    need_description  = force or not product.description
+    need_pack_size    = force or not getattr(product, "pack_size", None)
+    need_image        = force or not product.image_filename
+    need_benefits     = force or not getattr(product, "benefits", None)
+    need_origin       = force or not getattr(product, "origin", None)
+    need_storage_tips = force or not getattr(product, "storage_tips", None)
 
-    if need_description or need_pack_size or need_image:
+    if need_description or need_pack_size or need_image or need_benefits or need_origin or need_storage_tips:
         # Try Claude first
         data = _claude_autofill(name, category)
         if not data:
@@ -291,14 +294,28 @@ def autofill_product(product, force: bool = False) -> dict:
 
         # ── 2. Description ───────────────────────────────────────────────────
         if need_description and data.get("description"):
-            # Append storage tip and origin if available
-            desc = data["description"]
-            if data.get("storage_tip"):
-                desc += f"\n\n📦 Storage: {data['storage_tip']}"
-            if data.get("origin"):
-                desc += f"\n\n🌍 Origin: {data['origin']}"
-            product.description = desc
+            product.description = data["description"]
             updated["description"] = True
+
+        # ── 2b. Benefits (own column — list joined as markdown bullets) ──────
+        if need_benefits and data.get("benefits"):
+            benefits_raw = data["benefits"]
+            if isinstance(benefits_raw, list):
+                product.benefits = "\n".join(f"- {b}" for b in benefits_raw if b)
+            elif isinstance(benefits_raw, str):
+                product.benefits = benefits_raw
+            if product.benefits:
+                updated["benefits"] = True
+
+        # ── 2c. Origin (own column) ───────────────────────────────────────────
+        if need_origin and data.get("origin"):
+            product.origin = str(data["origin"])[:120]  # respect column length
+            updated["origin"] = True
+
+        # ── 2d. Storage tips (own column) ─────────────────────────────────────
+        if need_storage_tips and data.get("storage_tip"):
+            product.storage_tips = data["storage_tip"]
+            updated["storage_tips"] = True
 
         # ── 3. Pack size ─────────────────────────────────────────────────────
         if need_pack_size and data.get("pack_size"):
