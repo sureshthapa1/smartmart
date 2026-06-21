@@ -449,6 +449,17 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_stock_movement_type ON stock_movements(change_type)"),
             ),
         ),
+        (
+            "2026_06_21_product_enrichment_columns",
+            "Add benefits, origin, storage_tips columns to products "
+            "(referenced by store chatbot RAG, product detail page, AI autofill, "
+            "price justifier — previously missing, causing AttributeError in store_ai_service).",
+            lambda conn: (
+                _safe_add_column(conn, "products", "benefits", "TEXT"),
+                _safe_add_column(conn, "products", "origin", "VARCHAR(120)"),
+                _safe_add_column(conn, "products", "storage_tips", "TEXT"),
+            ),
+        ),
     ]
 
 
