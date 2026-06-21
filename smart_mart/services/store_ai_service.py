@@ -43,11 +43,11 @@ def _cache_get(key: str):
         return None
 
 
-def _cache_set(key: str, value):
-    """Set in shared cache_service."""
+def _cache_set(key: str, value, ttl: int = None):
+    """Set in shared cache_service. Accepts optional ttl override (seconds)."""
     try:
         from .cache_service import set as _cs_set
-        _cs_set(f"store_ai:{key}", value, ttl=_CACHE_TTL)
+        _cs_set(f"store_ai:{key}", value, ttl=ttl if ttl is not None else _CACHE_TTL)
     except Exception:
         pass
     return value
