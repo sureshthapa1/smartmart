@@ -9,7 +9,7 @@
       <p style="color:rgba(255,255,255,.78);font-size:.82rem;margin:0;">Join GoldKernel — track orders, save favourites & more</p>
     </div>
     <div style="padding:1.75rem;">
-      <form method="post" action="{{ url_for('store.register') }}">
+      <form method="post" action="{{ url_for('store.register_view') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row g-3">
           <div class="col-12">
