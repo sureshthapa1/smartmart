@@ -1019,7 +1019,7 @@ def register_view():
         address  = request.form.get("address", "").strip()
         area     = request.form.get("area", "").strip()
         password = request.form.get("password", "")
-        confirm  = request.form.get("confirm_password", "")
+        confirm  = request.form.get("password2", "")
 
         # Validate phone
         clean_phone = _validate_phone(phone)
