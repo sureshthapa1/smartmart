@@ -29,6 +29,9 @@ class Product(db.Model):
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
     description = db.Column(db.Text, nullable=True)
+    benefits = db.Column(db.Text, nullable=True)       # e.g. AI-generated health/usage benefits (markdown)
+    origin = db.Column(db.String(120), nullable=True)  # e.g. "California, USA" / "Nepal/Kashmir"
+    storage_tips = db.Column(db.Text, nullable=True)   # e.g. "Store in airtight container, cool dry place"
     pack_size = db.Column(db.String(40), nullable=True)  # e.g. "500g", "1kg", "250g"
     slug = db.Column(db.String(160), nullable=True, unique=True)
     is_featured = db.Column(db.Boolean, nullable=False, default=False)
