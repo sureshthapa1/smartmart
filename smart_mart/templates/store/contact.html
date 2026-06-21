@@ -4,22 +4,22 @@
 {% block content %}
 <div class="sc" style="padding-top:1.75rem;padding-bottom:3rem;max-width:760px;">
 
-  <div class="fade-up" style="text-align:center;margin-bottom:2rem;">
+  <div class="fu" style="text-align:center;margin-bottom:2rem;">
     <div style="font-size:2.5rem;margin-bottom:.75rem;">📞</div>
     <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.02em;margin-bottom:.4rem;">Contact Us</h1>
     <p style="color:var(--muted);margin:0;">We're here to help. Reach out any time — we respond within a few hours.</p>
   </div>
 
   <div class="row g-4">
-    <div class="col-md-5 fade-up">
-      <div class="ui-card" style="height:100%;">
-        <div class="ui-card-head"><span>📬</span><span class="ui-card-head-title">Get in Touch</span></div>
-        <div class="ui-card-body" style="display:flex;flex-direction:column;gap:.65rem;">
+    <div class="col-md-5 fu">
+      <div class="ucard" style="height:100%;">
+        <div class="ucard-head"><span>📬</span><span class="ucard-title">Get in Touch</span></div>
+        <div class="ucard-body" style="display:flex;flex-direction:column;gap:.65rem;">
 
           {% if settings and settings.phone %}
           <a href="tel:{{ settings.phone }}" style="text-decoration:none;display:flex;gap:.75rem;align-items:center;padding:.75rem;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);transition:background var(--t-fast);"
-             onmouseover="this.style.background='var(--brand-light)'" onmouseout="this.style.background='var(--surface)'">
-            <div style="width:38px;height:38px;border-radius:var(--r-sm);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📞</div>
+             onmouseover="this.style.background='var(--brand-l)'" onmouseout="this.style.background='var(--surface)'">
+            <div style="width:38px;height:38px;border-radius:var(--r-s);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📞</div>
             <div>
               <div style="font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Phone / WhatsApp</div>
               <div style="font-weight:700;color:var(--text);font-size:.88rem;">{{ settings.phone }}</div>
@@ -29,8 +29,8 @@
 
           {% if settings and settings.email %}
           <a href="mailto:{{ settings.email }}" style="text-decoration:none;display:flex;gap:.75rem;align-items:center;padding:.75rem;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);transition:background var(--t-fast);"
-             onmouseover="this.style.background='var(--brand-light)'" onmouseout="this.style.background='var(--surface)'">
-            <div style="width:38px;height:38px;border-radius:var(--r-sm);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">✉️</div>
+             onmouseover="this.style.background='var(--brand-l)'" onmouseout="this.style.background='var(--surface)'">
+            <div style="width:38px;height:38px;border-radius:var(--r-s);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">✉️</div>
             <div>
               <div style="font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Email</div>
               <div style="font-weight:700;color:var(--text);font-size:.88rem;">{{ settings.email }}</div>
@@ -40,7 +40,7 @@
 
           {% if settings and settings.address %}
           <div style="display:flex;gap:.75rem;align-items:flex-start;padding:.75rem;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);">
-            <div style="width:38px;height:38px;border-radius:var(--r-sm);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📍</div>
+            <div style="width:38px;height:38px;border-radius:var(--r-s);background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📍</div>
             <div>
               <div style="font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Address</div>
               <div style="font-weight:600;color:var(--text);font-size:.84rem;line-height:1.5;">{{ settings.address }}</div>
@@ -65,32 +65,32 @@
       </div>
     </div>
 
-    <div class="col-md-7 fade-up fade-up-d1">
-      <div class="ui-card">
-        <div class="ui-card-head"><span>✉️</span><span class="ui-card-head-title">Send a Message</span></div>
-        <div class="ui-card-body">
+    <div class="col-md-7 fu fu1">
+      <div class="ucard">
+        <div class="ucard-head"><span>✉️</span><span class="ucard-title">Send a Message</span></div>
+        <div class="ucard-body">
           <form method="post" action="{{ url_for('store.contact') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="row g-3">
               <div class="col-12">
                 <label class="field-label" for="c-name">Your Name *</label>
                 <div class="field-wrap">
-                  <i class="bi bi-person field-icon"></i>
+                  <i class="bi bi-person fico"></i>
                   <input id="c-name" type="text" name="name" placeholder="Ramesh Sharma"
-                         required maxlength="120" autocomplete="name" class="field-input has-icon">
+                         required maxlength="120" autocomplete="name" class="finput has-ico">
                 </div>
               </div>
               <div class="col-12">
                 <label class="field-label" for="c-contact">Phone or Email *</label>
                 <div class="field-wrap">
-                  <i class="bi bi-telephone field-icon"></i>
+                  <i class="bi bi-telephone fico"></i>
                   <input id="c-contact" type="text" name="contact" placeholder="98XXXXXXXX or your@email.com"
-                         required maxlength="120" class="field-input has-icon">
+                         required maxlength="120" class="finput has-ico">
                 </div>
               </div>
               <div class="col-12">
                 <label class="field-label" for="c-subject">Subject</label>
-                <select id="c-subject" name="subject" class="field-input">
+                <select id="c-subject" name="subject" class="finput">
                   <option value="order">Order enquiry</option>
                   <option value="delivery">Delivery question</option>
                   <option value="product">Product question</option>
@@ -101,7 +101,7 @@
               <div class="col-12">
                 <label class="field-label" for="c-msg">Message *</label>
                 <textarea id="c-msg" name="message" rows="4" placeholder="How can we help you?"
-                          required maxlength="1000" class="field-input" style="resize:vertical;"></textarea>
+                          required maxlength="1000" class="finput" style="resize:vertical;"></textarea>
               </div>
             </div>
             <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.7rem;margin-top:1rem;">
