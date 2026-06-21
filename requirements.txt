@@ -19,9 +19,6 @@ pillow==12.2.0
 python-dateutil==2.9.0
 anthropic>=0.40.0
 cloudinary>=1.36.0
-# Optional: Redis for shared rate-limiting and caching across Gunicorn workers
-# Uncomment when you add a Redis service to render.yaml
-# redis>=5.0.0
 Markdown==3.7
-# Redis client — required when REDIS_URL is set (shared cache + rate limiting)
+# Redis client — required when REDIS_URL is set (shared cache + rate limiting across workers)
 redis>=5.0.0
