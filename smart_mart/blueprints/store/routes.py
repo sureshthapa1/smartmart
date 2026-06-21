@@ -1854,6 +1854,39 @@ def wishlist():
                            settings=settings, customer=cust)
 
 
+@store_bp.route("/wishlist/remove", methods=["POST"])
+@limiter.limit("30/minute")
+def wishlist_remove():
+    """Remove a single item from the wishlist via plain HTML form POST + redirect.
+    (Distinct from wishlist_toggle, which is JSON/AJAX-only and used on product pages.)"""
+    from ...models.wishlist_item import WishlistItem
+    cust = g.customer
+    if not cust:
+        flash("Please sign in to manage your wishlist.", "info")
+        return redirect(url_for("store.login", next=url_for("store.wishlist")))
+
+    try:
+        product_id = int(request.form.get("product_id", 0))
+    except (ValueError, TypeError):
+        product_id = 0
+
+    if product_id:
+        item = db.session.execute(
+            db.select(WishlistItem).where(
+                WishlistItem.customer_phone == cust.phone,
+                WishlistItem.product_id == product_id,
+            )
+        ).scalar_one_or_none()
+        if item:
+            db.session.delete(item)
+            db.session.commit()
+            flash("Removed from wishlist.", "success")
+
+    # Redirect back to wherever the form was submitted from (account page or wishlist page)
+    referrer = request.referrer or url_for("store.wishlist")
+    return redirect(referrer)
+
+
 # ── FEATURE 10: Improved sitemap with image tags ──────────────────────────────
 
 
