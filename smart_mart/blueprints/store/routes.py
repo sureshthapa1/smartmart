@@ -1101,12 +1101,27 @@ def my_account():
     except Exception:
         pass
 
+    # Wishlist items (for the Account → Wishlist tab) — same join pattern as wishlist()
+    wishlist_items = []
+    try:
+        from ...models.wishlist_item import WishlistItem
+        wl_rows = db.session.execute(
+            db.select(WishlistItem, Product)
+            .join(Product, Product.id == WishlistItem.product_id)
+            .where(WishlistItem.customer_phone == cust.phone)
+            .order_by(WishlistItem.created_at.desc())
+        ).all()
+        wishlist_items = [row.Product for row in wl_rows]
+    except Exception:
+        pass
+
     return render_template("store/account.html", settings=settings,
                            customer=cust, orders=orders,
                            page=page, total_pages=total_pages,
                            total_orders=total_orders,
                            loyalty_pts=loyalty_pts,
-                           loyalty_npr=loyalty_npr)
+                           loyalty_npr=loyalty_npr,
+                           wishlist_items=wishlist_items)
 
 
 @store_bp.route("/account/update", methods=["POST"])
