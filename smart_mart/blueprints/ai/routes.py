@@ -526,6 +526,12 @@ def api_image_recognize():
         result = recognize_from_filename(f.filename)
         # Save the image if it's a product image
         if f and f.filename:
+            from ...services.image_service import _allowed as _is_allowed_image
+            if not _is_allowed_image(f.filename):
+                return jsonify({
+                    "error": "Unsupported file type. Allowed: png, jpg, jpeg, webp, gif."
+                }), 400
+
             import uuid
             ext = os.path.splitext(f.filename)[1].lower()
             filename = f"{uuid.uuid4().hex}{ext}"
