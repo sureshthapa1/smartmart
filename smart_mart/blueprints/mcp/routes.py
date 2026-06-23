@@ -43,18 +43,27 @@ mcp_bp = Blueprint("mcp", __name__, url_prefix="/mcp")
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 def _is_authorized() -> bool:
-    """Bearer token OR admin session. In dev with no secret, allow all."""
+    """Bearer token (MCP_SECRET) OR an authenticated admin session.
+
+    Fails closed: if MCP_SECRET isn't configured, bearer-token access is
+    simply unavailable — there is no "allow all" bypass. Only an
+    authenticated admin session can call these tools in that case.
+
+    (Previously, an unset MCP_SECRET made every tool here — sales figures,
+    customer profiles, KPIs, purchase-order creation — reachable by anyone
+    on the internet with no authentication at all, on any deployment where
+    the operator hadn't set MCP_SECRET. This app is deployed publicly, not
+    "localhost only".)
+    """
     secret = os.environ.get("MCP_SECRET", "")
 
-    # Dev mode with no secret configured — allow all (localhost only)
-    if not secret:
-        return True
+    if secret:
+        bearer = request.headers.get("Authorization", "")
+        if bearer.lower().startswith("bearer "):
+            bearer = bearer[7:].strip()
+        if bearer == secret:
+            return True
 
-    bearer = request.headers.get("Authorization", "")
-    if bearer.lower().startswith("bearer "):
-        bearer = bearer[7:].strip()
-    if bearer == secret:
-        return True
     try:
         return bool(current_user.is_authenticated and current_user.role == "admin")
     except Exception:
