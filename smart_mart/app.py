@@ -267,8 +267,24 @@ def create_app(config_name="development"):
     from datetime import datetime as _dt, timezone as _tz
 
     @app.context_processor
-    def inject_now():
-        return {"now": _dt.now(_tz.utc)}
+    def inject_globals():
+        """Inject common variables into every template context."""
+        from datetime import datetime as _dt2, timezone as _tz2
+        ctx = {"now": _dt2.now(_tz2.utc)}
+        # Inject active product categories for nav/footer use
+        try:
+            from .models.product import Product as _Prod
+            from .extensions import db as _db2
+            cats = _db2.session.execute(
+                _db2.select(_Prod.category)
+                .where(_Prod.is_active.isnot(False), _Prod.quantity > 0, _Prod.category.isnot(None))
+                .distinct()
+                .order_by(_Prod.category)
+            ).scalars().all()
+            ctx["categories"] = [c for c in cats if c]
+        except Exception:
+            ctx["categories"] = []
+        return ctx
 
     # ── Alert count context processor (sidebar badge) ────────────────────
     # Returns cached values only — actual DB query is done by /api/alert-count
