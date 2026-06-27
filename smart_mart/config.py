@@ -13,6 +13,7 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = True
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
     WTF_CSRF_TIME_LIMIT = None   # No expiry — token valid for the whole session
     LOW_STOCK_THRESHOLD = 10
     EXPIRY_WARNING_DAYS = 30
@@ -51,6 +52,7 @@ class ProductionConfig(Config):
         os.environ.get("DATABASE_URL")
     ) or "sqlite:///smart_mart.db"
     WTF_CSRF_ENABLED = True
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
 
     # ── Secure session cookies (HTTPS only) ──────────────────────────────
     SESSION_COOKIE_SECURE   = True   # only sent over HTTPS
