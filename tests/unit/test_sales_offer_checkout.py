@@ -108,6 +108,25 @@ def test_create_sale_rejects_offer_discount_not_in_submitted_discount(db):
     assert db.session.get(Product, product.id).quantity == 10
 
 
+def test_create_credit_sale_enforces_customer_credit_limit(db):
+    user = _user()
+    product = _product(name="Credit Rice", sku="CREDIT-RICE")
+    customer = _customer(name="Credit Buyer")
+    customer.credit_limit = 50
+    db.session.commit()
+
+    with pytest.raises(ValueError, match="Credit limit exceeded"):
+        sales_manager.create_sale(
+            [{"product_id": product.id, "quantity": 1, "unit_price": 100}],
+            user_id=user.id,
+            customer_name=customer.name,
+            customer_phone=customer.phone,
+            payment_mode="credit",
+        )
+
+    assert db.session.get(Product, product.id).quantity == 10
+
+
 def test_active_offer_payload_includes_product_scope(db):
     product = _product(name="Coffee", sku="OFFER-COFFEE")
     customer = _customer(name="Sita Karki")

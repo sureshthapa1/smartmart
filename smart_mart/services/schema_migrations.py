@@ -432,6 +432,11 @@ def _migration_steps() -> list[MigrationStep]:
             lambda conn: _safe_add_column(conn, "users", "email", "VARCHAR(120)"),
         ),
         (
+            "2026_06_29_customer_credit_limit",
+            "Add per-customer credit limit used by credit sale enforcement.",
+            lambda conn: _safe_add_column(conn, "customers", "credit_limit", "NUMERIC(12,2) NOT NULL DEFAULT 0"),
+        ),
+        (
             "2026_06_20_product_perf_indexes",
             "Add product name, is_active, and composite active+qty indexes for store query performance.",
             lambda conn: (
@@ -510,47 +515,3 @@ def run_pending_migrations(app) -> list[str]:
             app.logger.warning("AI autofill on startup failed (non-fatal): %s", exc)
 
     return applied_now
-
-    # ── knowledge_articles (chatbot FAQ RAG — added 2026) ────────────────
-    _safe_create(conn, """
-        CREATE TABLE IF NOT EXISTS knowledge_articles (
-            id         SERIAL PRIMARY KEY,
-            title      VARCHAR(200) NOT NULL,
-            category   VARCHAR(80)  NOT NULL DEFAULT 'general',
-            keywords   TEXT,
-            body       TEXT         NOT NULL,
-            is_active  BOOLEAN      NOT NULL DEFAULT TRUE,
-            created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # ── stock_reservations (checkout anti-oversell — added 2026) ─────────
-    _safe_create(conn, """
-        CREATE TABLE IF NOT EXISTS stock_reservations (
-            id          SERIAL PRIMARY KEY,
-            product_id  INTEGER      NOT NULL,
-            order_id    INTEGER,
-            session_key VARCHAR(128),
-            quantity    INTEGER      NOT NULL DEFAULT 1,
-            status      VARCHAR(30)  NOT NULL DEFAULT 'active',
-            expires_at  TIMESTAMP,
-            created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # ── notification_log (SMS delivery log — added 2026) ─────────────────
-    _safe_create(conn, """
-        CREATE TABLE IF NOT EXISTS notification_log (
-            id         SERIAL PRIMARY KEY,
-            phone      VARCHAR(30),
-            message    TEXT,
-            channel    VARCHAR(20)  DEFAULT 'sms',
-            provider   VARCHAR(30),
-            status     VARCHAR(20)  DEFAULT 'sent',
-            error      TEXT,
-            created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    

@@ -55,6 +55,10 @@ def generate_daily_report() -> dict:
         db.select(func.count(Sale.id))
         .where(func.date(Sale.sale_date) == today)
     ).scalar() or 0
+    week_sales = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .where(func.date(Sale.sale_date) >= week_start)
+    ).scalar() or 0
 
     # Yesterday's data
     yesterday_sales = db.session.execute(
@@ -143,7 +147,7 @@ def generate_daily_report() -> dict:
         "yesterday_sales": float(yesterday_sales),
         "top_product": top_today[0].name if top_today else "N/A",
         "low_stock_count": low_stock_count,
-        "week_sales": float(week_sales) if 'week_sales' in dir() else 0.0,
+        "week_sales": float(week_sales),
     }
     return {
         "type": "daily",
@@ -157,6 +161,7 @@ def generate_daily_report() -> dict:
             "today_profit": round(today_profit, 2),
             "vs_yesterday_pct": round(pct, 1),
             "low_stock_count": low_stock_count,
+            "week_sales": float(week_sales),
         },
     }
 

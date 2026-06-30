@@ -35,6 +35,7 @@ from ...services.customer_auth import (
     get_current_customer, login_customer,
     logout_customer, register, authenticate,
 )
+from ...services.cache_service import get as _cache_get, set as _cache_set
 from ...services.store_ai_service import (
     selling_fast_ids as _selling_fast_ids,
     get_velocity_map,
@@ -594,7 +595,6 @@ def cart():
         grand_total=grand_total, settings=settings, customer=g.customer,
         free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
         raw_cart_count=len(raw_cart),
-        cart_recommendations=cart_recommendations if "cart_recommendations" in dir() else [],
         cart_recommendations=cart_recs,
     )
 
@@ -910,14 +910,6 @@ def order_success(order_number):
         # Show safe redirect — don't expose PII
         flash("Order placed successfully! Use your order number to track it.", "success")
         return redirect(url_for("store.track", order_number=order_number))
-
-    # FEATURE 2: Send order receipt email if customer provided one
-    if order.customer_email and not session.get(f"email_sent_{order_number}"):
-        try:
-            _send_order_receipt_email(order, settings)
-            session[f"email_sent_{order_number}"] = True
-        except Exception:
-            pass
 
     # FEATURE 3: Build WhatsApp confirmation link
     wa_link = None
@@ -1967,8 +1959,8 @@ def price_justify(product_id: int):
             f"Write ONE sentence (max 18 words) explaining why {product.name} "
             f"(NPR {float(product.selling_price):.0f}"
             + (f", from {product.origin}" if product.origin else "")
-            + f") is worth its price for a Nepal customer. "
-            f"Focus on quality, origin, or nutrition. Be specific."
+            + ") is worth its price for a Nepal customer. "
+            "Focus on quality, origin, or nutrition. Be specific."
             + (f" Key benefits: {benefits}" if benefits else "")
         )
         payload = _json4.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 60,

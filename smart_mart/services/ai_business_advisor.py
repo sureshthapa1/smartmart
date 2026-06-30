@@ -190,7 +190,7 @@ def strategic_recommendations() -> list[dict]:
             "icon": "bi-exclamation-triangle-fill" if gross_margin < 15 else "bi-percent",
             "color": "danger" if gross_margin < 15 else "warning",
             "title": f"Gross margin {'critically low' if gross_margin < 15 else 'below target'} at {gross_margin:.1f}%",
-            "insight": f"Industry average for retail is 25-40%. Your lowest margin products are shown below.",
+            "insight": "Industry average for retail is 25-40%. Your lowest margin products are shown below.",
             "action": "Increase selling prices on low-margin items or negotiate better supplier costs.",
             "link": "/reports/profitability", "link_label": "View Profitability Report",
             "products": product_list,
