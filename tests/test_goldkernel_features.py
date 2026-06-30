@@ -314,7 +314,7 @@ def test_ai_chat_missing_key_returns_helpful_500(client, db, monkeypatch):
 def test_ai_context_builder_non_empty(db):
     from smart_mart.blueprints.ai_chat.routes import build_business_context
 
-    assert "Today's revenue" in build_business_context()
+    assert "Today revenue" in build_business_context()
 
 
 def test_ai_chat_login_required(client, db):

@@ -87,12 +87,20 @@ def create_sale(items: list[dict], user_id: int,
                         .where(Sale.payment_mode == "credit")
                         .where(Sale.is_credit_settled == False)
                     ).scalar() or 0
-                    if float(outstanding) + float(total_amount) > float(cust.credit_limit):
+                    # Prospective total for this sale — the authoritative
+                    # total_amount isn't computed until later in this
+                    # function (after stock locking), so estimate it here
+                    # from the same items/discount inputs for this check.
+                    _prospective_gross = sum(
+                        item["unit_price"] * item["quantity"] for item in items
+                    )
+                    _prospective_total = max(0, _prospective_gross - (discount_amount or 0))
+                    if float(outstanding) + float(_prospective_total) > float(cust.credit_limit):
                         raise ValueError(
                             f"Credit limit exceeded for {cust.name}. "
                             f"Limit: NPR {float(cust.credit_limit):,.0f}, "
                             f"Outstanding: NPR {float(outstanding):,.0f}, "
-                            f"This sale: NPR {float(total_amount):,.0f}."
+                            f"This sale: NPR {float(_prospective_total):,.0f}."
                         )
             except ValueError:
                 raise

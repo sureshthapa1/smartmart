@@ -911,7 +911,17 @@ def order_success(order_number):
     # FEATURE 2: Send order receipt email if customer provided one
     if order.customer_email and not session.get(f"email_sent_{order_number}"):
         try:
-            _send_order_receipt_email(order, settings)
+            from ...services.email_service import send_order_confirmation
+            _email_items = [
+                {
+                    "name": it.product_name,
+                    "qty": it.quantity,
+                    "unit_price": float(it.unit_price),
+                    "subtotal": float(it.subtotal),
+                }
+                for it in order.items
+            ]
+            send_order_confirmation(order, _email_items)
             session[f"email_sent_{order_number}"] = True
         except Exception:
             pass
@@ -1964,7 +1974,8 @@ def autofill_all_products():
 def price_justify(product_id: int):
     """Return a 1-sentence price justification. Cached 24h — same call all day."""
     cache_key = f"pj:{product_id}"
-    cached = _cache_get(cache_key)
+    from ...services import cache_service
+    cached = cache_service.get(cache_key)
     if cached is not None:
         return jsonify({"ok": True, "text": cached})
 
@@ -1982,7 +1993,7 @@ def price_justify(product_id: int):
         if product.pack_size:
             parts.append(f"available in {product.pack_size}")
         text = (", ".join(parts) + ".") if parts else ""
-        _cache_set(cache_key, text, ttl=86400)
+        cache_service.set(cache_key, text, ttl=86400)
         return jsonify({"ok": True, "text": text})
 
     try:
@@ -2003,7 +2014,7 @@ def price_justify(product_id: int):
                      "content-type": "application/json"})
         with _ureq4.urlopen(req, timeout=8) as resp:
             text = _json4.loads(resp.read())["content"][0]["text"].strip()
-        _cache_set(cache_key, text, ttl=86400)
+        cache_service.set(cache_key, text, ttl=86400)
         return jsonify({"ok": True, "text": text})
     except Exception:
         return jsonify({"ok": True, "text": ""})
