@@ -1009,6 +1009,11 @@ def _form_to_data(form) -> dict:
         "is_active": form.get("is_active") == "on",
         "tax_category": form.get("tax_category", "standard").strip() or "standard",
         "max_discount_pct": None,
+        # ── Store content fields (manual edit — see inventory/form.html) ─────
+        "description":   form.get("description", "").strip() or None,
+        "benefits":      form.get("benefits", "").strip() or None,
+        "origin":        form.get("origin", "").strip() or None,
+        "storage_tips":  form.get("storage_tips", "").strip() or None,
     }
     max_disc_raw = form.get("max_discount_pct", "").strip()
     if max_disc_raw:
