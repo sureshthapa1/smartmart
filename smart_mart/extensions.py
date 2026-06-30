@@ -7,12 +7,14 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_caching import Cache
+from flask_babel import Babel
 
 db = SQLAlchemy()
 login_manager = LoginManager()
 bcrypt = Bcrypt()
 csrf = CSRFProtect()
 migrate = Migrate()
+babel = Babel()
 
 # ── Rate limiter — use Redis in production, memory in dev ────────────────────
 # Set REDIS_URL env var (e.g. redis://localhost:6379/0) to enable shared

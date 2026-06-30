@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, flash, redirect, url_for, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
 from .config import config
-from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate, cache
+from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate, cache, babel
 from .services.schema_migrations import run_pending_migrations
 
 
@@ -69,6 +69,41 @@ def create_app(config_name="development"):
     except ImportError:
         pass
     limiter.init_app(app)
+
+    def _select_locale():
+        from flask import request as _req
+        supported = app.config.get("BABEL_SUPPORTED_LOCALES", ["en"])
+        # 1. Explicit choice via the language-switcher cookie
+        cookie_lang = _req.cookies.get("lang")
+        if cookie_lang in supported:
+            return cookie_lang
+        # 2. Browser preference
+        best = _req.accept_languages.best_match(supported)
+        if best:
+            return best
+        # 3. Default
+        return app.config.get("BABEL_DEFAULT_LOCALE", "en")
+
+    babel.init_app(app, locale_selector=_select_locale)
+
+    from flask_babel import gettext as _gettext, ngettext as _ngettext, get_locale as _get_locale
+    app.jinja_env.globals["_"] = _gettext
+    app.jinja_env.globals["gettext"] = _gettext
+    app.jinja_env.globals["ngettext"] = _ngettext
+    app.jinja_env.globals["get_locale"] = _get_locale
+
+    @app.route("/set-language/<lang_code>")
+    def set_language(lang_code):
+        """Language switcher — sets a cookie read by the Babel locale_selector
+        and redirects back to wherever the request came from."""
+        from flask import redirect as _redirect, request as _req
+
+        supported = app.config.get("BABEL_SUPPORTED_LOCALES", ["en"])
+        resp = _redirect(_req.referrer or url_for("store.home"))
+        if lang_code in supported:
+            # ~1 year; harmless preference cookie, no PII
+            resp.set_cookie("lang", lang_code, max_age=60 * 60 * 24 * 365, samesite="Lax")
+        return resp
 
     from . import models  # noqa: F401
 

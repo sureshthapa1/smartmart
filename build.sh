@@ -8,6 +8,9 @@ pip --version
 echo "=== Installing dependencies ==="
 pip install -r requirements.txt
 
+echo "=== Compiling translation catalogs (i18n) ==="
+pybabel compile -d smart_mart/translations 2>&1 || echo "WARNING: translation compile failed — falling back to English"
+
 echo "=== Initialising database ==="
 python - <<'PYEOF'
 import os, sys, traceback

@@ -1,16 +1,16 @@
 {% extends "store/base_store.html" %}
-{% block title %}Checkout — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
+{% block title %}{{ _('Checkout') }} — {{ settings.shop_name if settings else 'GoldKernel' }}{% endblock %}
 {% block content %}
 <div class="sc" style="padding-top:1.5rem;padding-bottom:3rem;">
 
-  <nav class="bc"><a href="{{ url_for('store.home') }}">Home</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><a href="{{ url_for('store.cart') }}">Cart</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><span class="bc-cur">Checkout</span></nav>
+  <nav class="bc"><a href="{{ url_for('store.home') }}">{{ _('Home') }}</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><a href="{{ url_for('store.cart') }}">{{ _('Cart') }}</a><span class="bc-sep"><i class="bi bi-chevron-right"></i></span><span class="bc-cur">{{ _('Checkout') }}</span></nav>
 
   {# Progress #}
   <div class="oprg fu" style="max-width:560px;margin:0 auto 2rem;">
-    <div class="oprg-step done"><div class="oprg-dot"><i class="bi bi-check-lg"></i></div><div class="oprg-label">Cart</div></div>
-    <div class="oprg-step active"><div class="oprg-dot"><i class="bi bi-receipt"></i></div><div class="oprg-label">Details</div></div>
-    <div class="oprg-step"><div class="oprg-dot">3</div><div class="oprg-label">Payment</div></div>
-    <div class="oprg-step"><div class="oprg-dot"><i class="bi bi-check-lg"></i></div><div class="oprg-label">Done</div></div>
+    <div class="oprg-step done"><div class="oprg-dot"><i class="bi bi-check-lg"></i></div><div class="oprg-label">{{ _('Cart') }}</div></div>
+    <div class="oprg-step active"><div class="oprg-dot"><i class="bi bi-receipt"></i></div><div class="oprg-label">{{ _('Details') }}</div></div>
+    <div class="oprg-step"><div class="oprg-dot">3</div><div class="oprg-label">{{ _('Payment') }}</div></div>
+    <div class="oprg-step"><div class="oprg-dot"><i class="bi bi-check-lg"></i></div><div class="oprg-label">{{ _('Done') }}</div></div>
   </div>
 
   <div class="row g-4">
@@ -21,40 +21,40 @@
 
         {# Step 1: Delivery #}
         <div class="ucard" style="margin-bottom:1.25rem;">
-          <div class="ucard-head"><span class="stepn">1</span><span class="ucard-title">Delivery Information</span></div>
+          <div class="ucard-head"><span class="stepn">1</span><span class="ucard-title">{{ _('Delivery Information') }}</span></div>
           <div class="ucard-body">
             <div class="row g-3">
               <div class="col-sm-6">
-                <label class="flabel" for="f-name">Full Name *</label>
+                <label class="flabel" for="f-name">{{ _('Full Name') }} *</label>
                 <div class="fwrap"><i class="bi bi-person fico"></i>
                 <input id="f-name" type="text" name="name" class="finput has-ico" placeholder="Ramesh Sharma"
                        value="{{ form_data.get('name', customer.name if customer else '') }}"
                        required maxlength="120" autocomplete="name"></div>
               </div>
               <div class="col-sm-6">
-                <label class="flabel" for="f-phone">Phone *</label>
+                <label class="flabel" for="f-phone">{{ _('Phone') }} *</label>
                 <div class="fwrap"><i class="bi bi-telephone fico"></i>
                 <input id="f-phone" type="tel" name="phone" class="finput has-ico" placeholder="98XXXXXXXX"
                        value="{{ form_data.get('phone', customer.phone if customer else '') }}"
                        required maxlength="15" autocomplete="tel"></div>
-                <div class="fhint">Nepal number (98/97 XXXXXXXX)</div>
+                <div class="fhint">{{ _('Nepal number (98/97 XXXXXXXX)') }}</div>
               </div>
               <div class="col-12">
-                <label class="flabel" for="f-email">Email <span style="font-weight:400;">(for order confirmation)</span></label>
+                <label class="flabel" for="f-email">{{ _('Email') }} <span style="font-weight:400;">({{ _('for order confirmation') }})</span></label>
                 <div class="fwrap"><i class="bi bi-envelope fico"></i>
                 <input id="f-email" type="email" name="email" class="finput has-ico" placeholder="you@example.com"
                        value="{{ form_data.get('email', customer.email if customer else '') }}"
                        maxlength="120" autocomplete="email"></div>
               </div>
               <div class="col-12">
-                <label class="flabel" for="f-address">Delivery Address *</label>
+                <label class="flabel" for="f-address">{{ _('Delivery Address') }} *</label>
                 <div class="fwrap"><i class="bi bi-geo-alt fico"></i>
-                <input id="f-address" type="text" name="address" class="finput has-ico" placeholder="House no., street, landmark"
+                <input id="f-address" type="text" name="address" class="finput has-ico" placeholder="{{ _('House no., street, landmark') }}"
                        value="{{ form_data.get('address', customer.address if customer else '') }}"
                        required maxlength="255" autocomplete="street-address"></div>
               </div>
               <div class="col-sm-6">
-                <label class="flabel" for="f-area">Area / Zone</label>
+                <label class="flabel" for="f-area">{{ _('Area / Zone') }}</label>
                 <input id="f-area" type="text" name="area" class="finput" placeholder="Lazimpat, Baneshwor…"
                        value="{{ form_data.get('area', customer.area if customer else '') }}"
                        maxlength="80" list="nepal-areas" autocomplete="off">
@@ -65,9 +65,9 @@
                 </datalist>
               </div>
               <div class="col-12">
-                <label class="flabel" for="f-notes">Order Notes <span style="font-weight:400;">(optional)</span></label>
+                <label class="flabel" for="f-notes">{{ _('Order Notes') }} <span style="font-weight:400;">({{ _('optional') }})</span></label>
                 <textarea id="f-notes" name="notes" class="finput" rows="2"
-                          placeholder="Any special delivery instructions?">{{ form_data.get('notes','') }}</textarea>
+                          placeholder="{{ _('Any special delivery instructions?') }}">{{ form_data.get('notes','') }}</textarea>
               </div>
             </div>
           </div>
@@ -75,15 +75,15 @@
 
         {# Step 2: Promo code #}
         <div class="ucard" style="margin-bottom:1.25rem;">
-          <div class="ucard-head"><span class="stepn">2</span><span class="ucard-title">Promo Code <span style="font-size:.75rem;font-weight:400;color:var(--muted);">Optional</span></span></div>
+          <div class="ucard-head"><span class="stepn">2</span><span class="ucard-title">{{ _('Promo Code') }} <span style="font-size:.75rem;font-weight:400;color:var(--muted);">{{ _('Optional') }}</span></span></div>
           <div class="ucard-body">
             <div style="display:flex;gap:.65rem;align-items:flex-start;">
               <div class="fwrap" style="flex:1;">
                 <i class="bi bi-tag fico"></i>
-                <input type="text" name="promo_code" id="promo-input" class="finput has-ico" placeholder="Enter promo code"
+                <input type="text" name="promo_code" id="promo-input" class="finput has-ico" placeholder="{{ _('Enter promo code') }}"
                        value="{{ form_data.get('promo_code','') }}" maxlength="30" style="text-transform:uppercase;" autocomplete="off">
               </div>
-              <button type="button" id="promo-btn" class="btn-ghost" onclick="applyPromo()" style="white-space:nowrap;padding:.6rem 1rem;">Apply</button>
+              <button type="button" id="promo-btn" class="btn-ghost" onclick="applyPromo()" style="white-space:nowrap;padding:.6rem 1rem;">{{ _('Apply') }}</button>
             </div>
             <div id="promo-result" style="margin-top:.5rem;font-size:.8rem;"></div>
           </div>
@@ -92,17 +92,17 @@
         {# Step 3: Loyalty Points #}
         {% if loyalty_pts is defined and loyalty_pts > 0 %}
         <div class="ucard" style="margin-bottom:1.25rem;">
-          <div class="ucard-head"><span class="stepn">3</span><span class="ucard-title">Loyalty Points <span style="font-size:.75rem;font-weight:400;color:var(--muted);">Optional</span></span></div>
+          <div class="ucard-head"><span class="stepn">3</span><span class="ucard-title">{{ _('Loyalty Points') }} <span style="font-size:.75rem;font-weight:400;color:var(--muted);">{{ _('Optional') }}</span></span></div>
           <div class="ucard-body">
             <div style="background:linear-gradient(135deg,var(--brand-l),#fff7e6);border:1.5px solid #fde68a;border-radius:var(--r);padding:.9rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
               <div>
-                <div style="font-weight:800;font-size:.9rem;color:var(--brand-d);">🪙 You have {{ loyalty_pts }} loyalty points</div>
-                <div style="font-size:.78rem;color:var(--muted);margin-top:.15rem;">Worth <strong style="color:var(--brand-d);">NPR {{ "%.0f"|format(loyalty_npr) }}</strong> — redeem to reduce your total</div>
+                <div style="font-weight:800;font-size:.9rem;color:var(--brand-d);">🪙 {{ _('You have %(n)s loyalty points', n=loyalty_pts) }}</div>
+                <div style="font-size:.78rem;color:var(--muted);margin-top:.15rem;">{{ _('Worth') }} <strong style="color:var(--brand-d);">NPR {{ "%.0f"|format(loyalty_npr) }}</strong> — {{ _('redeem to reduce your total') }}</div>
               </div>
               <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;flex-shrink:0;">
                 <input type="checkbox" name="use_loyalty" value="1" id="use-loyalty-cb"
                        style="width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;">
-                <span style="font-weight:700;font-size:.85rem;color:var(--brand-d);">Use points</span>
+                <span style="font-weight:700;font-size:.85rem;color:var(--brand-d);">{{ _('Use points') }}</span>
               </label>
             </div>
           </div>
@@ -111,13 +111,13 @@
 
         {# Step 4: Payment #}
         <div class="ucard" style="margin-bottom:1.5rem;">
-          <div class="ucard-head"><span class="stepn">4</span><span class="ucard-title">Payment Method</span></div>
+          <div class="ucard-head"><span class="stepn">4</span><span class="ucard-title">{{ _('Payment Method') }}</span></div>
           <div class="ucard-body">
             <div class="pm-opts" id="pm-opts">
               {% for val, icon, label, desc in [
-                ('cod','💵','Cash on Delivery','Pay when your order arrives'),
-                ('esewa','📱','eSewa','Pay instantly with your eSewa wallet'),
-                ('khalti','💜','Khalti','Pay with Khalti digital wallet'),
+                ('cod','💵', _('Cash on Delivery'), _('Pay when your order arrives')),
+                ('esewa','📱','eSewa', _('Pay instantly with your eSewa wallet')),
+                ('khalti','💜','Khalti', _('Pay with Khalti digital wallet')),
               ] %}
               <label class="pm-opt {% if loop.first %}sel{% endif %}" id="pm-{{ val }}" onclick="selectPM('{{ val }}')">
                 <input type="radio" name="payment_mode" value="{{ val }}" {% if loop.first %}checked{% endif %}>
@@ -138,20 +138,20 @@
           <label style="display:flex;align-items:center;gap:.75rem;cursor:pointer;">
             <input type="checkbox" name="gift_wrap" value="1" style="width:18px;height:18px;accent-color:var(--brand);flex-shrink:0;">
             <div>
-              <div style="font-weight:700;font-size:.9rem;color:var(--text);">🎁 Add Gift Wrapping <span style="color:var(--brand-d);">+NPR 50</span></div>
-              <div style="font-size:.74rem;color:var(--muted);margin-top:.1rem;">Beautiful packaging — perfect for Dashain, Tihar & special occasions</div>
+              <div style="font-weight:700;font-size:.9rem;color:var(--text);">🎁 {{ _('Add Gift Wrapping') }} <span style="color:var(--brand-d);">+NPR 50</span></div>
+              <div style="font-size:.74rem;color:var(--muted);margin-top:.1rem;">{{ _('Beautiful packaging — perfect for Dashain, Tihar & special occasions') }}</div>
             </div>
           </label>
           <div id="gift-msg-wrap" style="margin-top:.75rem;display:none;">
-            <input type="text" name="gift_message" class="finput" placeholder="Gift message (optional)…" maxlength="150">
+            <input type="text" name="gift_message" class="finput" placeholder="{{ _('Gift message (optional)…') }}" maxlength="150">
           </div>
         </div>
 
         <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.8rem;font-size:.95rem;" id="submit-btn">
-          <i class="bi bi-shield-lock-fill"></i> Place Order
+          <i class="bi bi-shield-lock-fill"></i> {{ _('Place Order') }}
         </button>
         <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-top:.65rem;">
-          <i class="bi bi-lock-fill"></i> Your information is encrypted and secure
+          <i class="bi bi-lock-fill"></i> {{ _('Your information is encrypted and secure') }}
         </div>
       </form>
     </div>
@@ -159,7 +159,7 @@
     {# Right: order summary #}
     <div class="col-lg-5 fu fu1">
       <div class="ucard" style="position:sticky;top:calc(var(--nav-h) + 1rem);">
-        <div class="ucard-head"><span class="ucard-title">Order Summary</span></div>
+        <div class="ucard-head"><span class="ucard-title">{{ _('Order Summary') }}</span></div>
         <div style="max-height:320px;overflow-y:auto;">
           {% for item in items %}
           {% set img_url = product_image_url(item.product.image_filename, 100) %}
@@ -170,7 +170,7 @@
             </div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:.83rem;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ item.product.name }}</div>
-              <div style="font-size:.73rem;color:var(--muted);">Qty: {{ item.qty }}</div>
+              <div style="font-size:.73rem;color:var(--muted);">{{ _('Qty:') }} {{ item.qty }}</div>
               <div class="pj-tip" style="font-size:.68rem;color:var(--success);margin-top:.1rem;font-style:italic;"></div>
             </div>
             <div style="font-size:.88rem;font-weight:700;flex-shrink:0;">NPR {{ "%.0f"|format(item.line_total) }}</div>
@@ -179,22 +179,22 @@
         </div>
         <div class="ucard-body" style="border-top:1px solid var(--border);">
           <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.9rem;margin-bottom:1rem;">
-            <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Subtotal</span><span style="font-weight:600;">NPR {{ "%.0f"|format(subtotal) }}</span></div>
-            <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Delivery</span>
-              {% if delivery==0 %}<span style="font-weight:700;color:var(--success);">FREE</span>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">{{ _('Subtotal') }}</span><span style="font-weight:600;">NPR {{ "%.0f"|format(subtotal) }}</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">{{ _('Delivery') }}</span>
+              {% if delivery==0 %}<span style="font-weight:700;color:var(--success);">{{ _('FREE') }}</span>
               {% else %}<span style="font-weight:600;">NPR {{ "%.0f"|format(delivery) }}</span>{% endif %}
             </div>
             {% if discount and discount > 0 %}
-            <div style="display:flex;justify-content:space-between;"><span style="color:var(--success);">Discount</span><span style="color:var(--success);font-weight:700;">−NPR {{ "%.0f"|format(discount) }}</span></div>
+            <div style="display:flex;justify-content:space-between;"><span style="color:var(--success);">{{ _('Discount') }}</span><span style="color:var(--success);font-weight:700;">−NPR {{ "%.0f"|format(discount) }}</span></div>
             {% endif %}
           </div>
           <hr class="dv">
           <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:800;margin-bottom:.5rem;">
-            <span>Total</span><span style="color:var(--brand-d);">NPR {{ "%.0f"|format(grand_total) }}</span>
+            <span>{{ _('Total') }}</span><span style="color:var(--brand-d);">NPR {{ "%.0f"|format(grand_total) }}</span>
           </div>
           {% if delivery > 0 %}
           <div style="font-size:.75rem;color:var(--muted);text-align:center;">
-            Add NPR {{ "%.0f"|format(free_delivery_threshold - subtotal) }} more for free delivery
+            {{ _('Add NPR %(amount)s more for free delivery', amount="%.0f"|format(free_delivery_threshold - subtotal)) }}
           </div>
           {% endif %}
         </div>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ get_locale().language if get_locale() else 'en' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -310,37 +310,49 @@
     <div class="snav-logo">🥜</div>
     <div>
       <div class="snav-name">{{ settings.shop_name if settings else 'GoldKernel' }}</div>
-      <div class="snav-sub">Premium Dry Fruits</div>
+      <div class="snav-sub">{{ _('Premium Dry Fruits') }}</div>
     </div>
   </a>
 
   <form class="snav-search" method="get" action="{{ url_for('store.home') }}" role="search">
     <i class="bi bi-search snav-si"></i>
-    <input type="search" name="q" placeholder="Search almonds, cashews, walnuts…"
+    <input type="search" name="q" placeholder="{{ _('Search almonds, cashews, walnuts…') }}"
            value="{{ request.args.get('q','') }}"
-           autocomplete="off" aria-label="Search products" spellcheck="false">
+           autocomplete="off" aria-label="{{ _('Search products') }}" spellcheck="false">
     <div class="sbox" id="nav-sbox"></div>
   </form>
 
   <div class="snav-actions">
+    {# Language switcher #}
+    <div class="nav-btn" style="position:relative;padding:0;" title="{{ _('Language') }}">
+      <div style="display:flex;gap:.15rem;font-size:.72rem;font-weight:700;">
+        <a href="{{ url_for('set_language', lang_code='en') }}"
+           style="padding:.25rem .4rem;border-radius:6px;text-decoration:none;
+                  {% if get_locale().language == 'en' %}background:var(--brand);color:#fff;{% else %}color:var(--muted);{% endif %}">EN</a>
+        <a href="{{ url_for('set_language', lang_code='ne') }}"
+           style="padding:.25rem .4rem;border-radius:6px;text-decoration:none;
+                  {% if get_locale().language == 'ne' %}background:var(--brand);color:#fff;{% else %}color:var(--muted);{% endif %}">ने</a>
+      </div>
+    </div>
+
     {# Account #}
     {% if customer %}
-    <a href="{{ url_for('store.my_account') }}" class="nav-btn" title="My Account ({{ customer.name.split()[0] }})">
+    <a href="{{ url_for('store.my_account') }}" class="nav-btn" title="{{ _('My Account') }} ({{ customer.name.split()[0] }})">
       <i class="bi bi-person-circle"></i>
     </a>
     {% else %}
-    <a href="{{ url_for('store.login') }}" class="nav-btn" title="Sign In">
+    <a href="{{ url_for('store.login') }}" class="nav-btn" title="{{ _('Sign In') }}">
       <i class="bi bi-person"></i>
     </a>
     {% endif %}
 
     {# Wishlist #}
-    <a href="{{ url_for('store.wishlist') }}" class="nav-btn" title="Wishlist">
+    <a href="{{ url_for('store.wishlist') }}" class="nav-btn" title="{{ _('Wishlist') }}">
       <i class="bi bi-heart"></i>
     </a>
 
     {# Cart #}
-    <a href="{{ url_for('store.cart') }}" class="nav-btn" title="Cart" aria-label="Shopping cart">
+    <a href="{{ url_for('store.cart') }}" class="nav-btn" title="{{ _('Cart') }}" aria-label="{{ _('Shopping cart') }}">
       <i class="bi bi-bag"></i>
       <span class="nav-cbadge" id="nav-cart-count">0</span>
     </a>
@@ -373,7 +385,7 @@
         <div class="sf-brand">
           <div class="sf-logo">🥜</div>
           <div style="font-size:1rem;font-weight:800;color:#e7e5e4;margin-bottom:.35rem;">{{ settings.shop_name if settings else 'GoldKernel' }}</div>
-          <div class="sf-tagline">Nepal's trusted source for premium dry fruits. Handpicked quality delivered fresh to your door.</div>
+          <div class="sf-tagline">{{ _("Nepal's trusted source for premium dry fruits. Handpicked quality delivered fresh to your door.") }}</div>
           {% if settings and settings.phone %}
           <div style="margin-top:.85rem;display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:#d6d3d1;">
             <i class="bi bi-telephone-fill" style="color:var(--brand);"></i>
@@ -389,9 +401,9 @@
         </div>
       </div>
       <div class="col-6 col-md-2">
-        <div class="sf-head">Shop</div>
+        <div class="sf-head">{{ _('Shop') }}</div>
         <ul class="sf-links">
-          <li><a href="{{ url_for('store.home') }}">All Products</a></li>
+          <li><a href="{{ url_for('store.home') }}">{{ _('All Products') }}</a></li>
           {% for cat in (categories if categories is defined else []) %}
           {% if loop.index <= 5 %}
           <li><a href="{{ url_for('store.home', category=cat) }}">{{ cat }}</a></li>
@@ -400,40 +412,40 @@
         </ul>
       </div>
       <div class="col-6 col-md-2">
-        <div class="sf-head">Help</div>
+        <div class="sf-head">{{ _('Help') }}</div>
         <ul class="sf-links">
-          <li><a href="{{ url_for('store.track') }}">Track Order</a></li>
-          <li><a href="{{ url_for('store.faq') }}">FAQ</a></li>
-          <li><a href="{{ url_for('store.contact') }}">Contact Us</a></li>
-          <li><a href="{{ url_for('store.about') }}">About Us</a></li>
-          <li><a href="{{ url_for('store.promos') }}">Offers</a></li>
+          <li><a href="{{ url_for('store.track') }}">{{ _('Track Order') }}</a></li>
+          <li><a href="{{ url_for('store.faq') }}">{{ _('FAQ') }}</a></li>
+          <li><a href="{{ url_for('store.contact') }}">{{ _('Contact Us') }}</a></li>
+          <li><a href="{{ url_for('store.about') }}">{{ _('About Us') }}</a></li>
+          <li><a href="{{ url_for('store.promos') }}">{{ _('Offers') }}</a></li>
         </ul>
       </div>
       <div class="col-6 col-md-2">
-        <div class="sf-head">Account</div>
+        <div class="sf-head">{{ _('Account') }}</div>
         <ul class="sf-links">
           {% if customer is defined and customer %}
-          <li><a href="{{ url_for('store.my_account') }}">My Account</a></li>
-          <li><a href="{{ url_for('store.my_account') }}">My Orders</a></li>
-          <li><a href="{{ url_for('store.wishlist') }}">Wishlist</a></li>
-          <li><a href="{{ url_for('store.logout') }}">Sign Out</a></li>
+          <li><a href="{{ url_for('store.my_account') }}">{{ _('My Account') }}</a></li>
+          <li><a href="{{ url_for('store.my_account') }}">{{ _('My Orders') }}</a></li>
+          <li><a href="{{ url_for('store.wishlist') }}">{{ _('Wishlist') }}</a></li>
+          <li><a href="{{ url_for('store.logout') }}">{{ _('Sign Out') }}</a></li>
           {% else %}
-          <li><a href="{{ url_for('store.login') }}">Sign In</a></li>
-          <li><a href="{{ url_for('store.register_view') }}">Register</a></li>
-          <li><a href="{{ url_for('store.wishlist') }}">Wishlist</a></li>
-          <li><a href="{{ url_for('store.track') }}">Track Order</a></li>
+          <li><a href="{{ url_for('store.login') }}">{{ _('Sign In') }}</a></li>
+          <li><a href="{{ url_for('store.register_view') }}">{{ _('Register') }}</a></li>
+          <li><a href="{{ url_for('store.wishlist') }}">{{ _('Wishlist') }}</a></li>
+          <li><a href="{{ url_for('store.track') }}">{{ _('Track Order') }}</a></li>
           {% endif %}
         </ul>
       </div>
       <div class="col-6 col-md-2">
-        <div class="sf-head">We Accept</div>
+        <div class="sf-head">{{ _('We Accept') }}</div>
         <div style="display:flex;flex-wrap:wrap;gap:.45rem;">
           {% for icon, label in [('💵','COD'),('📱','eSewa'),('💜','Khalti'),('🏦','IME Pay')] %}
           <span style="background:#292524;border-radius:8px;padding:.3em .65em;font-size:.72rem;color:#d6d3d1;display:flex;align-items:center;gap:.3rem;">{{ icon }} {{ label }}</span>
           {% endfor %}
         </div>
         <div style="margin-top:1rem;">
-          <div class="sf-head">Follow Us</div>
+          <div class="sf-head">{{ _('Follow Us') }}</div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             {% if settings and settings.facebook_url %}
             <a href="{{ settings.facebook_url }}" target="_blank" rel="noopener" class="sf-social" onmouseover="this.style.background='#1877f2'" onmouseout="this.style.background='#292524'"><i class="bi bi-facebook"></i></a>
@@ -458,11 +470,11 @@
       </div>
     </div>
     <div class="sf-copy">
-      <span>© {{ now.year if now is defined else '2025' }} {{ settings.shop_name if settings else 'GoldKernel' }}. All rights reserved.</span>
+      <span>© {{ now.year if now is defined else '2025' }} {{ settings.shop_name if settings else 'GoldKernel' }}. {{ _('All rights reserved.') }}</span>
       <div style="display:flex;gap:1rem;">
-        <a href="{{ url_for('store.home') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">Home</a>
-        <a href="{{ url_for('store.faq') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">FAQ</a>
-        <a href="{{ url_for('store.contact') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">Contact</a>
+        <a href="{{ url_for('store.home') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">{{ _('Home') }}</a>
+        <a href="{{ url_for('store.faq') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">{{ _('FAQ') }}</a>
+        <a href="{{ url_for('store.contact') }}" style="color:var(--muted);text-decoration:none;font-size:.72rem;">{{ _('Contact') }}</a>
       </div>
     </div>
   </div>
@@ -471,25 +483,25 @@
 {# ── Cart toast ── #}
 <div id="ctoast" role="status" aria-live="polite">
   <i class="bi bi-bag-check"></i>
-  <span id="ctoast-msg">Added to cart</span>
+  <span id="ctoast-msg">{{ _('Added to cart') }}</span>
 </div>
 
 <!-- ── Mobile Bottom Navigation ─────────────────────────────────────────── -->
 <nav class="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
   <a href="{{ url_for('store.home') }}" class="mbn-item {% if request.endpoint == 'store.home' %}active{% endif %}">
-    <i class="bi bi-house-fill"></i><span>Home</span>
+    <i class="bi bi-house-fill"></i><span>{{ _('Home') }}</span>
   </a>
   <a href="{{ url_for('store.home') }}?focus=search" class="mbn-item" id="mbn-search">
-    <i class="bi bi-search"></i><span>Search</span>
+    <i class="bi bi-search"></i><span>{{ _('Search') }}</span>
   </a>
   <a href="{{ url_for('store.cart') }}" class="mbn-item {% if request.endpoint == 'store.cart' %}active{% endif %}" style="position:relative;">
     <i class="bi bi-bag"></i>
     <span class="mbn-badge" id="mbn-cart-badge" style="display:none;">0</span>
-    <span>Cart</span>
+    <span>{{ _('Cart') }}</span>
   </a>
   <a href="{{ url_for('store.my_account') if customer else url_for('store.login') }}"
      class="mbn-item {% if request.endpoint in ['store.my_account','store.login'] %}active{% endif %}">
-    <i class="bi bi-person-circle"></i><span>Account</span>
+    <i class="bi bi-person-circle"></i><span>{{ _('Account') }}</span>
   </a>
 </nav>
 

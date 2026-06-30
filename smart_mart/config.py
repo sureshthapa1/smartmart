@@ -29,6 +29,15 @@ class Config:
     CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = int(os.environ.get("DASHBOARD_CACHE_TTL", 180))
 
+    # ── i18n (Flask-Babel) ───────────────────────────────────────────────────
+    # English + Nepali. Add more codes here as translations are added —
+    # see translations/README.md for the extract/update/compile workflow.
+    BABEL_DEFAULT_LOCALE = "en"
+    BABEL_SUPPORTED_LOCALES = ["en", "ne"]
+    BABEL_TRANSLATION_DIRECTORIES = os.path.join(
+        os.path.dirname(__file__), "translations"
+    )
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
