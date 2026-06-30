@@ -19,6 +19,7 @@ class Customer(db.Model):
     loyalty_points = db.Column(db.Integer, default=0)
     loyalty_tier = db.Column(db.String(20), default="silver")
     total_spent = db.Column(db.Numeric(12, 2), default=0)
+    credit_limit = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     visit_count = db.Column(db.Integer, default=1)
     last_visit = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

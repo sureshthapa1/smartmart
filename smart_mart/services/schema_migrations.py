@@ -432,6 +432,11 @@ def _migration_steps() -> list[MigrationStep]:
             lambda conn: _safe_add_column(conn, "users", "email", "VARCHAR(120)"),
         ),
         (
+            "2026_06_29_customer_credit_limit",
+            "Add per-customer credit limit used by credit sale enforcement.",
+            lambda conn: _safe_add_column(conn, "customers", "credit_limit", "NUMERIC(12,2) NOT NULL DEFAULT 0"),
+        ),
+        (
             "2026_06_20_product_perf_indexes",
             "Add product name, is_active, and composite active+qty indexes for store query performance.",
             lambda conn: (

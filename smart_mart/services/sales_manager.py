@@ -46,6 +46,31 @@ class InsufficientStockError(ValueError):
     """Raised when a sale item quantity exceeds available product stock."""
 
 
+def _enforce_credit_limit(customer_phone: str, sale_total: float) -> None:
+    from ..models.customer import Customer
+
+    phone = str(customer_phone).strip()
+    customer = db.session.execute(
+        db.select(Customer).where(Customer.phone == phone)
+    ).scalar_one_or_none()
+    if not customer or not customer.credit_limit or float(customer.credit_limit) <= 0:
+        return
+
+    outstanding = db.session.execute(
+        db.select(db.func.sum(Sale.total_amount))
+        .where(Sale.customer_phone == phone)
+        .where(Sale.payment_mode == "credit")
+        .where(Sale.credit_collected == False)
+    ).scalar() or 0
+    if float(outstanding) + float(sale_total) > float(customer.credit_limit):
+        raise ValueError(
+            f"Credit limit exceeded for {customer.name}. "
+            f"Limit: NPR {float(customer.credit_limit):,.0f}, "
+            f"Outstanding: NPR {float(outstanding):,.0f}, "
+            f"This sale: NPR {float(sale_total):,.0f}."
+        )
+
+
 def create_sale(items: list[dict], user_id: int,
                 customer_name: str = None, customer_address: str = None,
                 customer_phone: str = None, payment_mode: str = "cash",
@@ -72,32 +97,6 @@ def create_sale(items: list[dict], user_id: int,
             raise
         except Exception:
             pass  # Don't block sales if period check fails
-
-        # ── Credit limit enforcement ───────────────────────────────────────
-        if payment_mode == "credit" and customer_phone:
-            try:
-                from ..models.customer import Customer
-                cust = db.session.execute(
-                    db.select(Customer).where(Customer.phone == str(customer_phone).strip())
-                ).scalar_one_or_none()
-                if cust and cust.credit_limit and float(cust.credit_limit) > 0:
-                    outstanding = db.session.execute(
-                        db.select(db.func.sum(Sale.total_amount))
-                        .where(Sale.customer_phone == str(customer_phone).strip())
-                        .where(Sale.payment_mode == "credit")
-                        .where(Sale.is_credit_settled == False)
-                    ).scalar() or 0
-                    if float(outstanding) + float(total_amount) > float(cust.credit_limit):
-                        raise ValueError(
-                            f"Credit limit exceeded for {cust.name}. "
-                            f"Limit: NPR {float(cust.credit_limit):,.0f}, "
-                            f"Outstanding: NPR {float(outstanding):,.0f}, "
-                            f"This sale: NPR {float(total_amount):,.0f}."
-                        )
-            except ValueError:
-                raise
-            except Exception:
-                pass  # Non-blocking — don't fail sale if credit check errors
 
         invoice_number = None
         try:
@@ -149,6 +148,14 @@ def create_sale(items: list[dict], user_id: int,
                 else:
                     discount_note = "Loyalty points redeemed"
         # ── Fetch VAT settings for tax snapshot ──────────────────────────
+        if normalized_payment == "credit" and customer_phone:
+            try:
+                _enforce_credit_limit(customer_phone, total_amount)
+            except ValueError:
+                raise
+            except Exception as exc:
+                logger.debug("Credit limit check skipped after error: %s", exc)
+
         _tax_rate = 0.0
         _tax_amount = 0.0
         try:
@@ -183,6 +190,7 @@ def create_sale(items: list[dict], user_id: int,
             payment_method=normalized_payment,
             sale_type=sale_type or "regular",
             discount_amount=(discount_amount or 0) + loyalty_discount_amount,
+            commission_amount=commission_amount,
             discount_note=discount_note,
             promotion_id=promotion_id,
             tax_rate=_tax_rate,
@@ -288,7 +296,7 @@ def create_sale(items: list[dict], user_id: int,
     try:
         from .cache_service import invalidate_prefix
         invalidate_prefix("bi_dashboard")
-        invalidate_prefix(f"alert_count:")  # reset alert badge cache
+        invalidate_prefix("alert_count:")  # reset alert badge cache
     except Exception:
         pass
 
@@ -771,7 +779,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         disc_label = f"Discount ({sale.discount_note}):" if sale.discount_note else "Discount:"
         totals_rows.append([Paragraph(disc_label, tot_s), Paragraph(f"- NPR {discount:,.2f}", tot_red)])
     if vat_enabled and vat_rate > 0:
-        totals_rows.append([Paragraph(f"Taxable Amount:", tot_s), Paragraph(f"NPR {taxable_amount:,.2f}", tot_v)])
+        totals_rows.append([Paragraph("Taxable Amount:", tot_s), Paragraph(f"NPR {taxable_amount:,.2f}", tot_v)])
         totals_rows.append([Paragraph(f"VAT ({vat_rate:.0f}%):", tot_s), Paragraph(f"NPR {vat_amount:,.2f}", tot_v)])
     else:
         totals_rows.append([Paragraph("Tax (0%):", tot_s), Paragraph("NPR 0.00", tot_v)])
