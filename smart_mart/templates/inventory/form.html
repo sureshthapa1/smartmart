@@ -240,6 +240,42 @@
             </div>
             {% endif %}
 
+            <!-- ── Store Content (Online Store) — manual editing ──────────────────── -->
+            <div class="col-12">
+              <hr class="my-3">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-shop text-primary"></i>
+                <span class="fw-semibold" style="font-size:.9rem;">Store Content</span>
+                <span class="text-muted small">— shown on the online store product page. Edit manually or use AI Autofill above.</span>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium" for="descriptionInput">Description</label>
+              <textarea name="description" id="descriptionInput" class="form-control" rows="3"
+                        maxlength="2000" placeholder="Describe the product for customers — taste, quality, uses…">{{ product.description if product and product.description else '' }}</textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium" for="benefitsInput">Benefits / Nutrition</label>
+              <textarea name="benefits" id="benefitsInput" class="form-control" rows="3"
+                        maxlength="1000" placeholder="e.g. Rich in protein, healthy fats, and Vitamin E. Supports heart health.">{{ product.benefits if product and product.benefits else '' }}</textarea>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-medium" for="originInput">Origin</label>
+              <input type="text" name="origin" id="originInput" class="form-control"
+                     maxlength="120" placeholder="e.g. Kashmir, California, Afghanistan"
+                     value="{{ product.origin if product and product.origin else '' }}">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-medium" for="storageInput">Storage Tips</label>
+              <input type="text" name="storage_tips" id="storageInput" class="form-control"
+                     maxlength="300" placeholder="e.g. Store in an airtight container away from sunlight"
+                     value="{{ product.storage_tips if product and product.storage_tips else '' }}">
+            </div>
+
           </div>
 
           <div class="mt-4 d-flex gap-2 flex-wrap">
