@@ -191,42 +191,6 @@ with app.app_context():
             safe_add(conn, "products", "is_featured",   "BOOLEAN DEFAULT FALSE")
             safe_add(conn, "products", "description_ne","TEXT")    # Nepali description
 
-            # ── stock_reservations table ──────────────────────────────────────────
-            try:
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS stock_reservations (
-                        id          SERIAL PRIMARY KEY,
-                        product_id  INTEGER NOT NULL,
-                        order_id    INTEGER,
-                        session_key VARCHAR(128),
-                        quantity    INTEGER NOT NULL DEFAULT 1,
-                        status      VARCHAR(30) NOT NULL DEFAULT 'active',
-                        expires_at  TIMESTAMP,
-                        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                conn.commit()
-            except Exception:
-                pass
-
-            # ── notification_log table ────────────────────────────────────────────
-            try:
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS notification_log (
-                        id         SERIAL PRIMARY KEY,
-                        phone      VARCHAR(30),
-                        message    TEXT,
-                        channel    VARCHAR(20) DEFAULT 'sms',
-                        provider   VARCHAR(30),
-                        status     VARCHAR(20) DEFAULT 'sent',
-                        error      TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                conn.commit()
-            except Exception:
-                pass
-
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
