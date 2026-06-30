@@ -31,6 +31,10 @@ def create_product(data: dict) -> Product:
         is_active=data.get("is_active", True),
         max_discount_pct=data.get("max_discount_pct"),
         tax_category=data.get("tax_category", "standard"),
+        description=data.get("description"),
+        benefits=data.get("benefits"),
+        origin=data.get("origin"),
+        storage_tips=data.get("storage_tips"),
     )
     db.session.add(product)
     try:
@@ -68,7 +72,8 @@ def update_product(product_id: int, data: dict) -> Product:
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
                  "quantity", "low_stock_threshold", "supplier_id", "expiry_date", "image_filename",
                  "unit", "reorder_point", "barcode", "is_active",
-                 "max_discount_pct", "tax_category")
+                 "max_discount_pct", "tax_category",
+                 "description", "benefits", "origin", "storage_tips")
     for field in updatable:
         if field in data:
             setattr(product, field, data[field])
