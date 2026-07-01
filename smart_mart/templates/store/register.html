@@ -37,15 +37,16 @@
           <div class="col-sm-6">
             <label class="flabel" for="r-pass">Password *</label>
             <div class="fwrap"><i class="bi bi-lock fico"></i>
-            <input id="r-pass" type="password" name="password" class="finput has-ico" placeholder="Min 6 characters" autocomplete="new-password"
-                   required minlength="6" autocomplete="new-password">
+            <input id="r-pass" type="password" name="password" class="finput has-ico" placeholder="{{ _('Min 8 characters') }}" autocomplete="new-password"
+                   required minlength="8" autocomplete="new-password">
+            <div class="fhint">{{ _('8+ characters, one uppercase letter, one digit') }}</div>
             </div>
           </div>
           <div class="col-sm-6">
             <label class="flabel" for="r-pass2">Confirm Password *</label>
             <div class="fwrap"><i class="bi bi-lock-fill fico"></i>
-            <input id="r-pass2" type="password" name="password2" class="finput has-ico" placeholder="Repeat password" autocomplete="new-password"
-                   required minlength="6" autocomplete="new-password">
+            <input id="r-pass2" type="password" name="password2" class="finput has-ico" placeholder="{{ _('Repeat password') }}" autocomplete="new-password"
+                   required minlength="8" autocomplete="new-password">
             </div>
           </div>
           <div class="col-12">

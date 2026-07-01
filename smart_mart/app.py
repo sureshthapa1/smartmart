@@ -492,14 +492,19 @@ def _register_blueprints(app):
             module = importlib.import_module(module_path, package="smart_mart")
             bp = getattr(module, bp_name)
             app.register_blueprint(bp)
-        except ImportError:
-            pass  # Blueprint not yet implemented
+        except ImportError as exc:
+            # Log at WARNING — a real import error (missing dependency,
+            # syntax error in a blueprint) looks identical to "not yet
+            # implemented" without this line. Debug by checking the
+            # message: a genuinely stub blueprint won't have a traceback.
+            app.logger.warning(
+                "Blueprint %s not loaded (ImportError: %s)", bp_name, exc
+            )
         except Exception as exc:
             app.logger.error(
                 "Failed to register blueprint %s: %s\n%s",
                 bp_name, exc, traceback.format_exc()
             )
-
     # CSRF exemptions — endpoints called by external services (cron, curl)
     # that cannot include a CSRF token
     try:
@@ -514,14 +519,15 @@ def _register_blueprints(app):
     except Exception:
         pass
 
-    # Exempt only the login and logout routes — NOT change-password or reset.
-    # Rate limiting already protects login/logout; exempting the whole
-    # blueprint would leave change-password and reset routes CSRF-unprotected.
+    # csrf.exempt(login) was previously here but is unnecessary — the login
+    # template already renders {{ csrf_token() }} so CSRF protection works
+    # naturally. Removing it restores defense-in-depth against login CSRF
+    # (forcing a victim to authenticate as an attacker-controlled account).
+    # Logout remains exempt: it's a GET-based redirect with no persistent
+    # state mutation beyond ending the session (acceptable tradeoff).
     try:
-        from .blueprints.auth.routes import login, logout, request_password_reset
-        csrf.exempt(login)
+        from .blueprints.auth.routes import logout
         csrf.exempt(logout)
-        csrf.exempt(request_password_reset)
     except Exception:
         pass
 

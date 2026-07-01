@@ -1049,8 +1049,10 @@ def register_view():
             return render_template("store/register.html", settings=settings,
                                    form_data=request.form, customer=None)
 
-        if len(password) < 6:
-            flash("Password must be at least 6 characters.", "danger")
+        from ...services.authenticator import validate_password_strength
+        pw_errors = validate_password_strength(password)
+        if pw_errors:
+            flash("Password requirements: " + " ".join(pw_errors), "danger")
             return render_template("store/register.html", settings=settings,
                                    form_data=request.form, customer=None)
 
@@ -1175,14 +1177,17 @@ def account_change_password():
 
     if not cust.check_password(current_pw):
         flash("Current password is incorrect.", "danger")
-    elif len(new_pw) < 6:
-        flash("New password must be at least 6 characters.", "danger")
-    elif new_pw != confirm_pw:
-        flash("Passwords do not match.", "danger")
     else:
-        cust.set_password(new_pw)
-        db.session.commit()
-        flash("Password changed successfully.", "success")
+        from ...services.authenticator import validate_password_strength
+        pw_errors = validate_password_strength(new_pw)
+        if pw_errors:
+            flash("Password requirements: " + " ".join(pw_errors), "danger")
+        elif new_pw != confirm_pw:
+            flash("Passwords do not match.", "danger")
+        else:
+            cust.set_password(new_pw)
+            db.session.commit()
+            flash("Password changed successfully.", "success")
     return redirect(url_for("store.my_account"))
 
 
