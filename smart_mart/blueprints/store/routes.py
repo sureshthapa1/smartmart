@@ -911,6 +911,25 @@ def order_success(order_number):
         flash("Order placed successfully! Use your order number to track it.", "success")
         return redirect(url_for("store.track", order_number=order_number))
 
+
+    # FEATURE 2: Send order receipt email if customer provided one
+    if order.customer_email and not session.get(f"email_sent_{order_number}"):
+        try:
+            from ...services.email_service import send_order_confirmation
+            _email_items = [
+                {
+                    "name": it.product_name,
+                    "qty": it.quantity,
+                    "unit_price": float(it.unit_price),
+                    "subtotal": float(it.subtotal),
+                }
+                for it in order.items
+            ]
+            send_order_confirmation(order, _email_items)
+            session[f"email_sent_{order_number}"] = True
+        except Exception:
+            pass
+
     # FEATURE 3: Build WhatsApp confirmation link
     wa_link = None
     if settings and settings.phone:
@@ -933,6 +952,7 @@ def order_success(order_number):
 # ── Order Tracking ────────────────────────────────────────────────────────────
 
 @store_bp.route("/track", methods=["GET", "POST"])
+@limiter.limit("10/minute")
 def track():
     settings     = _settings()
     order        = None
@@ -1189,13 +1209,26 @@ def _esewa_product_code() -> str:
 
 
 def _esewa_secret() -> str:
-    """Return the eSewa secret key from env (sandbox default if not set)."""
+    """Return the eSewa secret key from env. Returns '' if not configured —
+    callers MUST treat an empty secret as 'not configured' and fail closed.
+    (No default fallback: eSewa's publicly-documented sandbox secret was
+    previously used as a default, which made signatures forgeable by anyone
+    in any environment where ESEWA_SECRET_KEY was left unset.)
+    """
     import os as _os
-    return _os.environ.get("ESEWA_SECRET_KEY", "8gBm/:&EnhH.1/q")
+    return _os.environ.get("ESEWA_SECRET_KEY", "")
 
 
-def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str | None = None) -> str:
-    """Generate eSewa HMAC-SHA256 signature for payment initiation."""
+def _esewa_configured() -> bool:
+    """True only if a real eSewa secret has been set via environment config."""
+    return bool(_esewa_secret())
+
+
+def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str | None = None) -> str | None:
+    """Generate eSewa HMAC-SHA256 signature for payment initiation.
+    Returns None if ESEWA_SECRET_KEY is not configured."""
+    if not _esewa_configured():
+        return None
     if product_code is None:
         product_code = _esewa_product_code()
     secret = _esewa_secret()
@@ -1207,10 +1240,15 @@ def _esewa_signature(total_amount: str, transaction_uuid: str, product_code: str
 def _verify_esewa_callback(args: dict) -> bool:
     """
     Verify eSewa v2 callback signature.
-    eSewa sends: transaction_code, status, total_amount, transaction_uuid,
-                 product_code, signed_field_names, signature
-    We recompute the HMAC over the signed fields and compare.
+    Fails closed: if ESEWA_SECRET_KEY isn't configured, no callback can be
+    verified, so nothing is ever marked paid via eSewa.
     """
+    if not _esewa_configured():
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "ESEWA_SECRET_KEY not configured — rejecting eSewa callback (fail closed)"
+        )
+        return False
     try:
         signed_fields = args.get("signed_field_names", "")
         if not signed_fields:
@@ -1932,7 +1970,8 @@ def autofill_all_products():
 def price_justify(product_id: int):
     """Return a 1-sentence price justification. Cached 24h — same call all day."""
     cache_key = f"pj:{product_id}"
-    cached = _cache_get(cache_key)
+    from ...services import cache_service
+    cached = cache_service.get(cache_key)
     if cached is not None:
         return jsonify({"ok": True, "text": cached})
 
@@ -1950,7 +1989,7 @@ def price_justify(product_id: int):
         if product.pack_size:
             parts.append(f"available in {product.pack_size}")
         text = (", ".join(parts) + ".") if parts else ""
-        _cache_set(cache_key, text, ttl=86400)
+        cache_service.set(cache_key, text, ttl=86400)
         return jsonify({"ok": True, "text": text})
 
     try:
@@ -1971,7 +2010,7 @@ def price_justify(product_id: int):
                      "content-type": "application/json"})
         with _ureq4.urlopen(req, timeout=8) as resp:
             text = _json4.loads(resp.read())["content"][0]["text"].strip()
-        _cache_set(cache_key, text, ttl=86400)
+        cache_service.set(cache_key, text, ttl=86400)
         return jsonify({"ok": True, "text": text})
     except Exception:
         return jsonify({"ok": True, "text": ""})

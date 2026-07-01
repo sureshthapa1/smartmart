@@ -98,6 +98,40 @@ def create_sale(items: list[dict], user_id: int,
         except Exception:
             pass  # Don't block sales if period check fails
 
+        # ── Credit limit enforcement ───────────────────────────────────────
+        if payment_mode == "credit" and customer_phone:
+            try:
+                from ..models.customer import Customer
+                cust = db.session.execute(
+                    db.select(Customer).where(Customer.phone == str(customer_phone).strip())
+                ).scalar_one_or_none()
+                if cust and cust.credit_limit and float(cust.credit_limit) > 0:
+                    outstanding = db.session.execute(
+                        db.select(db.func.sum(Sale.total_amount))
+                        .where(Sale.customer_phone == str(customer_phone).strip())
+                        .where(Sale.payment_mode == "credit")
+                        .where(Sale.is_credit_settled == False)
+                    ).scalar() or 0
+                    # Prospective total for this sale — the authoritative
+                    # total_amount isn't computed until later in this
+                    # function (after stock locking), so estimate it here
+                    # from the same items/discount inputs for this check.
+                    _prospective_gross = sum(
+                        item["unit_price"] * item["quantity"] for item in items
+                    )
+                    _prospective_total = max(0, _prospective_gross - (discount_amount or 0))
+                    if float(outstanding) + float(_prospective_total) > float(cust.credit_limit):
+                        raise ValueError(
+                            f"Credit limit exceeded for {cust.name}. "
+                            f"Limit: NPR {float(cust.credit_limit):,.0f}, "
+                            f"Outstanding: NPR {float(outstanding):,.0f}, "
+                            f"This sale: NPR {float(_prospective_total):,.0f}."
+                        )
+            except ValueError:
+                raise
+            except Exception:
+                pass  # Non-blocking — don't fail sale if credit check errors
+
         invoice_number = None
         try:
             invoice_number = _generate_invoice_number()

@@ -409,7 +409,7 @@ def build_business_context() -> str:
 
     return "\n".join([
         f"Date: {today.isoformat()} AD; BS month: {bs_month_name(today)}",
-        f"Today's revenue: NPR {float(today_row[0] or 0):,.2f}; sales: {today_row[1] or 0}",
+        f"Today revenue: NPR {float(today_row[0] or 0):,.2f}; sales: {today_row[1] or 0}",
         f"This week revenue: NPR {float(week_revenue):,.2f}",
         f"This month revenue: NPR {float(month_revenue):,.2f}",
         f"This month profit estimate: NPR {float(month_revenue) - float(month_expenses):,.2f}",

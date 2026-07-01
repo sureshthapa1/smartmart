@@ -33,7 +33,9 @@ _lock = threading.Lock()
 
 def _make_key(prefix: str, *args, **kwargs) -> str:
     raw = json.dumps({"a": args, "k": kwargs}, sort_keys=True, default=str)
-    digest = hashlib.md5(raw.encode()).hexdigest()[:12]
+    # MD5 used only as a fast non-cryptographic hash for cache-key shortening,
+    # not for any security purpose (signatures, passwords, etc.).
+    digest = hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()[:12]
     return f"{prefix}:{digest}"
 
 

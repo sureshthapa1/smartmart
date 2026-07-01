@@ -8,10 +8,10 @@
     <div class="pimg-ph">🥜</div>
     {% endif %}
     {% if product.quantity > 0 and product.quantity <= 8 %}
-    <span class="badge-low">{{ product.quantity }} left</span>
+    <span class="badge-low">{{ _('%(n)s left', n=product.quantity) }}</span>
     {% endif %}
     {% if selling_fast_ids is defined and product.id in selling_fast_ids %}
-    <span class="badge-hot"><i class="bi bi-fire"></i> Hot</span>
+    <span class="badge-hot"><i class="bi bi-fire"></i> {{ _('Hot') }}</span>
     {% endif %}
   </div>
   <div class="pbody">
@@ -24,13 +24,13 @@
     {% if product.quantity > 0 %}
     <button class="btn-add" data-add-cart data-pid="{{ product.id }}" data-name="{{ product.name }}" data-qty="1"
             onclick="event.stopPropagation()">
-      <i class="bi bi-cart-plus"></i> Add
+      <i class="bi bi-cart-plus"></i> {{ _('Add') }}
     </button>
     {% else %}
-    <button class="btn-add" disabled>Out of Stock</button>
+    <button class="btn-add" disabled>{{ _('Out of Stock') }}</button>
     {% endif %}
     <a href="{{ url_for('store.product_detail', product_id=product.id) }}" class="btn-icon"
-       onclick="event.stopPropagation()" title="View details">
+       onclick="event.stopPropagation()" title="{{ _('View details') }}">
       <i class="bi bi-eye"></i>
     </a>
   </div>

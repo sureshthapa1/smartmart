@@ -8,8 +8,8 @@
 {% if active_promos %}
 <div class="promo-bar">
   <i class="bi bi-tag-fill"></i>
-  <span>Special offers available!</span>
-  <a href="{{ url_for('store.promos') }}">View Promo Codes →</a>
+  <span>{{ _('Special offers available!') }}</span>
+  <a href="{{ url_for('store.promos') }}">{{ _('View Promo Codes →') }}</a>
   <button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fef3c7;cursor:pointer;font-size:1rem;line-height:1;margin-left:.5rem;opacity:.7;">✕</button>
 </div>
 {% endif %}
@@ -19,13 +19,13 @@
 <section class="hero">
   <div class="sc">
     <div class="hero-inner fu">
-      <div class="hero-tag"><i class="bi bi-stars"></i> Nepal's #1 Dry Fruit Store</div>
-      <h1>Nature's Finest<br><em>Dry Fruits</em> & Treats</h1>
-      <p class="hero-sub">Handpicked almonds, cashews, pistachios & more — delivered fresh to your door anywhere in Nepal.</p>
+      <div class="hero-tag"><i class="bi bi-stars"></i> {{ _("Nepal's #1 Dry Fruit Store") }}</div>
+      <h1>{{ _("Nature's Finest") }}<br><em>{{ _('Dry Fruits') }}</em> &amp; {{ _('Treats') }}</h1>
+      <p class="hero-sub">{{ _('Handpicked almonds, cashews, pistachios & more — delivered fresh to your door anywhere in Nepal.') }}</p>
       <div style="display:flex;flex-wrap:wrap;gap:.75rem;">
-        <a href="#products" class="btn-brand"><i class="bi bi-bag-heart-fill"></i> Shop Now</a>
+        <a href="#products" class="btn-brand"><i class="bi bi-bag-heart-fill"></i> {{ _('Shop Now') }}</a>
         <a href="{{ url_for('store.track') }}" class="btn-ob" style="color:rgba(255,255,255,.9);border-color:rgba(255,255,255,.45);">
-          <i class="bi bi-geo-alt"></i> Track Order
+          <i class="bi bi-geo-alt"></i> {{ _('Track Order') }}
         </a>
       </div>
     </div>
@@ -37,11 +37,11 @@
 <div class="tstrip">
   <div class="tstrip-i">
     {% for icon, title, sub in [
-      ('🚚','Free Delivery','On orders above NPR 2000'),
-      ('✅','100% Genuine','Handpicked & verified'),
-      ('💳','Easy Payment','COD · eSewa · Khalti'),
-      ('🔄','7-Day Returns','Hassle-free returns'),
-      ('📦','Fresh Stock','Direct from source'),
+      ('🚚', _('Free Delivery'), _('On orders above NPR 2000')),
+      ('✅', _('100 Percent Genuine'), _('Handpicked & verified')),
+      ('💳', _('Easy Payment'), 'COD · eSewa · Khalti'),
+      ('🔄', _('7-Day Returns'), _('Hassle-free returns')),
+      ('📦', _('Fresh Stock'), _('Direct from source')),
     ] %}
     <div class="ti"><span>{{ icon }}</span><span><strong>{{ title }}</strong> — {{ sub }}</span></div>
     {% endfor %}
@@ -54,9 +54,9 @@
   <form method="get" action="{{ url_for('store.home') }}" role="search">
     <div style="position:relative;">
       <i class="bi bi-search" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:.85rem;pointer-events:none;"></i>
-      <input type="search" name="q" placeholder="Search dry fruits…" value="{{ request.args.get('q','') }}"
+      <input type="search" name="q" placeholder="{{ _('Search dry fruits…') }}" value="{{ request.args.get('q','') }}"
              style="width:100%;padding:.55rem 1rem .55rem 2.4rem;border:1.5px solid var(--border);border-radius:var(--r-f);background:var(--card);font-family:inherit;font-size:.875rem;outline:none;"
-             autocomplete="off" aria-label="Search products">
+             autocomplete="off" aria-label="{{ _('Search products') }}">
     </div>
   </form>
 </div>
@@ -64,7 +64,7 @@
 {# ── Category strip ── #}
 <div class="cstrip" id="products">
   <a href="{{ url_for('store.home', q=q or '') }}" class="cpill {% if not selected_category %}active{% endif %}">
-    <i class="bi bi-grid-fill"></i> All
+    <i class="bi bi-grid-fill"></i> {{ _('All') }}
   </a>
   {% set cat_emojis = {
     'Almonds':'🥜','Cashews':'🌰','Pistachios':'🫘','Walnuts':'🪨',
@@ -90,27 +90,27 @@
   {% if customer and personalised and not q and not selected_category %}
   <div style="background:linear-gradient(135deg,var(--brand-l),#fff);border:1.5px solid #fde68a;border-radius:var(--r-l);padding:.75rem 1.1rem;display:flex;align-items:center;gap:.75rem;font-size:.85rem;margin-bottom:1.25rem;" class="fu">
     <span style="font-size:1.2rem;">👋</span>
-    <span>Welcome back, <strong style="color:var(--brand-d);">{{ customer.name.split()[0] }}</strong>! Showing your favourite categories first.</span>
+    <span>{{ _('Welcome back,') }} <strong style="color:var(--brand-d);">{{ customer.name.split()[0] }}</strong>! {{ _('Showing your favourite categories first.') }}</span>
   </div>
   {% endif %}
 
   {# Sort + result count #}
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;" class="fu">
     <div style="font-size:.85rem;color:var(--muted);">
-      {% if q %}Results for <strong style="color:var(--text);">"{{ q }}"</strong> —
+      {% if q %}{{ _('Results for') }} <strong style="color:var(--text);">"{{ q }}"</strong> —
       {% elif selected_category %}<strong style="color:var(--brand);">{{ selected_category }}</strong> —{% endif %}
-      <span style="color:var(--text);">{{ products|length }} product{{ 's' if products|length != 1 }}</span>
+      <span style="color:var(--text);">{{ ngettext('%(num)s product', '%(num)s products', products|length) }}</span>
     </div>
     <form method="get" style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;">
       {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
       {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
-      <label style="color:var(--muted);font-weight:600;" for="sort-sel">Sort:</label>
+      <label style="color:var(--muted);font-weight:600;" for="sort-sel">{{ _('Sort:') }}</label>
       <select id="sort-sel" name="sort" onchange="this.form.submit()"
               style="padding:.35rem .7rem;border:1.5px solid var(--border);border-radius:var(--r-f);font-size:.8rem;font-family:inherit;background:var(--card);outline:none;cursor:pointer;">
-        <option value="name"       {% if sort=='name'       %}selected{% endif %}>Name A–Z</option>
-        <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>Price ↑</option>
-        <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>Price ↓</option>
-        <option value="newest"     {% if sort=='newest'     %}selected{% endif %}>Newest</option>
+        <option value="name"       {% if sort=='name'       %}selected{% endif %}>{{ _('Name A–Z') }}</option>
+        <option value="price_asc"  {% if sort=='price_asc'  %}selected{% endif %}>{{ _('Price ↑') }}</option>
+        <option value="price_desc" {% if sort=='price_desc' %}selected{% endif %}>{{ _('Price ↓') }}</option>
+        <option value="newest"     {% if sort=='newest'     %}selected{% endif %}>{{ _('Newest') }}</option>
       </select>
     </form>
   </div>
@@ -120,7 +120,7 @@
   {# Featured section — only on unfiltered home #}
   {% if featured_products and not q and not selected_category %}
   <div style="margin-bottom:2.5rem;">
-    <div class="sh fu"><div class="sh-title">⭐ Featured <em>Picks</em></div></div>
+    <div class="sh fu"><div class="sh-title">⭐ {{ _('Featured') }} <em>{{ _('Picks') }}</em></div></div>
     <div class="row g-3">
       {% for p in featured_products %}
       <div class="col-6 col-sm-4 col-md-3 col-xl-2 fu" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
@@ -134,7 +134,7 @@
 
   {# Products grid #}
   {% if not q and not selected_category %}
-  <div class="sh fu"><div class="sh-title">All <em>Products</em></div></div>
+  <div class="sh fu"><div class="sh-title">{{ _('All') }} <em>{{ _('Products') }}</em></div></div>
   {% endif %}
   <div class="row g-3">
     {% for p in products %}
@@ -153,7 +153,7 @@
        style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-f);color:var(--muted);text-decoration:none;font-size:.8rem;font-weight:600;background:var(--card);transition:all var(--t-f);"
        onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      ‹ Prev
+      ‹ {{ _('Prev') }}
     </a>
     {% endif %}
     {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
@@ -168,17 +168,17 @@
        style="display:inline-flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-f);color:var(--muted);text-decoration:none;font-size:.8rem;font-weight:600;background:var(--card);transition:all var(--t-f);"
        onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'"
        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-      Next ›
+      {{ _('Next') }} ›
     </a>
     {% endif %}
-    <span style="font-size:.75rem;color:var(--muted);margin-left:.5rem;">{{ total_products }} total</span>
+    <span style="font-size:.75rem;color:var(--muted);margin-left:.5rem;">{{ _('%(n)s total', n=total_products) }}</span>
   </nav>
   {% endif %}
 
   {# Recently viewed #}
   {% if recently_viewed and not q and not selected_category %}
   <div style="margin-top:3rem;">
-    <div class="sh fu"><div class="sh-title">👀 Recently <em>Viewed</em></div></div>
+    <div class="sh fu"><div class="sh-title">👀 {{ _('Recently') }} <em>{{ _('Viewed') }}</em></div></div>
     <div class="row g-3">
       {% for p in recently_viewed %}
       <div class="col-6 col-sm-4 col-md-3 col-xl-2 fu" style="animation-delay:{{ loop.index0 * 0.04 }}s;">
@@ -194,14 +194,14 @@
   <div class="ucard fu" style="margin-top:1rem;">
     <div class="empty">
       <div class="empty-icon">🔍</div>
-      <h4>No products found</h4>
-      <p>{% if q %}No results for "<strong>{{ q }}</strong>". Try different keywords or browse a category below.{% else %}No products in this category yet.{% endif %}</p>
+      <h4>{{ _('No products found') }}</h4>
+      <p>{% if q %}{{ _('No results for') }} "<strong>{{ q }}</strong>". {{ _('Try different keywords or browse a category below.') }}{% else %}{{ _('No products in this category yet.') }}{% endif %}</p>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.1rem;">
         {% for cat in (categories or [])[:5] %}
         <a href="{{ url_for('store.home', category=cat) }}" class="btn-ghost" style="font-size:.8rem;">{{ cat }}</a>
         {% endfor %}
       </div>
-      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> Browse All Products</a>
+      <a href="{{ url_for('store.home') }}" class="btn-brand"><i class="bi bi-arrow-left"></i> {{ _('Browse All Products') }}</a>
     </div>
   </div>
   {% endif %}
