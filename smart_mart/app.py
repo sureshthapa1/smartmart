@@ -138,14 +138,20 @@ def create_app(config_name="development"):
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains"
             )
-        # Allow CDN resources used by the app
+        # Allow CDN resources used by the app.
+        # Note: unsafe-inline is still required for the inline <script> blocks in
+        # our templates. A future improvement is to extract those to external files
+        # and use a per-request nonce instead, which would let us drop unsafe-inline too.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net fonts.googleapis.com; "
             "font-src 'self' fonts.gstatic.com cdn.jsdelivr.net; "
             "img-src 'self' data: blob: https://res.cloudinary.com https://images.pexels.com; "
-            "connect-src 'self' rc-epay.esewa.com.np uat.esewa.com.np khalti.com;"
+            "connect-src 'self' rc-epay.esewa.com.np uat.esewa.com.np khalti.com "
+            "https://res.cloudinary.com https://api.cloudinary.com; "
+            "worker-src 'self'; "
+            "frame-ancestors 'none';"
         )
         return response
 

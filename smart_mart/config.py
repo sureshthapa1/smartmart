@@ -63,6 +63,12 @@ class ProductionConfig(Config):
     WTF_CSRF_ENABLED = True
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
 
+    # ── Static file caching ───────────────────────────────────────────────
+    # Tell browsers to cache static assets for 1 year.
+    # On deploy, hashed filenames (or the ?v= query string we use in
+    # sw.js) ensure users always get the updated file.
+    SEND_FILE_MAX_AGE_DEFAULT = 60 * 60 * 24 * 365  # 1 year in seconds
+
     # ── Secure session cookies (HTTPS only) ──────────────────────────────
     SESSION_COOKIE_SECURE   = True   # only sent over HTTPS
     SESSION_COOKIE_HTTPONLY = True   # no JS access to session cookie

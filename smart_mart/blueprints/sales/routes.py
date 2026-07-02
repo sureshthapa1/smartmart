@@ -166,8 +166,9 @@ def create_sale():
                     customer_points = sale.customer.loyalty_points if sale.customer else None
                     if earned_points > 0 and customer_points is not None:
                         flash(f"+{earned_points} points earned! Customer now has {customer_points} points.", "success")
-                except Exception:
-                    pass
+                except Exception as _exc:
+                    import logging as _log
+                    _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
             flash(f"Sale #{sale.id} created successfully.", "success")
             return redirect(url_for("sales.sale_detail", sale_id=sale.id))
         except InsufficientStockError as e:
@@ -197,8 +198,9 @@ def sale_detail(sale_id):
             wallet = db.session.get(LoyaltyWallet, txns[0].wallet_id)
             if wallet:
                 loyalty_balance = wallet.points_balance
-    except Exception:
-        pass
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
     return render_template("sales/detail.html", sale=sale,
                            loyalty_txns=loyalty_txns, loyalty_balance=loyalty_balance)
 
@@ -268,8 +270,9 @@ def thermal_receipt(sale_id):
             wallet = db.session.get(LoyaltyWallet, txns[0].wallet_id)
             if wallet:
                 loyalty_balance = wallet.points_balance
-    except Exception:
-        pass
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
 
     return render_template("sales/thermal_receipt.html", sale=sale, shop=shop,
                            loyalty_txns=loyalty_txns, loyalty_balance=loyalty_balance)
@@ -345,8 +348,9 @@ def customer_statement():
                     loyalty_points = int(wallet.points_balance)
                     loyalty_lifetime = int(wallet.lifetime_points_earned)
                     loyalty_tier = wallet.tier or "Silver"
-        except Exception:
-            pass
+        except Exception as _exc:
+            import logging as _log
+            _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
 
         # Customer info
         cust_info = db.session.execute(

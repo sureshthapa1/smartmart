@@ -36,6 +36,15 @@ def _safe_add_column(conn, table_name: str, column_name: str, column_sql: str) -
     conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"))
 
 
+def _safe_create_index(conn, index_name: str, table_name: str, columns: list[str]) -> None:
+    """Create a database index if it doesn't already exist.
+    Uses IF NOT EXISTS so it's safe to call on an already-migrated DB."""
+    if not _table_exists(conn, table_name):
+        return
+    cols = ", ".join(columns)
+    _safe_exec(conn, f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({cols})")
+
+
 def _safe_exec(conn, sql: str) -> None:
     """Execute a DDL statement, silently ignoring errors (e.g. already exists)."""
     try:
@@ -464,6 +473,32 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "products", "origin", "VARCHAR(120)"),
                 _safe_add_column(conn, "products", "storage_tips", "TEXT"),
             ),
+        ),
+        (
+            "2026_07_01_online_order_perf_indexes",
+            "Add missing performance indexes to online_orders table. "
+            "Previously zero indexes on the table — every status/phone/date filter "
+            "was doing a full table scan in production.",
+            lambda conn: [
+                _safe_create_index(conn, "ix_online_order_status", "online_orders", ["status"]),
+                _safe_create_index(conn, "ix_online_order_payment_status", "online_orders", ["payment_status"]),
+                _safe_create_index(conn, "ix_online_order_customer_phone", "online_orders", ["customer_phone"]),
+                _safe_create_index(conn, "ix_online_order_created_at", "online_orders", ["created_at"]),
+                _safe_create_index(conn, "ix_online_order_payment_mode", "online_orders", ["payment_mode"]),
+                _safe_create_index(conn, "ix_online_order_status_created", "online_orders", ["status", "created_at"]),
+            ],
+        ),
+        (
+            "2026_07_01_sale_credit_indexes",
+            "Add missing indexes to sales table for credit/udharo queries. "
+            "customer_phone + payment_mode + is_credit_settled are queried together "
+            "on every credit sale and on the credit dashboard — full table scan in production.",
+            lambda conn: [
+                _safe_create_index(conn, "ix_sale_customer_phone", "sales", ["customer_phone"]),
+                _safe_create_index(conn, "ix_sale_credit_lookup", "sales", ["customer_phone", "payment_mode", "credit_collected"]),
+                _safe_create_index(conn, "ix_sale_user_date", "sales", ["user_id", "sale_date"]),
+                _safe_create_index(conn, "ix_sale_customer_id", "sales", ["customer_id"]),
+            ],
         ),
     ]
 

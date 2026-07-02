@@ -10,6 +10,9 @@
     </div>
     <div style="padding:1.75rem;">
       <form method="post" action="{{ url_for('store.register_view') }}">
+        {# Honeypot — invisible to real users; bots fill it in, we reject silently #}
+        <input type="text" name="website" value="" autocomplete="off"
+               style="display:none !important;position:absolute;left:-9999px;" tabindex="-1" aria-hidden="true">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row g-3">
           <div class="col-12">

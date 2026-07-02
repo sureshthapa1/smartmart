@@ -6,6 +6,14 @@ from ..extensions import db
 
 class OnlineOrder(db.Model):
     __tablename__ = "online_orders"
+    __table_args__ = (
+        db.Index("ix_online_order_status", "status"),
+        db.Index("ix_online_order_payment_status", "payment_status"),
+        db.Index("ix_online_order_customer_phone", "customer_phone"),
+        db.Index("ix_online_order_created_at", "created_at"),
+        db.Index("ix_online_order_payment_mode", "payment_mode"),
+        db.Index("ix_online_order_status_created", "status", "created_at"),  # list view sort
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(30), unique=True, nullable=False)

@@ -6,7 +6,7 @@ services:
     buildCommand: bash build.sh && flask --app run.py db upgrade
     # Workers auto-scale: 2 workers × 4 threads when REDIS_URL is set (shared rate-limit + cache)
     # Without Redis: 1 worker × 8 threads (safe, no shared-state needed)
-    startCommand: bash -c 'if [ -n "$REDIS_URL" ]; then exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -; else exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile -; fi'
+    startCommand: bash -c 'if [ -n "$REDIS_URL" ]; then exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 2 --threads 4 --worker-class gthread --timeout 30 --keep-alive 5 --max-requests 800 --max-requests-jitter 80 --access-logfile - --error-logfile - --log-level info; else exec gunicorn "smart_mart.app:create_app(\"production\")" --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 30 --keep-alive 5 --max-requests 800 --max-requests-jitter 80 --access-logfile - --error-logfile - --log-level info; fi'
     envVars:
       - key: FLASK_ENV
         value: production
@@ -75,6 +75,13 @@ services:
           type: redis
           property: connectionString
         optional: true
+
+      # ── MCP Tools API (AI agent integration) ────────────────────────────
+      # REQUIRED: Without this, the MCP tools endpoint (sales data, customer
+      # PII, KPIs) rejects bearer-token access. Only admin sessions can use
+      # it. Set to a strong random string to enable external AI agent access.
+      - key: MCP_SECRET
+        sync: false   # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
 
       # ── App URL (used by the daily cron bot) ────────────────────────────
       - key: APP_URL
