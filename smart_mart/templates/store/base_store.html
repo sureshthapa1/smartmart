@@ -657,9 +657,10 @@ document.addEventListener('click',function(e){
             if(!d||!d.results||!d.results.length){box.classList.remove('open');return;}
             box.innerHTML=d.results.map(p=>{
               const url='/store/product/'+p.id;
+              const altText=p.name.replace(/"/g,'&quot;');
               const img=p.image_filename&&!p.image_filename.startsWith('cld:')
-                ?'<img src="/static/uploads/products/'+p.image_filename+'" alt="" loading="lazy">'
-                :(p.image_url?'<img src="'+p.image_url+'" alt="" loading="lazy">'+'🥜':'🥜');
+                ?'<img src="/static/uploads/products/'+p.image_filename+'" alt="'+altText+'" loading="lazy">'
+                :(p.image_url?'<img src="'+p.image_url+'" alt="'+altText+'" loading="lazy">'+'🥜':'🥜');
               return '<a href="'+url+'" class="sitem">'
                 +'<div class="sthumb">'+img+'</div>'
                 +'<div style="flex:1;min-width:0;">'

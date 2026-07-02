@@ -370,12 +370,44 @@ def create_order(payload: dict[str, Any], idempotency_key: str | None = None) ->
         order_source=payload.get("order_source") or "website",
     )
     db.session.add(order)
-    db.session.flush()
+    db.session.flush()  # get order.id before adding items
 
     Customer.upsert(name=name, phone=phone, address=address)
 
     for idx, item in enumerate(items, start=1):
         product = item["product"]
+
+        # Re-check availability inside the transaction with a row-level lock
+        # (SELECT FOR UPDATE) to prevent two concurrent checkouts from both
+        # reading "1 in stock" and both succeeding — resulting in -1 stock.
+        # This lock is held until db.session.commit() at the end of the with block.
+        locked_product = db.session.execute(
+            db.select(type(product))
+            .where(type(product).id == product.id)
+            .with_for_update()
+        ).scalar_one_or_none()
+
+        if locked_product is None:
+            raise EcommerceSyncError(
+                f"Product '{product.name}' no longer exists.",
+                status_code=409,
+            )
+
+        now_locked = utcnow()
+        available_now = available_quantity(locked_product, now=now_locked)
+        if available_now < item["quantity"]:
+            raise EcommerceSyncError(
+                f"Insufficient stock for '{locked_product.name}'. "
+                f"Only {available_now} available.",
+                status_code=409,
+                details={
+                    "product_id": locked_product.id,
+                    "sku": locked_product.sku,
+                    "requested_quantity": item["quantity"],
+                    "available_quantity": available_now,
+                },
+            )
+
         db.session.add(
             OnlineOrderItem(
                 order_id=order.id,
