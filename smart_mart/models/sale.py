@@ -20,6 +20,11 @@ class Sale(db.Model):
         db.Index("ix_sale_payment_mode", "payment_mode"),
         db.Index("ix_sale_payment_method", "payment_method"),
         db.Index("ix_sale_customer_name", "customer_name"),
+        # Credit/udharo queries: WHERE customer_phone=X AND payment_mode='credit' AND credit_collected=False
+        db.Index("ix_sale_customer_phone", "customer_phone"),
+        db.Index("ix_sale_credit_lookup", "customer_phone", "payment_mode", "credit_collected"),
+        db.Index("ix_sale_user_date", "user_id", "sale_date"),      # per-cashier daily reports
+        db.Index("ix_sale_customer_id", "customer_id"),              # customer history
     )
     PAYMENT_METHODS = PAYMENT_METHODS
 

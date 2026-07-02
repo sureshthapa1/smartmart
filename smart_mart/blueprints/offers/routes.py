@@ -272,8 +272,9 @@ def customer_offers(customer_id):
     ai_suggestions = []
     try:
         ai_suggestions = offer_service.ai_suggest_offers_for_customer(customer_id)
-    except Exception:
-        pass
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
     return render_template(
         "offers/customer_offers.html",
         customer=customer, cos=cos, offers=offers,

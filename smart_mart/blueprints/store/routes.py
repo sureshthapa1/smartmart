@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from flask_login import login_required
 from flask import (
-    Blueprint, Response, jsonify, redirect, render_template,
+    Blueprint, Response, current_app, jsonify, redirect, render_template,
     request, session, url_for, flash, g
 )
 from sqlalchemy import func
@@ -685,6 +685,11 @@ def checkout():
         flash("Your cart is empty.", "warning")
         return redirect(url_for("store.home"))
 
+    # Honeypot: silently reject bot submissions
+    if request.method == "POST" and request.form.get("website", ""):
+        flash("Your cart is empty.", "warning")
+        return redirect(url_for("store.home"))
+
     items    = []
     subtotal = 0.0
     _maybe_expire_reservations()
@@ -713,6 +718,10 @@ def checkout():
     cust        = g.customer
 
     if request.method == "POST":
+        # Honeypot: real browsers leave this hidden field empty; bots fill it in
+        if request.form.get("website", ""):
+            return redirect(url_for("store.home"))
+
         name    = request.form.get("name", "").strip()
         phone   = request.form.get("phone", "").strip()
         email   = request.form.get("email", "").strip()
@@ -927,8 +936,8 @@ def order_success(order_number):
             ]
             send_order_confirmation(order, _email_items)
             session[f"email_sent_{order_number}"] = True
-        except Exception:
-            pass
+        except Exception as exc:
+            current_app.logger.error("Order confirmation email failed for %s: %s", order_number, exc)
 
     # FEATURE 3: Build WhatsApp confirmation link
     wa_link = None
@@ -1129,8 +1138,8 @@ def my_account():
             .order_by(WishlistItem.created_at.desc())
         ).all()
         wishlist_items = [row.Product for row in wl_rows]
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning("Wishlist fetch failed for account page: %s", exc)
 
     return render_template("store/account.html", settings=settings,
                            customer=cust, orders=orders,
@@ -1334,8 +1343,8 @@ def payment_pending(order_number):
         ).scalar_one_or_none()
         if _res and _res.expires_at:
             reservation_expires_at = _res.expires_at.isoformat()
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.debug("Reservation expiry check failed (non-fatal): %s", exc)
 
     return render_template("store/payment_pending.html", order=order,
                            settings=settings, customer=cust,
@@ -1446,8 +1455,8 @@ def payment_callback(order_number, provider):
                     f"Customer: {order.customer_name} ({order.customer_phone})."
                 )
                 send_notification(admin_phone, msg)
-        except Exception:
-            pass  # Never block the payment confirmation on notification failure
+        except Exception as exc:
+            current_app.logger.warning("Payment notification failed (non-fatal): %s", exc)
 
         return redirect(url_for("store.order_success", order_number=order_number))
     else:
@@ -1835,8 +1844,8 @@ def submit_review(product_id):
                     return redirect(url_for("store.product_detail", product_id=product_id))
                 if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
                     review.is_approved = True   # Auto-approve high-confidence genuine reviews
-        except Exception:
-            pass  # Classification failure → review goes to manual queue as normal
+        except Exception as exc:
+            current_app.logger.debug("AI review classification failed, going to manual queue: %s", exc)
 
         db.session.add(review)
         db.session.commit()

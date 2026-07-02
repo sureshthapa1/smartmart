@@ -179,8 +179,9 @@ def customer_profile(customer_id):
                 .order_by(LoyaltyWalletTransaction.id.desc())
                 .limit(20)
             ).scalars().all()
-    except Exception:
-        pass
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
 
     return render_template("customers/profile.html",
                            customer=customer, sales=sales,
@@ -201,8 +202,9 @@ def edit_customer(customer_id):
         customer.address = request.form.get("address", "").strip() or None
         try:
             customer.email = request.form.get("email", "").strip() or None
-        except Exception:
-            pass
+        except Exception as _exc:
+            import logging as _log
+            _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
         birthday_raw = request.form.get("birthday", "").strip()
         if birthday_raw:
             try:
@@ -213,8 +215,9 @@ def edit_customer(customer_id):
         elif request.form.get("clear_birthday") == "1":
             try:
                 customer.birthday = None
-            except Exception:
-                pass
+            except Exception as _exc:
+                import logging as _log
+                _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
         try:
             db.session.commit()
             flash("Customer updated.", "success")
@@ -287,8 +290,9 @@ def loyalty_card(customer_id):
         wallet = db.session.execute(
             db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == customer.id)
         ).scalar_one_or_none()
-    except Exception:
-        pass
+    except Exception as _exc:
+        import logging as _log
+        _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
 
     # Get shop settings
     from ...models.shop_settings import ShopSettings

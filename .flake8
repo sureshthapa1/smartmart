@@ -1,10 +1,27 @@
 [flake8]
+max-line-length = 120
+max-complexity = 18
+
+# Ignore stylistic warnings that are intentional or noisy in bulk
+# W503/W504: line break before/after binary operator (conflicting)
+# E203: whitespace before ':' (conflicts with Black)
+# E402: module level import not at top (used in blueprint lazy-imports)
+# W291/W293: trailing whitespace (cosmetic)
+ignore = W503,W504,E203,E402,W291,W293
+
 exclude =
     .git,
+    __pycache__,
     .venv,
     venv,
     env,
-    __pycache__,
-    .pytest_cache,
-    .hypothesis
-max-line-length = 127
+    migrations/,
+    *.egg-info,
+    build/,
+    dist/,
+    node_modules/,
+    smart_mart/static/
+
+per-file-ignores =
+    tests/*:E501,F401,F811
+    smart_mart/config.py:E501

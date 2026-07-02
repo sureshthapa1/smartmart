@@ -110,7 +110,7 @@ def create_sale(items: list[dict], user_id: int,
                         db.select(db.func.sum(Sale.total_amount))
                         .where(Sale.customer_phone == str(customer_phone).strip())
                         .where(Sale.payment_mode == "credit")
-                        .where(Sale.is_credit_settled == False)
+                        .where(Sale.credit_collected == False)
                     ).scalar() or 0
                     # Prospective total for this sale — the authoritative
                     # total_amount isn't computed until later in this

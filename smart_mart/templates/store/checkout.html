@@ -18,6 +18,9 @@
     <div class="col-lg-7 fu">
       <form method="post" action="{{ url_for('store.checkout') }}" id="checkout-form" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# Honeypot — invisible to real users; bots fill it in #}
+        <input type="text" name="website" value="" autocomplete="off"
+               style="display:none !important;position:absolute;left:-9999px;" tabindex="-1" aria-hidden="true">
 
         {# Step 1: Delivery #}
         <div class="ucard" style="margin-bottom:1.25rem;">
