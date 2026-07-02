@@ -208,8 +208,8 @@ def customer_login_required(f):
 @limiter.limit("120/minute")
 def home():
     settings  = _settings()
-    q         = request.args.get("q", "").strip()
-    category  = request.args.get("category", "").strip()
+    q         = request.args.get("q", "").strip()[:100]  # cap at 100 chars — prevents DoS via huge LIKE queries
+    category  = request.args.get("category", "").strip()[:80]
     sort      = request.args.get("sort", "name")
     min_price = request.args.get("min_price", "")
     max_price = request.args.get("max_price", "")
@@ -564,22 +564,26 @@ def cart():
     raw_cart   = _cart()
     items      = []
     subtotal   = 0.0
+    cleaned    = False
 
-    for pid_str, qty in raw_cart.items():
+    for pid_str, qty in list(raw_cart.items()):
         try:
             product = db.session.get(Product, int(pid_str))
         except Exception:
-            continue
+            raw_cart.pop(pid_str, None); cleaned = True; continue
         if not product or not getattr(product, "is_active", True):
-            continue
+            raw_cart.pop(pid_str, None); cleaned = True; continue
         avail      = available_quantity(product)
         line_qty   = min(qty, avail, MAX_QTY_PER_ITEM)
         if line_qty < 1:
-            continue
-        line_total  = float(product.selling_price) * line_qty
+            raw_cart.pop(pid_str, None); cleaned = True; continue
+        line_total  = round(float(product.selling_price) * line_qty, 2)
         subtotal   += line_total
         items.append({"product": product, "qty": line_qty,
                        "line_total": line_total, "avail": avail})
+
+    if cleaned:
+        _save_cart(raw_cart)
 
     delivery    = _calc_delivery(subtotal)
     grand_total = subtotal + delivery
@@ -705,7 +709,9 @@ def checkout():
         if avail < 1:
             continue
         line_qty   = min(qty, avail, MAX_QTY_PER_ITEM)
-        line_total = float(product.selling_price) * line_qty
+        # Round to 2 decimal places immediately to prevent float drift
+        # (e.g. 99.99999999 showing as 100 in the summary)
+        line_total = round(float(product.selling_price) * line_qty, 2)
         subtotal  += line_total
         items.append({"product": product, "qty": line_qty, "line_total": line_total})
 
@@ -1283,12 +1289,16 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
     """
     Verify Khalti payment by calling Khalti's verification API.
     amount_paisa is the expected amount in paisa (NPR * 100).
-    Returns True only if Khalti confirms the payment as Completed.
+
+    Verifies both:
+    1. That Khalti confirms the payment as 'Completed'
+    2. That the returned amount matches what we expected (prevents partial-payment attacks
+       where an attacker pays NPR 1 for a NPR 1000 order and Khalti returns 'Completed'
+       but for a different amount than we charged)
     """
     import os as _os, urllib.request as _req, json as _json
     secret_key = _os.environ.get("KHALTI_SECRET_KEY", "")
     if not secret_key:
-        # No Khalti key configured — log and fail secure
         import logging as _log
         _log.getLogger(__name__).warning(
             "KHALTI_SECRET_KEY not configured — cannot verify Khalti payment"
@@ -1302,7 +1312,28 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         req.add_header("Content-Type", "application/json")
         with _req.urlopen(req, timeout=15) as resp:
             data = _json.loads(resp.read())
-            return data.get("state", {}).get("name") == "Completed"
+
+        # Must be Completed
+        if data.get("state", {}).get("name") != "Completed":
+            return False
+
+        # Amount returned by Khalti MUST match what we sent
+        returned_amount = data.get("amount")
+        if returned_amount is None:
+            import logging as _log2
+            _log2.getLogger(__name__).error(
+                "Khalti response missing 'amount' field — rejecting as precaution"
+            )
+            return False
+        if int(returned_amount) != int(amount_paisa):
+            import logging as _log3
+            _log3.getLogger(__name__).error(
+                "Khalti amount mismatch: expected %s paisa, got %s — possible partial-payment attack",
+                amount_paisa, returned_amount
+            )
+            return False
+
+        return True
     except Exception:
         return False
 
@@ -1671,7 +1702,7 @@ def product_by_slug(slug):
 @limiter.limit("60/minute")
 def search_suggestions_api():
     """JSON endpoint for live search dropdown."""
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:100]
     from ...services.store_ai_service import search_suggestions
     results = search_suggestions(q, limit=6)
     return jsonify({"ok": True, "results": results})
