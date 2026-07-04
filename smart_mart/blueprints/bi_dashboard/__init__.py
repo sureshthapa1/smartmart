@@ -1,0 +1,1 @@
+"""Bi Dashboard blueprint."""
