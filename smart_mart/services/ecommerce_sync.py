@@ -380,10 +380,10 @@ def create_order(payload: dict[str, Any], idempotency_key: str | None = None) ->
         # Re-check availability inside the transaction with a row-level lock
         # (SELECT FOR UPDATE) to prevent two concurrent checkouts from both
         # reading "1 in stock" and both succeeding — resulting in -1 stock.
-        # This lock is held until db.session.commit() at the end of the with block.
+        from ..models.product import Product as _ProductModel
         locked_product = db.session.execute(
-            db.select(type(product))
-            .where(type(product).id == product.id)
+            db.select(_ProductModel)
+            .where(_ProductModel.id == product.id)
             .with_for_update()
         ).scalar_one_or_none()
 

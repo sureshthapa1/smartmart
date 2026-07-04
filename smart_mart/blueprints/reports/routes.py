@@ -44,16 +44,22 @@ def _get_risk_map() -> dict:
     except Exception:
         return {}
 def _get_date_range():
+    from datetime import datetime, timezone
     start_raw = request.args.get("start_date", "")
     end_raw = request.args.get("end_date", "")
+    today = date.today()
     try:
-        start = date.fromisoformat(start_raw) if start_raw else date.today() - timedelta(days=30)
+        d = date.fromisoformat(start_raw) if start_raw else today - timedelta(days=30)
     except ValueError:
-        start = date.today() - timedelta(days=30)
+        d = today - timedelta(days=30)
+    start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
     try:
-        end = date.fromisoformat(end_raw) if end_raw else date.today()
+        d2 = date.fromisoformat(end_raw) if end_raw else today
     except ValueError:
-        end = date.today()
+        d2 = today
+    end = datetime(d2.year, d2.month, d2.day, 23, 59, 59, tzinfo=timezone.utc)
+
     return start, end, start_raw, end_raw
 
 
@@ -78,7 +84,7 @@ def cash_flow():
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
             func.count(Sale.id).label("txn_count"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Sale.payment_mode)
         .order_by(func.sum(Sale.total_amount).desc())
     ).all()
@@ -106,7 +112,7 @@ def cash_flow():
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
@@ -327,14 +333,17 @@ def staff_efficiency():
 def export_sales_csv():
     from ...extensions import db
     from ...models.sale import Sale, SaleItem
-    from sqlalchemy import and_, func
+    from sqlalchemy import and_
+    from sqlalchemy.orm import joinedload
     import csv, io
     start, end, _, _ = _get_date_range()
     sales = db.session.execute(
         db.select(Sale)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .options(joinedload(Sale.items))  # eager-load items — prevents N+1 (1 query, not 1 per sale)
+        .where(Sale.sale_date >= start)
+        .where(Sale.sale_date <= end)
         .order_by(Sale.sale_date.desc())
-    ).scalars().all()
+    ).unique().scalars().all()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Date", "Invoice No", "Customer", "Payment Mode", "Items", "Subtotal", "Discount", "Total"])
@@ -435,7 +444,10 @@ def credit_udharo():
     today = date.today()
     status_filter = request.args.get("status", "all")  # all | pending | overdue | collected
 
-    q = db.select(Sale).where(Sale.payment_mode == "credit").order_by(Sale.sale_date.desc())
+    q = (db.select(Sale)
+         .where(Sale.payment_mode == "credit")
+         .order_by(Sale.sale_date.desc())
+         .limit(500))  # cap at 500 — prevents memory spike on large shops
     all_credit = db.session.execute(q).scalars().all()
 
     # Annotate each sale
@@ -678,7 +690,7 @@ def profit_margin():
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id, Product.name, Product.category, Product.sku)
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
@@ -707,7 +719,7 @@ def profit_margin():
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
@@ -761,7 +773,7 @@ def customer_spend():
             func.avg(Sale.total_amount).label("avg_order"),
         )
         .join(Sale, Sale.customer_id == Customer.id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Customer.id, Customer.name, Customer.phone,
                   Customer.visit_count, Customer.last_visit)
         .order_by(func.sum(Sale.total_amount).desc())
@@ -814,7 +826,7 @@ def vat_report():
             func.sum(Sale.discount_amount).label("total_discount"),
         )
         .where(
-            and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+            and_(Sale.sale_date >= start, Sale.sale_date <= end)
         )
     ).one()
 
@@ -826,7 +838,7 @@ def vat_report():
             func.sum(Sale.total_amount).label("revenue"),
             func.sum(Sale.tax_amount).label("vat"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()

@@ -7,7 +7,7 @@ with dynamic data insertion and conditional logic.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func
 
@@ -15,6 +15,11 @@ from ..extensions import db
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
 from ..models.expense import Expense
+
+
+def _dt(d: date) -> datetime:
+    """Convert date to UTC-aware datetime at midnight for index-friendly comparisons."""
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
 
 
 def _pct_change(current: float, previous: float) -> float:
@@ -49,28 +54,28 @@ def generate_daily_report() -> dict:
     # Today's data
     today_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
     ).scalar() or 0
     today_count = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
     ).scalar() or 0
     week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= _dt(week_start))
     ).scalar() or 0
 
     # Yesterday's data
     yesterday_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) == yesterday)
+        .where(Sale.sale_date.between(_dt(yesterday), _dt(yesterday).replace(hour=23, minute=59, second=59)))
     ).scalar() or 0
 
     # This week's data (Mon..today)
     week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
-        .where(func.date(Sale.sale_date) <= today)
+        .where(Sale.sale_date >= _dt(week_start))
+        .where(Sale.sale_date <= _dt(today).replace(hour=23, minute=59, second=59))
     ).scalar() or 0
 
     # Top product today
@@ -78,7 +83,7 @@ def generate_daily_report() -> dict:
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(1)
@@ -100,7 +105,7 @@ def generate_daily_report() -> dict:
         db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
         .group_by(Product.id)
     ).all()
     today_cogs = sum(float(r.cost_price) * r.qty for r in cogs_rows)
@@ -182,17 +187,17 @@ def generate_weekly_report() -> dict:
 
     this_week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= _dt(week_start))
     ).scalar() or 0
     this_week_count = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= _dt(week_start))
     ).scalar() or 0
 
     last_week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= last_week_start)
-        .where(func.date(Sale.sale_date) <= last_week_end)
+        .where(Sale.sale_date >= _dt(last_week_start))
+        .where(Sale.sale_date <= _dt(last_week_end).replace(hour=23, minute=59, second=59))
     ).scalar() or 0
 
     # Top 3 products this week
@@ -200,7 +205,7 @@ def generate_weekly_report() -> dict:
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= _dt(week_start))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(3)
@@ -254,12 +259,12 @@ def generate_monthly_report() -> dict:
 
     this_month_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= _dt(month_start))
     ).scalar() or 0
     last_month_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= last_month_start)
-        .where(func.date(Sale.sale_date) <= last_month_end)
+        .where(Sale.sale_date >= _dt(last_month_start))
+        .where(Sale.sale_date <= _dt(last_month_end).replace(hour=23, minute=59, second=59))
     ).scalar() or 0
 
     # Expenses this month
@@ -273,7 +278,7 @@ def generate_monthly_report() -> dict:
         db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= _dt(month_start))
         .group_by(Product.id)
     ).all()
     cogs = sum(float(r.cost_price) * r.qty for r in cogs_rows)
