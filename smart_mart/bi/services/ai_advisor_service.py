@@ -48,7 +48,7 @@ class AIAdvisorService:
                 func.coalesce(func.sum(SaleItem.quantity), 0).label("recent_qty"),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= movement_cutoff)
+            .where(Sale.sale_date >= movement_cutoff)
             .group_by(SaleItem.product_id)
         ).all()
         recent_qty_map = {r.product_id: int(r.recent_qty) for r in recent_rows}

@@ -293,9 +293,9 @@ def analytics():
     def _revenue(start=None, end=None, status=None):
         stmt = db.select(func.coalesce(func.sum(OnlineOrder.total_amount + OnlineOrder.delivery_charge - OnlineOrder.discount_amount), 0))
         if start:
-            stmt = stmt.where(func.date(OnlineOrder.created_at) >= start)
+            stmt = stmt.where(OnlineOrder.created_at >= start)
         if end:
-            stmt = stmt.where(func.date(OnlineOrder.created_at) <= end)
+            stmt = stmt.where(OnlineOrder.created_at <= end)
         if status:
             stmt = stmt.where(OnlineOrder.status == status)
         return float(db.session.execute(stmt).scalar() or 0)
@@ -303,7 +303,7 @@ def analytics():
     def _count(start=None, status=None):
         stmt = db.select(func.count(OnlineOrder.id))
         if start:
-            stmt = stmt.where(func.date(OnlineOrder.created_at) >= start)
+            stmt = stmt.where(OnlineOrder.created_at >= start)
         if status:
             stmt = stmt.where(OnlineOrder.status == status)
         return db.session.execute(stmt).scalar() or 0
@@ -347,7 +347,7 @@ def analytics():
         db.select(func.date(OnlineOrder.created_at).label("day"),
                   func.count(OnlineOrder.id).label("count"),
                   func.sum(OnlineOrder.total_amount).label("revenue"))
-        .where(func.date(OnlineOrder.created_at) >= today - timedelta(days=29))
+        .where(OnlineOrder.created_at >= today - timedelta(days=29))
         .group_by(func.date(OnlineOrder.created_at))
         .order_by(func.date(OnlineOrder.created_at))
     ).all()

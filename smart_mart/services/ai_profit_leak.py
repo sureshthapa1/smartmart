@@ -74,7 +74,7 @@ def discount_loss_analysis(days: int = 30) -> dict:
     start = date.today() - timedelta(days=days)
     sales = db.session.execute(
         db.select(Sale)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .where(Sale.discount_amount > 0)
     ).scalars().all()
 
@@ -176,7 +176,7 @@ def detect_fraud_signals(days: int = 30) -> dict:
             func.coalesce(func.sum(Sale.discount_amount), 0).label("discount_total"),
         )
         .join(User, User.id == Sale.user_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(Sale.user_id, User.username)
     ).all()
 
@@ -208,7 +208,7 @@ def detect_fraud_signals(days: int = 30) -> dict:
             func.coalesce(func.sum(SaleReturn.refund_amount), 0).label("refund_total"),
         )
         .join(User, User.id == SaleReturn.processed_by)
-        .where(func.date(SaleReturn.created_at) >= start)
+        .where(SaleReturn.created_at >= start)
         .group_by(SaleReturn.processed_by, User.username)
     ).all()
     suspicious_returns = []
@@ -234,7 +234,7 @@ def detect_fraud_signals(days: int = 30) -> dict:
             func.coalesce(func.sum(func.abs(StockMovement.change_amount)), 0).label("adjustment_qty"),
         )
         .join(User, User.id == StockMovement.created_by)
-        .where(func.date(StockMovement.timestamp) >= start)
+        .where(StockMovement.timestamp >= start)
         .where(StockMovement.change_type == "adjustment_out")
         .group_by(StockMovement.created_by, User.username)
     ).all()

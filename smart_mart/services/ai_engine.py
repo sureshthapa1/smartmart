@@ -30,7 +30,7 @@ def _daily_sales_series(product_id: int, days: int = 90) -> list[float]:
         )
         .join(SaleItem, SaleItem.sale_id == Sale.id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -74,7 +74,7 @@ def _total_sold(product_id: int, days: int) -> float:
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
     ).scalar() or 0
     return float(result)
 
@@ -202,12 +202,12 @@ def generate_insights() -> list[dict]:
     # ── Sales trend ───────────────────────────────────────────────────────
     this_week = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= week_start)
     ).scalar() or 0
     last_week = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= last_week_start)
-        .where(func.date(Sale.sale_date) < week_start)
+        .where(Sale.sale_date >= last_week_start)
+        .where(Sale.sale_date < week_start)
     ).scalar() or 0
 
     if float(last_week) > 0:
@@ -232,7 +232,7 @@ def generate_insights() -> list[dict]:
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(1)
@@ -273,7 +273,7 @@ def generate_insights() -> list[dict]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
     ).scalars().all()
     dead_count = db.session.execute(
         db.select(func.count(Product.id))
@@ -291,7 +291,7 @@ def generate_insights() -> list[dict]:
     # ── Best sales day ────────────────────────────────────────────────────
     best_day = db.session.execute(
         db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("total"))
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.sum(Sale.total_amount).desc())
         .limit(1)
@@ -317,7 +317,7 @@ def detect_dead_stock(days: int = 30) -> list[dict]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
     ).scalars().all()
 
     products = db.session.execute(
@@ -362,7 +362,7 @@ def forecast_sales(days_ahead: int = 7) -> list[dict]:
             func.date(Sale.sale_date).label("day"),
             func.sum(Sale.total_amount).label("total"),
         )
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -434,16 +434,16 @@ def chatbot_query(message: str) -> str:
 
     def _rev(start, end=None):
         stmt = db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        stmt = stmt.where(func.date(Sale.sale_date) >= start)
+        stmt = stmt.where(Sale.sale_date >= start)
         if end:
-            stmt = stmt.where(func.date(Sale.sale_date) <= end)
+            stmt = stmt.where(Sale.sale_date <= end)
         return float(db.session.execute(stmt).scalar() or 0)
 
     def _cnt(start, end=None):
         stmt = db.select(func.count(Sale.id))
-        stmt = stmt.where(func.date(Sale.sale_date) >= start)
+        stmt = stmt.where(Sale.sale_date >= start)
         if end:
-            stmt = stmt.where(func.date(Sale.sale_date) <= end)
+            stmt = stmt.where(Sale.sale_date <= end)
         return int(db.session.execute(stmt).scalar() or 0)
 
     def _has(*words):
@@ -533,7 +533,7 @@ def chatbot_query(message: str) -> str:
                 db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
                 .join(SaleItem, SaleItem.product_id == Product.id)
                 .join(Sale, Sale.id == SaleItem.sale_id)
-                .where(func.date(Sale.sale_date) == today)
+                .where(Sale.sale_date.between(today, today))
             ).scalar() or 0
             profit_today = total - float(cogs)
         except Exception:
@@ -588,7 +588,7 @@ def chatbot_query(message: str) -> str:
                       func.sum(SaleItem.subtotal).label("rev"))
             .join(SaleItem, SaleItem.product_id == Product.id)
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= month_start)
+            .where(Sale.sale_date >= month_start)
             .group_by(Product.id)
             .order_by(func.sum(SaleItem.quantity).desc())
             .limit(5)
@@ -604,7 +604,7 @@ def chatbot_query(message: str) -> str:
             db.select(Product, func.sum(SaleItem.quantity).label("qty"))
             .join(SaleItem, SaleItem.product_id == Product.id)
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= month_start)
+            .where(Sale.sale_date >= month_start)
             .group_by(Product.id)
             .order_by(func.sum(SaleItem.quantity).asc())
             .limit(5)
@@ -730,11 +730,11 @@ def chatbot_query(message: str) -> str:
         from ..models.purchase import Purchase
         count = db.session.execute(
             db.select(func.count(Purchase.id))
-            .where(func.date(Purchase.purchase_date) >= month_start)
+            .where(Purchase.purchase_date >= month_start)
         ).scalar() or 0
         total = db.session.execute(
             db.select(func.coalesce(func.sum(Purchase.total_cost), 0))
-            .where(func.date(Purchase.purchase_date) >= month_start)
+            .where(Purchase.purchase_date >= month_start)
         ).scalar() or 0
         return f"🛒 **This Month's Purchases**\nOrders: {count}\nTotal cost: NPR {float(total):,.2f}"
 

@@ -18,7 +18,7 @@ def sales_report(start: date, end: date, granularity: str = "daily") -> list[dic
     """Return sales totals grouped by date within [start, end]."""
     rows = db.session.execute(
         db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("total"))
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -31,7 +31,7 @@ def top_products(start: date, end: date, n: int = 10) -> list[dict]:
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(n)
@@ -45,7 +45,7 @@ def least_products(start: date, end: date, n: int = 10) -> list[dict]:
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).asc())
         .limit(n)
@@ -59,7 +59,7 @@ def dead_stock(days: int = 90) -> list[Product]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
     ).scalars().all()
     stmt = db.select(Product)
     if sold_ids:
@@ -81,7 +81,7 @@ def profit_per_product(start: date, end: date) -> list[dict]:
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
     ).all()
     result = []
@@ -112,7 +112,7 @@ def category_performance(start: date, end: date) -> list[dict]:
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
@@ -141,14 +141,14 @@ def opening_closing_stock(start: date, end: date) -> list[dict]:
         # Opening = current qty minus all movements after start
         after_start = db.session.execute(
             db.select(func.coalesce(func.sum(StockMovement.change_amount), 0))
-            .where(and_(StockMovement.product_id == p.id, func.date(StockMovement.timestamp) > end))
+            .where(and_(StockMovement.product_id == p.id, StockMovement.timestamp > end))
         ).scalar() or 0
         closing = p.quantity - after_start
         before_start = db.session.execute(
             db.select(func.coalesce(func.sum(StockMovement.change_amount), 0))
             .where(and_(StockMovement.product_id == p.id,
-                        func.date(StockMovement.timestamp) >= start,
-                        func.date(StockMovement.timestamp) <= end))
+                        StockMovement.timestamp >= start,
+                        StockMovement.timestamp <= end))
         ).scalar() or 0
         opening = closing - before_start
         result.append({"product": p, "opening": opening, "closing": closing})
@@ -165,18 +165,18 @@ def sales_summary(start: date, end: date) -> dict:
     from ..models.user import User
     total_revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
     ).scalar() or 0
 
     total_transactions = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
     ).scalar() or 0
 
     total_items_sold = db.session.execute(
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, SaleItem.sale_id == Sale.id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
     ).scalar() or 0
 
     avg_transaction = float(total_revenue) / total_transactions if total_transactions else 0
@@ -184,7 +184,7 @@ def sales_summary(start: date, end: date) -> dict:
     # Best single day
     best_day_row = db.session.execute(
         db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("total"))
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(func.date(Sale.sale_date))
         .order_by(func.sum(Sale.total_amount).desc())
         .limit(1)
@@ -209,7 +209,7 @@ def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]
                 func.sum(Sale.total_amount).label("total"),
                 func.count(Sale.id).label("transactions"),
             )
-            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
             .group_by(date_format_year_week(Sale.sale_date))
             .order_by(date_format_year_week(Sale.sale_date))
         ).all()
@@ -220,7 +220,7 @@ def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]
                 func.sum(Sale.total_amount).label("total"),
                 func.count(Sale.id).label("transactions"),
             )
-            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
             .group_by(date_format_year_month(Sale.sale_date))
             .order_by(date_format_year_month(Sale.sale_date))
         ).all()
@@ -231,7 +231,7 @@ def sales_by_period(start: date, end: date, period: str = "daily") -> list[dict]
                 func.sum(Sale.total_amount).label("total"),
                 func.count(Sale.id).label("transactions"),
             )
-            .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+            .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
@@ -252,7 +252,7 @@ def product_wise_sales(start: date, end: date) -> list[dict]:
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.subtotal).desc())
     ).all()
@@ -286,7 +286,7 @@ def staff_sales_report(start: date, end: date) -> list[dict]:
         )
         .join(Sale, Sale.user_id == User.id)
         .join(SaleItem, SaleItem.sale_id == Sale.id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(User.id)
         .order_by(func.sum(Sale.total_amount).desc())
     ).all()
@@ -308,7 +308,7 @@ def hourly_sales(start: date, end: date) -> list[dict]:
             func.sum(Sale.total_amount).label("total"),
             func.count(Sale.id).label("transactions"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(date_format_hour(Sale.sale_date))
         .order_by(date_format_hour(Sale.sale_date))
     ).all()
@@ -330,8 +330,8 @@ def staff_efficiency_report(start: date, end: date) -> list[dict]:
             db.select(Sale)
             .where(and_(
                 Sale.user_id == user.id,
-                func.date(Sale.sale_date) >= start,
-                func.date(Sale.sale_date) <= end,
+                Sale.sale_date >= start,
+                Sale.sale_date <= end,
             ))
         ).scalars().all()
 
@@ -429,7 +429,7 @@ def discount_analysis(start: date, end: date) -> dict:
                 sa_case((Sale.discount_amount > 0, Sale.id), else_=None)
             ).label("discounted_sales"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
     ).one()
 
     gross = float(summary.total_revenue) + float(summary.total_discount)
@@ -445,7 +445,7 @@ def discount_analysis(start: date, end: date) -> dict:
             func.count(sa_case((Sale.discount_amount > 0, Sale.id), else_=None)).label("disc_sales"),
         )
         .join(User, User.id == Sale.user_id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(User.id, User.username)
         .order_by(func.sum(Sale.discount_amount).desc())
     ).all()
@@ -472,8 +472,8 @@ def discount_analysis(start: date, end: date) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
         )
         .where(and_(
-            func.date(Sale.sale_date) >= start,
-            func.date(Sale.sale_date) <= end,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
             Sale.discount_amount > 0,
             Sale.customer_name.isnot(None),
         ))
@@ -496,8 +496,8 @@ def discount_analysis(start: date, end: date) -> dict:
             func.coalesce(func.sum(Sale.discount_amount), 0).label("total"),
         )
         .where(and_(
-            func.date(Sale.sale_date) >= start,
-            func.date(Sale.sale_date) <= end,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
             Sale.discount_amount > 0,
         ))
         .group_by(Sale.discount_note)
@@ -519,7 +519,7 @@ def discount_analysis(start: date, end: date) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
             func.count(Sale.id).label("sales"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -538,7 +538,7 @@ def discount_analysis(start: date, end: date) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
             func.coalesce(func.sum(Sale.discount_amount), 0).label("discount"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Sale.payment_mode)
         .order_by(func.sum(Sale.total_amount).desc())
     ).all()
@@ -581,8 +581,8 @@ def customer_analysis(start: date, end: date) -> dict:
             func.max(Sale.sale_date).label("last_purchase"),
         )
         .where(and_(
-            func.date(Sale.sale_date) >= start,
-            func.date(Sale.sale_date) <= end,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
             Sale.customer_name.isnot(None),
         ))
         .group_by(Sale.customer_name)
@@ -623,7 +623,7 @@ def customer_analysis(start: date, end: date) -> dict:
             func.count(Sale.id).label("count"),
             func.coalesce(func.sum(Sale.total_amount), 0).label("revenue"),
         )
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Sale.payment_mode)
         .order_by(func.count(Sale.id).desc())
     ).all()
@@ -632,8 +632,8 @@ def customer_analysis(start: date, end: date) -> dict:
     all_customers_period = db.session.execute(
         db.select(Sale.customer_name.distinct())
         .where(and_(
-            func.date(Sale.sale_date) >= start,
-            func.date(Sale.sale_date) <= end,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
             Sale.customer_name.isnot(None),
         ))
     ).scalars().all()
@@ -642,8 +642,8 @@ def customer_analysis(start: date, end: date) -> dict:
     walkin_count = db.session.execute(
         db.select(func.count(Sale.id))
         .where(and_(
-            func.date(Sale.sale_date) >= start,
-            func.date(Sale.sale_date) <= end,
+            Sale.sale_date >= start,
+            Sale.sale_date <= end,
             db.or_(Sale.customer_name.is_(None), func.lower(Sale.customer_name) == "walk-in customer"),
         ))
     ).scalar() or 0

@@ -114,7 +114,7 @@ class AnalyticsService:
                 func.coalesce(func.sum(SaleItem.quantity), 0).label("qty"),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= fast_cutoff)
+            .where(Sale.sale_date >= fast_cutoff)
             .group_by(SaleItem.product_id)
         ).all()
         fast_map = {r.product_id: int(r.qty) for r in fast_rows}
@@ -125,7 +125,7 @@ class AnalyticsService:
                 func.coalesce(func.sum(SaleItem.quantity), 0).label("qty"),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= slow_cutoff)
+            .where(Sale.sale_date >= slow_cutoff)
             .group_by(SaleItem.product_id)
         ).all()
         slow_map = {r.product_id: int(r.qty) for r in slow_rows}
@@ -223,9 +223,9 @@ class AnalyticsService:
             .join(Product, Product.id == SaleItem.product_id)
         )
         if start:
-            item_stmt = item_stmt.where(func.date(Sale.sale_date) >= start)
+            item_stmt = item_stmt.where(Sale.sale_date >= start)
         if end:
-            item_stmt = item_stmt.where(func.date(Sale.sale_date) <= end)
+            item_stmt = item_stmt.where(Sale.sale_date <= end)
         item_stmt = item_stmt.group_by(
             SaleItem.product_id, Product.name, Product.sku,
             Product.cost_price, Product.selling_price,
@@ -345,9 +345,9 @@ class AnalyticsService:
             .join(Product, Product.id == SaleItem.product_id)
         )
         if start:
-            cogs_stmt = cogs_stmt.where(func.date(Sale.sale_date) >= start)
+            cogs_stmt = cogs_stmt.where(Sale.sale_date >= start)
         if end:
-            cogs_stmt = cogs_stmt.where(func.date(Sale.sale_date) <= end)
+            cogs_stmt = cogs_stmt.where(Sale.sale_date <= end)
         cogs_stmt = cogs_stmt.group_by(
             SaleItem.product_id, Product.name, Product.sku, Product.category
         )
@@ -456,7 +456,7 @@ class AnalyticsService:
                 func.date(Sale.sale_date).label("day"),
                 func.coalesce(func.sum(Sale.total_amount), 0).label("sales"),
             )
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
@@ -467,7 +467,7 @@ class AnalyticsService:
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()

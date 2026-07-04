@@ -38,12 +38,12 @@ def list_returns():
         )
     if start_raw:
         try:
-            stmt = stmt.where(func.date(SaleReturn.created_at) >= date.fromisoformat(start_raw))
+            stmt = stmt.where(SaleReturn.created_at >= date.fromisoformat(start_raw))
         except ValueError:
             pass
     if end_raw:
         try:
-            stmt = stmt.where(func.date(SaleReturn.created_at) <= date.fromisoformat(end_raw))
+            stmt = stmt.where(SaleReturn.created_at <= date.fromisoformat(end_raw))
         except ValueError:
             pass
 

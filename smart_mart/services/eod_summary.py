@@ -20,7 +20,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
             func.coalesce(func.sum(Sale.discount_amount), 0).label("discounts"),
         )
-        .where(func.date(Sale.sale_date) == d)
+        .where(Sale.sale_date.between(d, d))
         .group_by(Sale.payment_mode)
     ).all()
 
@@ -44,7 +44,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
         db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) == d)
+        .where(Sale.sale_date.between(d, d))
     ).scalar() or 0
 
     # Expenses
@@ -69,7 +69,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
                   func.sum(SaleItem.subtotal).label("rev"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) == d)
+        .where(Sale.sale_date.between(d, d))
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.subtotal).desc())
         .limit(5)
@@ -78,7 +78,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
     # Cash session for the day
     sessions = db.session.execute(
         db.select(CashSession)
-        .where(func.date(CashSession.opened_at) == d)
+        .where(CashSession.opened_at.between(d, d))
         .order_by(CashSession.opened_at)
     ).scalars().all()
 

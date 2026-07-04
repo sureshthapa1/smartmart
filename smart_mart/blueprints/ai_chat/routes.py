@@ -353,15 +353,15 @@ def build_business_context() -> str:
 
     today_row = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0), func.count(Sale.id))
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(today, today))
     ).one()
     week_revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= week_start)
+        .where(Sale.sale_date >= week_start)
     ).scalar() or 0
     month_revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
     ).scalar() or 0
     month_expenses = db.session.execute(
         db.select(func.coalesce(func.sum(Expense.amount), 0))
@@ -375,7 +375,7 @@ def build_business_context() -> str:
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Product.name)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(5)
@@ -391,7 +391,7 @@ def build_business_context() -> str:
         db.select(Sale.customer_name, func.count(Sale.id).label("visits"),
                   func.sum(Sale.total_amount).label("spent"))
         .where(Sale.customer_name.isnot(None))
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Sale.customer_name)
         .order_by(func.count(Sale.id).desc())
         .limit(5)

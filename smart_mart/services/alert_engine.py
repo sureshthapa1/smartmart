@@ -59,7 +59,7 @@ def get_high_demand_alerts(threshold: int | None = None) -> list[dict]:
         db.select(Product, func.sum(SaleItem.quantity).label("total_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
         .group_by(Product.id)
         .having(func.sum(SaleItem.quantity) > threshold)
         .order_by(func.sum(SaleItem.quantity).desc())

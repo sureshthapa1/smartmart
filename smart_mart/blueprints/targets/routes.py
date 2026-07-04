@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -108,6 +108,6 @@ def _achieved(user_id, start, end):
     return float(db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
         .where(Sale.user_id == user_id)
-        .where(func.date(Sale.sale_date) >= start)
-        .where(func.date(Sale.sale_date) <= end)
+        .where(Sale.sale_date >= start)
+        .where(Sale.sale_date <= end)
     ).scalar() or 0)

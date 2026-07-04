@@ -25,7 +25,7 @@ def _money(v) -> float:
 def _period_revenue(start: date, end: date) -> float:
     r = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+        .where(Sale.sale_date >= start, Sale.sale_date <= end)
     ).scalar()
     return _money(r)
 
@@ -35,7 +35,7 @@ def _period_cogs(start: date, end: date) -> float:
         db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+        .where(Sale.sale_date >= start, Sale.sale_date <= end)
     ).scalar()
     return _money(r)
 
@@ -51,7 +51,7 @@ def _period_expenses(start: date, end: date) -> float:
 def _period_transactions(start: date, end: date) -> int:
     r = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+        .where(Sale.sale_date >= start, Sale.sale_date <= end)
     ).scalar()
     return int(r or 0)
 
@@ -112,7 +112,7 @@ def executive_summary() -> dict:
     total_customers = db.session.execute(db.select(func.count(Customer.id))).scalar() or 0
     new_customers_month = db.session.execute(
         db.select(func.count(Customer.id))
-        .where(func.date(Customer.created_at) >= month_start)
+        .where(Customer.created_at >= month_start)
     ).scalar() or 0
 
     return {
@@ -216,7 +216,7 @@ def strategic_recommendations() -> list[dict]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff_30)
+        .where(Sale.sale_date >= cutoff_30)
     ).scalars().all()
     dead_products = db.session.execute(
         db.select(Product)
@@ -275,7 +275,7 @@ def strategic_recommendations() -> list[dict]:
     # 7. Credit exposure
     credit_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(Sale.payment_mode == "credit", func.date(Sale.sale_date) >= month_start)
+        .where(Sale.payment_mode == "credit", Sale.sale_date >= month_start)
     ).scalar() or 0
     if rev_m > 0 and _money(credit_sales) / rev_m > 0.3:
         # Show top credit customers
@@ -315,7 +315,7 @@ def growth_opportunities() -> list[dict]:
         db.select(Product.category, func.sum(SaleItem.subtotal).label("rev"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Product.category)
         .order_by(func.sum(SaleItem.subtotal).desc())
         .limit(1)
@@ -348,7 +348,7 @@ def growth_opportunities() -> list[dict]:
             date_format_hour(Sale.sale_date).label("hour"),
             func.count(Sale.id).label("cnt")
         )
-        .where(func.date(Sale.sale_date) >= today - timedelta(days=30))
+        .where(Sale.sale_date >= today - timedelta(days=30))
         .group_by(date_format_hour(Sale.sale_date))
         .order_by(func.count(Sale.id))
         .limit(3)
@@ -383,7 +383,7 @@ def revenue_forecast_30d() -> dict:
     start = today - timedelta(days=89)
     rows = db.session.execute(
         db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("rev"))
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -509,7 +509,7 @@ def product_action_recommendations() -> list[dict]:
             func.sum(SaleItem.subtotal).label("revenue_30d"),
         )
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= days_30)
+        .where(Sale.sale_date >= days_30)
         .group_by(SaleItem.product_id)
     ).all()
     velocity = {r.product_id: {"qty": int(r.qty_sold_30d), "rev": float(r.revenue_30d)} for r in velocity_rows}
@@ -518,7 +518,7 @@ def product_action_recommendations() -> list[dict]:
     sold_90d = set(db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= days_90)
+        .where(Sale.sale_date >= days_90)
     ).scalars().all())
 
     # All active products
@@ -531,7 +531,7 @@ def product_action_recommendations() -> list[dict]:
     total_daily_avg = db.session.execute(
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= days_30)
+        .where(Sale.sale_date >= days_30)
     ).scalar() or 0
     avg_daily_units = float(total_daily_avg) / 30 if total_daily_avg else 1
 

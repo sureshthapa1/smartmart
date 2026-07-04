@@ -30,7 +30,7 @@ def detect_price_anomalies(days: int = 30) -> list[dict]:
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(Product.id)
         .having(func.count(SaleItem.id) >= 2)
     ).all()
@@ -68,7 +68,7 @@ def detect_sales_spikes(days: int = 30) -> list[dict]:
             func.sum(Sale.total_amount).label("total"),
             func.count(Sale.id).label("count"),
         )
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -104,7 +104,7 @@ def detect_suspicious_discounts(days: int = 30) -> list[dict]:
     start = date.today() - timedelta(days=days)
     sales_with_discount = db.session.execute(
         db.select(Sale)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .where(Sale.discount_amount > 0)
     ).scalars().all()
 

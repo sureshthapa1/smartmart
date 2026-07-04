@@ -171,7 +171,7 @@ def run_reorder_bot(user_id: int = 1) -> dict:
                 db.select(PurchaseOrder).where(
                     PurchaseOrder.supplier_id == grp["supplier_id"],
                     PurchaseOrder.status == "draft",
-                    db.func.date(PurchaseOrder.created_at) == date.today(),
+                    db.PurchaseOrder.created_at.between(date, date).today(),
                 )
             ).scalars().first()
             if existing_po:

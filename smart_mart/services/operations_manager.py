@@ -376,7 +376,7 @@ def get_reorder_suggestions(days: int = 30) -> list[dict]:
     for product_id, qty in db.session.execute(
         db.select(SaleItem.product_id, func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff)
+        .where(Sale.sale_date >= cutoff)
         .group_by(SaleItem.product_id)
     ).all():
         sales_by_product[product_id] = int(qty or 0)
@@ -762,7 +762,7 @@ def get_loyalty_analytics() -> dict:
             func.sum(sa_case((LoyaltyWalletTransaction.points_change > 0, LoyaltyWalletTransaction.points_change), else_=0)).label("earned"),
             func.sum(sa_case((LoyaltyWalletTransaction.points_change < 0, -LoyaltyWalletTransaction.points_change), else_=0)).label("redeemed"),
         )
-        .where(func.date(LoyaltyWalletTransaction.created_at) >= last_30)
+        .where(LoyaltyWalletTransaction.created_at >= last_30)
         .group_by(func.date(LoyaltyWalletTransaction.created_at))
         .order_by(func.date(LoyaltyWalletTransaction.created_at))
     ).all()
@@ -795,19 +795,19 @@ def get_loyalty_analytics() -> dict:
     month_earned = db.session.execute(
         db.select(func.coalesce(func.sum(LoyaltyWalletTransaction.points_change), 0))
         .where(LoyaltyWalletTransaction.points_change > 0)
-        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+        .where(LoyaltyWalletTransaction.created_at >= month_start)
     ).scalar() or 0
 
     month_redeemed = db.session.execute(
         db.select(func.coalesce(func.sum(-LoyaltyWalletTransaction.points_change), 0))
         .where(LoyaltyWalletTransaction.points_change < 0)
-        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+        .where(LoyaltyWalletTransaction.created_at >= month_start)
     ).scalar() or 0
 
     month_discount = db.session.execute(
         db.select(func.coalesce(func.sum(LoyaltyWalletTransaction.rupee_value), 0))
         .where(LoyaltyWalletTransaction.points_change < 0)
-        .where(func.date(LoyaltyWalletTransaction.created_at) >= month_start)
+        .where(LoyaltyWalletTransaction.created_at >= month_start)
     ).scalar() or 0
 
     return {
