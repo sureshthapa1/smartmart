@@ -26,14 +26,14 @@ def _get_baseline(days: int = 30) -> dict:
 
     revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
 
     cogs_rows = db.session.execute(
         db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(Product.id)
     ).all()
     cogs = sum(float(r.cost_price) * r.qty for r in cogs_rows)
@@ -45,7 +45,7 @@ def _get_baseline(days: int = 30) -> dict:
 
     transactions = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
 
     return {
@@ -110,7 +110,7 @@ def simulate_price_change(product_id: int, new_price: float, days: int = 30) -> 
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
 
     old_price = float(product.selling_price)
@@ -187,12 +187,12 @@ def simulate_stock_out(product_id: int, days: int = 30) -> dict:
         db.select(func.coalesce(func.sum(SaleItem.subtotal), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
 
     total_revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 1
 
     pct_of_revenue = (float(revenue_from_product) / float(total_revenue)) * 100
@@ -229,7 +229,7 @@ def simulate_product_scenario(
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
 
     current_price = float(product.selling_price)

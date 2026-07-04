@@ -36,9 +36,9 @@ class ReportService:
         )
 
         if start:
-            item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) >= start)
+            item_stmt = item_stmt.where(sale_stmt.c.sale_date >= start)
         if end:
-            item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) <= end)
+            item_stmt = item_stmt.where(sale_stmt.c.sale_date <= end)
 
         item_stmt = item_stmt.group_by(
             SaleItem.product_id, Product.name, Product.sku,
@@ -162,9 +162,9 @@ class ReportService:
             func.coalesce(func.sum(SaleItem.subtotal), 0)
         ).join(Sale, Sale.id == SaleItem.sale_id)
         if start:
-            total_revenue_stmt = total_revenue_stmt.where(func.date(Sale.sale_date) >= start)
+            total_revenue_stmt = total_revenue_stmt.where(Sale.sale_date >= start)
         if end:
-            total_revenue_stmt = total_revenue_stmt.where(func.date(Sale.sale_date) <= end)
+            total_revenue_stmt = total_revenue_stmt.where(Sale.sale_date <= end)
         total_revenue = as_decimal(db.session.execute(total_revenue_stmt).scalar() or 0)
 
         opex_stmt = db.select(func.coalesce(func.sum(OperatingExpense.amount), 0))
@@ -220,7 +220,7 @@ class ReportService:
                 func.date(Sale.sale_date).label("day"),
                 func.coalesce(func.sum(Sale.total_amount), 0).label("sales"),
             )
-            .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+            .where(Sale.sale_date >= start, Sale.sale_date <= end)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
@@ -243,7 +243,7 @@ class ReportService:
             )
             .join(Product, Product.id == SaleItem.product_id)
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+            .where(Sale.sale_date >= start, Sale.sale_date <= end)
             .group_by(Product.id, Product.name)
             .order_by(func.coalesce(func.sum(SaleItem.subtotal), 0).desc())
             .limit(10)
@@ -257,7 +257,7 @@ class ReportService:
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
             )
             .join(Sale, Sale.id == SaleItem.sale_id)
-            .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+            .where(Sale.sale_date >= start, Sale.sale_date <= end)
             .group_by(func.date(Sale.sale_date))
             .order_by(func.date(Sale.sale_date))
         ).all()
@@ -419,9 +419,9 @@ class ReportService:
             .join(Product, Product.id == SaleItem.product_id)
         )
         if start:
-            item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) >= start)
+            item_stmt = item_stmt.where(sale_stmt.c.sale_date >= start)
         if end:
-            item_stmt = item_stmt.where(func.date(sale_stmt.c.sale_date) <= end)
+            item_stmt = item_stmt.where(sale_stmt.c.sale_date <= end)
         item_stmt = item_stmt.group_by(Product.category).order_by(
             func.coalesce(func.sum(SaleItem.subtotal), 0).desc()
         )

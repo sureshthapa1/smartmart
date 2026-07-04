@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -25,9 +25,9 @@ def index():
     stmt = db.select(WasteRecord).order_by(WasteRecord.created_at.desc())
     try:
         if start_raw:
-            stmt = stmt.where(func.date(WasteRecord.created_at) >= date.fromisoformat(start_raw))
+            stmt = stmt.where(WasteRecord.created_at >= date.fromisoformat(start_raw))
         if end_raw:
-            stmt = stmt.where(func.date(WasteRecord.created_at) <= date.fromisoformat(end_raw))
+            stmt = stmt.where(WasteRecord.created_at <= date.fromisoformat(end_raw))
     except ValueError:
         flash("Invalid date filter.", "warning")
     if reason:
@@ -97,11 +97,11 @@ def report():
     month_start = today.replace(day=1)
     total = db.session.execute(
         db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
-        .where(func.date(WasteRecord.created_at) >= month_start)
+        .where(WasteRecord.created_at >= month_start)
     ).scalar() or 0
     by_reason = db.session.execute(
         db.select(WasteRecord.reason, func.coalesce(func.sum(WasteRecord.cost_value), 0).label("total"))
-        .where(func.date(WasteRecord.created_at) >= month_start)
+        .where(WasteRecord.created_at >= month_start)
         .group_by(WasteRecord.reason)
         .order_by(func.sum(WasteRecord.cost_value).desc())
     ).all()
@@ -109,7 +109,7 @@ def report():
         db.select(Product.name, func.coalesce(func.sum(WasteRecord.quantity), 0).label("qty"),
                   func.coalesce(func.sum(WasteRecord.cost_value), 0).label("total"))
         .join(Product, Product.id == WasteRecord.product_id)
-        .where(func.date(WasteRecord.created_at) >= month_start)
+        .where(WasteRecord.created_at >= month_start)
         .group_by(Product.name)
         .order_by(func.sum(WasteRecord.cost_value).desc())
         .limit(5)
@@ -119,8 +119,8 @@ def report():
     previous_month_start = (month_start.replace(day=1) - __import__("datetime").timedelta(days=1)).replace(day=1)
     previous_total = db.session.execute(
         db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
-        .where(func.date(WasteRecord.created_at) >= previous_month_start)
-        .where(func.date(WasteRecord.created_at) < previous_month_end)
+        .where(WasteRecord.created_at >= previous_month_start)
+        .where(WasteRecord.created_at < previous_month_end)
     ).scalar() or 0
     return render_template(
         "waste/report.html",

@@ -144,7 +144,7 @@ def retrain_anomaly_thresholds(trigger: str = "scheduled") -> dict:
                 func.date(Sale.sale_date).label("day"),
                 func.sum(Sale.total_amount).label("total"),
             )
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
             .group_by(func.date(Sale.sale_date))
         ).all()
 

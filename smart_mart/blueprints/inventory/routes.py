@@ -122,7 +122,7 @@ def list_products():
     except Exception:
         pass
 
-    from datetime import date as _date
+    from datetime import date as _date, datetime, timezone
     return render_template("inventory/list.html", products=products, search=search or "",
                            page=page, total=total, total_pages=total_pages, per_page=per_page,
                            status_filter=status_filter, today=_date.today(),
@@ -325,7 +325,7 @@ def list_categories():
         )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= thirty_days_ago)
+        .where(Sale.sale_date >= thirty_days_ago)
         .group_by(Product.category)
     ).all()
     rev_map = {r.category or "": r for r in rev_rows}
@@ -385,7 +385,7 @@ def category_detail(cat_id):
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(
             SaleItem.product_id.in_([p.id for p in products]),
-            func.date(Sale.sale_date) >= thirty_days_ago,
+            Sale.sale_date >= thirty_days_ago,
         )
         .group_by(SaleItem.product_id)
     ).all()
@@ -410,7 +410,7 @@ def category_detail(cat_id):
         .join(Product, Product.id == SaleItem.product_id)
         .where(
             Product.category == cat.name,
-            func.date(Sale.sale_date) >= date.today() - timedelta(days=13),
+            Sale.sale_date >= date.today() - timedelta(days=13),
         )
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
@@ -599,7 +599,7 @@ def bulk_upload():
             # Parse expiry
             expiry_date = None
             if expiry_raw:
-                from datetime import date as _date
+                from datetime import date as _date, datetime, timezone
                 for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y"):
                     try:
                         expiry_date = _date.fromisoformat(expiry_raw) if fmt == "%Y-%m-%d" \

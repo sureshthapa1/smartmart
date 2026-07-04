@@ -151,7 +151,7 @@ def smart_search(query: str) -> dict:
         q = db.select(Sale)
         if filters.get("days_back"):
             since = date.today() - timedelta(days=int(filters["days_back"]))
-            q = q.where(func.date(Sale.sale_date) >= since)
+            q = q.where(Sale.sale_date >= since)
         if filters.get("min_amount"):
             q = q.where(Sale.total_amount >= float(filters["min_amount"]))
         if filters.get("max_amount"):
@@ -184,7 +184,7 @@ def smart_search(query: str) -> dict:
         q = db.select(Expense)
         if filters.get("days_back"):
             since = date.today() - timedelta(days=int(filters["days_back"]))
-            q = q.where(func.date(Expense.expense_date) >= since)
+            q = q.where(Expense.expense_date >= since)
         if filters.get("min_amount"):
             q = q.where(Expense.amount >= float(filters["min_amount"]))
         q = q.order_by(Expense.expense_date.desc())

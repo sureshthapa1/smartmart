@@ -1637,8 +1637,10 @@ def reset_password():
     if request.method == "POST":
         new_pw = request.form.get("new_password", "")
         confirm = request.form.get("confirm_password", "")
-        if len(new_pw) < 6:
-            flash("Password must be at least 6 characters.", "danger")
+        from ...services.authenticator import validate_password_strength
+        pw_errors = validate_password_strength(new_pw)
+        if pw_errors:
+            flash("Password requirements: " + " ".join(pw_errors), "danger")
         elif new_pw != confirm:
             flash("Passwords do not match.", "danger")
         else:

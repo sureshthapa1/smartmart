@@ -44,7 +44,7 @@ def _avg_daily_demand(product_id: int, lookback_days: int) -> float:
         db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(SaleItem.product_id == product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
     ).scalar() or 0
     return float(qty) / max(1, lookback_days)
 
@@ -205,7 +205,7 @@ def optimize_product_prices(
             db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(SaleItem.product_id == product.id)
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
         ).scalar() or 0
 
         recent_start = date.today() - timedelta(days=13)
@@ -216,20 +216,20 @@ def optimize_product_prices(
             db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(SaleItem.product_id == product.id)
-            .where(func.date(Sale.sale_date) >= recent_start)
+            .where(Sale.sale_date >= recent_start)
         ).scalar() or 0
         prev_qty = db.session.execute(
             db.select(func.coalesce(func.sum(SaleItem.quantity), 0))
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(SaleItem.product_id == product.id)
-            .where(func.date(Sale.sale_date) >= prev_start)
-            .where(func.date(Sale.sale_date) <= prev_end)
+            .where(Sale.sale_date >= prev_start)
+            .where(Sale.sale_date <= prev_end)
         ).scalar() or 0
 
         competitor_median = db.session.execute(
             db.select(func.avg(CompetitorPriceEntry.competitor_price))
             .where(CompetitorPriceEntry.product_id == product.id)
-            .where(func.date(CompetitorPriceEntry.observed_at) >= competitor_cutoff)
+            .where(CompetitorPriceEntry.observed_at >= competitor_cutoff)
         ).scalar()
         competitor_price = float(competitor_median) if competitor_median else None
 

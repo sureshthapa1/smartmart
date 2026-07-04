@@ -298,13 +298,13 @@ def _tool_sales_summary(args: dict) -> dict:
     def _rev(start):
         return float(db.session.execute(
             db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
         ).scalar() or 0)
 
     def _cnt(start):
         return int(db.session.execute(
             db.select(func.count(Sale.id))
-            .where(func.date(Sale.sale_date) >= start)
+            .where(Sale.sale_date >= start)
         ).scalar() or 0)
 
     from ...models.product import Product
@@ -313,7 +313,7 @@ def _tool_sales_summary(args: dict) -> dict:
                   func.sum(SaleItem.subtotal).label("rev"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Product.name)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(5)
@@ -378,7 +378,7 @@ def _tool_top_products(args: dict) -> dict:
                   func.sum(SaleItem.subtotal).label("revenue"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= since)
+        .where(Sale.sale_date >= since)
         .group_by(Product.id, Product.name, Product.category)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(limit)

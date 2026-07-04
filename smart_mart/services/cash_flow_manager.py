@@ -37,7 +37,7 @@ def daily_balance(target_date: date) -> Decimal:
     """Return total income minus total expenses for a given date."""
     income = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
-            func.date(Sale.sale_date) == target_date
+            Sale.sale_date.between(target_date, target_date)
         )
     ).scalar() or Decimal("0")
 
@@ -59,7 +59,7 @@ def profit_loss(start: date, end: date) -> dict:
     # Total sales revenue
     revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
-            and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end)
+            and_(Sale.sale_date >= start, Sale.sale_date <= end)
         )
     ).scalar() or Decimal("0")
 
@@ -68,7 +68,7 @@ def profit_loss(start: date, end: date) -> dict:
         db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, SaleItem.sale_id == Sale.id)
-        .where(and_(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) <= end))
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
     ).all()
     cogs = sum(Decimal(str(r.cost_price)) * r.qty_sold for r in cogs_rows)

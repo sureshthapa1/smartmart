@@ -1,6 +1,6 @@
 """API blueprint — JSON endpoints for Chart.js charts and autofill."""
 
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
@@ -21,7 +21,7 @@ def sales_trend():
     start = end - timedelta(days=29)
     rows = db.session.execute(
         db.select(func.date(Sale.sale_date).label("day"), func.sum(Sale.total_amount).label("total"))
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
         .order_by(func.date(Sale.sale_date))
     ).all()
@@ -48,7 +48,7 @@ def profit_trend():
             func.date(Sale.sale_date).label("day"),
             func.sum(Sale.total_amount).label("revenue"),
         )
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
     ).all()
     revenue_by_day = {str(r.day): float(r.revenue) for r in rev_rows}
@@ -61,7 +61,7 @@ def profit_trend():
         )
         .join(SaleItem, SaleItem.sale_id == Sale.id)
         .join(Product, Product.id == SaleItem.product_id)
-        .where(func.date(Sale.sale_date) >= start)
+        .where(Sale.sale_date >= start)
         .group_by(func.date(Sale.sale_date))
     ).all()
     cogs_by_day = {str(r.day): float(r.cogs) for r in cogs_rows}

@@ -43,13 +43,13 @@ def close_period(year: int, month: int, user_id: int, notes: str | None = None) 
 
     total_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) < end)
+        .where(Sale.sale_date >= start, Sale.sale_date < end)
     ).scalar() or 0
 
     total_cogs = db.session.execute(
         db.select(func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) < end)
+        .where(Sale.sale_date >= start, Sale.sale_date < end)
     ).scalar() or 0
 
     total_opex = db.session.execute(
@@ -127,7 +127,7 @@ def export_period_sales_csv(year: int, month: int) -> str:
             Sale.discount_amount,
             Sale.tax_amount,
         )
-        .where(func.date(Sale.sale_date) >= start, func.date(Sale.sale_date) < end)
+        .where(Sale.sale_date >= start, Sale.sale_date < end)
         .order_by(Sale.sale_date)
     ).all()
 
