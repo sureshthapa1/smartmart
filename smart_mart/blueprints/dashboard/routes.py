@@ -1,6 +1,6 @@
 """Dashboard blueprint — enhanced business insights."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user as cu
@@ -17,36 +17,43 @@ from ...services.cache_service import get as _cache_get, set as _cache_set
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 
+def _to_dt(d: date) -> datetime:
+    """Convert a date to a UTC-aware datetime at midnight for index-friendly comparisons."""
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
 def _parse_filter():
-    """Parse date filter from request args. Returns (start, end, filter_label)."""
+    """Parse date filter from request args. Returns (start_dt, end_dt, filter_label) as datetimes."""
     f = request.args.get("filter", "today")
     today = date.today()
     if f == "today":
-        return today, today, "Today"
+        return _to_dt(today), _to_dt(today), "Today"
     elif f == "week":
-        return today - timedelta(days=today.weekday()), today, "This Week"
+        return _to_dt(today - timedelta(days=today.weekday())), _to_dt(today), "This Week"
     elif f == "month":
-        return today.replace(day=1), today, "This Month"
+        return _to_dt(today.replace(day=1)), _to_dt(today), "This Month"
     elif f == "quarter":
         quarter_start_month = ((today.month - 1) // 3) * 3 + 1
-        return today.replace(month=quarter_start_month, day=1), today, "This Quarter"
+        return _to_dt(today.replace(month=quarter_start_month, day=1)), _to_dt(today), "This Quarter"
     elif f == "year":
-        return today.replace(month=1, day=1), today, "This Year"
+        return _to_dt(today.replace(month=1, day=1)), _to_dt(today), "This Year"
     elif f == "custom":
         try:
             start = date.fromisoformat(request.args.get("start", str(today)))
             end = date.fromisoformat(request.args.get("end", str(today)))
-            return start, end, f"{start} – {end}"
+            return _to_dt(start), _to_dt(end), f"{start} – {end}"
         except ValueError:
-            return today, today, "Today"
-    return today, today, "Today"
+            return _to_dt(today), _to_dt(today), "Today"
+    return _to_dt(today), _to_dt(today), "Today"
 
 
 @dashboard_bp.route("/")
 @login_required
 def index():
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
+    today_date  = date.today()
+    today       = datetime(today_date.year, today_date.month, today_date.day, tzinfo=timezone.utc)
+    today_end   = datetime(today_date.year, today_date.month, today_date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    week_start  = today - timedelta(days=today_date.weekday())
     month_start = today.replace(day=1)
     filter_start, filter_end, filter_label = _parse_filter()
     active_filter = request.args.get("filter", "today")
@@ -59,26 +66,29 @@ def index():
 
     # ── Combined Sales Aggregation — 1 query replaces 7 separate round-trips ─
     # Uses CASE/WHEN to compute today / week / month / total in a single pass.
+    # Uses datetime range comparisons (>= / <=) instead of func.date() wrappers
+    # so PostgreSQL can use the ix_sale_date index on Sale.sale_date (DateTime).
+    # func.date(Sale.sale_date) prevents index use even when the column is indexed.
     from sqlalchemy import case, literal_column
     agg_row = db.session.execute(
         db.select(
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) == today, Sale.total_amount), else_=0)
+                case((Sale.sale_date.between(today, today_end), Sale.total_amount), else_=0)
             ), 0).label("today_amount"),
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) == today, 1), else_=0)
+                case((Sale.sale_date.between(today, today_end), 1), else_=0)
             ), 0).label("today_count"),
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) >= week_start, Sale.total_amount), else_=0)
+                case((Sale.sale_date >= week_start, Sale.total_amount), else_=0)
             ), 0).label("weekly_amount"),
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) >= week_start, 1), else_=0)
+                case((Sale.sale_date >= week_start, 1), else_=0)
             ), 0).label("weekly_count"),
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) >= month_start, Sale.total_amount), else_=0)
+                case((Sale.sale_date >= month_start, Sale.total_amount), else_=0)
             ), 0).label("monthly_amount"),
             func.coalesce(func.sum(
-                case((func.date(Sale.sale_date) >= month_start, 1), else_=0)
+                case((Sale.sale_date >= month_start, 1), else_=0)
             ), 0).label("monthly_count"),
             func.count(Sale.id).label("total_count"),
             func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
@@ -104,7 +114,7 @@ def index():
         )
         .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) == today)
+        .where(Sale.sale_date.between(today, today_end))
     ).scalar() or 0
     today_profit = float(today_sales_amount) - float(today_cogs)
 
@@ -126,7 +136,7 @@ def index():
         from ...models.waste_record import WasteRecord
         waste_cost_month = float(db.session.execute(
             db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
-            .where(func.date(WasteRecord.created_at) >= month_start)
+            .where(WasteRecord.created_at >= month_start)
         ).scalar() or 0)
     except Exception:
         pass
@@ -148,7 +158,7 @@ def index():
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= month_start)
+        .where(Sale.sale_date >= month_start)
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(5)
@@ -159,7 +169,7 @@ def index():
     sold_ids_30 = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(func.date(Sale.sale_date) >= cutoff_30)
+        .where(Sale.sale_date >= cutoff_30)
     ).scalars().all()
     dead_stock = db.session.execute(
         db.select(Product)
@@ -172,13 +182,13 @@ def index():
     # ── Period sales (respects active filter) ────────────────────────────
     period_sales_amount = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= filter_start)
-        .where(func.date(Sale.sale_date) <= filter_end)
+        .where(Sale.sale_date >= filter_start)
+        .where(Sale.sale_date <= filter_end)
     ).scalar() or 0
     period_sales_count = db.session.execute(
         db.select(func.count(Sale.id))
-        .where(func.date(Sale.sale_date) >= filter_start)
-        .where(func.date(Sale.sale_date) <= filter_end)
+        .where(Sale.sale_date >= filter_start)
+        .where(Sale.sale_date <= filter_end)
     ).scalar() or 0
     avg_transaction_value = (
         float(period_sales_amount) / period_sales_count
@@ -199,8 +209,8 @@ def index():
     last_week_end = week_start - timedelta(days=1)
     last_week_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(func.date(Sale.sale_date) >= last_week_start)
-        .where(func.date(Sale.sale_date) <= last_week_end)
+        .where(Sale.sale_date >= last_week_start)
+        .where(Sale.sale_date <= last_week_end)
     ).scalar() or 0
     if last_week_sales > 0:
         pct = ((float(weekly_sales_amount) - float(last_week_sales)) / float(last_week_sales)) * 100

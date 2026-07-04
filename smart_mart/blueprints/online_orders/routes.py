@@ -57,16 +57,22 @@ def list_orders():
         )
     if start_raw:
         try:
-            stmt = stmt.where(func.date(OnlineOrder.created_at) >= date.fromisoformat(start_raw))
+            from datetime import datetime as _dt, timezone as _tz
+            d = date.fromisoformat(start_raw)
+            stmt = stmt.where(OnlineOrder.created_at >= _dt(d.year, d.month, d.day, tzinfo=_tz.utc))
         except ValueError:
             pass
     if end_raw:
         try:
-            stmt = stmt.where(func.date(OnlineOrder.created_at) <= date.fromisoformat(end_raw))
+            from datetime import datetime as _dt, timezone as _tz
+            d = date.fromisoformat(end_raw)
+            stmt = stmt.where(OnlineOrder.created_at <= _dt(d.year, d.month, d.day, 23, 59, 59, tzinfo=_tz.utc))
         except ValueError:
             pass
 
-    orders = db.session.execute(stmt).scalars().all()
+    # Limit to 200 most recent — prevents full table scan on large shops.
+    # Search/filter will narrow it further; export endpoints handle bulk.
+    orders = db.session.execute(stmt.limit(200)).scalars().all()
 
     # Status counts — single grouped query instead of 6 separate queries
     count_rows = db.session.execute(

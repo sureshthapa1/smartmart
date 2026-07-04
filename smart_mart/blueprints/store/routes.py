@@ -1716,9 +1716,19 @@ def store_chat_api():
     """JSON endpoint for the store AI chatbot widget."""
     data    = request.get_json(silent=True) or {}
     message = (data.get("message") or "").strip()
-    history = data.get("history") or []
     if not message:
         return jsonify({"ok": False, "error": "Empty message"}), 400
+    # Cap message length and history depth to prevent prompt injection via
+    # oversized inputs and context stuffing attacks.
+    message = message[:500]
+    history = (data.get("history") or [])[:10]   # last 10 turns max
+    # Sanitise history entries — only keep role/content, truncate content
+    history = [
+        {"role": str(h.get("role", "user"))[:20],
+         "content": str(h.get("content", ""))[:300]}
+        for h in history
+        if isinstance(h, dict) and h.get("role") in ("user", "assistant")
+    ]
     cust_name = g.customer.name if g.customer else None
     from ...services.store_ai_service import chatbot_reply
     reply = chatbot_reply(message, history=history, customer_name=cust_name)

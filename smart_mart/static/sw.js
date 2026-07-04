@@ -1,6 +1,6 @@
 // Smart Mart Service Worker v3 — PWA install + offline support
 // Bump cache name whenever precache URLs change to force update.
-const CACHE = 'smartmart-v3';
+const CACHE = 'smartmart-v5';
 const PRECACHE_URLS = [
   '/store/',
   '/static/manifest.json',
