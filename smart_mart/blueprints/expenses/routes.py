@@ -1,5 +1,6 @@
 """Expenses blueprint — CRUD for rent, salary, utilities, and other costs."""
 
+from decimal import Decimal
 from __future__ import annotations
 
 from datetime import date
@@ -311,7 +312,7 @@ def edit_recurring(item_id):
         item.name = request.form.get("name", "").strip() or item.name
         item.expense_type = request.form.get("expense_type", item.expense_type)
         try:
-            item.amount = float(request.form.get("amount", item.amount))
+            item.amount = Decimal(str(request.form.get("amount", item.amount) or item.amount))
         except (ValueError, TypeError):
             pass
         item.frequency = request.form.get("frequency", item.frequency)
