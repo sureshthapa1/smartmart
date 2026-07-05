@@ -25,7 +25,18 @@ _consumed_tokens: dict[str, float] = {}
 
 
 def _secret() -> bytes:
-    return os.environ.get("SECRET_KEY", "dev-secret-key").encode()
+    key = os.environ.get("SECRET_KEY")
+    if not key:
+        # In production SECRET_KEY must always be set. Falling back to a
+        # hardcoded value makes password-reset tokens forgeable — raise so
+        # misconfigured deployments fail loudly rather than silently insecure.
+        if not os.environ.get("FLASK_DEBUG") and not os.environ.get("TESTING"):
+            raise RuntimeError(
+                "SECRET_KEY environment variable is not set. "
+                "Password reset tokens cannot be signed securely."
+            )
+        key = "dev-secret-key"  # only reached in local dev / test
+    return key.encode()
 
 
 def _prune_consumed() -> None:

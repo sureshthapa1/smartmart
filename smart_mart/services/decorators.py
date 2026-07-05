@@ -11,8 +11,8 @@ __all__ = ["login_required", "admin_required", "permission_required", "require_p
 
 def admin_required(f):
     """Restrict route to Admin users only."""
-    @login_required
     @wraps(f)
+    @login_required
     def decorated(*args, **kwargs):
         if current_user.role != "admin":
             abort(403)
@@ -25,8 +25,8 @@ def permission_required(perm: str):
     Admin users always pass. Staff users are checked against UserPermissions.
     """
     def decorator(f):
-        @login_required
         @wraps(f)
+        @login_required
         def decorated(*args, **kwargs):
             if current_user.role == "admin":
                 return f(*args, **kwargs)

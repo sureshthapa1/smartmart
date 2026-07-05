@@ -21,7 +21,7 @@ def create_product(data: dict) -> Product:
         cost_price=data["cost_price"],
         selling_price=data["selling_price"],
         quantity=data.get("quantity", 0),
-        low_stock_threshold=data.get("low_stock_threshold", 500),
+        low_stock_threshold=data.get("low_stock_threshold", 10),
         supplier_id=data.get("supplier_id"),
         expiry_date=data.get("expiry_date"),
         image_filename=data.get("image_filename"),
@@ -114,9 +114,18 @@ def update_product(product_id: int, data: dict) -> Product:
 def delete_product(product_id: int) -> None:
     """Delete a product. Raises ValueError if it has sale/purchase records."""
     product: Product = db.get_or_404(Product, product_id)
-    if product.sale_items.count() > 0:
+    from sqlalchemy import select
+    from ..models.sale import SaleItem
+    from ..models.purchase import PurchaseItem
+    has_sales = db.session.execute(
+        select(SaleItem.id).where(SaleItem.product_id == product_id).limit(1)
+    ).first()
+    if has_sales:
         raise ValueError(f"Cannot delete '{product.name}': has associated sale records.")
-    if product.purchase_items.count() > 0:
+    has_purchases = db.session.execute(
+        select(PurchaseItem.id).where(PurchaseItem.product_id == product_id).limit(1)
+    ).first()
+    if has_purchases:
         raise ValueError(f"Cannot delete '{product.name}': has associated purchase records.")
     db.session.delete(product)
     db.session.commit()

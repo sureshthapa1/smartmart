@@ -32,7 +32,7 @@ def create_backup(user_id: int | None = None, backup_type: str = "manual") -> di
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
             for table_name in inspector.get_table_names():
-                rows = conn.execute(text(f"SELECT * FROM {table_name}")).mappings().all()
+                rows = conn.execute(text(f'SELECT * FROM "{table_name}"')).mappings().all()
                 snapshot[table_name] = [dict(r) for r in rows]
 
         # Serialize (handle non-JSON-serializable types)
@@ -98,7 +98,7 @@ def list_backups() -> list[dict]:
                     "modified": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
                 })
         return files
-    except Exception:
+    except OSError:
         return []
 
 
@@ -117,6 +117,6 @@ def delete_backup_file(filename: str) -> bool:
         if os.path.exists(path) and filename.endswith(".json"):
             os.remove(path)
             return True
-    except Exception:
+    except OSError:
         pass
     return False

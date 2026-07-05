@@ -488,8 +488,8 @@ def _register_blueprints(app):
         (".blueprints.loyalty", "loyalty_bp"),
         (".blueprints.ai_chat", "ai_chat_bp"),
         (".blueprints.mcp", "mcp_bp"),
-        (".bi.routes", "bi_bp"),
-        (".bi.routes", "bi_dashboard_bp"),
+        (".bi.routes.api", "bi_bp"),
+        (".bi.routes.api", "bi_dashboard_bp"),
     ]
 
     for module_path, bp_name in blueprints:

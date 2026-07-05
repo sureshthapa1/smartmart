@@ -33,7 +33,12 @@ def _safe_add_column(conn, table_name: str, column_name: str, column_sql: str) -
         return
     if _column_exists(conn, table_name, column_name):
         return
-    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"))
+    # Quote identifiers to prevent SQL injection if names ever come from
+    # untrusted input. column_sql (e.g. "VARCHAR(255)") is always a
+    # developer-supplied literal so it does not need quoting.
+    safe_table = table_name.replace('"', '')
+    safe_column = column_name.replace('"', '')
+    conn.execute(text(f'ALTER TABLE "{safe_table}" ADD COLUMN "{safe_column}" {column_sql}'))
 
 
 def _safe_create_index(conn, index_name: str, table_name: str, columns: list[str]) -> None:
@@ -41,8 +46,10 @@ def _safe_create_index(conn, index_name: str, table_name: str, columns: list[str
     Uses IF NOT EXISTS so it's safe to call on an already-migrated DB."""
     if not _table_exists(conn, table_name):
         return
-    cols = ", ".join(columns)
-    _safe_exec(conn, f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({cols})")
+    safe_index = index_name.replace('"', '')
+    safe_table = table_name.replace('"', '')
+    safe_cols = ", ".join(f'"{c.replace(chr(34), "")}"' for c in columns)
+    _safe_exec(conn, f'CREATE INDEX IF NOT EXISTS "{safe_index}" ON "{safe_table}" ({safe_cols})')
 
 
 def _safe_exec(conn, sql: str) -> None:
