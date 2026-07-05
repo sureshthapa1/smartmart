@@ -389,10 +389,9 @@ def export_category_csv():
     import csv, io
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Category", "Revenue", "Qty Sold", "Transactions", "Avg Order"])
+    writer.writerow(["Category", "Revenue", "Qty Sold"])
     for r in rows:
-        writer.writerow([r.get("category", ""), r.get("revenue", 0),
-                         r.get("qty_sold", 0), r.get("txn_count", 0), r.get("avg_order", 0)])
+        writer.writerow([r.get("category", ""), r.get("revenue", 0), r.get("qty_sold", 0)])
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=category_performance.csv"})
 
@@ -406,7 +405,7 @@ def export_inventory_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Product", "SKU", "Category", "Qty", "Cost Price", "Selling Price", "Stock Value"])
-    for r in data.get("products", []):
+    for r in data.get("items", []):
         p = r.get("product")
         if p:
             writer.writerow([p.name, p.sku, p.category or "", p.quantity,
@@ -426,10 +425,10 @@ def export_staff_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Staff", "Role", "Transactions", "Items Sold", "Revenue", "Avg Sale"])
-    for r in data.get("staff", []):
-        writer.writerow([r.get("username", ""), r.get("role", ""),
-                         r.get("transactions", 0), r.get("items_sold", 0),
-                         r.get("revenue", 0), r.get("avg_sale", 0)])
+    for r in data:  # staff_efficiency_report returns a list directly
+        writer.writerow([r["user"].username, r["user"].role,
+                         r.get("total_transactions", 0), r.get("items_sold", 0),
+                         r.get("total_revenue", 0), r.get("avg_sale", 0)])
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=staff_efficiency.csv"})
 
@@ -575,9 +574,9 @@ def export_profitability_excel():
     from flask import Response
     start, end, _, _ = _get_date_range()
     rows = report_engine.profitability_analysis(start, end)
-    data = [{"Product": r.get("name", ""), "Revenue": float(r.get("revenue", 0)),
-             "COGS": float(r.get("cogs", 0)), "Profit": float(r.get("profit", 0)),
-             "Margin %": float(r.get("margin_pct", 0))} for r in rows]
+    data = [{"Product": r["product"].name, "Revenue": float(r["revenue"]),
+             "COGS": float(r["cost"]), "Profit": float(r["profit"]),
+             "Margin %": float(r.get("margin", 0))} for r in rows]
     xlsx = exporter.export_report_excel(data, f"Profitability {start} to {end}",
                                         ["Product", "Revenue", "COGS", "Profit", "Margin %"])
     return Response(xlsx, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -598,34 +597,45 @@ def shift_sales():
         _db.select(Shift).order_by(Shift.started_at.desc()).limit(30)
     ).scalars().all()
 
+    import datetime as _dt
+
+    # Pre-load all users in one query
+    user_ids = list({s.user_id for s in shifts if s.user_id})
+    users_map = {u.id: u for u in _db.session.execute(
+        _db.select(User).where(User.id.in_(user_ids))
+    ).scalars().all()} if user_ids else {}
+
     shift_data = []
     for shift in shifts:
         if not shift.started_at:
             continue
-        import datetime as _dt
         end = shift.ended_at or _dt.datetime.now(_dt.timezone.utc)
-        sales = _db.session.execute(
-            _db.select(Sale)
+
+        # Single query for all sale ids + revenue in this shift window
+        sale_rows = _db.session.execute(
+            _db.select(Sale.id, Sale.total_amount)
             .where(Sale.user_id == shift.user_id)
             .where(Sale.sale_date >= shift.started_at)
             .where(Sale.sale_date <= end)
-        ).scalars().all()
-        revenue = sum(float(s.total_amount) for s in sales)
-        items_sold = sum(
-            _db.session.execute(
+        ).all()
+        sale_ids = [r.id for r in sale_rows]
+        revenue = sum(float(r.total_amount) for r in sale_rows)
+
+        # Single query for total items sold across all sales in this shift
+        items_sold = 0
+        if sale_ids:
+            items_sold = _db.session.execute(
                 _db.select(_f.coalesce(_f.sum(SaleItem.quantity), 0))
-                .where(SaleItem.sale_id == s.id)
+                .where(SaleItem.sale_id.in_(sale_ids))
             ).scalar() or 0
-            for s in sales
-        )
-        user = _db.session.get(User, shift.user_id)
+
         shift_data.append({
             "shift": shift,
-            "user": user,
-            "sales_count": len(sales),
+            "user": users_map.get(shift.user_id),
+            "sales_count": len(sale_ids),
             "revenue": revenue,
             "items_sold": items_sold,
-            "duration_hrs": round((end - shift.started_at).total_seconds() / 3600, 1) if shift.started_at else 0,
+            "duration_hrs": round((end - shift.started_at).total_seconds() / 3600, 1),
         })
 
     return render_template("reports/shift_sales.html", shift_data=shift_data)

@@ -63,10 +63,15 @@ def list_products():
 
     if status_filter == "low":
         from sqlalchemy import func as _func, or_
+        from ...models.shop_settings import ShopSettings as _SS
+        try:
+            _threshold = _SS.get().low_stock_threshold or 10
+        except Exception:
+            _threshold = 10
         term = search.strip().lower() if search else None
         stmt_products = db.select(Product).where(
             Product.is_active == True,
-            Product.quantity <= _func.coalesce(Product.low_stock_threshold, 500),
+            Product.quantity <= db.func.coalesce(Product.low_stock_threshold, _threshold),
         ).order_by(Product.quantity.asc(), Product.name.asc())
         if term:
             stmt_products = stmt_products.where(or_(
@@ -98,7 +103,7 @@ def list_products():
         stmt = stmt.where(Product.is_active == False)
     if status_filter == "low":
         stmt = stmt.where(Product.is_active == True)
-        stmt = stmt.where(Product.quantity <= _func.coalesce(Product.low_stock_threshold, 500))
+        stmt = stmt.where(Product.quantity <= _func.coalesce(Product.low_stock_threshold, _threshold))
 
     total = db.session.execute(stmt).scalar() or 0
     per_page = 100

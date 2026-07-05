@@ -13,8 +13,12 @@ def create_user(username: str, password: str, role: str,
                 commission_rate: float = 0.0, email: str | None = None) -> User:
     """Create a new user with a hashed password.
     Staff users automatically get minimal default permissions.
-    Raises ValueError if the username already exists.
+    Raises ValueError if the username already exists or password is too weak.
     """
+    pw_errors = authenticator.validate_password_strength(password)
+    if pw_errors:
+        raise ValueError("Password too weak: " + " ".join(pw_errors))
+
     user = User(
         username=username,
         password_hash=authenticator.hash_password(password),
@@ -64,7 +68,12 @@ def update_user(user_id: int, data: dict) -> User:
 
 
 def reset_password(user_id: int, new_password: str) -> None:
-    """Hash and store a new password for the given user."""
+    """Hash and store a new password for the given user.
+    Raises ValueError if the password does not meet strength requirements.
+    """
+    pw_errors = authenticator.validate_password_strength(new_password)
+    if pw_errors:
+        raise ValueError("Password too weak: " + " ".join(pw_errors))
     user: User = db.get_or_404(User, user_id)
     user.password_hash = authenticator.hash_password(new_password)
     db.session.commit()

@@ -54,7 +54,14 @@ def index():
         s.invoice_prefix = request.form.get("invoice_prefix", "INV").strip() or "INV"
         s.footer_note = request.form.get("footer_note", "").strip() or "Thank you for shopping with us!"
         s.vat_enabled = request.form.get("vat_enabled") == "on"
-        s.vat_rate = float(request.form.get("vat_rate", "13") or 13)
+        try:
+            vat_rate = float(request.form.get("vat_rate", "13") or 13)
+            if not (0 <= vat_rate <= 100):
+                raise ValueError
+            s.vat_rate = vat_rate
+        except (ValueError, TypeError):
+            flash("Invalid VAT rate — must be a number between 0 and 100.", "danger")
+            return render_template("settings/index.html", s=s)
         s.vat_number = request.form.get("vat_number", "").strip() or None
         s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
         s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)

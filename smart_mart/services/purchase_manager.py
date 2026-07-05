@@ -111,7 +111,10 @@ def update_supplier(supplier_id: int, data: dict) -> Supplier:
 def delete_supplier(supplier_id: int) -> None:
     """Delete a supplier. Raises ValueError if it has purchases."""
     supplier = db.get_or_404(Supplier, supplier_id)
-    if supplier.purchases.count() > 0:
+    has_purchases = db.session.execute(
+        db.select(Purchase.id).where(Purchase.supplier_id == supplier_id).limit(1)
+    ).first()
+    if has_purchases:
         raise ValueError(f"Cannot delete '{supplier.name}': has associated purchase records.")
     db.session.delete(supplier)
     db.session.commit()

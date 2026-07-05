@@ -134,23 +134,43 @@ def inventory_valuation() -> dict:
 
 
 def opening_closing_stock(start: date, end: date) -> list[dict]:
-    """Return opening and closing stock per product for [start, end]."""
+    """Return opening and closing stock per product for [start, end].
+    Uses two aggregated queries instead of 2 queries per product (N+1).
+    """
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+    if not products:
+        return []
+    product_ids = [p.id for p in products]
+
+    # Movements strictly after end (to compute closing = current - after_end)
+    after_end_rows = db.session.execute(
+        db.select(
+            StockMovement.product_id,
+            func.coalesce(func.sum(StockMovement.change_amount), 0).label("total"),
+        )
+        .where(StockMovement.product_id.in_(product_ids))
+        .where(StockMovement.timestamp > end)
+        .group_by(StockMovement.product_id)
+    ).all()
+    after_end_map = {r.product_id: int(r.total) for r in after_end_rows}
+
+    # Movements within [start, end] (to compute opening = closing - within_period)
+    within_rows = db.session.execute(
+        db.select(
+            StockMovement.product_id,
+            func.coalesce(func.sum(StockMovement.change_amount), 0).label("total"),
+        )
+        .where(StockMovement.product_id.in_(product_ids))
+        .where(StockMovement.timestamp >= start)
+        .where(StockMovement.timestamp <= end)
+        .group_by(StockMovement.product_id)
+    ).all()
+    within_map = {r.product_id: int(r.total) for r in within_rows}
+
     result = []
     for p in products:
-        # Opening = current qty minus all movements after start
-        after_start = db.session.execute(
-            db.select(func.coalesce(func.sum(StockMovement.change_amount), 0))
-            .where(and_(StockMovement.product_id == p.id, StockMovement.timestamp > end))
-        ).scalar() or 0
-        closing = p.quantity - after_start
-        before_start = db.session.execute(
-            db.select(func.coalesce(func.sum(StockMovement.change_amount), 0))
-            .where(and_(StockMovement.product_id == p.id,
-                        StockMovement.timestamp >= start,
-                        StockMovement.timestamp <= end))
-        ).scalar() or 0
-        opening = closing - before_start
+        closing = p.quantity - after_end_map.get(p.id, 0)
+        opening = closing - within_map.get(p.id, 0)
         result.append({"product": p, "opening": opening, "closing": closing})
     return result
 
@@ -386,11 +406,8 @@ def staff_efficiency_report(start: date, end: date) -> list[dict]:
         # Sales per active day
         sales_per_day = round(total_transactions / active_days, 1) if active_days else 0
 
-        # Discount rate
-        gross = sum(
-            float(si.unit_price) * si.quantity
-            for s in sales for si in s.items
-        )
+        # Discount rate — use pre-aggregated discount, avoid loading sale.items
+        gross = total_revenue + total_discount
         discount_rate = round((total_discount / gross * 100), 1) if gross else 0
 
         result.append({
@@ -590,22 +607,32 @@ def customer_analysis(start: date, end: date) -> dict:
         .limit(20)
     ).all()
 
+    # Pre-load all customers and their wallets in 2 queries instead of N*2
+    customer_names = [r.customer_name for r in top_buyers if r.customer_name]
+    customers_map = {}
+    if customer_names:
+        cust_rows = db.session.execute(
+            db.select(Customer).where(
+                func.lower(Customer.name).in_([n.lower() for n in customer_names])
+            )
+        ).scalars().all()
+        customers_map = {c.name.lower(): c for c in cust_rows}
+
+    wallet_pts_map = {}
+    if customers_map:
+        cust_ids = [c.id for c in customers_map.values()]
+        wallet_rows = db.session.execute(
+            db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id.in_(cust_ids))
+        ).scalars().all()
+        wallet_pts_map = {w.customer_id: int(w.points_balance) for w in wallet_rows}
+
     buyer_data = []
     for r in top_buyers:
         avg_order = float(r.revenue) / r.purchases if r.purchases else 0
-        # Get loyalty points
         pts = 0
-        try:
-            cust = db.session.execute(
-                db.select(Customer).where(func.lower(Customer.name) == r.customer_name.lower())
-            ).scalar_one_or_none()
-            if cust:
-                wallet = db.session.execute(
-                    db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == cust.id)
-                ).scalar_one_or_none()
-                pts = int(wallet.points_balance) if wallet else 0
-        except Exception:
-            pass
+        cust = customers_map.get((r.customer_name or "").lower())
+        if cust:
+            pts = wallet_pts_map.get(cust.id, 0)
         buyer_data.append({
             "name": r.customer_name,
             "purchases": r.purchases,

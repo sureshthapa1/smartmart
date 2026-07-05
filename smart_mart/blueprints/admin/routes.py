@@ -76,7 +76,6 @@ def reset_password(user_id):
         flash(str(e), "danger")
     return redirect(url_for("admin.users"))
 
-
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def delete_user(user_id):
