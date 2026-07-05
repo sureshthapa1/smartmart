@@ -1473,21 +1473,70 @@ def payment_callback(order_number, provider):
         flash(f"Payment successful! Order {order_number} confirmed.", "success")
         _logger.info("Payment verified for order %s via %s", order_number, provider)
 
-        # ── Notify admin of new paid online order ─────────────────────────
+        # ── Consume stock reservations (mark as fulfilled, not expired) ────
         try:
-            from ...services.notification_service import send_notification
+            from ...models.ecommerce import StockReservation as _SR
+            reservations = db.session.execute(
+                db.select(_SR).where(
+                    _SR.order_id == order.id,
+                    _SR.status == "active"
+                )
+            ).scalars().all()
+            for r in reservations:
+                r.status = "fulfilled"
+            if reservations:
+                db.session.commit()
+                _logger.info("Consumed %d stock reservations for order %s", len(reservations), order_number)
+        except Exception as exc:
+            _logger.warning("Reservation cleanup failed (non-fatal): %s", exc)
+
+        # ── Notify admin + customer of confirmed payment ──────────────────
+        try:
+            from ...services.notification_service import send_notification, notify_order_status
             from ...models.shop_settings import ShopSettings
             settings = ShopSettings.get()
+            _shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+            _app_url = getattr(settings, "website_url", "") or ""
+            _track_url = f"{_app_url.rstrip('/')}/store/track?order_number={order_number}" if _app_url else ""
+
+            # Admin notification
             admin_phone = getattr(settings, "phone", None) or getattr(settings, "contact_phone", None)
             if admin_phone:
                 msg = (
-                    f"[GoldKernel] New order {order_number} PAID via {provider.upper()}. "
+                    f"[{_shop}] New order {order_number} PAID via {provider.upper()}. "
                     f"Amount: NPR {order.grand_total:.0f}. "
                     f"Customer: {order.customer_name} ({order.customer_phone})."
                 )
                 send_notification(admin_phone, msg)
+
+            # Customer SMS confirmation
+            if order.customer_phone:
+                notify_order_status(
+                    customer_name=order.customer_name or "Customer",
+                    phone=order.customer_phone,
+                    order_number=order_number,
+                    status="confirmed",
+                    shop_name=_shop,
+                    track_url=_track_url,
+                )
         except Exception as exc:
             current_app.logger.warning("Payment notification failed (non-fatal): %s", exc)
+
+        # ── Send order confirmation email ─────────────────────────────────
+        try:
+            from ...services.email_service import send_order_confirmation
+            order_items = [
+                {
+                    "name":       item.product_name,
+                    "qty":        item.quantity,
+                    "unit_price": float(item.unit_price or 0),
+                    "subtotal":   float(item.quantity * (item.unit_price or 0)),
+                }
+                for item in order.items
+            ]
+            send_order_confirmation(order, order_items)
+        except Exception as exc:
+            current_app.logger.warning("Order confirmation email failed (non-fatal): %s", exc)
 
         return redirect(url_for("store.order_success", order_number=order_number))
     else:
