@@ -32,7 +32,7 @@ class Sale(db.Model):
     invoice_number = db.Column(db.String(30), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
-    sale_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    sale_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc, index=True))
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     customer_name = db.Column(db.String(120), nullable=True)
     customer_address = db.Column(db.String(255), nullable=True)
