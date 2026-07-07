@@ -226,10 +226,10 @@
     <a href="{{ url_for('purchases.list_purchases') }}" class="qa-btn">
       <i class="bi bi-truck" style="color:#0e7490"></i>Purchase
     </a>
-    <a href="{{ url_for('inventory.add_product') }}" class="qa-btn">
+    <a href="{{ url_for('inventory.create_product') }}" class="qa-btn">
       <i class="bi bi-plus-circle" style="color:#7c3aed"></i>Add Product
     </a>
-    <a href="{{ url_for('expenses.add_expense') }}" class="qa-btn">
+    <a href="{{ url_for('expenses.create_expense') }}" class="qa-btn">
       <i class="bi bi-receipt-cutoff" style="color:#dc2626"></i>Expense
     </a>
     <a href="{{ url_for('customers.list_customers') }}" class="qa-btn">
@@ -321,7 +321,7 @@
             <tbody>
               {% for s in recent_sales[:8] %}
               <tr>
-                <td><a href="{{ url_for('sales.view_sale', sale_id=s.id) }}" style="color:#6366f1;font-weight:600;text-decoration:none">#{{ s.id }}</a></td>
+                <td><a href="{{ url_for('sales.sale_detail', sale_id=s.id) }}" style="color:#6366f1;font-weight:600;text-decoration:none">#{{ s.id }}</a></td>
                 <td style="max-width:140px" class="text-truncate">{{ s.customer_name or '—' }}</td>
                 <td>{{ s.items|length if s.items else '—' }}</td>
                 <td>
