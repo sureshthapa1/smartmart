@@ -45,7 +45,9 @@ def complete_transfer(transfer_id: int) -> StockTransfer:
         raise ValueError("Only pending transfers can be completed.")
 
     for item in transfer.items:
-        product = db.session.get(Product, item.product_id)
+        product = db.session.execute(
+            db.select(Product).where(Product.id == item.product_id).with_for_update()
+        ).scalar_one_or_none()
         if product.quantity < item.quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")
         product.quantity -= item.quantity
