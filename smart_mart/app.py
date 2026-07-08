@@ -3,6 +3,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, flash, redirect, url_for, render_template, request, session
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import config
 from .extensions import db, login_manager, bcrypt, csrf, limiter, migrate, cache, babel
 from .services.schema_migrations import run_pending_migrations
@@ -26,6 +27,14 @@ def create_app(config_name="development"):
     app.config.from_object(config_object)
     if hasattr(config_object, "init_app"):
         config_object.init_app(app)
+
+    # ── Trust Render's reverse proxy ────────────────────────────────────────
+    # Render terminates TLS at its edge and forwards plain HTTP to this app
+    # via a single proxy hop. Without ProxyFix, request.remote_addr and
+    # request.is_secure reflect the proxy, not the real client — this breaks
+    # per-IP rate limiting (Flask-Limiter would bucket every customer as one
+    # client) and secure-cookie/HTTPS detection.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # ── Logging ───────────────────────────────────────────────────────────
     if not app.debug:

@@ -70,3 +70,30 @@ smart_mart/static/uploads/products/
 # The project root contains a duplicate of the smartmart/ directory.
 # This is an artefact of a rename — the canonical source is smartmart/.
 # Do not commit files from the root-level smart_mart/ copy.
+
+# ── IDE and AI assistant config — keep LOCAL, do not commit ─────────────────
+.cursor/
+.windsurf/
+.vscode/
+.idea/
+
+# ── AI prompt injection / VibeCheck files (security) ────────────────────────
+.vibecheck/
+*vibecheck*
+*truthpack*
+*vibe-flow*
+
+# ── Uploaded binary files — serve from Cloudinary/object storage ────────────
+smart_mart/static/uploads/shop/*.png
+smart_mart/static/uploads/shop/*.jpg
+smart_mart/static/uploads/shop/*.jpeg
+smart_mart/static/uploads/shop/*.webp
+smart_mart/static/uploads/shop/*.gif
+smart_mart/static/uploads/products/*.png
+smart_mart/static/uploads/products/*.jpg
+smart_mart/static/uploads/products/*.jpeg
+smart_mart/static/uploads/products/*.webp
+smart_mart/static/uploads/products/*.gif
+
+# ── Ghost submodule artifact ─────────────────────────────────────────────────
+/smartmart

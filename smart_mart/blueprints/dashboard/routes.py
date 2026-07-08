@@ -262,6 +262,17 @@ def index():
         pending_credits_total = float(result.total or 0)
     except Exception:
         pass
+
+    # ── Pending online orders (awaiting fulfillment) ──────────────────────
+    pending_orders_count = 0
+    try:
+        from ...models.online_order import OnlineOrder as _OnlineOrder
+        pending_orders_count = db.session.execute(
+            db.select(func.count(_OnlineOrder.id))
+            .where(_OnlineOrder.status == "pending")
+        ).scalar() or 0
+    except Exception:
+        pass
     # NLG summary + advisor actions — cached per-day to avoid recomputing on every load
     nlg_summary = None
     advisor_actions = []
@@ -337,6 +348,7 @@ def index():
                            cash_session_balance=cash_session_balance,
                            pending_credits_total=pending_credits_total,
                            pending_credits_count=pending_credits_count,
+                           pending_orders_count=pending_orders_count,
                            low_stock_alerts=low_stock_alerts,
                            waste_cost_month=waste_cost_month,
                            )
