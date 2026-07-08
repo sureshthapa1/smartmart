@@ -108,8 +108,8 @@ def generate_vat_invoice(sale, shop_settings):
 
     discount = float(sale.discount_amount or 0)
     taxable = max(0.0, subtotal - discount)
-    vat_amount = (Decimal(str(taxable * Decimal('0.13')))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    grand_total = taxable + vat_amount
+    vat_amount = (Decimal(str(taxable)) * Decimal('0.13')).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    grand_total = Decimal(str(taxable)) + vat_amount
     totals = [
         ["Subtotal", f"NPR {subtotal:,.2f}"],
         ["Discount", f"NPR {discount:,.2f}"],
