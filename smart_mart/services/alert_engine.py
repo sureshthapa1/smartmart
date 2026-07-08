@@ -35,8 +35,11 @@ def get_low_stock_alerts(threshold: int | None = None) -> list[Product]:
 def get_expiry_alerts(days: int | None = None) -> list[Product]:
     """Return products expiring within the warning window (default 30 days)."""
     if days is None:
-        from flask import current_app
-        days = current_app.config.get("EXPIRY_WARNING_DAYS", 30)
+        try:
+            from flask import current_app
+            days = current_app.config.get("EXPIRY_WARNING_DAYS", 30)
+        except Exception:
+            days = 30
     today = date.today()
     cutoff = today + timedelta(days=days)
     stmt = (
@@ -52,8 +55,11 @@ def get_expiry_alerts(days: int | None = None) -> list[Product]:
 def get_high_demand_alerts(threshold: int | None = None) -> list[dict]:
     """Return products whose total quantity sold in the past 7 days exceeds threshold (default 50)."""
     if threshold is None:
-        from flask import current_app
-        threshold = current_app.config.get("HIGH_DEMAND_THRESHOLD", 50)
+        try:
+            from flask import current_app
+            threshold = current_app.config.get("HIGH_DEMAND_THRESHOLD", 50)
+        except Exception:
+            threshold = 50
     cutoff = date.today() - timedelta(days=7)
     rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("total_sold"))

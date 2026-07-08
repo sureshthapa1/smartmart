@@ -165,17 +165,25 @@ def create_order():
 
         for item in items_data:
             product = db.session.get(Product, item["product_id"])
+            if product is None:
+                db.session.rollback()
+                flash(f"Product ID {item['product_id']} not found.", "danger")
+                return render_template("online_orders/create.html", products=products)
             db.session.add(OnlineOrderItem(
                 order_id=order.id,
                 product_id=item["product_id"],
-                product_name=product.name if product else f"Product #{item['product_id']}",
+                product_name=product.name,
                 quantity=item["quantity"],
                 unit_price=item["unit_price"],
                 subtotal=item["unit_price"] * item["quantity"],
             ))
-            # Deduct stock when order is created
-            if product and product.quantity >= item["quantity"]:
+            # Deduct stock — only if sufficient quantity available
+            if product.quantity >= item["quantity"]:
                 product.quantity -= item["quantity"]
+            else:
+                db.session.rollback()
+                flash(f"Insufficient stock for '{product.name}': requested {item['quantity']}, available {product.quantity}.", "danger")
+                return render_template("online_orders/create.html", products=products)
 
         db.session.commit()
         flash(f"Online order {order.order_number} created successfully.", "success")

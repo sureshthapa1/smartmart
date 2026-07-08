@@ -35,9 +35,14 @@ def record_expense(expense_type: str, amount, expense_date: date, user_id: int, 
 
 def daily_balance(target_date: date) -> Decimal:
     """Return total income minus total expenses for a given date."""
+    from datetime import timedelta
+    day_start = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
+    day_end   = day_start + timedelta(days=1)
+
     income = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
-            Sale.sale_date.between(target_date, target_date)
+            Sale.sale_date >= day_start,
+            Sale.sale_date < day_end,
         )
     ).scalar() or Decimal("0")
 
@@ -63,15 +68,19 @@ def profit_loss(start: date, end: date) -> dict:
         )
     ).scalar() or Decimal("0")
 
-    # Cost of goods sold = cost_price * qty_sold for each sale item in range
-    cogs_rows = db.session.execute(
-        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty_sold"))
+    # Cost of goods sold — use historical cost_price stored on SaleItem (snapshot at time
+    # of sale) so figures remain accurate even after product cost changes.
+    cogs_row = db.session.execute(
+        db.select(
+            func.coalesce(
+                func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
+            )
+        )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, SaleItem.sale_id == Sale.id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
-        .group_by(Product.id)
-    ).all()
-    cogs = sum(Decimal(str(r.cost_price)) * r.qty_sold for r in cogs_rows)
+    ).scalar()
+    cogs = Decimal(str(cogs_row or 0))
 
     # Non-purchase expenses
     other_expenses = db.session.execute(

@@ -781,9 +781,11 @@ def checkout():
             try:
                 from ...models.promotion import Promotion
                 from datetime import date
+                # Promotion model has no 'code' column — match against name (case-insensitive).
+                # A dedicated 'code' column should be added via schema migration for production use.
                 promo = db.session.execute(
                     db.select(Promotion).where(
-                        Promotion.code == promo_code,
+                        func.upper(Promotion.name) == promo_code,
                         Promotion.is_active == True,
                     )
                 ).scalar_one_or_none()
