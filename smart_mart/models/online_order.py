@@ -16,11 +16,11 @@ class OnlineOrder(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    order_number = db.Column(db.String(30), unique=True, nullable=False)
+    order_number = db.Column(db.String(30), index=True, unique=True, nullable=False)
 
     # Customer info
     customer_name = db.Column(db.String(120), nullable=False)
-    customer_phone = db.Column(db.String(50), nullable=False)
+    customer_phone = db.Column(db.String(50), index=True, nullable=False)
     customer_email = db.Column(db.String(120), nullable=True)
     delivery_address = db.Column(db.String(500), nullable=False)
     delivery_area = db.Column(db.String(120), nullable=True)

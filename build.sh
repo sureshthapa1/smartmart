@@ -178,6 +178,20 @@ with app.app_context():
             safe_add(conn, "products", "is_featured",   "BOOLEAN DEFAULT FALSE")
             safe_add(conn, "products", "description_ne","TEXT")    # Nepali description
 
+        # ── Performance indexes on high-traffic columns ──────────────────────
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS ix_online_orders_order_number ON online_orders(order_number)",
+                "CREATE INDEX IF NOT EXISTS ix_online_orders_customer_phone ON online_orders(customer_phone)",
+                "CREATE INDEX IF NOT EXISTS ix_sales_sale_date ON sales(sale_date)",
+                "CREATE INDEX IF NOT EXISTS ix_products_category ON products(category)",
+                "CREATE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
+            ]:
+                try:
+                    conn.execute(text(idx_sql))
+                    conn.commit()
+                except Exception:
+                    pass  # index already exists or table not yet created
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
