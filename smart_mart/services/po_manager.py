@@ -8,7 +8,7 @@ from ..models.product import Product
 
 def _next_po_number() -> str:
     count = db.session.execute(db.select(db.func.count(PurchaseOrder.id))).scalar() or 0
-    return f"PO-{datetime.now().strftime('%Y%m')}-{count + 1:04d}"
+    return f"PO-{datetime.now(timezone.utc).strftime('%Y%m')}-{count + 1:04d}"
 
 
 def create_po(supplier_id: int, items: list[dict], user_id: int,
