@@ -1,8 +1,8 @@
 """Expenses blueprint — CRUD for rent, salary, utilities, and other costs."""
 
-from decimal import Decimal
 from __future__ import annotations
 
+from decimal import Decimal
 from datetime import date
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
