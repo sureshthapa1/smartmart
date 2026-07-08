@@ -53,11 +53,23 @@ def list_expenses():
     if type_filter:
         stmt = stmt.where(Expense.expense_type == type_filter)
 
-    all_expenses = db.session.execute(stmt).scalars().all()
-    total = len(all_expenses)
-    expenses = all_expenses[(page - 1) * per_page: page * per_page]
-
-    total_amount = sum(float(e.amount) for e in all_expenses)
+    # SQL-level count + total (no full table load)
+    from sqlalchemy import func as _f3
+    sq = stmt.subquery()
+    total = db.session.execute(
+        db.select(_f3.count()).select_from(sq)
+    ).scalar() or 0
+    total_amount = float(
+        db.session.execute(
+            db.select(_f3.coalesce(_f3.sum(Expense.amount), 0))
+            .select_from(sq)
+        ).scalar() or 0
+    )
+    # SQL-level pagination
+    offset = (page - 1) * per_page
+    expenses = db.session.execute(
+        stmt.offset(offset).limit(per_page)
+    ).scalars().all()
 
     # By-type totals for summary cards and donut chart
     by_type: dict = {}
