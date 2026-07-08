@@ -47,10 +47,20 @@ def list_returns():
         except ValueError:
             pass
 
-    all_returns = db.session.execute(stmt).scalars().all()
-    total = len(all_returns)
-    total_refund = sum(float(r.refund_amount) for r in all_returns)
-    returns = all_returns[(page - 1) * per_page: page * per_page]
+    # SQL-level count and refund total (no full table load)
+    from sqlalchemy import func as _f2
+    count_stmt = db.select(_f2.count()).select_from(stmt.subquery())
+    total = db.session.execute(count_stmt).scalar() or 0
+    total_refund_row = db.session.execute(
+        db.select(_f2.coalesce(_f2.sum(SaleReturn.refund_amount), 0))
+        .select_from(stmt.subquery())
+    ).scalar() or 0
+    total_refund = float(total_refund_row)
+    # SQL-level pagination
+    offset = (page - 1) * per_page
+    returns = db.session.execute(
+        stmt.offset(offset).limit(per_page)
+    ).scalars().all()
 
     return render_template("returns/list.html", returns=returns,
                            total=total, total_refund=total_refund,
