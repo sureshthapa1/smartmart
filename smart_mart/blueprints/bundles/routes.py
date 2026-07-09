@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import datetime, timezone
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
@@ -117,7 +118,7 @@ def _bundle_form(bundle=None):
             target = bundle or Bundle()
             target.name = request.form.get("name", "").strip()
             target.description = request.form.get("description", "").strip() or None
-            target.price = float(request.form.get("price", 0) or 0)
+            target.price = Decimal(str(request.form.get("price", 0) or 0 or 0))
             target.is_seasonal = request.form.get("is_seasonal") == "on"
             target.season_tag = request.form.get("season_tag", "General")
             target.is_active = request.form.get("is_active", "on") == "on"
