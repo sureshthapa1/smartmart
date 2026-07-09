@@ -60,15 +60,15 @@ def create_app(config_name="development"):
     cache.init_app(app)
 
     # ── Flask-Mail configuration from environment ─────────────────────────
-    import os as _os
-    app.config.setdefault("MAIL_SERVER",         _os.environ.get("MAIL_SERVER", ""))
-    app.config.setdefault("MAIL_PORT",           int(_os.environ.get("MAIL_PORT", 587)))
-    app.config.setdefault("MAIL_USE_TLS",        _os.environ.get("MAIL_USE_TLS", "true").lower() == "true")
+    # os imported at module level
+    app.config.setdefault("MAIL_SERVER",         os.environ.get("MAIL_SERVER", ""))
+    app.config.setdefault("MAIL_PORT",           int(os.environ.get("MAIL_PORT", 587)))
+    app.config.setdefault("MAIL_USE_TLS",        os.environ.get("MAIL_USE_TLS", "true").lower() == "true")
     app.config.setdefault("MAIL_USE_SSL",        False)
-    app.config.setdefault("MAIL_USERNAME",       _os.environ.get("MAIL_USERNAME", ""))
-    app.config.setdefault("MAIL_PASSWORD",       _os.environ.get("MAIL_PASSWORD", ""))
-    app.config.setdefault("MAIL_DEFAULT_SENDER", _os.environ.get("MAIL_DEFAULT_SENDER", "GoldKernel <noreply@goldkernel.com>"))
-    app.config.setdefault("MAIL_SUPPRESS_SEND",  not bool(_os.environ.get("MAIL_SERVER", "")))
+    app.config.setdefault("MAIL_USERNAME",       os.environ.get("MAIL_USERNAME", ""))
+    app.config.setdefault("MAIL_PASSWORD",       os.environ.get("MAIL_PASSWORD", ""))
+    app.config.setdefault("MAIL_DEFAULT_SENDER", os.environ.get("MAIL_DEFAULT_SENDER", "GoldKernel <noreply@goldkernel.com>"))
+    app.config.setdefault("MAIL_SUPPRESS_SEND",  not bool(os.environ.get("MAIL_SERVER", "")))
 
     # Init Flask-Mail (graceful — app runs fine without email configured)
     try:
@@ -227,13 +227,13 @@ def create_app(config_name="development"):
         app.jinja_env.globals["product_image_url"] = _piu
         app.jinja_env.filters["product_image_url"] = _piu
     except Exception:
-        import os as _os
+        # os imported at module level
         def _fallback_img_url(f, width=400):
             if not f:
                 return None
             if f.startswith("cld:") or f.startswith("http"):
                 return f if f.startswith("http") else None
-            return f"/static/uploads/products/{_os.path.basename(f)}"
+            return f"/static/uploads/products/{os.path.basename(f)}"
         app.jinja_env.globals["product_image_url"] = _fallback_img_url
         app.jinja_env.filters["product_image_url"] = _fallback_img_url
 
