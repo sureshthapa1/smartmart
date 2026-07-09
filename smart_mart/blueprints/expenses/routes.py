@@ -71,10 +71,14 @@ def list_expenses():
         stmt.offset(offset).limit(per_page)
     ).scalars().all()
 
-    # By-type totals for summary cards and donut chart
-    by_type: dict = {}
-    for e in all_expenses:
-        by_type[e.expense_type] = by_type.get(e.expense_type, 0) + float(e.amount)
+    # By-type totals for summary cards and donut chart (query all filtered rows, not just current page)
+    by_type_rows = db.session.execute(
+        db.select(Expense.expense_type, db.func.sum(Expense.amount).label("total"))
+        .select_from(sq)
+        .join(Expense, Expense.id == sq.c.id)
+        .group_by(Expense.expense_type)
+    ).all()
+    by_type: dict = {r.expense_type: float(r.total) for r in by_type_rows}
 
     # Monthly breakdown for stacked bar chart (last 6 months, all data)
     from sqlalchemy import extract
