@@ -10,8 +10,13 @@ from ..models.stock_take import StockTake, StockTakeItem
 
 
 def _next_reference() -> str:
-    count = db.session.execute(db.select(db.func.count(StockTake.id))).scalar() or 0
-    return f"ST-{count + 1:05d}"
+    """Race-resistant reference: uses MAX(id)+1 with timestamp suffix."""
+    from datetime import datetime, timezone as _tz
+    max_id = db.session.execute(
+        db.select(db.func.max(StockTake.id))
+    ).scalar() or 0
+    ts = datetime.now(_tz.utc).strftime("%H%M%S")
+    return f"ST-{max_id + 1:05d}-{ts}"
 
 
 def create_stock_take(user_id: int, notes: str = None,

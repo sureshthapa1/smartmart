@@ -622,21 +622,25 @@ def customer_risk(customer_name):
 
     # Compute outstanding on-the-fly for accuracy
     from ...models.operations import CustomerCreditPayment
-    credit_sales = db.session.execute(
-        db.select(Sale)
+    # Single aggregated query — avoids N+1 (one query per sale)
+    from sqlalchemy import case as _case
+    row = db.session.execute(
+        db.select(
+            _func.coalesce(_func.sum(Sale.total_amount), 0).label("total_credit"),
+            _func.coalesce(
+                db.select(_func.sum(CustomerCreditPayment.amount))
+                .where(CustomerCreditPayment.sale_id == Sale.id)
+                .correlate(Sale)
+                .scalar_subquery(),
+                0
+            ).label("total_paid")
+        )
         .where(
             _func.lower(Sale.customer_name) == name.lower(),
             Sale.payment_mode == "credit",
         )
-    ).scalars().all()
-
-    total_outstanding = 0.0
-    for s in credit_sales:
-        paid = db.session.execute(
-            db.select(_func.coalesce(_func.sum(CustomerCreditPayment.amount), 0))
-            .where(CustomerCreditPayment.sale_id == s.id)
-        ).scalar() or 0
-        total_outstanding += max(0.0, float(s.total_amount) - float(paid))
+    ).one()
+    total_outstanding = max(0.0, float(row.total_credit) - float(row.total_paid))
 
     return jsonify({
         "customer_name": name,

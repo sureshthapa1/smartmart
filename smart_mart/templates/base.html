@@ -415,7 +415,7 @@
             <li><a class="nav-link {% if request.endpoint == 'ai.anomalies_page' %}active{% endif %}"
                    href="{{ url_for('ai.anomalies_page') }}"><i class="bi bi-shield-exclamation"></i> Anomalies</a></li>
             <li><a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_profit_leakage_page' %}active{% endif %}"
-                   href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
+                   href="{{ url_for('bi_dashboard.bi_profit_leakage_page') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
             <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-file-earmark-bar-graph"></i> P&L Statement</a></li>
           </ul>

@@ -102,7 +102,10 @@ def generate_daily_report() -> dict:
 
     # COGS today
     cogs_rows = db.session.execute(
-        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
+        db.select(
+            func.coalesce(SaleItem.cost_price, Product.cost_price).label("cost_price"),
+            func.sum(SaleItem.quantity).label("qty")
+        )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
@@ -275,7 +278,10 @@ def generate_monthly_report() -> dict:
 
     # COGS
     cogs_rows = db.session.execute(
-        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
+        db.select(
+            func.coalesce(SaleItem.cost_price, Product.cost_price).label("cost_price"),
+            func.sum(SaleItem.quantity).label("qty")
+        )
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= _dt(month_start))

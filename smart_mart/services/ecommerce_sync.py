@@ -74,7 +74,7 @@ def generate_order_number() -> str:
         prefix = (settings.invoice_prefix or "GK").replace("INV", "WEB")
     except Exception:
         prefix = "GK"
-    return f"{prefix}-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    return f"{prefix}-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 def web_status(pos_status: str | None) -> str:

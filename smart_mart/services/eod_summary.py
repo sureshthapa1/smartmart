@@ -10,7 +10,13 @@ from ..models.operations import CashSession
 
 
 def get_eod_summary(target_date: date | None = None) -> dict:
+    from datetime import timedelta
     d = target_date or date.today()
+    # Use explicit >= / < range instead of .between(d, d) — that compares a
+    # DateTime column to a Date value which works on SQLite but fails on
+    # PostgreSQL (type mismatch). Covering the full calendar day is safer.
+    day_start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    day_end   = day_start + timedelta(days=1)
 
     # Sales breakdown
     sales_rows = db.session.execute(
@@ -20,7 +26,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
             func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
             func.coalesce(func.sum(Sale.discount_amount), 0).label("discounts"),
         )
-        .where(Sale.sale_date.between(d, d))
+        .where(Sale.sale_date >= day_start, Sale.sale_date < day_end)
         .group_by(Sale.payment_mode)
     ).all()
 
@@ -39,12 +45,15 @@ def get_eod_summary(target_date: date | None = None) -> dict:
         total_transactions += r.count
         total_discounts += float(r.discounts)
 
-    # COGS
+    # COGS — use historical cost_price stored on SaleItem (snapshot at time of sale)
+    # so figures stay accurate even after product cost changes
     cogs = db.session.execute(
-        db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
+        db.select(func.coalesce(
+            func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
+        ))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date.between(d, d))
+        .where(Sale.sale_date >= day_start, Sale.sale_date < day_end)
     ).scalar() or 0
 
     # Expenses
@@ -69,7 +78,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
                   func.sum(SaleItem.subtotal).label("rev"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date.between(d, d))
+        .where(Sale.sale_date >= day_start, Sale.sale_date < day_end)
         .group_by(Product.id)
         .order_by(func.sum(SaleItem.subtotal).desc())
         .limit(5)
@@ -78,7 +87,7 @@ def get_eod_summary(target_date: date | None = None) -> dict:
     # Cash session for the day
     sessions = db.session.execute(
         db.select(CashSession)
-        .where(CashSession.opened_at.between(d, d))
+        .where(CashSession.opened_at >= day_start, CashSession.opened_at < day_end)
         .order_by(CashSession.opened_at)
     ).scalars().all()
 

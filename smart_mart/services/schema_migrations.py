@@ -507,6 +507,15 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_create_index(conn, "ix_sale_customer_id", "sales", ["customer_id"]),
             ],
         ),
+        (
+            "2026_07_02_promotions_code_column",
+            "Add promotions.code column for short promo code lookup (e.g. SAVE10). "
+            "Unique index added so duplicate codes are rejected at DB level.",
+            lambda conn: (
+                _safe_add_column(conn, "promotions", "code", "VARCHAR(30)"),
+                _safe_exec(conn, 'CREATE UNIQUE INDEX IF NOT EXISTS "ix_promotions_code" ON "promotions" ("code") WHERE "code" IS NOT NULL'),
+            ),
+        ),
     ]
 
 

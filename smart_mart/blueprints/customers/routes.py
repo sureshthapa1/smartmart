@@ -200,24 +200,16 @@ def edit_customer(customer_id):
         customer.name = request.form.get("name", "").strip() or customer.name
         customer.phone = request.form.get("phone", "").strip() or None
         customer.address = request.form.get("address", "").strip() or None
-        try:
-            customer.email = request.form.get("email", "").strip() or None
-        except Exception as _exc:
-            import logging as _log
-            _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
+        customer.email = request.form.get("email", "").strip() or None
         birthday_raw = request.form.get("birthday", "").strip()
         if birthday_raw:
             try:
                 from datetime import date as _date
                 customer.birthday = _date.fromisoformat(birthday_raw)
             except ValueError:
-                pass
+                flash("Invalid birthday date format. Use YYYY-MM-DD.", "warning")
         elif request.form.get("clear_birthday") == "1":
-            try:
-                customer.birthday = None
-            except Exception as _exc:
-                import logging as _log
-                _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
+            customer.birthday = None
         try:
             db.session.commit()
             flash("Customer updated.", "success")
