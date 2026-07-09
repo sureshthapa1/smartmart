@@ -1,7 +1,7 @@
 """Advanced AI Business Advisor — comprehensive business intelligence and recommendations."""
 from __future__ import annotations
 
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import func
@@ -482,7 +482,7 @@ def full_advisor_report() -> dict:
         "forecast": revenue_forecast_30d(),
         "kpis": kpi_scorecard(),
         "product_actions": product_action_recommendations(),
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
