@@ -1,9 +1,9 @@
 """Sales blueprint — POS-style sale creation, listing, detail, and invoice routes."""
 
-from decimal import Decimal
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for

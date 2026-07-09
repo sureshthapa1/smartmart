@@ -63,10 +63,11 @@ def record_waste():
             raise ValueError("Choose a valid waste reason.")
 
         product = db.get_or_404(Product, product_id)
-        if quantity > float(product.quantity or 0):
+        stock_quantity = Decimal(str(product.quantity or 0))
+        if quantity > stock_quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")
-        cost_value = quantity * float(product.cost_price or 0)
-        product.quantity = int(float(product.quantity or 0) - quantity)
+        cost_value = quantity * Decimal(str(product.cost_price or 0))
+        product.quantity = int(stock_quantity - quantity)
         record = WasteRecord(
             product_id=product.id,
             quantity=quantity,

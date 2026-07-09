@@ -232,8 +232,8 @@ function applyPromo(){
   const csrf=document.querySelector('meta[name=csrf-token]')?.content||'';
   fetch('{{ url_for("store.apply_promo") }}',{
     method:'POST',credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code,csrf_token:csrf})
+    headers:{'Content-Type':'application/json','X-CSRFToken':csrf},
+    body:JSON.stringify({code})
   }).then(r=>r.json()).then(d=>{
     if(d.ok){
       res.innerHTML='<span style="color:var(--success);font-weight:700;"><i class="bi bi-check-circle-fill"></i> '+d.message+'</span>';

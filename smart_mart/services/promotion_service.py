@@ -68,7 +68,7 @@ def create_promotion(data: dict) -> Promotion:
 
 def update_promotion(promo_id: int, data: dict) -> Promotion:
     promo = db.get_or_404(Promotion, promo_id)
-    for field in ("name", "promo_type", "discount_value", "buy_qty", "free_qty",
+    for field in ("name", "code", "promo_type", "discount_value", "buy_qty", "free_qty",
                   "scope", "scope_value", "min_purchase", "start_date", "end_date", "is_active"):
         if field in data:
             setattr(promo, field, data[field])
