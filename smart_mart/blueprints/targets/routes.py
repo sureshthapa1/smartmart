@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
@@ -39,7 +40,7 @@ def set_target():
         target_date = date.fromisoformat(request.form.get("target_date", ""))
         if target_type == "monthly":
             target_date = target_date.replace(day=1)
-        amount = float(request.form.get("amount", 0) or 0)
+        amount = Decimal(str(request.form.get("amount", 0) or 0 or 0))
         if amount <= 0:
             raise ValueError("Target amount must be greater than zero.")
         existing = db.session.execute(
