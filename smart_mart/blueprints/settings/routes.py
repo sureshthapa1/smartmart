@@ -1,5 +1,6 @@
 """Settings blueprint — shop configuration (admin only)."""
 
+from decimal import Decimal
 import os
 import uuid
 
@@ -55,7 +56,7 @@ def index():
         s.footer_note = request.form.get("footer_note", "").strip() or "Thank you for shopping with us!"
         s.vat_enabled = request.form.get("vat_enabled") == "on"
         try:
-            vat_rate = float(request.form.get("vat_rate", "13") or 13)
+            vat_rate = Decimal(str(request.form.get("vat_rate", "13") or 13 or 0))
             if not (0 <= vat_rate <= 100):
                 raise ValueError
             s.vat_rate = vat_rate
@@ -67,8 +68,8 @@ def index():
         s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
         # Loyalty rates
         try:
-            s.loyalty_points_per_rupee = float(request.form.get("loyalty_points_per_rupee", "0.01") or 0.01)
-            s.loyalty_rupee_per_point = float(request.form.get("loyalty_rupee_per_point", "1.00") or 1.00)
+            s.loyalty_points_per_rupee = Decimal(str(request.form.get("loyalty_points_per_rupee", "0.01") or 0.01 or 0))
+            s.loyalty_rupee_per_point = Decimal(str(request.form.get("loyalty_rupee_per_point", "1.00") or 1.00 or 0))
         except (ValueError, TypeError):
             pass
 
