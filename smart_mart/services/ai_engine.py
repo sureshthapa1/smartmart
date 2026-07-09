@@ -7,7 +7,7 @@ No external ML libraries required.
 from __future__ import annotations
 
 import math
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from typing import Any
 
 from sqlalchemy import and_, func
@@ -533,7 +533,7 @@ def chatbot_query(message: str) -> str:
                 db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
                 .join(SaleItem, SaleItem.product_id == Product.id)
                 .join(Sale, Sale.id == SaleItem.sale_id)
-                .where(Sale.sale_date.between(today, today))
+                .where(Sale.sale_date.between(datetime.combine(today, datetime.min.time()), datetime.combine(today, datetime.max.time())))
             ).scalar() or 0
             profit_today = total - float(cogs)
         except Exception:
