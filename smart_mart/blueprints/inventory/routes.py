@@ -1,5 +1,6 @@
 """Inventory blueprint — product CRUD, stock adjustment, and category management."""
 
+from decimal import Decimal
 import os
 import uuid
 
@@ -740,14 +741,14 @@ def record_supplier_price(product_id):
     product = db.get_or_404(Product, product_id)
     try:
         from ...models.supplier_price_record import SupplierPriceRecord
-        new_cost = float(request.form.get("cost_price", 0) or 0)
+        new_cost = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
         if new_cost <= 0:
             raise ValueError("Cost price must be greater than zero.")
         record = SupplierPriceRecord(
             product_id=product.id,
             supplier_name=request.form.get("supplier_name", "").strip() or None,
             cost_price=new_cost,
-            quantity_kg=float(request.form.get("quantity_kg", 0) or 0) or None,
+            quantity_kg=Decimal(str(request.form.get("quantity_kg", 0) or 0 or 0)) or None,
             invoice_ref=request.form.get("invoice_ref", "").strip() or None,
             recorded_by=current_user.id,
         )
@@ -907,8 +908,8 @@ def create_variant(product_id):
     if request.method == "POST":
         variant_name = request.form.get("variant_name", "").strip()
         sku = request.form.get("sku", "").strip()
-        cost_price = float(request.form.get("cost_price", 0) or 0)
-        selling_price = float(request.form.get("selling_price", 0) or 0)
+        cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
+        selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
         quantity = int(request.form.get("quantity", 0) or 0)
         barcode = request.form.get("barcode", "").strip() or None
         if not variant_name or not sku:
@@ -946,8 +947,8 @@ def edit_variant(product_id, variant_id):
     if request.method == "POST":
         variant.variant_name = request.form.get("variant_name", "").strip()
         variant.sku = request.form.get("sku", "").strip()
-        variant.cost_price = float(request.form.get("cost_price", 0) or 0)
-        variant.selling_price = float(request.form.get("selling_price", 0) or 0)
+        variant.cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
+        variant.selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
         variant.quantity = int(request.form.get("quantity", 0) or 0)
         variant.barcode = request.form.get("barcode", "").strip() or None
         variant.is_active = request.form.get("is_active") == "on"
