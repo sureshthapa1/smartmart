@@ -1,5 +1,6 @@
 """Online Orders blueprint — full order management with delivery tracking."""
 
+from decimal import Decimal
 from __future__ import annotations
 
 import uuid
@@ -25,7 +26,7 @@ def _gen_order_number() -> str:
         prefix = (s.invoice_prefix or "ORD").replace("INV", "ORD")
     except Exception:
         prefix = "ORD"
-    return f"{prefix}-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+    return f"{prefix}-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
@@ -129,8 +130,8 @@ def create_order():
             return render_template("online_orders/create.html", products=products)
 
         subtotal = sum(i["unit_price"] * i["quantity"] for i in items_data)
-        delivery_charge = float(request.form.get("delivery_charge", 0) or 0)
-        discount = float(request.form.get("discount_amount", 0) or 0)
+        delivery_charge = Decimal(str(request.form.get("delivery_charge", 0) or 0 or 0))
+        discount = Decimal(str(request.form.get("discount_amount", 0) or 0 or 0))
 
         # Estimated delivery
         est_raw = request.form.get("estimated_delivery", "")
