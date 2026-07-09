@@ -112,6 +112,7 @@ def index():
                 0
             )
         )
+        .select_from(SaleItem)
         .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date.between(today, today_end))
