@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -53,7 +54,7 @@ def index():
 def record_waste():
     try:
         product_id = int(request.form.get("product_id", 0) or 0)
-        quantity = float(request.form.get("quantity", 0) or 0)
+        quantity = Decimal(str(request.form.get("quantity", 0) or 0 or 0))
         reason = request.form.get("reason", "").strip()
         notes = request.form.get("notes", "").strip() or None
         if quantity <= 0:
