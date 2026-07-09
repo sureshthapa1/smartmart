@@ -1,5 +1,6 @@
 """AI blueprint — demand prediction, insights, forecasting, chatbot, and advanced AI modules."""
 
+from decimal import Decimal
 from flask import Blueprint, jsonify, render_template, request
 from ...services import ai_engine
 from ...services.ai_trend_analyzer import (
@@ -847,7 +848,7 @@ def add_competitor_price():
         _add(
             product_id=int(request.form.get("product_id", 0)),
             competitor_name=request.form.get("competitor_name", "").strip(),
-            competitor_price=float(request.form.get("competitor_price", 0)),
+            competitor_price=Decimal(str(request.form.get("competitor_price", 0) or 0)),
             captured_by_user_id=current_user.id,
             notes=request.form.get("notes", "").strip() or None,
         )
