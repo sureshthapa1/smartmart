@@ -48,6 +48,7 @@ def get_active_promotions_for_cart(items: list[dict], subtotal: float) -> list[d
 def create_promotion(data: dict) -> Promotion:
     promo = Promotion(
         name=data["name"],
+        code=data.get("code"),
         promo_type=data.get("promo_type", "percentage"),
         discount_value=data.get("discount_value", 0),
         buy_qty=data.get("buy_qty"),
