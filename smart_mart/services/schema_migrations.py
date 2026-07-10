@@ -516,6 +516,18 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, 'CREATE UNIQUE INDEX IF NOT EXISTS "ix_promotions_code" ON "promotions" ("code") WHERE "code" IS NOT NULL'),
             ),
         ),
+        (
+            "2026_07_10_shop_settings_social_media",
+            "Add social media link columns to shop_settings for store footer display.",
+            lambda conn: (
+                _safe_add_column(conn, "shop_settings", "facebook_url",    "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "instagram_url",   "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "twitter_url",     "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "tiktok_url",      "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)"),
+                _safe_add_column(conn, "shop_settings", "website_url",     "VARCHAR(255)"),
+            ),
+        ),
     ]
 
 
