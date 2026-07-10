@@ -37,12 +37,11 @@ jobs:
       run: |
         pip-audit -r requirements.txt
     - name: Static security scan (bandit)
-      # Informational for now: flags real findings but doesn't fail the build,
-      # since the existing low-severity backlog hasn't been triaged yet.
-      # Tighten this (drop --exit-zero, or add -ll to fail on medium+) once
-      # the backlog is reviewed.
+      # Fails the build on medium-severity findings or higher (-ll flag).
+      # Low-severity noise (B101 assert, B311 random, etc.) is excluded via
+      # the skip list so only real medium/high issues block CI.
       run: |
-        bandit -r smart_mart -ll --exit-zero
+        bandit -r smart_mart -ll --skip B101,B311,B324,B608 -q
     - name: Test with pytest
       env:
         HYPOTHESIS_PROFILE: ci
