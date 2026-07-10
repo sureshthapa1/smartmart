@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Sales blueprint — POS-style sale creation, listing, detail, and invoice routes."""
 
-from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
