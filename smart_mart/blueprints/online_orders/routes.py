@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 """Online Orders blueprint — full order management with delivery tracking."""
 
-from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone, date, timedelta
