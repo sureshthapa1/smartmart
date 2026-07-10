@@ -58,6 +58,16 @@ class DevelopmentConfig(Config):
             stacklevel=2,
         )
 
+    # Session cookies must work over plain HTTP on LAN (no HTTPS).
+    # Explicitly set Secure=False so the cookie is sent on http:// requests
+    # from phones/tablets on the same network.
+    SESSION_COOKIE_SECURE   = False
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE   = False
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+
     # Use Redis cache if available in dev, otherwise SimpleCache
     _redis = os.environ.get("REDIS_URL", "")
     if _redis:
