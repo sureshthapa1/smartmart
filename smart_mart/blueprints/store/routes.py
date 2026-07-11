@@ -780,9 +780,10 @@ def checkout():
         if promo_code:
             try:
                 from ...models.promotion import Promotion
+                from datetime import date
                 promo = db.session.execute(
                     db.select(Promotion).where(
-                        func.upper(Promotion.code) == promo_code,
+                        Promotion.code == promo_code,
                         Promotion.is_active == True,
                     )
                 ).scalar_one_or_none()
@@ -1304,7 +1305,7 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         )
         return False
     try:
-        verify_url = "https://khalti.ebanking.com.np/api/v2/payment/verify/"
+        verify_url = "https://khalti.com/api/v2/payment/verify/"
         payload = _json.dumps({"token": token, "amount": amount_paisa}).encode()
         req = _req.Request(verify_url, data=payload, method="POST")
         req.add_header("Authorization", f"Key {secret_key}")
@@ -1804,24 +1805,13 @@ def apply_promo():
         return jsonify({"ok": False, "message": "Please enter a promo code."})
     today = date.today()
     cart = _cart()
-    subtotal = 0.0
-    for pid, qty in cart.items():
-        try:
-            product_id = int(pid)
-            line_qty = max(0, min(int(qty), MAX_QTY_PER_ITEM))
-        except (TypeError, ValueError):
-            continue
-
-        product = db.session.get(Product, product_id)
-        if not product or not getattr(product, "is_active", True):
-            continue
-
-        line_qty = min(line_qty, available_quantity(product))
-        subtotal += float(product.selling_price or 0) * line_qty
+    subtotal = sum(
+        float(v.get("price", 0)) * int(v.get("qty", 0)) for v in cart.values()
+    )
     try:
         promo = db.session.execute(
             db.select(Promotion).where(
-                func.upper(Promotion.code) == code,
+                Promotion.code == code,
                 Promotion.is_active == True,
                 Promotion.start_date <= today,
                 Promotion.end_date >= today,
