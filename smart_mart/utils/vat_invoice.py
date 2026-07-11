@@ -81,16 +81,16 @@ def generate_vat_invoice(sale, shop_settings):
     story.append(Spacer(1, 14))
 
     rows = [["#", "Product Name", "Quantity (g)", "Unit Price (NPR)", "Amount (NPR)"]]
-    subtotal = Decimal("0")
+    subtotal = 0.0
     for idx, item in enumerate(sale.items, 1):
-        amount = Decimal(str(item.subtotal or 0))
+        amount = float(item.subtotal or 0)
         subtotal += amount
         rows.append([
             idx,
             item.product.name if item.product else f"Product #{item.product_id}",
             f"{float(item.quantity):,.0f}",
             f"{float(item.unit_price):,.2f}",
-            f"{float(amount):,.2f}",
+            f"{amount:,.2f}",
         ])
 
     item_table = Table(rows, colWidths=[width * 0.07, width * 0.43, width * 0.17, width * 0.16, width * 0.17])
@@ -106,16 +106,17 @@ def generate_vat_invoice(sale, shop_settings):
     story.append(item_table)
     story.append(Spacer(1, 12))
 
-    discount = Decimal(str(sale.discount_amount or 0))
-    taxable = max(Decimal("0"), subtotal - discount)
-    vat_amount = (taxable * Decimal("0.13")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    grand_total = taxable + vat_amount
+    discount = float(sale.discount_amount or 0)
+    taxable = max(0.0, subtotal - discount)
+    taxable_decimal = Decimal(str(taxable))
+    vat_amount = (taxable_decimal * Decimal('0.13')).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    grand_total = taxable_decimal + vat_amount
     totals = [
-        ["Subtotal", f"NPR {float(subtotal):,.2f}"],
-        ["Discount", f"NPR {float(discount):,.2f}"],
-        ["Taxable Amount", f"NPR {float(taxable):,.2f}"],
-        ["VAT 13%", f"NPR {float(vat_amount):,.2f}"],
-        ["GRAND TOTAL", f"NPR {float(grand_total):,.2f}"],
+        ["Subtotal", f"NPR {subtotal:,.2f}"],
+        ["Discount", f"NPR {discount:,.2f}"],
+        ["Taxable Amount", f"NPR {taxable:,.2f}"],
+        ["VAT 13%", f"NPR {vat_amount:,.2f}"],
+        ["GRAND TOTAL", f"NPR {grand_total:,.2f}"],
     ]
     totals_table = Table(totals, colWidths=[width * 0.75, width * 0.25])
     totals_table.setStyle(TableStyle([
