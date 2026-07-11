@@ -58,10 +58,10 @@
   <a id="exportCsv" href="#" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-download me-1"></i>Export P&amp;L CSV
   </a>
-  <a href="{{ url_for('bi_dashboard.bi_batches_page') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+  <a href="{{ url_for('bi.bi_batches_page') }}" class="btn btn-outline-secondary btn-sm ms-auto">
     <i class="bi bi-box-seam me-1"></i>Purchase Batches
   </a>
-  <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-warning btn-sm">
+  <a href="{{ url_for('bi.bi_opex_page') }}" class="btn btn-warning btn-sm">
     <i class="bi bi-plus-circle me-1"></i>Add OPEX
   </a>
 </div>
@@ -75,7 +75,7 @@
 <div id="opexSummaryBar" class="alert alert-warning d-none mb-3 d-flex align-items-center gap-3">
   <i class="bi bi-exclamation-triangle-fill fs-5"></i>
   <div class="flex-grow-1" id="opexSummaryText"></div>
-  <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-warning btn-sm text-nowrap">
+  <a href="{{ url_for('bi.bi_opex_page') }}" class="btn btn-warning btn-sm text-nowrap">
     <i class="bi bi-plus-circle me-1"></i>Manage OPEX
   </a>
 </div>
@@ -370,7 +370,7 @@ async function loadDashboard(){
       wrap.innerHTML = `<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
         <i class="bi bi-pie-chart fs-1 opacity-25 mb-2"></i>
         <div class="small">No OPEX data recorded yet.</div>
-        <a href="{{ url_for('bi_dashboard.bi_opex_page') }}" class="btn btn-sm btn-warning mt-2"><i class="bi bi-plus-circle me-1"></i>Add OPEX</a>
+        <a href="{{ url_for('bi.bi_opex_page') }}" class="btn btn-sm btn-warning mt-2"><i class="bi bi-plus-circle me-1"></i>Add OPEX</a>
       </div>`;
     }
     if(json.product_performance.labels.length)
