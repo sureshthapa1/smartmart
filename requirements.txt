@@ -23,3 +23,5 @@ cloudinary==1.44.0
 Markdown==3.8.1
 # Redis client — required when REDIS_URL is set (shared cache + rate limiting across workers)
 redis==5.2.1
+# Windows-compatible WSGI server (replaces gunicorn which is Linux-only)
+waitress==3.0.1

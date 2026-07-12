@@ -26,12 +26,6 @@ echo  Press Ctrl+C to stop the server.
 echo  ==========================================
 echo.
 
-.venv\Scripts\python.exe -m gunicorn "smart_mart.app:create_app('development')" ^
-    --bind 0.0.0.0:5000 ^
-    --workers 1 ^
-    --threads 4 ^
-    --timeout 30 ^
-    --access-logfile logs/access.log ^
-    --error-logfile logs/error.log
+.venv\Scripts\python.exe serve.py
 
 pause
