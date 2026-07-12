@@ -136,11 +136,11 @@ Generate product content. Respond with this exact JSON structure:
 
 def _claude_autofill(product_name: str, category: str = "") -> Optional[dict]:
     """
-    Call Claude API to generate product content.
+    Call Gemini API to generate product content.
     Returns parsed dict or None on failure.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return None
 
     prompt = _AI_PROMPT.format(
@@ -149,32 +149,13 @@ def _claude_autofill(product_name: str, category: str = "") -> Optional[dict]:
     )
 
     try:
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 600,
-            "system": _AI_SYSTEM,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            result = json.loads(resp.read())
-
-        raw = result["content"][0]["text"].strip()
+        raw = gemini_generate(prompt, system=_AI_SYSTEM, max_tokens=600, temperature=0.4)
+        if not raw:
+            return None
         # Strip markdown fences if present
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
-        data = json.loads(raw)
-        return data
+        return json.loads(raw)
     except Exception:
         return None
 

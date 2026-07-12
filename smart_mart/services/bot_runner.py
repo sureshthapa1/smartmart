@@ -195,45 +195,37 @@ def run_reorder_bot(user_id: int = 1) -> dict:
                                grp["supplier_name"], e)
 
         logger.info("reorder_bot: %d POs created", len(pos_created))
-        # Festival RAG + Claude narrative
+        # Festival RAG + Gemini narrative
         _festival_ctx = ''
-        _claude_summ  = ''
+        _gemini_summ  = ''
         try:
             from .nepal_festivals import get_festival_context_for_ai
             _festival_ctx = get_festival_context_for_ai(45)
-            import os as _os2, json as _json2, urllib.request as _ureq2
-            _ak = _os2.environ.get('ANTHROPIC_API_KEY', '')
-            if _ak and pos_created:
+            from .gemini_client import gemini_generate, gemini_available
+            if gemini_available() and pos_created:
                 _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
                 _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
-                _pl = _json2.dumps({"model":"claude-haiku-4-5-20251001","max_tokens":150,"messages":[{"role":"user","content":_pr}]}).encode()
-                _rq = _ureq2.Request('https://api.anthropic.com/v1/messages',data=_pl,method='POST',headers={"x-api-key":_ak,"anthropic-version":"2023-06-01","content-type":"application/json"})
-                with _ureq2.urlopen(_rq, timeout=12) as _rs:
-                    _claude_summ = _json2.loads(_rs.read())['content'][0]['text'].strip()
+                _gemini_summ = gemini_generate(_pr, max_tokens=150) or ''
         except Exception:
             pass
 
-        # Festival RAG + Claude narrative
+        # Festival RAG + Gemini narrative
         _festival_ctx = ''
-        _claude_summ  = ''
+        _gemini_summ  = ''
         try:
             from .nepal_festivals import get_festival_context_for_ai
             _festival_ctx = get_festival_context_for_ai(45)
-            import os as _os2, json as _json2, urllib.request as _ureq2
-            _ak = _os2.environ.get('ANTHROPIC_API_KEY', '')
-            if _ak and pos_created:
+            from .gemini_client import gemini_generate, gemini_available
+            if gemini_available() and pos_created:
                 _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
                 _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
-                _pl = _json2.dumps({"model":"claude-haiku-4-5-20251001","max_tokens":150,"messages":[{"role":"user","content":_pr}]}).encode()
-                _rq = _ureq2.Request('https://api.anthropic.com/v1/messages',data=_pl,method='POST',headers={"x-api-key":_ak,"anthropic-version":"2023-06-01","content-type":"application/json"})
-                with _ureq2.urlopen(_rq, timeout=12) as _rs:
-                    _claude_summ = _json2.loads(_rs.read())['content'][0]['text'].strip()
+                _gemini_summ = gemini_generate(_pr, max_tokens=150) or ''
         except Exception:
             pass
 
         return {"task": "reorder_bot", "pos_created": len(pos_created),
                 "details": pos_created, "festival_context": _festival_ctx,
-                "claude_summary": _claude_summ}
+                "claude_summary": _gemini_summ}
     except Exception as e:
         logger.warning("reorder_bot failed: %s", e)
         return {"task": "reorder_bot", "pos_created": 0, "error": str(e)}
@@ -698,11 +690,11 @@ def run_winback_bot(inactive_days: int = 45) -> dict:
     from ..models.customer_account import CustomerAccount
     from ..models.shop_settings import ShopSettings
     from ..services.notification_service import send_notification
-    import os, json, urllib.request as _ureq
+    from .gemini_client import gemini_generate, gemini_available
 
     settings = ShopSettings.get()
     cutoff   = date.today() - timedelta(days=inactive_days)
-    api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
+    use_ai   = gemini_available()
 
     try:
         # Find customers with last order before cutoff
@@ -755,7 +747,7 @@ def run_winback_bot(inactive_days: int = 45) -> dict:
                 pass
 
             # Generate personalised message
-            if api_key:
+            if use_ai:
                 try:
                     prompt = (
                         f"Write a friendly 1-sentence WhatsApp/SMS win-back message "
@@ -764,17 +756,9 @@ def run_winback_bot(inactive_days: int = 45) -> dict:
                         f"{'They have loyalty points: ' + loyalty_text if loyalty_text else ''} "
                         f"Mention their favourite product. Warm, not pushy. Max 160 chars including shop name."
                     )
-                    payload = json.dumps({
-                        "model": "claude-haiku-4-5-20251001", "max_tokens": 80,
-                        "messages": [{"role": "user", "content": prompt}],
-                    }).encode()
-                    req = _ureq.Request(
-                        "https://api.anthropic.com/v1/messages", data=payload, method="POST",
-                        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                                 "content-type": "application/json"},
-                    )
-                    with _ureq.urlopen(req, timeout=10) as resp:
-                        msg = json.loads(resp.read())["content"][0]["text"].strip()
+                    msg = gemini_generate(prompt, max_tokens=80) or ""
+                    if not msg:
+                        raise ValueError("empty")
                 except Exception:
                     shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
                     msg  = f"[{shop}] We miss you! Your favourite {fav_products} are waiting. {loyalty_text} Visit us: goldkernel.com/store"

@@ -32,10 +32,9 @@ def _get_mail():
 
 
 def _claude_personalised_email_section(items: list) -> str:
-    """Generate personalised product tips + upsell using Claude Haiku."""
-    import os, json, urllib.request as _ureq
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key or not items:
+    """Generate personalised product tips + upsell using Gemini."""
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available() or not items:
         return ""
     try:
         product_names = ", ".join(i.get("name", "") for i in items[:4])
@@ -47,18 +46,7 @@ def _claude_personalised_email_section(items: list) -> str:
             f"3. (Optional) One complementary product they might enjoy next time\n\n"
             f"Keep it warm, helpful, and specific to dry fruits. No generic text."
         )
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 160,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-        req = _ureq.Request(
-            "https://api.anthropic.com/v1/messages", data=payload, method="POST",
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-        )
-        with _ureq.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())["content"][0]["text"].strip()
+        return gemini_generate(prompt, max_tokens=160) or ""
     except Exception:
         return ""
 

@@ -19,44 +19,31 @@ from ..extensions import db
 
 
 def _parse_query_with_claude(query: str) -> dict | None:
-    """Use Claude to convert natural language to a structured search intent."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    """Use Gemini to convert natural language to a structured search intent."""
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return None
     try:
-        import urllib.request
         today = date.today().isoformat()
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 200,
-            "system": (
-                f"Today is {today}. You are a search parser for a Nepal retail shop system. "
-                "Convert the user's query into a JSON search intent. "
-                "Reply ONLY with a JSON object (no markdown) with these keys: "
-                "type (one of: product, sale, customer, expense, supplier, report), "
-                "filters (object with optional keys: min_amount, max_amount, days_back, "
-                "status, category, keyword), "
-                "sort (string: 'recent', 'amount_desc', 'amount_asc', 'name'). "
-                "Example: {\"type\": \"sale\", \"filters\": {\"min_amount\": 5000, \"days_back\": 1}, \"sort\": \"amount_desc\"}"
-            ),
-            "messages": [{"role": "user", "content": query}],
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            method="POST",
+        system = (
+            f"Today is {today}. You are a search parser for a Nepal retail shop system. "
+            "Convert the user's query into a JSON search intent. "
+            "Reply ONLY with a JSON object (no markdown) with these keys: "
+            "type (one of: product, sale, customer, expense, supplier, report), "
+            "filters (object with optional keys: min_amount, max_amount, days_back, "
+            "status, category, keyword), "
+            "sort (string: 'recent', 'amount_desc', 'amount_asc', 'name'). "
+            "Example: {\"type\": \"sale\", \"filters\": {\"min_amount\": 5000, \"days_back\": 1}, \"sort\": \"amount_desc\"}"
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            result = json.loads(resp.read())
-        text = result["content"][0]["text"].strip()
+        text = gemini_generate(query, system=system, max_tokens=200, temperature=0.1)
+        if not text:
+            return None
         if text.startswith("```"):
             text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         return json.loads(text)
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).debug("Smart search parse failed: %s", exc)
+        import logging as _log
+        _log.getLogger(__name__).debug("Smart search parse failed: %s", exc)
         return None
 
 

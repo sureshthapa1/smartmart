@@ -428,8 +428,8 @@ def chatbot_reply(
     customer_name: str | None = None,
 ) -> str:
     """
-    Generate a Claude-powered reply for the store chatbot.
-    Falls back to a keyword reply if ANTHROPIC_API_KEY is not set.
+    Generate a Gemini-powered reply for the store chatbot.
+    Falls back to a keyword reply if GEMINI_API_KEY is not set.
 
     Args:
         message:       Customer's latest message.
@@ -443,8 +443,8 @@ def chatbot_reply(
     if not message:
         return "How can I help you today?"
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return _keyword_chatbot_reply(message)
 
     # RAG: retrieve relevant products for this specific query
@@ -454,9 +454,7 @@ def chatbot_reply(
     customer_ctx = ""
     if customer_name:
         customer_ctx = f"CUSTOMER: {customer_name} (logged in).\n"
-    if customer_phone := (
-        history[-1].get("customer_phone") if history else None
-    ):
+    if history and (customer_phone := history[-1].get("customer_phone")):
         try:
             from ..models.online_order import OnlineOrder
             recent_orders = db.session.execute(
@@ -491,41 +489,24 @@ def chatbot_reply(
         customer_context=customer_ctx + kb_context,
     )
 
-    # Build message list — last 6 turns of history
-    messages = []
+    # Build Gemini-compatible history (role must be "user" or "model")
+    gemini_history = []
     if history:
         for turn in history[-6:]:
             role = turn.get("role", "user")
             content = turn.get("content", "")
-            if role in ("user", "assistant") and content:
-                messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": message})
+            if role == "assistant":
+                role = "model"
+            if role in ("user", "model") and content:
+                gemini_history.append({"role": role, "parts": [{"text": content}]})
 
-    try:
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 200,
-            "system": system,
-            "messages": messages,
-        }).encode()
-
-        import urllib.request as _urllib_req
-        req = _urllib_req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            method="POST",
-        )
-        with _urllib_req.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read())
-        return result["content"][0]["text"].strip()
-
-    except Exception:
-        return _keyword_chatbot_reply(message)
+    result = gemini_generate(
+        message,
+        system=system,
+        max_tokens=200,
+        history=gemini_history,
+    )
+    return result if result else _keyword_chatbot_reply(message)
 
 
 def _keyword_chatbot_reply(message: str) -> str:

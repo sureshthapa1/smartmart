@@ -94,11 +94,11 @@ def chatbot():
 @ai_bp.route("/chatbot/query", methods=["POST"])
 @login_required
 def chatbot_query():
-    """Chatbot query — uses Anthropic API when key is configured, falls back to
+    """Chatbot query — uses Gemini API when key is configured, falls back to
     the built-in keyword engine so the chatbot always works even without an API key.
     """
-    import os as _os
     from flask import session as flask_session
+    from smart_mart.services.gemini_client import gemini_generate, gemini_available
     data = request.get_json() or {}
     message = data.get("message", "").strip()
     if not message:
@@ -106,13 +106,11 @@ def chatbot_query():
 
     history = flask_session.get("chatbot_history", [])
 
-    api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
     reply = None
 
-    if api_key:
-        # ── Anthropic API path ──────────────────────────────────────────
+    if gemini_available():
+        # ── Gemini API path ──────────────────────────────────────────────
         try:
-            import urllib.request as _req, json as _json
             # Build live data context for grounding
             kw_reply = ai_engine.chatbot_query(message)  # fast DB stats
             system = (
@@ -123,29 +121,21 @@ def chatbot_query():
                 "If the live data already answers the question fully, summarise it clearly. "
                 "Otherwise answer from your own knowledge."
             )
-            msgs = [{"role": "user", "content": message}]
-            body = _json.dumps({
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 400,
-                "system": system,
-                "messages": msgs,
-            }).encode()
-            req = _req.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=body,
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                method="POST",
+            # Convert history to Gemini format
+            gemini_history = []
+            for h in history[-6:]:
+                role = "model" if h["role"] == "bot" else "user"
+                gemini_history.append({"role": role, "parts": [{"text": h["text"]}]})
+
+            reply = gemini_generate(
+                message,
+                system=system,
+                max_tokens=400,
+                history=gemini_history,
             )
-            with _req.urlopen(req, timeout=10) as resp:
-                result = _json.loads(resp.read())
-            reply = result["content"][0]["text"].strip()
         except Exception as _exc:
             import logging as _log
-            _log.getLogger(__name__).warning("Chatbot API call failed, using fallback: %s", _exc)
+            _log.getLogger(__name__).warning("Chatbot Gemini call failed, using fallback: %s", _exc)
 
     if not reply:
         # ── Keyword-matching fallback (always available, no API key needed) ──

@@ -189,11 +189,11 @@ def _collab_recs(customer_phone: str, limit: int = 8) -> list[int]:
 
 def _llm_recs(product_name: str, category: str, available_names: list[str]) -> list[str]:
     """
-    Ask Claude which products pair well with `product_name`.
+    Ask Gemini which products pair well with `product_name`.
     Returns list of product names from available_names.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key or not available_names:
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available() or not available_names:
         return []
 
     try:
@@ -205,27 +205,9 @@ def _llm_recs(product_name: str, category: str, available_names: list[str]) -> l
             f"Reply with ONLY a JSON array of product names, e.g. [\"Almonds 500g\", \"Cashews 250g\"]\n\n"
             f"Products:\n{catalogue_preview}"
         )
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 150,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-
-        import urllib.request as _req
-        req = _req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            method="POST",
-        )
-        with _req.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read())
-        text = data["content"][0]["text"].strip()
-        # Extract JSON array
+        text = gemini_generate(prompt, max_tokens=150, temperature=0.3)
+        if not text:
+            return []
         import re
         m = re.search(r'\[.*?\]', text, re.DOTALL)
         if m:
