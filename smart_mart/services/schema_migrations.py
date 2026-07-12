@@ -528,6 +528,15 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "shop_settings", "website_url",     "VARCHAR(255)"),
             ),
         ),
+        (
+            "2026_07_12_product_seo_tags",
+            "Add tags, meta_description, seo_title columns to products for AI SEO features.",
+            lambda conn: (
+                _safe_add_column(conn, "products", "tags",             "TEXT"),
+                _safe_add_column(conn, "products", "meta_description", "VARCHAR(320)"),
+                _safe_add_column(conn, "products", "seo_title",        "VARCHAR(120)"),
+            ),
+        ),
     ]
 
 

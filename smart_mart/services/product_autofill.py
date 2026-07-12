@@ -130,7 +130,10 @@ Generate product content. Respond with this exact JSON structure:
   "pack_size": "most common pack size for this product type e.g. 250g, 1kg, 500ml",
   "storage_tip": "one sentence on how to store this product",
   "origin": "where this product typically comes from e.g. Nepal, India, California",
-  "image_search": "3-4 word Pexels image search query for a clean product photo e.g. cashew nuts bowl"
+  "image_search": "3-4 word Pexels image search query for a clean product photo e.g. cashew nuts bowl",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6"],
+  "meta_description": "SEO meta description under 160 characters — benefit-focused for Nepal customers",
+  "seo_title": "SEO page title under 60 characters e.g. Buy Premium Cashews Nepal - GoldKernel"
 }}"""
 
 
@@ -265,8 +268,11 @@ def autofill_product(product, force: bool = False) -> dict:
     need_benefits     = force or not getattr(product, "benefits", None)
     need_origin       = force or not getattr(product, "origin", None)
     need_storage_tips = force or not getattr(product, "storage_tips", None)
+    need_tags         = force or not getattr(product, "tags", None)
+    need_meta_desc    = force or not getattr(product, "meta_description", None)
+    need_seo_title    = force or not getattr(product, "seo_title", None)
 
-    if need_description or need_pack_size or need_image or need_benefits or need_origin or need_storage_tips:
+    if need_description or need_pack_size or need_image or need_benefits or need_origin or need_storage_tips or need_tags or need_meta_desc or need_seo_title:
         # Try Claude first
         data = _claude_autofill(name, category)
         if not data:
@@ -297,6 +303,26 @@ def autofill_product(product, force: bool = False) -> dict:
         if need_storage_tips and data.get("storage_tip"):
             product.storage_tips = data["storage_tip"]
             updated["storage_tips"] = True
+
+        # ── 2e. Tags (comma-separated) ────────────────────────────────────────
+        if need_tags and data.get("tags"):
+            tags_raw = data["tags"]
+            if isinstance(tags_raw, list):
+                product.tags = ", ".join(str(t).strip().lower() for t in tags_raw if t)
+            elif isinstance(tags_raw, str):
+                product.tags = tags_raw
+            if getattr(product, "tags", None):
+                updated["tags"] = True
+
+        # ── 2f. Meta description (SEO) ────────────────────────────────────────
+        if need_meta_desc and data.get("meta_description"):
+            product.meta_description = str(data["meta_description"])[:320]
+            updated["meta_description"] = True
+
+        # ── 2g. SEO title ─────────────────────────────────────────────────────
+        if need_seo_title and data.get("seo_title"):
+            product.seo_title = str(data["seo_title"])[:120]
+            updated["seo_title"] = True
 
         # ── 3. Pack size ─────────────────────────────────────────────────────
         if need_pack_size and data.get("pack_size"):
