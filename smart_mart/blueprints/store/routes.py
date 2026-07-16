@@ -1901,9 +1901,9 @@ def submit_review(product_id):
         )
         # AI Review Classification — auto-approve genuine reviews, flag suspicious ones
         try:
-            import os as _os3, json as _json3, urllib.request as _ureq3
-            _ak = _os3.environ.get("ANTHROPIC_API_KEY", "")
-            if _ak and (review.body or review.title):
+            from ...services.gemini_client import gemini_generate, gemini_available
+            if gemini_available() and (review.body or review.title):
+                import json as _json3
                 _review_text = f"Rating: {review.rating}/5\nTitle: {review.title or ''}\nBody: {review.body or ''}"
                 _prompt = (
                     "Classify this product review for a Nepal dry fruits store.\n\n"
@@ -1913,29 +1913,19 @@ def submit_review(product_id):
                     '"reason": "one sentence"}\n'
                     "Auto-approve if: genuine, rating 4-5, confidence > 0.85, no suspicious patterns."
                 )
-                _pl = _json3.dumps({
-                    "model": "claude-haiku-4-5-20251001", "max_tokens": 120,
-                    "messages": [{"role": "user", "content": _prompt}],
-                }).encode()
-                _rq = _ureq3.Request(
-                    "https://api.anthropic.com/v1/messages", data=_pl, method="POST",
-                    headers={"x-api-key": _ak, "anthropic-version": "2023-06-01",
-                             "content-type": "application/json"},
-                )
-                with _ureq3.urlopen(_rq, timeout=10) as _rs:
-                    _res = _json3.loads(_rs.read())
-                _raw = _res["content"][0]["text"].strip()
-                # Strip markdown code fences if present
-                if _raw.startswith("```"):
-                    _raw = _raw.split("```")[1].strip()
-                    if _raw.startswith("json"):
-                        _raw = _raw[4:].strip()
-                _cls = _json3.loads(_raw)
-                if _cls.get("classification") == "toxic":
-                    flash("Your review contains inappropriate content and could not be submitted.", "danger")
-                    return redirect(url_for("store.product_detail", product_id=product_id))
-                if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
-                    review.is_approved = True   # Auto-approve high-confidence genuine reviews
+                _raw = gemini_generate(_prompt, max_tokens=120, temperature=0.1)
+                if _raw:
+                    # Strip markdown code fences if present
+                    if _raw.startswith("```"):
+                        _raw = _raw.split("```")[1].strip()
+                        if _raw.startswith("json"):
+                            _raw = _raw[4:].strip()
+                    _cls = _json3.loads(_raw)
+                    if _cls.get("classification") == "toxic":
+                        flash("Your review contains inappropriate content and could not be submitted.", "danger")
+                        return redirect(url_for("store.product_detail", product_id=product_id))
+                    if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
+                        review.is_approved = True   # Auto-approve high-confidence genuine reviews
         except Exception as exc:
             current_app.logger.debug("AI review classification failed, going to manual queue: %s", exc)
 
@@ -2085,8 +2075,8 @@ def price_justify(product_id: int):
     if not product:
         return jsonify({"ok": False, "text": ""})
 
-    import os as _os4, json as _json4, urllib.request as _ureq4
-    api_key = _os4.environ.get("ANTHROPIC_API_KEY", "")
+    import os as _os4
+    api_key = _os4.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         # Fallback: build from product fields
         parts = []
@@ -2099,6 +2089,7 @@ def price_justify(product_id: int):
         return jsonify({"ok": True, "text": text})
 
     try:
+        from ...services.gemini_client import gemini_generate
         benefits = (product.benefits or "")[:100]
         prompt = (
             f"Write ONE sentence (max 18 words) explaining why {product.name} "
@@ -2108,14 +2099,7 @@ def price_justify(product_id: int):
             "Focus on quality, origin, or nutrition. Be specific."
             + (f" Key benefits: {benefits}" if benefits else "")
         )
-        payload = _json4.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 60,
-            "messages": [{"role": "user", "content": prompt}]}).encode()
-        req = _ureq4.Request("https://api.anthropic.com/v1/messages",
-            data=payload, method="POST",
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"})
-        with _ureq4.urlopen(req, timeout=8) as resp:
-            text = _json4.loads(resp.read())["content"][0]["text"].strip()
+        text = gemini_generate(prompt, max_tokens=60, temperature=0.5) or ""
         cache_service.set(cache_key, text, ttl=86400)
         return jsonify({"ok": True, "text": text})
     except Exception:

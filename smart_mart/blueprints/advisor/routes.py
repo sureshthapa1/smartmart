@@ -1,8 +1,5 @@
-"""AI Business Advisor blueprint — rule-based analysis + Claude narrative commentary."""
+"""AI Business Advisor blueprint — rule-based analysis + Gemini narrative commentary."""
 from __future__ import annotations
-
-import json
-import os
 
 from flask import Blueprint, jsonify, render_template, request
 from ...services.decorators import admin_required, login_required
@@ -25,11 +22,11 @@ def _require_perm(perm: str):
 
 def _claude_advisor_commentary(report: dict) -> str | None:
     """
-    Ask Claude to write a short executive commentary on the full advisor report.
+    Ask Gemini to write a short executive commentary on the full advisor report.
     Returns plain text paragraph or None if API key missing / call fails.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    from ...services.gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return None
     try:
         summary = report.get("summary", {})
@@ -47,36 +44,18 @@ def _claude_advisor_commentary(report: dict) -> str | None:
             "kpi_scores":         {k.get("kpi"): k.get("score") for k in kpis},
         }
 
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 220,
-            "system": (
-                "You are a concise business advisor for GoldKernel, a premium dry fruits "
-                "retail shop in Dhangadhi, Nepal. Write a 2-3 sentence executive summary "
-                "of the business health. Be direct, specific, and action-oriented. "
-                "Currency is NPR. No markdown."
-            ),
-            "messages": [{
-                "role": "user",
-                "content": (
-                    f"Here is the current business data: {json.dumps(condensed)}\n\n"
-                    "Give me a brief executive commentary on the state of the business "
-                    "and the single most important action to take right now."
-                ),
-            }],
-        }).encode()
-
-        import urllib.request as _req
-        req = _req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            method="POST",
+        import json as _json
+        prompt = (
+            f"Business data for GoldKernel dry fruits retail shop (Dhangadhi, Nepal): "
+            f"{_json.dumps(condensed)}\n\n"
+            "Give a 2-3 sentence executive summary of the business health and the single most "
+            "important action to take right now. Be direct and specific. Currency is NPR. No markdown."
         )
-        with _req.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        return data["content"][0]["text"].strip()
+        system = (
+            "You are a concise business advisor for GoldKernel, a premium dry fruits "
+            "retail shop in Dhangadhi, Nepal. Currency is NPR."
+        )
+        return gemini_generate(prompt, system=system, max_tokens=220)
     except Exception:
         return None
 

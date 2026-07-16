@@ -209,20 +209,6 @@ def run_reorder_bot(user_id: int = 1) -> dict:
         except Exception:
             pass
 
-        # Festival RAG + Gemini narrative
-        _festival_ctx = ''
-        _gemini_summ  = ''
-        try:
-            from .nepal_festivals import get_festival_context_for_ai
-            _festival_ctx = get_festival_context_for_ai(45)
-            from .gemini_client import gemini_generate, gemini_available
-            if gemini_available() and pos_created:
-                _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
-                _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
-                _gemini_summ = gemini_generate(_pr, max_tokens=150) or ''
-        except Exception:
-            pass
-
         return {"task": "reorder_bot", "pos_created": len(pos_created),
                 "details": pos_created, "festival_context": _festival_ctx,
                 "claude_summary": _gemini_summ}
