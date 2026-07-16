@@ -477,11 +477,6 @@ def credit_udharo():
         records = [r for r in records if r["status"] == status_filter]
 
     # Summary stats (always from full list)
-    total_credit = sum(float(r["sale"].total_amount) for r in records)
-    pending_records = [r for r in records if r["status"] in ("pending", "due_soon", "overdue")]
-    overdue_records = [r for r in records if r["status"] == "overdue"]
-    collected_records = [r for r in records if r["status"] == "collected"]
-
     summary = {
         "total_count": len(all_credit),
         "total_amount": sum(float(s.total_amount) for s in all_credit),

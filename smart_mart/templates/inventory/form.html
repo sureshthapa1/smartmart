@@ -269,12 +269,76 @@
                      value="{{ product.origin if product and product.origin else '' }}">
             </div>
 
-            <div class="col-md-6">
+            <div class="col-12">
               <label class="form-label fw-medium" for="storageInput">Storage Tips</label>
               <input type="text" name="storage_tips" id="storageInput" class="form-control"
                      maxlength="300" placeholder="e.g. Store in an airtight container away from sunlight"
                      value="{{ product.storage_tips if product and product.storage_tips else '' }}">
             </div>
+
+            <!-- ── SEO & Tags Section ─────────────────────────────────────────────── -->
+            <div class="col-12 mt-2">
+              <hr class="my-2">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-search text-success"></i>
+                <span class="fw-semibold" style="font-size:.9rem;">SEO &amp; Tags</span>
+                <span class="text-muted small">— helps customers find this product on Google and store search.</span>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium" for="tagsInput">Product Tags
+                <button type="button" class="btn btn-sm btn-outline-success ms-2" id="genTagsBtn" style="font-size:.72rem;padding:2px 8px;">
+                  <i class="bi bi-stars"></i> AI Generate
+                </button>
+              </label>
+              <input type="text" name="tags" id="tagsInput" class="form-control"
+                     maxlength="500" placeholder="e.g. healthy, snack, gift, premium, dry-fruit"
+                     value="{{ product.tags if product and product.tags else '' }}">
+              <div class="form-text">Comma-separated tags. Used for store search and filtering.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium" for="metaDescInput">Meta Description
+                <button type="button" class="btn btn-sm btn-outline-success ms-2" id="genMetaBtn" style="font-size:.72rem;padding:2px 8px;">
+                  <i class="bi bi-stars"></i> AI Generate
+                </button>
+              </label>
+              <textarea name="meta_description" id="metaDescInput" class="form-control" rows="2"
+                        maxlength="320" placeholder="Under 160 chars — shown in Google search results. e.g. Buy premium California almonds in Nepal. Rich in Vitamin E and protein. Free delivery above NPR 2000.">{{ product.meta_description if product and product.meta_description else '' }}</textarea>
+              <div class="form-text"><span id="metaCharCount">{{ (product.meta_description | length) if product and product.meta_description else 0 }}</span>/160 chars (ideal)</div>
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label fw-medium" for="seoTitleInput">SEO Title</label>
+              <input type="text" name="seo_title" id="seoTitleInput" class="form-control"
+                     maxlength="120" placeholder="e.g. Buy Premium Cashews Nepal – GoldKernel"
+                     value="{{ product.seo_title if product and product.seo_title else '' }}">
+              <div class="form-text"><span id="seoTitleCount">{{ (product.seo_title | length) if product and product.seo_title else 0 }}</span>/60 chars (ideal)</div>
+            </div>
+
+            {% if current_user.role == 'admin' %}
+            <!-- ── Pexels Image Search ─────────────────────────────────────────────── -->
+            <div class="col-12 mt-2">
+              <hr class="my-2">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-images text-info"></i>
+                <span class="fw-semibold" style="font-size:.9rem;">Search Pexels</span>
+                <span class="text-muted small">— find and import a professional product photo.</span>
+              </div>
+              <div class="d-flex gap-2 mb-2">
+                <input type="text" id="pexelsQuery" class="form-control form-control-sm"
+                       style="max-width:280px;"
+                       placeholder="e.g. cashew nuts bowl"
+                       value="{{ product.name if product else '' }}">
+                <button type="button" class="btn btn-sm btn-info text-white" id="pexelsSearchBtn">
+                  <i class="bi bi-search me-1"></i>Search
+                </button>
+              </div>
+              <div id="pexelsResults" class="d-flex flex-wrap gap-2 mt-2"></div>
+              <div id="pexelsMsg" class="text-muted small mt-1"></div>
+            </div>
+            {% endif %}
 
           </div>
 
@@ -495,7 +559,7 @@ This will OVERWRITE existing description, image and pack size.')">
 <script>
   const COMMON_PRODUCTS = [
     "Basmati Rice","Sona Masoori Rice","Brown Rice","White Rice","Beaten Rice (Chiura)",
-    "Wheat Flour (Atta)","Maida","Semolina (Suji)","Corn Flour","Oats","Poha","Barley",
+    "Wheat Flour (Atta)","Maida","Semolina (Suji)","Corn Flour","Oats","Barley",
     "Red Lentil (Masoor Dal)","Yellow Lentil (Moong Dal)","Black Lentil (Urad Dal)",
     "Chickpeas (Chana)","Kidney Beans (Rajma)","Green Peas","Soybean",
     "Mustard Oil","Sunflower Oil","Soybean Oil","Coconut Oil","Ghee","Dalda",
@@ -535,44 +599,33 @@ This will OVERWRITE existing description, image and pack size.')">
     "Cigarette","Lighter","Match Box","Candle","Incense Sticks (Agarbatti)"
   ];
 
-  // ── Product Name: Tom Select on a <select>, create=true ─────────────────
+  // ── Tom Select: Product Name ──────────────────────────────────────────────
   const nameSel = new TomSelect('#productNameSelect', {
-    create: true,
-    createOnBlur: true,
-    persist: false,
-    maxOptions: 20,
+    create: true, createOnBlur: true, persist: false, maxOptions: 20,
     placeholder: 'Type or search product name…',
     options: COMMON_PRODUCTS.map(v => ({ value: v, text: v })),
     {% if product %}items: [{{ product.name | tojson }}],{% endif %}
     render: {
       option_create(data, escape) {
-        return `<div class="create">✏️ Add "<strong>${escape(data.input)}</strong>" as new product</div>`;
+        return `<div class="create">✏️ Add "<strong>${escape(data.input)}</strong>"</div>`;
       }
     },
-    onChange(val) {
-      document.getElementById('nameHidden').value = val || '';
-    }
+    onChange(val) { document.getElementById('nameHidden').value = val || ''; }
   });
-  // Set initial value
   document.getElementById('nameHidden').value = nameSel.getValue() || '';
 
-  // ── Category: Tom Select with create ────────────────────────────────────
-  const existingCats = new Set([...document.querySelectorAll('#categorySelect option')]
-    .map(o => o.value).filter(Boolean));
-
+  // ── Tom Select: Category ──────────────────────────────────────────────────
+  const existingCats = new Set([...document.querySelectorAll('#categorySelect option')].map(o => o.value).filter(Boolean));
   const catSel = new TomSelect('#categorySelect', {
-    create: true,
-    createOnBlur: true,
-    persist: false,
+    create: true, createOnBlur: true, persist: false,
     placeholder: 'Search or type new category…',
     render: {
       option_create(data, escape) {
-        return `<div class="create">➕ Create category "<strong>${escape(data.input)}</strong>"</div>`;
+        return `<div class="create">➕ Create "<strong>${escape(data.input)}</strong>"</div>`;
       }
     },
     onChange(val) {
       if (val && !existingCats.has(val)) {
-        // New category — put in new_category, clear category
         document.getElementById('categoryHidden').value = '';
         document.getElementById('newCategoryHidden').value = val;
       } else {
@@ -581,75 +634,196 @@ This will OVERWRITE existing description, image and pack size.')">
       }
     }
   });
-  // Set initial
   const initCat = {{ (product.category | tojson) if product and product.category else 'null' }};
-  if (initCat) {
-    document.getElementById('categoryHidden').value = initCat;
-  }
+  if (initCat) document.getElementById('categoryHidden').value = initCat;
 
-  // ── Supplier: Tom Select searchable ─────────────────────────────────────
-  new TomSelect('#supplierSelect', {
-    allowEmptyOption: true,
-    placeholder: 'Search supplier…'
-  });
+  // ── Tom Select: Supplier ──────────────────────────────────────────────────
+  new TomSelect('#supplierSelect', { allowEmptyOption: true, placeholder: 'Search supplier…' });
 
-  // ── On submit: validate name is filled ──────────────────────────────────
+  // ── Form submit: validate name ────────────────────────────────────────────
   document.getElementById('productForm').addEventListener('submit', function(e) {
     const name = document.getElementById('nameHidden').value.trim();
-    if (!name) {
-      e.preventDefault();
-      alert('Please enter a product name.');
-      nameSel.focus();
-    }
+    if (!name) { e.preventDefault(); alert('Please enter a product name.'); nameSel.focus(); }
   });
 
-  // ── Image preview ─────────────────────────────────────────────────────
-  const imgInput = document.getElementById('productImageInput');
-  if (imgInput) {
-    imgInput.addEventListener('change', function() {
-      const file = this.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        // Update or create preview
-        let preview = document.getElementById('imagePreview');
-        let box = document.getElementById('imagePreviewBox');
-        if (preview) {
-          preview.src = e.target.result;
-        } else if (box) {
-          box.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;">`;
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-    // Live image preview when user picks a file
-  const fileInput = document.querySelector('input[name="product_image"]');
-  if (fileInput) {
-    fileInput.addEventListener('change', function() {
+  // ── Image file preview ────────────────────────────────────────────────────
+  function _setupImagePreview(inputId) {
+    const inp = document.getElementById(inputId) || document.querySelector('input[name="product_image"]');
+    if (!inp) return;
+    inp.addEventListener('change', function() {
       if (!this.files || !this.files[0]) return;
       const reader = new FileReader();
       reader.onload = function(e) {
-        let prev = document.getElementById('imgPreview');
-        if (!prev) {
-          prev = document.createElement('img');
-          prev.id = 'imgPreview';
-          prev.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;';
-          fileInput.parentElement.insertBefore(prev, fileInput);
-        }
-        if (prev.tagName === 'IMG') {
-          prev.src = e.target.result;
-        } else {
-          // Replace placeholder div with img
+        let prev = document.getElementById('imagePreview') || document.getElementById('imgPreview');
+        let box  = document.getElementById('imagePreviewBox');
+        if (prev && prev.tagName === 'IMG') { prev.src = e.target.result; }
+        else if (box) { box.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;">`; }
+        else {
           const img = document.createElement('img');
           img.id = 'imgPreview';
           img.src = e.target.result;
           img.style.cssText = 'height:90px;width:90px;object-fit:cover;border-radius:10px;border:1.5px solid #e2e8f0;margin-bottom:.5rem;display:block;';
-          prev.replaceWith(img);
+          inp.parentElement.insertBefore(img, inp);
         }
       };
       reader.readAsDataURL(this.files[0]);
     });
+  }
+  _setupImagePreview('productImageInput');
+
+  // ── SEO character counters ─────────────────────────────────────────────────
+  const metaInput = document.getElementById('metaDescInput');
+  const metaCount = document.getElementById('metaCharCount');
+  if (metaInput && metaCount) {
+    metaInput.addEventListener('input', () => {
+      const n = metaInput.value.length;
+      metaCount.textContent = n;
+      metaCount.style.color = n > 160 ? '#dc3545' : n > 130 ? '#f59e0b' : '#198754';
+    });
+  }
+  const seoTitleInput = document.getElementById('seoTitleInput');
+  const seoTitleCount = document.getElementById('seoTitleCount');
+  if (seoTitleInput && seoTitleCount) {
+    seoTitleInput.addEventListener('input', () => {
+      const n = seoTitleInput.value.length;
+      seoTitleCount.textContent = n;
+      seoTitleCount.style.color = n > 60 ? '#dc3545' : '#198754';
+    });
+  }
+
+  // ── AI helper: get current product name + category ───────────────────────
+  function _getProductFields() {
+    return {
+      name: document.getElementById('nameHidden').value.trim(),
+      category: document.getElementById('categoryHidden').value.trim(),
+      description: (document.getElementById('descriptionInput') || {value:''}).value.trim(),
+    };
+  }
+
+  // ── AI: Generate Tags ─────────────────────────────────────────────────────
+  const genTagsBtn = document.getElementById('genTagsBtn');
+  if (genTagsBtn) {
+    genTagsBtn.addEventListener('click', async function() {
+      const f = _getProductFields();
+      if (!f.name) { alert('Enter a product name first.'); return; }
+      genTagsBtn.disabled = true;
+      genTagsBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      try {
+        const resp = await fetch('/inventory/api/ai/generate-tags', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrf_token]').value},
+          body: JSON.stringify(f)
+        });
+        const data = await resp.json();
+        if (data.tags_string) {
+          document.getElementById('tagsInput').value = data.tags_string;
+        } else {
+          alert(data.error || 'Failed to generate tags.');
+        }
+      } catch(e) { alert('Network error.'); }
+      genTagsBtn.disabled = false;
+      genTagsBtn.innerHTML = '<i class="bi bi-stars"></i> AI Generate';
+    });
+  }
+
+  // ── AI: Generate Meta Description + SEO Title ─────────────────────────────
+  const genMetaBtn = document.getElementById('genMetaBtn');
+  if (genMetaBtn) {
+    genMetaBtn.addEventListener('click', async function() {
+      const f = _getProductFields();
+      if (!f.name) { alert('Enter a product name first.'); return; }
+      genMetaBtn.disabled = true;
+      genMetaBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      try {
+        const resp = await fetch('/inventory/api/ai/generate-meta', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrf_token]').value},
+          body: JSON.stringify(f)
+        });
+        const data = await resp.json();
+        if (data.meta_description) {
+          document.getElementById('metaDescInput').value = data.meta_description;
+          if (metaCount) { metaCount.textContent = data.meta_description.length; }
+        }
+        if (data.seo_title) {
+          document.getElementById('seoTitleInput').value = data.seo_title;
+          if (seoTitleCount) { seoTitleCount.textContent = data.seo_title.length; }
+        }
+        if (data.error) alert(data.error);
+      } catch(e) { alert('Network error.'); }
+      genMetaBtn.disabled = false;
+      genMetaBtn.innerHTML = '<i class="bi bi-stars"></i> AI Generate';
+    });
+  }
+
+  // ── Pexels Image Search ────────────────────────────────────────────────────
+  const pexelsSearchBtn = document.getElementById('pexelsSearchBtn');
+  if (pexelsSearchBtn) {
+    pexelsSearchBtn.addEventListener('click', async function() {
+      const q = document.getElementById('pexelsQuery').value.trim();
+      if (!q) { alert('Enter a search term.'); return; }
+      const msg  = document.getElementById('pexelsMsg');
+      const grid = document.getElementById('pexelsResults');
+      msg.textContent = 'Searching…';
+      grid.innerHTML = '';
+      pexelsSearchBtn.disabled = true;
+      try {
+        const resp = await fetch(`/inventory/api/pexels/search?q=${encodeURIComponent(q)}&per_page=9`);
+        const data = await resp.json();
+        if (data.error) { msg.textContent = 'Error: ' + data.error; return; }
+        if (!data.photos || !data.photos.length) { msg.textContent = 'No photos found. Try a different search.'; return; }
+        msg.textContent = data.total + ' photos found. Click one to import.';
+        data.photos.forEach(photo => {
+          const div = document.createElement('div');
+          div.style.cssText = 'cursor:pointer;position:relative;';
+          div.innerHTML = `
+            <img src="${photo.thumb}" alt="${photo.alt}"
+                 style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;transition:border .15s;"
+                 onmouseover="this.style.border='2px solid #6366f1'"
+                 onmouseout="this.style.border='2px solid #e2e8f0'">
+            <div style="font-size:.6rem;color:#64748b;text-align:center;margin-top:2px;max-width:90px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${photo.photographer}</div>`;
+          div.addEventListener('click', () => _importPexelsPhoto(photo, div));
+          grid.appendChild(div);
+        });
+      } catch(e) { msg.textContent = 'Network error. Try again.'; }
+      pexelsSearchBtn.disabled = false;
+    });
+  }
+
+  async function _importPexelsPhoto(photo, div) {
+    const msg = document.getElementById('pexelsMsg');
+    const productId = {{ product.id if product and product.id else 'null' }};
+    msg.textContent = 'Importing image…';
+    div.style.opacity = '0.5';
+    try {
+      const resp = await fetch('/inventory/api/pexels/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrf_token]').value},
+        body: JSON.stringify({ product_id: productId, image_url: photo.full_url, alt: photo.alt })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        // Update image preview
+        const preview = document.getElementById('imagePreview') || document.getElementById('imgPreview');
+        const box = document.getElementById('imagePreviewBox');
+        if (preview && preview.tagName === 'IMG') {
+          preview.src = data.thumb_url;
+        } else if (box) {
+          box.innerHTML = `<img src="${data.thumb_url}" style="width:80px;height:80px;object-fit:cover;border-radius:10px;" id="imagePreview">`;
+        }
+        msg.innerHTML = '<span class="text-success">Image imported successfully!</span> ' +
+          (productId ? 'Product image updated.' : 'Save the product to apply.');
+        // Highlight selected photo
+        document.querySelectorAll('#pexelsResults img').forEach(i => i.style.border = '2px solid #e2e8f0');
+        div.querySelector('img').style.border = '3px solid #22c55e';
+      } else {
+        msg.textContent = 'Import failed: ' + (data.error || 'Unknown error');
+        div.style.opacity = '1';
+      }
+    } catch(e) {
+      msg.textContent = 'Network error during import.';
+      div.style.opacity = '1';
+    }
   }
 </script>
 {% endblock %}

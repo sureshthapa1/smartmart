@@ -158,9 +158,11 @@ class ReportService:
 
         # Estimate OPEX allocation based on revenue share
         # Use total revenue from the period to compute share
-        total_revenue_stmt = db.select(
-            func.coalesce(func.sum(SaleItem.subtotal), 0)
-        ).join(Sale, Sale.id == SaleItem.sale_id)
+        total_revenue_stmt = (
+            db.select(func.coalesce(func.sum(SaleItem.subtotal), 0))
+            .select_from(SaleItem)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+        )
         if start:
             total_revenue_stmt = total_revenue_stmt.where(Sale.sale_date >= start)
         if end:
@@ -241,6 +243,7 @@ class ReportService:
                 func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
             )
+            .select_from(SaleItem)
             .join(Product, Product.id == SaleItem.product_id)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sale_date >= start, Sale.sale_date <= end)
@@ -256,6 +259,7 @@ class ReportService:
                 func.date(Sale.sale_date).label("day"),
                 func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
             )
+            .select_from(SaleItem)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sale_date >= start, Sale.sale_date <= end)
             .group_by(func.date(Sale.sale_date))

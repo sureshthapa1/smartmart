@@ -106,7 +106,8 @@ def generate_daily_report() -> dict:
             func.coalesce(SaleItem.cost_price, Product.cost_price).label("cost_price"),
             func.sum(SaleItem.quantity).label("qty")
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
         .group_by(Product.id)
@@ -347,11 +348,9 @@ def generate_smart_summary() -> dict:
     }
 
 def _claude_daily_narrative(data: dict, fallback: str = "") -> str:
-    """Generate a genuine Claude-powered 3-bullet daily business briefing."""
-    import os, json
-    import urllib.request as _req
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    """Generate a Gemini-powered 3-bullet daily business briefing."""
+    from .gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return fallback
 
     prompt = (
@@ -367,22 +366,5 @@ def _claude_daily_narrative(data: dict, fallback: str = "") -> str:
         "Cover: (1) performance vs yesterday with insight, (2) action item or opportunity, "
         "(3) stock/ops note. Be specific and direct. Vary bullet openings."
     )
-    try:
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 220,
-            "messages": [{"role": "user", "content": prompt}],
-        }).encode()
-        req = _req.Request(
-            "https://api.anthropic.com/v1/messages", data=payload, method="POST",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-        )
-        with _req.urlopen(req, timeout=12) as resp:
-            result = json.loads(resp.read())
-        return result["content"][0]["text"].strip()
-    except Exception:
-        return fallback
+    result = gemini_generate(prompt, max_tokens=220)
+    return result if result else fallback

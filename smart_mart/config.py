@@ -14,7 +14,9 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = True
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
-    WTF_CSRF_TIME_LIMIT = None   # No expiry — token valid for the whole session
+    # CSRF tokens expire after 24 hours. None (infinite) would leave leaked
+    # tokens valid forever; 86400s is a reasonable balance between UX and security.
+    WTF_CSRF_TIME_LIMIT = 86400
     LOW_STOCK_THRESHOLD = 10
     EXPIRY_WARNING_DAYS = 30
     HIGH_DEMAND_THRESHOLD = 50
@@ -45,6 +47,26 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = _fix_db_url(
         os.environ.get("DATABASE_URL")
     ) or "sqlite:///smart_mart_dev.db"
+
+    # Warn loudly if using the insecure fallback key so it's never silently
+    # used in a staging/shared environment.
+    if not os.environ.get("SECRET_KEY"):
+        import warnings
+        warnings.warn(
+            "SECRET_KEY is not set — using insecure dev fallback. "
+            "Set SECRET_KEY in your .env before running on any shared machine.",
+            stacklevel=2,
+        )
+
+    # Session cookies must work over plain HTTP on LAN (no HTTPS).
+    # Explicitly set Secure=False so the cookie is sent on http:// requests
+    # from phones/tablets on the same network.
+    SESSION_COOKIE_SECURE   = False
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE   = False
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
 
     # Use Redis cache if available in dev, otherwise SimpleCache
     _redis = os.environ.get("REDIS_URL", "")

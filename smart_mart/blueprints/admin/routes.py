@@ -1,5 +1,6 @@
 """Admin blueprint — user management routes."""
 
+from decimal import Decimal
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 
@@ -24,7 +25,7 @@ def create_user():
         password = request.form.get("password", "")
         role = request.form.get("role", "staff")
         try:
-            commission_rate = float(request.form.get("commission_rate", 0) or 0)
+            commission_rate = Decimal(str(request.form.get("commission_rate", 0) or 0 or 0))
             email = request.form.get("email", "").strip() or None
             user_manager.create_user(username, password, role,
                                      commission_rate=commission_rate, email=email)
@@ -52,7 +53,7 @@ def edit_user(user_id):
             data["username"] = username
         data["role"] = role
         try:
-            commission_rate = float(request.form.get("commission_rate", 0) or 0)
+            commission_rate = Decimal(str(request.form.get("commission_rate", 0) or 0 or 0))
             data["commission_rate"] = min(max(commission_rate, 0), 100)
             email = request.form.get("email", "").strip() or None
             data["email"] = email

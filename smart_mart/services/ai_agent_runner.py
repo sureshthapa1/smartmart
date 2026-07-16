@@ -75,9 +75,9 @@ def run_daily_nlg_agent() -> dict[str, Any]:
         report = generate_daily_report()
         summary = report.get("summary") or report.get("text") or str(report)[:500]
 
-        # Try to enhance with Claude if API key is set
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if api_key:
+        # Try to enhance with Gemini if API key is set
+        from .gemini_client import gemini_available
+        if gemini_available():
             try:
                 from .ai_business_advisor import executive_summary
                 metrics = executive_summary()

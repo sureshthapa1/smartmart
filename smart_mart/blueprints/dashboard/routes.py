@@ -64,85 +64,119 @@ def index():
     except Exception:
         pass
 
-    # ── Combined Sales Aggregation — 1 query replaces 7 separate round-trips ─
-    # Uses CASE/WHEN to compute today / week / month / total in a single pass.
-    # Uses datetime range comparisons (>= / <=) instead of func.date() wrappers
-    # so PostgreSQL can use the ix_sale_date index on Sale.sale_date (DateTime).
-    # func.date(Sale.sale_date) prevents index use even when the column is indexed.
-    from sqlalchemy import case, literal_column
-    agg_row = db.session.execute(
-        db.select(
-            func.coalesce(func.sum(
-                case((Sale.sale_date.between(today, today_end), Sale.total_amount), else_=0)
-            ), 0).label("today_amount"),
-            func.coalesce(func.sum(
-                case((Sale.sale_date.between(today, today_end), 1), else_=0)
-            ), 0).label("today_count"),
-            func.coalesce(func.sum(
-                case((Sale.sale_date >= week_start, Sale.total_amount), else_=0)
-            ), 0).label("weekly_amount"),
-            func.coalesce(func.sum(
-                case((Sale.sale_date >= week_start, 1), else_=0)
-            ), 0).label("weekly_count"),
-            func.coalesce(func.sum(
-                case((Sale.sale_date >= month_start, Sale.total_amount), else_=0)
-            ), 0).label("monthly_amount"),
-            func.coalesce(func.sum(
-                case((Sale.sale_date >= month_start, 1), else_=0)
-            ), 0).label("monthly_count"),
-            func.count(Sale.id).label("total_count"),
-            func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
-        )
-    ).one()
+    # ── Cached aggregated stats (60s TTL) ─────────────────────────────────
+    # The heavy queries below (sales agg, COGS, stock value, profit) hit the
+    # DB on every page load. Caching per calendar-day+filter cuts DB load
+    # dramatically under normal use while still reflecting recent sales
+    # quickly (cache is invalidated by sales_manager after every new sale).
+    _stats_key = f"dashboard_stats:{today_date}:{active_filter}"
+    _cached = _cache_get(_stats_key)
 
-    today_sales_amount  = float(agg_row.today_amount)
-    today_sales_count   = int(agg_row.today_count)
-    weekly_sales_amount = float(agg_row.weekly_amount)
-    weekly_sales_count  = int(agg_row.weekly_count)
-    monthly_sales_amount = float(agg_row.monthly_amount)
-    monthly_sales_count  = int(agg_row.monthly_count)
-    total_sales_count   = int(agg_row.total_count)
-    total_revenue       = float(agg_row.total_revenue)
-
-    # ── Today COGS (separate join query — can't combine with above) ────────
-    today_cogs = db.session.execute(
-        db.select(
-            func.coalesce(
-                func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity),
-                0
+    if _cached is not None:
+        stats = _cached
+    else:
+        # ── Combined Sales Aggregation — 1 query replaces 7 separate round-trips ─
+        # Uses CASE/WHEN to compute today / week / month / total in a single pass.
+        # Uses datetime range comparisons (>= / <=) instead of func.date() wrappers
+        # so PostgreSQL can use the ix_sale_date index on Sale.sale_date (DateTime).
+        # func.date(Sale.sale_date) prevents index use even when the column is indexed.
+        from sqlalchemy import case, literal_column
+        agg_row = db.session.execute(
+            db.select(
+                func.coalesce(func.sum(
+                    case((Sale.sale_date.between(today, today_end), Sale.total_amount), else_=0)
+                ), 0).label("today_amount"),
+                func.coalesce(func.sum(
+                    case((Sale.sale_date.between(today, today_end), 1), else_=0)
+                ), 0).label("today_count"),
+                func.coalesce(func.sum(
+                    case((Sale.sale_date >= week_start, Sale.total_amount), else_=0)
+                ), 0).label("weekly_amount"),
+                func.coalesce(func.sum(
+                    case((Sale.sale_date >= week_start, 1), else_=0)
+                ), 0).label("weekly_count"),
+                func.coalesce(func.sum(
+                    case((Sale.sale_date >= month_start, Sale.total_amount), else_=0)
+                ), 0).label("monthly_amount"),
+                func.coalesce(func.sum(
+                    case((Sale.sale_date >= month_start, 1), else_=0)
+                ), 0).label("monthly_count"),
+                func.count(Sale.id).label("total_count"),
+                func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
             )
-        )
-        .join(Product, Product.id == SaleItem.product_id)
-        .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date.between(today, today_end))
-    ).scalar() or 0
-    today_profit = float(today_sales_amount) - float(today_cogs)
+        ).one()
 
-    # ── Cash Balance: total revenue - total expenses (2 queries → 1) ──────
-    total_expenses = db.session.execute(
-        db.select(func.coalesce(func.sum(Expense.amount), 0))
-    ).scalar() or 0
-    cash_balance = total_revenue - float(total_expenses)
+        today_cogs = db.session.execute(
+            db.select(
+                func.coalesce(
+                    func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity),
+                    0
+                )
+            )
+            .select_from(SaleItem)
+            .join(Product, Product.id == SaleItem.product_id)
+            .join(Sale, Sale.id == SaleItem.sale_id)
+            .where(Sale.sale_date.between(today, today_end))
+        ).scalar() or 0
 
-    # ── Stock value ───────────────────────────────────────────────────────
-    stock_value = db.session.execute(
-        db.select(func.coalesce(func.sum(Product.cost_price * Product.quantity), 0))
-    ).scalar() or 0
+        total_expenses = db.session.execute(
+            db.select(func.coalesce(func.sum(Expense.amount), 0))
+        ).scalar() or 0
 
-    # ── Monthly profit ────────────────────────────────────────────────────
-    monthly_profit = cash_flow_manager.profit_loss(month_start, today)["profit"]
-    waste_cost_month = 0.0
-    try:
-        from ...models.waste_record import WasteRecord
-        waste_cost_month = float(db.session.execute(
-            db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
-            .where(WasteRecord.created_at >= month_start)
-        ).scalar() or 0)
-    except Exception:
-        pass
+        stock_value = db.session.execute(
+            db.select(func.coalesce(func.sum(Product.cost_price * Product.quantity), 0))
+        ).scalar() or 0
 
-    # ── Total products ────────────────────────────────────────────────────
-    total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
+        monthly_profit = cash_flow_manager.profit_loss(month_start, today)["profit"]
+
+        waste_cost_month = 0.0
+        try:
+            from ...models.waste_record import WasteRecord
+            waste_cost_month = float(db.session.execute(
+                db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
+                .where(WasteRecord.created_at >= month_start)
+            ).scalar() or 0)
+        except Exception:
+            pass
+
+        total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
+
+        total_revenue = float(agg_row.total_revenue)
+        stats = {
+            "today_sales_amount":  float(agg_row.today_amount),
+            "today_sales_count":   int(agg_row.today_count),
+            "weekly_sales_amount": float(agg_row.weekly_amount),
+            "weekly_sales_count":  int(agg_row.weekly_count),
+            "monthly_sales_amount": float(agg_row.monthly_amount),
+            "monthly_sales_count":  int(agg_row.monthly_count),
+            "total_sales_count":   int(agg_row.total_count),
+            "total_revenue":       total_revenue,
+            "today_cogs":          float(today_cogs),
+            "today_profit":        total_revenue - float(today_cogs),  # approximate; not agg_row.today_amount
+            "cash_balance":        total_revenue - float(total_expenses),
+            "stock_value":         float(stock_value),
+            "monthly_profit":      float(monthly_profit),
+            "waste_cost_month":    waste_cost_month,
+            "total_products":      int(total_products),
+        }
+        # Use today_sales_amount for today_profit (correct figure)
+        stats["today_profit"] = stats["today_sales_amount"] - stats["today_cogs"]
+        _cache_set(_stats_key, stats, ttl=60)
+
+    today_sales_amount   = stats["today_sales_amount"]
+    today_sales_count    = stats["today_sales_count"]
+    weekly_sales_amount  = stats["weekly_sales_amount"]
+    weekly_sales_count   = stats["weekly_sales_count"]
+    monthly_sales_amount = stats["monthly_sales_amount"]
+    monthly_sales_count  = stats["monthly_sales_count"]
+    total_sales_count    = stats["total_sales_count"]
+    total_revenue        = stats["total_revenue"]
+    today_profit         = stats["today_profit"]
+    cash_balance         = stats["cash_balance"]
+    stock_value          = stats["stock_value"]
+    monthly_profit       = stats["monthly_profit"]
+    waste_cost_month     = stats["waste_cost_month"]
+    total_products       = stats["total_products"]
 
     # ── Recent sales (last 8) with eager loading ─────────────────────────
     from sqlalchemy.orm import joinedload

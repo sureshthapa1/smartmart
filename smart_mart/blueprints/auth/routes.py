@@ -1,6 +1,6 @@
 """Auth blueprint — login, logout, password change, and password reset routes."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -26,7 +26,7 @@ def login():
 
         flash("Invalid username or password.", "danger")
 
-    return render_template("auth/login.html", now=datetime.now())
+    return render_template("auth/login.html", now=datetime.now(timezone.utc))
 
 
 @auth_bp.route("/logout")

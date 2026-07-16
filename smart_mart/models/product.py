@@ -22,18 +22,23 @@ class Product(db.Model):
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=0)
-    low_stock_threshold = db.Column(db.Integer, nullable=True, default=10)  # matches LOW_STOCK_THRESHOLD config
+    low_stock_threshold = db.Column(db.Integer, nullable=True, default=10)
     inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
     description = db.Column(db.Text, nullable=True)
-    benefits = db.Column(db.Text, nullable=True)       # e.g. AI-generated health/usage benefits (markdown)
-    origin = db.Column(db.String(120), nullable=True)  # e.g. "California, USA" / "Nepal/Kashmir"
-    storage_tips = db.Column(db.Text, nullable=True)   # e.g. "Store in airtight container, cool dry place"
-    pack_size = db.Column(db.String(40), nullable=True)  # e.g. "500g", "1kg", "250g"
+    benefits = db.Column(db.Text, nullable=True)
+    origin = db.Column(db.String(120), nullable=True)
+    storage_tips = db.Column(db.Text, nullable=True)
+    pack_size = db.Column(db.String(40), nullable=True)
     slug = db.Column(db.String(160), nullable=True, unique=True)
+    # ── SEO & Discovery fields ────────────────────────────────────────────
+    tags = db.Column(db.Text, nullable=True)               # comma-separated tags e.g. "healthy,snack,gift"
+    meta_description = db.Column(db.String(320), nullable=True)  # SEO meta description (max 160 chars ideal)
+    seo_title = db.Column(db.String(120), nullable=True)   # SEO page title override
+    # ─────────────────────────────────────────────────────────────────────
     is_featured = db.Column(db.Boolean, nullable=False, default=False)
     reorder_point = db.Column(db.Integer, nullable=True, default=10)  # MOQ alert threshold
     is_active = db.Column(db.Boolean, nullable=False, default=True)  # False = discontinued

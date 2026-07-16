@@ -304,11 +304,11 @@ def test_bundle_sell_blocked_when_stock_insufficient(client, db):
 def test_ai_chat_missing_key_returns_helpful_500(client, db, monkeypatch):
     user = _admin("ai_admin")
     _login(client, user)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     response = client.post("/ai/chat/ask", json={"message": "How were sales today?", "history": []})
     assert response.status_code == 500
-    assert "ANTHROPIC_API_KEY" in response.get_json()["error"]
+    assert "GEMINI_API_KEY" in response.get_json()["error"]
 
 
 def test_ai_context_builder_non_empty(db):

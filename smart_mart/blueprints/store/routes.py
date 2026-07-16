@@ -781,11 +781,9 @@ def checkout():
             try:
                 from ...models.promotion import Promotion
                 from datetime import date
-                # Promotion model has no 'code' column — match against name (case-insensitive).
-                # A dedicated 'code' column should be added via schema migration for production use.
                 promo = db.session.execute(
                     db.select(Promotion).where(
-                        func.upper(Promotion.name) == promo_code,
+                        Promotion.code == promo_code,
                         Promotion.is_active == True,
                     )
                 ).scalar_one_or_none()
@@ -1307,7 +1305,7 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         )
         return False
     try:
-        verify_url = "https://khalti.ebanking.com.np/api/v2/payment/verify/"
+        verify_url = "https://khalti.com/api/v2/payment/verify/"
         payload = _json.dumps({"token": token, "amount": amount_paisa}).encode()
         req = _req.Request(verify_url, data=payload, method="POST")
         req.add_header("Authorization", f"Key {secret_key}")

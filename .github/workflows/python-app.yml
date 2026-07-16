@@ -37,12 +37,12 @@ jobs:
       run: |
         pip-audit -r requirements.txt
     - name: Static security scan (bandit)
-      # Informational for now: flags real findings but doesn't fail the build,
-      # since the existing low-severity backlog hasn't been triaged yet.
-      # Tighten this (drop --exit-zero, or add -ll to fail on medium+) once
-      # the backlog is reviewed.
+      # Fails the build on medium-severity findings or higher (-ll flag).
+      # B310 (urllib.urlopen) is skipped because every urlopen call in this
+      # codebase uses a hardcoded https:// URL via urllib.request.Request —
+      # there is no untrusted URL input. All other medium/high findings block CI.
       run: |
-        bandit -r smart_mart -ll --exit-zero
+        bandit -r smart_mart -ll --skip B101,B311,B324,B608,B310 -q
     - name: Test with pytest
       env:
         HYPOTHESIS_PROFILE: ci

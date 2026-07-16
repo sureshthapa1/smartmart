@@ -1,8 +1,10 @@
-"""Sales blueprint — POS-style sale creation, listing, detail, and invoice routes."""
-
 from __future__ import annotations
 
+"""Sales blueprint — POS-style sale creation, listing, detail, and invoice routes."""
+
+
 from datetime import date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
@@ -144,7 +146,7 @@ def create_sale():
                 customer_phone=request.form.get("customer_phone", "").strip() or None,
                 payment_mode=request.form.get("payment_mode") or request.form.get("payment_method", "cash"),
                 payment_method=request.form.get("payment_method") or request.form.get("payment_mode", "cash"),
-                discount_amount=float(request.form.get("discount_amount", 0) or 0),
+                discount_amount=Decimal(str(request.form.get("discount_amount", 0) or 0 or 0)),
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
                 applied_customer_offer_ids=_parse_customer_offer_ids(request.form),

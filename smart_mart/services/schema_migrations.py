@@ -516,6 +516,27 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, 'CREATE UNIQUE INDEX IF NOT EXISTS "ix_promotions_code" ON "promotions" ("code") WHERE "code" IS NOT NULL'),
             ),
         ),
+        (
+            "2026_07_10_shop_settings_social_media",
+            "Add social media link columns to shop_settings for store footer display.",
+            lambda conn: (
+                _safe_add_column(conn, "shop_settings", "facebook_url",    "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "instagram_url",   "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "twitter_url",     "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "tiktok_url",      "VARCHAR(255)"),
+                _safe_add_column(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)"),
+                _safe_add_column(conn, "shop_settings", "website_url",     "VARCHAR(255)"),
+            ),
+        ),
+        (
+            "2026_07_12_product_seo_tags",
+            "Add tags, meta_description, seo_title columns to products for AI SEO features.",
+            lambda conn: (
+                _safe_add_column(conn, "products", "tags",             "TEXT"),
+                _safe_add_column(conn, "products", "meta_description", "VARCHAR(320)"),
+                _safe_add_column(conn, "products", "seo_title",        "VARCHAR(120)"),
+            ),
+        ),
     ]
 
 
@@ -534,9 +555,19 @@ def run_pending_migrations(app) -> list[str]:
     for migration_key, description, migration_fn in _migration_steps():
         if migration_key in applied_keys:
             continue
+        # Run the DDL first — in its own connection so DDL is committed
+        # before we try to record it in the ORM session.
         try:
             with db.engine.begin() as conn:
                 migration_fn(conn)
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.exception("Schema migration %s DDL failed: %s", migration_key, exc)
+            raise
+
+        # Record the migration separately so a duplicate-key error (e.g. dev
+        # reloader firing migrations twice) doesn't mask a real DDL failure.
+        try:
             db.session.add(
                 SchemaMigrationRecord(
                     migration_key=migration_key,
@@ -546,10 +577,19 @@ def run_pending_migrations(app) -> list[str]:
             db.session.commit()
             applied_now.append(migration_key)
             app.logger.info("Applied schema migration %s", migration_key)
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            app.logger.exception("Schema migration %s failed: %s", migration_key, exc)
-            raise
+            # Already recorded — happens when the dev reloader runs this twice
+            # in rapid succession. Safe to skip.
+            already = db.session.execute(
+                db.select(SchemaMigrationRecord.migration_key)
+                .where(SchemaMigrationRecord.migration_key == migration_key)
+            ).scalar_one_or_none()
+            if already:
+                app.logger.info("Migration %s already recorded (duplicate skipped)", migration_key)
+            else:
+                app.logger.exception("Failed to record migration %s", migration_key)
+                raise
 
     # ── Auto-fill product descriptions + images for empty products ─────────
     # Runs after migrations — idempotent, only fills empty fields

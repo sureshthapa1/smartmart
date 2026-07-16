@@ -199,6 +199,9 @@ def create_app(config_name="development"):
         session.permanent = True
 
     # ── Track page views per active session ───────────────────────────────
+    # Batches writes using a per-session counter in the Flask session dict.
+    # The DB is updated every 10 page views instead of every single request,
+    # cutting per-request write overhead by ~90% under normal browsing.
     @app.before_request
     def track_page_view():
         from flask import session as flask_session, request
@@ -206,11 +209,17 @@ def create_app(config_name="development"):
             try:
                 activity_id = flask_session.get("activity_id")
                 if activity_id:
-                    from .models.user_activity import UserActivity
-                    act = db.session.get(UserActivity, activity_id)
-                    if act and act.logout_at is None:
-                        act.page_views = (act.page_views or 0) + 1
-                        db.session.commit()
+                    # Increment the in-session counter (no DB hit)
+                    pv_buf = flask_session.get("_pv_buf", 0) + 1
+                    flask_session["_pv_buf"] = pv_buf
+                    # Flush to DB every 10 views to reduce write pressure
+                    if pv_buf >= 10:
+                        from .models.user_activity import UserActivity
+                        act = db.session.get(UserActivity, activity_id)
+                        if act and act.logout_at is None:
+                            act.page_views = (act.page_views or 0) + pv_buf
+                            db.session.commit()
+                        flask_session["_pv_buf"] = 0
             except Exception:
                 pass
 
@@ -321,17 +330,25 @@ def create_app(config_name="development"):
         """Inject common variables into every template context."""
         from datetime import datetime as _dt2, timezone as _tz2
         ctx = {"now": _dt2.now(_tz2.utc)}
-        # Inject active product categories for nav/footer use
+        # Inject active product categories for nav/footer use.
+        # Cached for 120s — categories change rarely and this runs on every
+        # template render, so a DB query per request is wasteful.
         try:
-            from .models.product import Product as _Prod
-            from .extensions import db as _db2
-            cats = _db2.session.execute(
-                _db2.select(_Prod.category)
-                .where(_Prod.is_active.isnot(False), _Prod.quantity > 0, _Prod.category.isnot(None))
-                .distinct()
-                .order_by(_Prod.category)
-            ).scalars().all()
-            ctx["categories"] = [c for c in cats if c]
+            from .services.cache_service import get as _cg, set as _cs
+            _CAT_KEY = "global:active_categories"
+            _cats = _cg(_CAT_KEY)
+            if _cats is None:
+                from .models.product import Product as _Prod
+                from .extensions import db as _db2
+                _cats = _db2.session.execute(
+                    _db2.select(_Prod.category)
+                    .where(_Prod.is_active.isnot(False), _Prod.quantity > 0, _Prod.category.isnot(None))
+                    .distinct()
+                    .order_by(_Prod.category)
+                ).scalars().all()
+                _cats = [c for c in _cats if c]
+                _cs(_CAT_KEY, _cats, ttl=120)
+            ctx["categories"] = _cats
         except Exception:
             ctx["categories"] = []
         return ctx

@@ -1,5 +1,5 @@
 """
-AI Chat blueprint — Claude-powered Business Advisor with:
+AI Chat blueprint — Gemini-powered Business Advisor with:
  • SSE streaming responses (no waiting for full reply)
  • Persistent conversation history in DB (ChatConversation / ChatMessage)
  • RAG-grounded context (live business data + product catalogue)
@@ -8,9 +8,7 @@ AI Chat blueprint — Claude-powered Business Advisor with:
 from __future__ import annotations
 
 import json
-import os
-import urllib.error
-import urllib.request
+import logging
 from datetime import date, timedelta, datetime, timezone
 
 from flask import Blueprint, Response, jsonify, render_template, request, stream_with_context
@@ -23,7 +21,10 @@ from ...models.product import Product
 from ...models.sale import Sale, SaleItem
 from ...models.ai_memory import ChatConversation, ChatMessage
 from ...services.decorators import login_required
+from ...services.gemini_client import gemini_available, gemini_generate
 from ...utils.nepali_date import bs_month_name
+
+logger = logging.getLogger(__name__)
 
 ai_chat_bp = Blueprint("ai_chat", __name__, url_prefix="/ai/chat")
 
@@ -60,7 +61,7 @@ def index():
     ).scalars().all()
     return render_template(
         "ai_chat/index.html",
-        api_key_configured=bool(os.environ.get("ANTHROPIC_API_KEY")),
+        api_key_configured=gemini_available(),
         conversations=conversations,
     )
 
@@ -70,9 +71,8 @@ def index():
 @ai_chat_bp.route("/ask", methods=["POST"])
 @login_required
 def ask():
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+    if not gemini_available():
+        return jsonify({"error": "GEMINI_API_KEY not configured."}), 500
 
     payload = request.get_json(silent=True) or {}
     message = (payload.get("message") or "").strip()
@@ -82,41 +82,23 @@ def ask():
     conv_id = payload.get("conversation_id")
     history = _load_history(conv_id, current_user.id, fallback=payload.get("history") or [])
 
-    messages = [{"role": m["role"], "content": m["content"]}
-                for m in history if m.get("role") in ("user", "assistant")]
-    messages.append({"role": "user", "content": message})
+    # Build Gemini-format history
+    gemini_history = []
+    for m in history:
+        role = m.get("role", "user")
+        if role == "assistant":
+            role = "model"
+        if role in ("user", "model"):
+            gemini_history.append({"role": role, "parts": [{"text": m.get("content", "")}]})
 
-    body = {
-        "model": "claude-sonnet-4-20250514",
-        "max_tokens": 1024,
-        "system": SYSTEM_PROMPT.format(injected_business_context=build_business_context()),
-        "messages": messages,
-    }
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        text_parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
-        reply = "\n".join(text_parts).strip() or "I could not generate a reply."
+    system = SYSTEM_PROMPT.format(injected_business_context=build_business_context())
+    reply = gemini_generate(message, system=system, max_tokens=1024, history=gemini_history)
 
-        # Persist to DB
-        conv_id = _save_turn(conv_id, current_user.id, message, reply)
-        return jsonify({"reply": reply, "conversation_id": conv_id})
+    if not reply:
+        return jsonify({"error": "AI Advisor unavailable."}), 502
 
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:300]
-        return jsonify({"error": f"Claude API error: {detail}"}), 502
-    except Exception as exc:
-        return jsonify({"error": f"AI Advisor unavailable: {exc}"}), 502
+    conv_id = _save_turn(conv_id, current_user.id, message, reply)
+    return jsonify({"reply": reply, "conversation_id": conv_id})
 
 
 # ── SSE Streaming ask ─────────────────────────────────────────────────────────
@@ -126,18 +108,18 @@ def ask():
 def stream():
     """
     Server-Sent Events streaming endpoint.
-    Streams Claude's reply token-by-token so the UI can display it progressively.
+    Uses Gemini API (non-streaming) and sends the reply in word-chunks via SSE
+    so the UI displays it progressively without blocking.
 
     POST body: {message, conversation_id (optional)}
 
     SSE events:
-      data: {"token": "..."}          — partial text chunk
-      data: {"done": true, "conversation_id": N}  — stream finished
-      data: {"error": "..."}          — error occurred
+      data: {"token": "..."}                              — partial text chunk
+      data: {"done": true, "conversation_id": N}          — stream finished
+      data: {"error": "..."}                              — error occurred
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        return jsonify({"error": "ANTHROPIC_API_KEY not configured."}), 500
+    if not gemini_available():
+        return jsonify({"error": "GEMINI_API_KEY not configured."}), 500
 
     payload = request.get_json(silent=True) or {}
     message = (payload.get("message") or "").strip()
@@ -147,86 +129,56 @@ def stream():
     conv_id = payload.get("conversation_id")
     history = _load_history(conv_id, current_user.id, fallback=payload.get("history") or [])
 
-    messages = [{"role": m["role"], "content": m["content"]}
-                for m in history if m.get("role") in ("user", "assistant")]
-    messages.append({"role": "user", "content": message})
+    # Build Gemini-format history
+    gemini_history = []
+    for m in history:
+        role = m.get("role", "user")
+        if role == "assistant":
+            role = "model"
+        if role in ("user", "model"):
+            gemini_history.append({"role": role, "parts": [{"text": m.get("content", "")}]})
 
     context = build_business_context()
+    system  = SYSTEM_PROMPT.format(injected_business_context=context)
 
-    # Capture for persistence after stream completes
     user_id    = current_user.id
-    user_msg   = message
     conv_id_in = conv_id
+    user_msg   = message
 
     def generate():
-        full_reply = []
-        try:
-            body = json.dumps({
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1024,
-                "stream": True,
-                "system": SYSTEM_PROMPT.format(injected_business_context=context),
-                "messages": messages,
-            }).encode()
+        # Call Gemini (blocking — response arrives all at once)
+        reply = gemini_generate(message, system=system, max_tokens=1024, history=gemini_history)
 
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=body,
-                method="POST",
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-            )
-
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                for raw_line in resp:
-                    line = raw_line.decode("utf-8").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data_str = line[5:].strip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        event = json.loads(data_str)
-                    except Exception:
-                        continue
-
-                    etype = event.get("type", "")
-                    if etype == "content_block_delta":
-                        delta = event.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            token = delta.get("text", "")
-                            if token:
-                                full_reply.append(token)
-                                yield f"data: {json.dumps({'token': token})}\n\n"
-
-                    elif etype == "message_stop":
-                        break
-
-        except Exception as exc:
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        if not reply:
+            yield f"data: {json.dumps({'error': 'AI Advisor unavailable'})}\n\n"
             return
 
-        # Persist full reply to DB — use app context
+        # Stream word-by-word so the UI feels responsive
+        words = reply.split(" ")
+        chunk = []
+        for i, word in enumerate(words):
+            chunk.append(word)
+            # Send every 4 words as a token chunk
+            if len(chunk) >= 4 or i == len(words) - 1:
+                token = " ".join(chunk) + (" " if i < len(words) - 1 else "")
+                yield f"data: {json.dumps({'token': token})}\n\n"
+                chunk = []
+
+        # Persist to DB
         from flask import current_app
-        final_text = "".join(full_reply).strip()
         try:
             with current_app.app_context():
-                saved_conv_id = _save_turn(conv_id_in, user_id, user_msg, final_text)
-        except Exception:
-            saved_conv_id = conv_id_in
+                saved_id = _save_turn(conv_id_in, user_id, user_msg, reply)
+        except Exception as exc:
+            logger.warning("_save_turn failed in stream: %s", exc)
+            saved_id = conv_id_in
 
-        yield f"data: {json.dumps({'done': True, 'conversation_id': saved_conv_id})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'conversation_id': saved_id})}\n\n"
 
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",   # disable Nginx buffering
-        },
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

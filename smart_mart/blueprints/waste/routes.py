@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -53,7 +54,7 @@ def index():
 def record_waste():
     try:
         product_id = int(request.form.get("product_id", 0) or 0)
-        quantity = float(request.form.get("quantity", 0) or 0)
+        quantity = Decimal(str(request.form.get("quantity", 0) or 0 or 0))
         reason = request.form.get("reason", "").strip()
         notes = request.form.get("notes", "").strip() or None
         if quantity <= 0:
@@ -62,10 +63,11 @@ def record_waste():
             raise ValueError("Choose a valid waste reason.")
 
         product = db.get_or_404(Product, product_id)
-        if quantity > float(product.quantity or 0):
+        stock_quantity = Decimal(str(product.quantity or 0))
+        if quantity > stock_quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")
-        cost_value = quantity * float(product.cost_price or 0)
-        product.quantity = int(float(product.quantity or 0) - quantity)
+        cost_value = quantity * Decimal(str(product.cost_price or 0))
+        product.quantity = int(stock_quantity - quantity)
         record = WasteRecord(
             product_id=product.id,
             quantity=quantity,

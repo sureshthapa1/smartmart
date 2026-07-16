@@ -16,10 +16,12 @@ python-dotenv==1.2.2
 gunicorn==22.0.0
 psycopg2-binary==2.9.12
 qrcode==8.2
-pillow==12.2.0
+pillow==12.3.0
 python-dateutil==2.9.0
-anthropic>=0.40.0
-cloudinary>=1.36.0
+anthropic==0.57.1
+cloudinary==1.44.0
 Markdown==3.8.1
 # Redis client — required when REDIS_URL is set (shared cache + rate limiting across workers)
-redis>=5.0.0
+redis==5.2.1
+# Windows-compatible WSGI server (replaces gunicorn which is Linux-only)
+waitress==3.0.1

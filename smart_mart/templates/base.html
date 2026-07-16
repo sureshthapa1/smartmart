@@ -407,15 +407,15 @@
         <div class="collapse submenu {% if request.blueprint in ['advisor','bi_dashboard'] or (request.blueprint == 'ai' and request.endpoint not in ['ai.voice_assistant']) %}show{% endif %}" id="aiMenu">
           <ul class="nav flex-column">
             <li><a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_dashboard_page' %}active{% endif %}"
-                   href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer"></i> BI Dashboard</a></li>
+                   href="{{ url_for('bi_dashboard.bi_dashboard_page') }}"><i class="bi bi-speedometer"></i> BI Dashboard</a></li>
             <li><a class="nav-link {% if request.blueprint == 'advisor' %}active{% endif %}"
                    href="{{ url_for('advisor.index') }}"><i class="bi bi-lightbulb"></i> Business Advisor</a></li>
             <li><a class="nav-link {% if request.endpoint == 'ai.customer_intelligence' %}active{% endif %}"
                    href="{{ url_for('ai.customer_intelligence') }}"><i class="bi bi-person-bounding-box"></i> Customer Intel</a></li>
             <li><a class="nav-link {% if request.endpoint == 'ai.anomalies_page' %}active{% endif %}"
                    href="{{ url_for('ai.anomalies_page') }}"><i class="bi bi-shield-exclamation"></i> Anomalies</a></li>
-            <li><a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_profit_leakage_page' %}active{% endif %}"
-                   href="{{ url_for('bi_dashboard.bi_profit_leakage_page') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
+                   href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
             <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-file-earmark-bar-graph"></i> P&L Statement</a></li>
           </ul>

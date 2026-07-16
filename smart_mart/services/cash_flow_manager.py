@@ -76,8 +76,9 @@ def profit_loss(start: date, end: date) -> dict:
                 func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
             )
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
-        .join(Sale, SaleItem.sale_id == Sale.id)
+        .select_from(SaleItem)
+        .join(Product, Product.id == SaleItem.product_id)
+        .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
     ).scalar()
     cogs = Decimal(str(cogs_row or 0))

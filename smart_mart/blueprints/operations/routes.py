@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import date
 
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
@@ -52,7 +53,7 @@ def credits():
             operations_manager.record_credit_payment(
                 sale_id=int(request.form.get("sale_id", "0")),
                 user_id=current_user.id,
-                amount=float(request.form.get("amount", "0") or 0),
+                amount=Decimal(str(request.form.get("amount", "0") or 0 or 0)),
                 payment_mode=request.form.get("payment_mode", "cash"),
                 note=request.form.get("note"),
             )
@@ -94,7 +95,7 @@ def suppliers():
                 supplier_id=int(request.form.get("supplier_id", "0")),
                 purchase_id=int(purchase_id) if purchase_id else None,
                 user_id=current_user.id,
-                amount=float(request.form.get("amount", "0") or 0),
+                amount=Decimal(str(request.form.get("amount", "0") or 0 or 0)),
                 payment_mode=request.form.get("payment_mode", "cash"),
                 note=request.form.get("note"),
             )
@@ -123,14 +124,14 @@ def closing():
             if action == "open":
                 operations_manager.open_cash_session(
                     user_id=current_user.id,
-                    opening_cash=float(request.form.get("opening_cash", "0") or 0),
+                    opening_cash=Decimal(str(request.form.get("opening_cash", "0") or 0 or 0)),
                     notes=request.form.get("notes"),
                 )
                 flash("Cash session opened.", "success")
             elif action == "close":
                 operations_manager.close_cash_session(
                     session_id=int(request.form.get("session_id", "0")),
-                    closing_cash=float(request.form.get("closing_cash", "0") or 0),
+                    closing_cash=Decimal(str(request.form.get("closing_cash", "0") or 0 or 0)),
                     notes=request.form.get("notes"),
                 )
                 flash("Cash session closed.", "success")
@@ -275,12 +276,12 @@ def shifts():
         action = request.form.get("action")
         try:
             if action == "open":
-                open_shift(current_user.id, float(request.form.get("opening_cash", 0) or 0),
+                open_shift(current_user.id, Decimal(str(request.form.get("opening_cash", 0) or 0 or 0)),
                            request.form.get("notes"))
                 flash("Shift opened.", "success")
             elif action == "close":
                 close_shift(int(request.form.get("shift_id", 0)),
-                            float(request.form.get("closing_cash", 0) or 0),
+                            Decimal(str(request.form.get("closing_cash", 0) or 0 or 0)),
                             request.form.get("notes"))
                 flash("Shift closed.", "success")
         except ValueError as e:

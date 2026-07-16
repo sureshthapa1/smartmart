@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 def _generate_invoice_number() -> str:
     """Generate invoice number in format INV-YYYYMMDD-XXXX.
 
-    Uses MAX() on existing invoice numbers for the day rather than COUNT(),
-    which prevents duplicate numbers when two sales are created concurrently
-    (COUNT can return the same value for two simultaneous transactions).
+    Uses MAX() on existing committed invoice numbers for the day.
+    Must be called AFTER product row locks are held (inside the transaction)
+    so concurrent sales are serialized and can't both read the same MAX value.
+    Falls back gracefully on any DB error — the sale is more important than
+    the invoice number format.
     """
     from datetime import date as _date
     today_str = _date.today().strftime("%Y%m%d")
     prefix = f"INV-{today_str}-"
-    # Use MAX to find the highest sequence for today, not COUNT
     max_invoice = db.session.execute(
         db.select(db.func.max(Sale.invoice_number)).where(
             Sale.invoice_number.like(f"{prefix}%")
@@ -133,10 +134,6 @@ def create_sale(items: list[dict], user_id: int,
                 pass  # Non-blocking — don't fail sale if credit check errors
 
         invoice_number = None
-        try:
-            invoice_number = _generate_invoice_number()
-        except Exception as exc:
-            logger.warning("Invoice number generation failed; using fallback invoice id: %s", exc)
 
         # ── Lock product rows to prevent concurrent oversell ──────────────
         # SELECT ... FOR UPDATE acquires a row-level lock so two concurrent
@@ -148,6 +145,13 @@ def create_sale(items: list[dict], user_id: int,
             .with_for_update()
         ).scalars().all()
         products: dict[int, Product] = {p.id: p for p in locked_products}
+
+        # Generate invoice number AFTER acquiring row locks so concurrent
+        # transactions are serialized — both cannot read the same MAX value.
+        try:
+            invoice_number = _generate_invoice_number()
+        except Exception as exc:
+            logger.warning("Invoice number generation failed; using fallback: %s", exc)
 
         for item in items:
             pid = item["product_id"]

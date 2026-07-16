@@ -22,6 +22,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>Code</th>
             <th>Type</th>
             <th>Value</th>
             <th>Scope</th>
@@ -35,6 +36,7 @@
           {% for p in promos %}
           <tr>
             <td class="fw-semibold">{{ p.name }}</td>
+            <td class="text-muted small">{{ p.code or '-' }}</td>
             <td><span class="badge bg-light text-dark border">{{ p.type_label }}</span></td>
             <td>
               {% if p.promo_type == 'percentage' %}{{ p.discount_value }}%
@@ -73,7 +75,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-4">No promotions yet.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-4">No promotions yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

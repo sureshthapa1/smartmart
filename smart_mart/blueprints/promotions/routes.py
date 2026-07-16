@@ -98,6 +98,7 @@ def check_promotions():
 def _form_to_data(form) -> dict:
     data = {
         "name": form.get("name", "").strip(),
+        "code": form.get("code", "").strip().upper() or None,
         "promo_type": form.get("promo_type", "percentage"),
         "discount_value": float(form.get("discount_value", 0) or 0),
         "scope": form.get("scope", "all"),

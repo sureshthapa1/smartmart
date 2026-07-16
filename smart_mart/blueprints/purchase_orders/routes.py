@@ -1,4 +1,5 @@
 """Purchase Orders blueprint."""
+from decimal import Decimal
 from datetime import date
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
@@ -50,7 +51,7 @@ def create_po():
                 break
             try:
                 qty = int(request.form.get(f"items[{idx}][quantity]", 0))
-                cost = float(request.form.get(f"items[{idx}][unit_cost]", 0))
+                cost = Decimal(str(request.form.get(f"items[{idx}][unit_cost]", 0) or 0))
                 if int(pid) > 0 and qty > 0:
                     items.append({"product_id": int(pid), "quantity": qty, "unit_cost": cost})
             except (ValueError, TypeError):

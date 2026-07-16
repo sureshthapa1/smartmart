@@ -1,5 +1,6 @@
 """Inventory blueprint — product CRUD, stock adjustment, and category management."""
 
+from decimal import Decimal
 import os
 import uuid
 
@@ -708,6 +709,285 @@ def autofill_all():
         flash(f"Bulk autofill failed: {exc}", "danger")
     return redirect(url_for("inventory.list_products"))
 
+
+# ── AI Content Generation API endpoints ──────────────────────────────────────
+
+@inventory_bp.route("/api/ai/generate-description", methods=["POST"])
+@admin_required
+def api_ai_generate_description():
+    """Generate AI product description. POST {name, category} → {description}"""
+    from flask import jsonify
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    category = (data.get("category") or "").strip()
+    if not name:
+        return jsonify({"error": "Product name required"}), 400
+    try:
+        from ...services.gemini_client import gemini_generate, gemini_available
+        if not gemini_available():
+            return jsonify({"error": "GEMINI_API_KEY not configured"}), 503
+        prompt = (
+            f"Write a rich product description for '{name}' ({category or 'General'}) "
+            f"sold at a premium dry fruits store in Nepal (GoldKernel). "
+            f"2-3 paragraphs. Include health benefits with ✅ bullets and a 💡 How to Use tip. "
+            f"150-220 words. Plain text only, no markdown headers."
+        )
+        result = gemini_generate(prompt, max_tokens=400)
+        if not result:
+            return jsonify({"error": "AI generation failed"}), 502
+        return jsonify({"description": result.strip()})
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("AI description gen failed: %s", exc)
+        return jsonify({"error": "Generation failed"}), 500
+
+
+@inventory_bp.route("/api/ai/generate-tags", methods=["POST"])
+@admin_required
+def api_ai_generate_tags():
+    """Generate AI product tags. POST {name, category, description} → {tags}"""
+    from flask import jsonify
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    category = (data.get("category") or "").strip()
+    description = (data.get("description") or "").strip()[:200]
+    if not name:
+        return jsonify({"error": "Product name required"}), 400
+    try:
+        from ...services.gemini_client import gemini_generate, gemini_available
+        if not gemini_available():
+            return jsonify({"error": "GEMINI_API_KEY not configured"}), 503
+        prompt = (
+            f"Generate 6-8 SEO-friendly product tags for: {name} (category: {category or 'General'}).\n"
+            f"Context: {description}\n"
+            f"Rules: lowercase, no spaces in tag, use hyphens for multi-word, relevant to Nepal market.\n"
+            f"Reply with ONLY a JSON array: [\"tag1\", \"tag2\", \"tag3\"]"
+        )
+        result = gemini_generate(prompt, max_tokens=100, temperature=0.3)
+        if not result:
+            return jsonify({"error": "AI generation failed"}), 502
+        import json, re
+        m = re.search(r'\[.*?\]', result, re.DOTALL)
+        if m:
+            tags = json.loads(m.group())
+            tags = [str(t).strip().lower() for t in tags if t]
+            return jsonify({"tags": tags, "tags_string": ", ".join(tags)})
+        return jsonify({"error": "Could not parse tags"}), 502
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("AI tags gen failed: %s", exc)
+        return jsonify({"error": "Generation failed"}), 500
+
+
+@inventory_bp.route("/api/ai/generate-meta", methods=["POST"])
+@admin_required
+def api_ai_generate_meta():
+    """Generate AI SEO meta description + title. POST {name, category, description} → {meta_description, seo_title}"""
+    from flask import jsonify
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    category = (data.get("category") or "").strip()
+    description = (data.get("description") or "").strip()[:300]
+    if not name:
+        return jsonify({"error": "Product name required"}), 400
+    try:
+        from ...services.gemini_client import gemini_generate, gemini_available
+        if not gemini_available():
+            return jsonify({"error": "GEMINI_API_KEY not configured"}), 503
+        prompt = (
+            f"Write SEO content for a Nepal e-commerce product page.\n"
+            f"Product: {name} | Category: {category or 'General'}\n"
+            f"Description context: {description}\n\n"
+            f"Reply ONLY with valid JSON (no markdown):\n"
+            f'{{"meta_description": "under 155 chars, benefit-focused, includes Nepal/GoldKernel", '
+            f'"seo_title": "under 60 chars, includes product name and buy/shop"}}'
+        )
+        result = gemini_generate(prompt, max_tokens=150, temperature=0.3)
+        if not result:
+            return jsonify({"error": "AI generation failed"}), 502
+        import json, re
+        # Strip markdown fences if present
+        clean = re.sub(r"^```(?:json)?\s*", "", result.strip())
+        clean = re.sub(r"\s*```$", "", clean)
+        parsed = json.loads(clean)
+        return jsonify({
+            "meta_description": str(parsed.get("meta_description", ""))[:320],
+            "seo_title": str(parsed.get("seo_title", ""))[:120],
+        })
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("AI meta gen failed: %s", exc)
+        return jsonify({"error": "Generation failed"}), 500
+
+
+# ── Pexels Image Search API ───────────────────────────────────────────────────
+
+@inventory_bp.route("/api/pexels/search", methods=["GET"])
+@admin_required
+def api_pexels_search():
+    """
+    Proxy Pexels search via server with browser-like headers to avoid Cloudflare blocks.
+    GET ?q=almond&per_page=9
+    """
+    from flask import jsonify
+    import urllib.request, urllib.parse, json as _json, urllib.error
+
+    query = request.args.get("q", "").strip()
+    per_page = min(int(request.args.get("per_page", 9)), 15)
+    if not query:
+        return jsonify({"error": "Query required"}), 400
+
+    pexels_key = os.environ.get("PEXELS_API_KEY", "")
+    if not pexels_key:
+        return jsonify({"error": "PEXELS_API_KEY not configured"}), 503
+
+    try:
+        encoded = urllib.parse.quote(query)
+        url = f"https://api.pexels.com/v1/search?query={encoded}&per_page={per_page}&orientation=square"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": pexels_key,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.pexels.com/",
+                "Origin": "https://www.pexels.com",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        photos = [
+            {
+                "id": p["id"],
+                "url": p["src"]["medium"],
+                "full_url": p["src"]["large2x"],
+                "thumb": p["src"]["small"],
+                "photographer": p.get("photographer", ""),
+                "alt": p.get("alt", query),
+            }
+            for p in data.get("photos", [])
+        ]
+        return jsonify({"photos": photos, "total": data.get("total_results", 0)})
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode()[:200]
+        import logging
+        logging.getLogger(__name__).warning("Pexels HTTP %s: %s", e.code, err_body)
+        # Fallback: return curated hardcoded images for common product types
+        return _pexels_curated_fallback(query, per_page)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Pexels search error: %s", exc)
+        return _pexels_curated_fallback(query, per_page)
+
+
+def _pexels_curated_fallback(query: str, limit: int = 9):
+    """Return curated Pexels direct image URLs when API is blocked."""
+    from flask import jsonify
+    q = query.lower()
+    CURATED = {
+        "cashew":    [("4109080","Cashew nuts in bowl"),("4109081","Raw cashews"),("4109082","Cashew close up")],
+        "almond":    [("6157052","Almonds pile"),("6157053","Almond nuts"),("1295572","Almond bowl")],
+        "walnut":    [("3630197","Walnuts"),("3630198","Walnut halves"),("1295573","Walnuts pile")],
+        "pistachio": [("5702716","Pistachios"),("5702717","Pistachio nuts"),("5702718","Green pistachio")],
+        "raisin":    [("6157050","Raisins"),("6157051","Dried raisins"),("3650438","Dried grapes")],
+        "date":      [("6157049","Medjool dates"),("6157048","Dates fruit"),("1640771","Date palm")],
+        "fig":       [("4051347","Dried figs"),("4051348","Fig fruit"),("4051349","Figs bowl")],
+        "apricot":   [("3644742","Dried apricots"),("3644743","Apricot"),("3644744","Orange apricot")],
+        "peanut":    [("4110380","Peanuts"),("4110381","Groundnuts"),("4110382","Peanut pile")],
+        "coconut":   [("1528051","Coconut"),("1528052","Coconut halved"),("1528053","Coconut pieces")],
+    }
+    matched = []
+    for key, photos in CURATED.items():
+        if key in q:
+            matched = photos[:limit]
+            break
+    if not matched:
+        matched = [("5632388","Dry fruits mix"),("4109080","Nuts assorted"),("6157052","Mixed nuts")]
+
+    result = []
+    for pid, alt in matched[:limit]:
+        base = f"https://images.pexels.com/photos/{pid}/pexels-photo-{pid}.jpeg"
+        result.append({
+            "id": int(pid),
+            "url": base + "?auto=compress&cs=tinysrgb&w=400",
+            "full_url": base + "?auto=compress&cs=tinysrgb&w=1260",
+            "thumb": base + "?auto=compress&cs=tinysrgb&w=200",
+            "photographer": "Pexels",
+            "alt": alt,
+        })
+    return jsonify({"photos": result, "total": len(result), "source": "curated"})
+
+
+@inventory_bp.route("/api/pexels/import", methods=["POST"])
+@admin_required
+def api_pexels_import():
+    """Import a Pexels image into Cloudinary (or local). POST {product_id, image_url, alt}"""
+    from flask import jsonify
+    import urllib.request
+    data = request.get_json(silent=True) or {}
+    product_id = data.get("product_id")
+    image_url = (data.get("image_url") or "").strip()
+    if not image_url or not image_url.startswith("https://"):
+        return jsonify({"error": "Valid HTTPS image_url required"}), 400
+
+    try:
+        # Download image bytes
+        req = urllib.request.Request(
+            image_url,
+            headers={"User-Agent": "SmartMart/1.0 (product image import)"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            img_bytes = resp.read()
+
+        if len(img_bytes) < 5000:
+            return jsonify({"error": "Image too small or download failed"}), 400
+
+        # Try Cloudinary upload first
+        from ...services.image_service import _cloudinary_available, _cloudinary, _local_upload_dir
+        cl = _cloudinary()
+        if cl and _cloudinary_available():
+            import io
+            result = cl.uploader.upload(
+                io.BytesIO(img_bytes),
+                folder="smartmart/products",
+                transformation=[
+                    {"width": 800, "height": 800, "crop": "limit", "quality": "auto:good"},
+                ],
+                resource_type="image",
+            )
+            identifier = "cld:" + result["public_id"]
+            thumb_url = cl.CloudinaryImage(result["public_id"]).build_url(
+                transformation=[{"width": 200, "height": 200, "crop": "fill", "quality": "auto"}]
+            )
+        else:
+            # Local fallback
+            import uuid, os
+            filename = f"{uuid.uuid4().hex}.jpg"
+            dest = os.path.join(_local_upload_dir(), filename)
+            with open(dest, "wb") as f:
+                f.write(img_bytes)
+            identifier = filename
+            thumb_url = f"/static/uploads/products/{filename}"
+
+        # Update product if product_id provided
+        if product_id:
+            product = db.session.get(Product, int(product_id))
+            if product:
+                # Delete old image
+                from ...services.image_service import delete_product_image
+                if product.image_filename:
+                    delete_product_image(product.image_filename)
+                product.image_filename = identifier
+                db.session.commit()
+
+        return jsonify({"identifier": identifier, "thumb_url": thumb_url, "ok": True})
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("Pexels import failed: %s", exc)
+        return jsonify({"error": "Import failed"}), 500
+
 @inventory_bp.route("/export-csv")
 @admin_required
 def export_csv():
@@ -740,14 +1020,14 @@ def record_supplier_price(product_id):
     product = db.get_or_404(Product, product_id)
     try:
         from ...models.supplier_price_record import SupplierPriceRecord
-        new_cost = float(request.form.get("cost_price", 0) or 0)
+        new_cost = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
         if new_cost <= 0:
             raise ValueError("Cost price must be greater than zero.")
         record = SupplierPriceRecord(
             product_id=product.id,
             supplier_name=request.form.get("supplier_name", "").strip() or None,
             cost_price=new_cost,
-            quantity_kg=float(request.form.get("quantity_kg", 0) or 0) or None,
+            quantity_kg=Decimal(str(request.form.get("quantity_kg", 0) or 0 or 0)) or None,
             invoice_ref=request.form.get("invoice_ref", "").strip() or None,
             recorded_by=current_user.id,
         )
@@ -907,8 +1187,8 @@ def create_variant(product_id):
     if request.method == "POST":
         variant_name = request.form.get("variant_name", "").strip()
         sku = request.form.get("sku", "").strip()
-        cost_price = float(request.form.get("cost_price", 0) or 0)
-        selling_price = float(request.form.get("selling_price", 0) or 0)
+        cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
+        selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
         quantity = int(request.form.get("quantity", 0) or 0)
         barcode = request.form.get("barcode", "").strip() or None
         if not variant_name or not sku:
@@ -946,8 +1226,8 @@ def edit_variant(product_id, variant_id):
     if request.method == "POST":
         variant.variant_name = request.form.get("variant_name", "").strip()
         variant.sku = request.form.get("sku", "").strip()
-        variant.cost_price = float(request.form.get("cost_price", 0) or 0)
-        variant.selling_price = float(request.form.get("selling_price", 0) or 0)
+        variant.cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
+        variant.selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
         variant.quantity = int(request.form.get("quantity", 0) or 0)
         variant.barcode = request.form.get("barcode", "").strip() or None
         variant.is_active = request.form.get("is_active") == "on"
@@ -1015,10 +1295,14 @@ def _form_to_data(form) -> dict:
         "tax_category": form.get("tax_category", "standard").strip() or "standard",
         "max_discount_pct": None,
         # ── Store content fields (manual edit — see inventory/form.html) ─────
-        "description":   form.get("description", "").strip() or None,
-        "benefits":      form.get("benefits", "").strip() or None,
-        "origin":        form.get("origin", "").strip() or None,
-        "storage_tips":  form.get("storage_tips", "").strip() or None,
+        "description":       form.get("description", "").strip() or None,
+        "benefits":          form.get("benefits", "").strip() or None,
+        "origin":            form.get("origin", "").strip() or None,
+        "storage_tips":      form.get("storage_tips", "").strip() or None,
+        # ── SEO & Discovery fields ────────────────────────────────────────────
+        "tags":              form.get("tags", "").strip() or None,
+        "meta_description":  form.get("meta_description", "").strip()[:320] or None,
+        "seo_title":         form.get("seo_title", "").strip()[:120] or None,
     }
     max_disc_raw = form.get("max_discount_pct", "").strip()
     if max_disc_raw:
