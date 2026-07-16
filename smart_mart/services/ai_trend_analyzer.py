@@ -49,7 +49,8 @@ def fast_moving_products(period: str = "weekly", top_n: int = 10) -> dict:
             func.sum(SaleItem.subtotal).label("revenue"),
             func.count(SaleItem.id.distinct()).label("order_count"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start)
         .group_by(Product.id)

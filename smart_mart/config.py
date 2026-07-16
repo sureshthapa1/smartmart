@@ -57,9 +57,11 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    # DATABASE_URL is validated in create_app() not here — class body code
+    # runs at import time which breaks test collection even for non-production configs.
     SQLALCHEMY_DATABASE_URI = _fix_db_url(
         os.environ.get("DATABASE_URL")
-    ) or "sqlite:///smart_mart.db"
+    ) or "sqlite:///smart_mart_prod_MISSING_DATABASE_URL.db"
     WTF_CSRF_ENABLED = True
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
 

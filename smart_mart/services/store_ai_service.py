@@ -22,7 +22,7 @@ from typing import Optional
 
 from sqlalchemy import func
 
-from ..extensions import db
+from ..extensions import db, cache as _cs_cache
 from ..models.product import Product
 from ..models.online_order import OnlineOrder, OnlineOrderItem
 
@@ -37,17 +37,16 @@ _CACHE_TTL = 300  # 5 minutes (seconds, matching cache_service convention)
 def _cache_get(key: str):
     """Get from shared cache_service."""
     try:
-        from .cache_service import get as _cs_get
-        return _cs_get(f"store_ai:{key}")
+        from ..extensions import cache as _cs_cache
+        return _cs_cache.get(f"store_ai:{key}")
     except Exception:
         return None
 
 
 def _cache_set(key: str, value, ttl: int = None):
-    """Set in shared cache_service. Accepts optional ttl override (seconds)."""
+    """Set in shared cache. Accepts optional ttl override (seconds)."""
     try:
-        from .cache_service import set as _cs_set
-        _cs_set(f"store_ai:{key}", value, ttl=ttl if ttl is not None else _CACHE_TTL)
+        _cs_cache.set(f"store_ai:{key}", value, ttl=ttl if ttl is not None else _CACHE_TTL)
     except Exception:
         pass
     return value

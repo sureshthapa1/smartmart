@@ -230,7 +230,8 @@ def generate_insights() -> list[dict]:
     # ── Top product this month ────────────────────────────────────────────
     top = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
         .group_by(Product.id)

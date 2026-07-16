@@ -228,6 +228,7 @@ with app.app_context():
         ).scalar_one_or_none()
 
         if not admin:
+            # First deploy only: create the admin account
             admin = User(
                 username=admin_username,
                 password_hash=hash_password(admin_password),
@@ -237,9 +238,12 @@ with app.app_context():
             db.session.commit()
             print(f"Admin user created: {admin_username}")
         else:
-            admin.password_hash = hash_password(admin_password)
-            db.session.commit()
-            print(f"Admin password updated: {admin_username}")
+            # IMPORTANT: Do NOT reset password on every deploy.
+            # Admins may have changed their password in production.
+            # To reset the admin password manually, run:
+            #   flask shell -c "from smart_mart.models.user import User; ..."
+            # or add a separate RESET_ADMIN_PASSWORD=1 env var check.
+            print(f"Admin user already exists: {admin_username} (password unchanged)")
     except Exception as e:
         print(f"ERROR setting up admin user: {e}")
         traceback.print_exc()

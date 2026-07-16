@@ -29,7 +29,8 @@ def top_products(start: date, end: date, n: int = 10) -> list[dict]:
     """Return top N products by quantity sold in [start, end], descending."""
     rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
@@ -43,7 +44,8 @@ def least_products(start: date, end: date, n: int = 10) -> list[dict]:
     """Return bottom N products by quantity sold in [start, end], ascending."""
     rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
@@ -79,7 +81,8 @@ def profit_per_product(start: date, end: date) -> list[dict]:
                 func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
             ).label("cogs"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)
@@ -110,7 +113,8 @@ def category_performance(start: date, end: date) -> list[dict]:
             func.sum(SaleItem.subtotal).label("revenue"),
             func.sum(SaleItem.quantity).label("qty_sold"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)
@@ -270,7 +274,8 @@ def product_wise_sales(start: date, end: date) -> list[dict]:
             ).label("cogs"),
             func.count(SaleItem.id.distinct()).label("times_sold"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id)

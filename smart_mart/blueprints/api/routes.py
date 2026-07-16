@@ -1,12 +1,13 @@
 """API blueprint — JSON endpoints for Chart.js charts and autofill."""
 
+import hmac
 from datetime import date, timedelta, datetime, timezone
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
 from sqlalchemy import func
 
-from ...extensions import db, limiter
+from ...extensions import db, limiter, cache
 from ...models.sale import Sale
 from ...services.decorators import login_required, admin_required
 
@@ -681,33 +682,35 @@ def product_price_history(product_id):
 
 @api_bp.route("/bot/run", methods=["POST"])
 def run_bots():
-    """Run all daily bots. Protected by BOT_SECRET header or admin session.
+    """Run all daily bots. Protected by BOT_SECRET header (cron/external callers).
+
+    SECURITY: This endpoint is CSRF-exempt so cron jobs can call it without a
+    browser session. Because of that, we MUST NOT accept admin-session auth here
+    — a logged-in admin visiting a malicious page could trigger this via a
+    cross-site POST. Only BOT_SECRET header auth is accepted on this path.
 
     Call from a cron job / Render scheduler:
-        curl -X POST https://your-app.onrender.com/api/bot/run \
+        curl -X POST https://your-app.onrender.com/api/bot/run \\
              -H "X-Bot-Secret: YOUR_BOT_SECRET"
 
-    Or trigger manually from the admin panel.
+    Admins wanting to trigger bots manually should use the CSRF-protected
+    admin panel page (/admin/bots/run), not this endpoint.
     """
     import os
     from flask import current_app
 
-    # Auth: either valid admin session OR correct BOT_SECRET header
     bot_secret = os.environ.get("BOT_SECRET", "")
     header_secret = request.headers.get("X-Bot-Secret", "")
 
-    is_admin_session = (
-        current_user.is_authenticated and current_user.role == "admin"
-    )
-    is_valid_secret = bot_secret and header_secret == bot_secret
-
-    if not is_admin_session and not is_valid_secret:
+    # Only accept BOT_SECRET — never bare admin session (CSRF risk on exempt route)
+    if not bot_secret:
+        return jsonify({"error": "BOT_SECRET is not configured on this server"}), 503
+    if not hmac.compare_digest(header_secret, bot_secret):
         return jsonify({"error": "Unauthorized"}), 401
 
     try:
         from ...services.bot_runner import run_all_bots
-        user_id = current_user.id if current_user.is_authenticated else 1
-        result = run_all_bots(user_id=user_id)
+        result = run_all_bots(user_id=1)
         current_app.logger.info("Bot runner completed: %s", result)
         return jsonify(result)
     except Exception as e:
@@ -912,9 +915,8 @@ def suggest_expense_category():
 @login_required
 def alert_count():
     """Return sidebar badge counts: alert count + pending online orders."""
-    from ...services.cache_service import get as _cache_get, set as _cache_set
     cache_key = f"alert_count:u{current_user.id}"
-    cached = _cache_get(cache_key)
+    cached = cache.get(cache_key)
     if cached is not None:
         return jsonify(cached)
     try:
@@ -937,7 +939,7 @@ def alert_count():
                 .where(OnlineOrder.status == "pending")
             ).scalar() or 0
         result = {"global_alert_count": count, "pending_orders_count": pending_orders}
-        _cache_set(cache_key, result, ttl=60)
+        cache.set(cache_key, result, ttl=60)
         return jsonify(result)
     except Exception as exc:
         import logging

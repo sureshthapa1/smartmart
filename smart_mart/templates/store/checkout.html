@@ -229,10 +229,10 @@ function applyPromo(){
   const code=document.getElementById('promo-input').value.trim().toUpperCase();
   const res=document.getElementById('promo-result');
   if(!code){res.innerHTML='<span style="color:var(--danger);">Please enter a promo code.</span>';return;}
-  const csrf=document.querySelector('meta[name=csrf-token]')?.content||'';
+  const csrf=document.querySelector('meta[name=csrf-token]')?.content||document.querySelector('input[name=csrf_token]')?.value||'';
   fetch('{{ url_for("store.apply_promo") }}',{
     method:'POST',credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json','X-CSRFToken':csrf},
     body:JSON.stringify({code,csrf_token:csrf})
   }).then(r=>r.json()).then(d=>{
     if(d.ok){

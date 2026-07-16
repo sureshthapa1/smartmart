@@ -110,7 +110,8 @@ def cash_flow():
             func.sum(SaleItem.quantity).label("qty_sold"),
             func.count(SaleItem.id.distinct()).label("txn_count"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)
@@ -698,7 +699,8 @@ def profit_margin():
                 func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
             ).label("cogs"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.id, Product.name, Product.category, Product.sku)
@@ -727,7 +729,8 @@ def profit_margin():
                 func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
             ).label("cogs"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
         .group_by(Product.category)

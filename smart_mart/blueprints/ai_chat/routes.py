@@ -373,7 +373,8 @@ def build_business_context() -> str:
             func.coalesce(func.sum(SaleItem.quantity), 0).label("qty"),
             func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
         .group_by(Product.name)

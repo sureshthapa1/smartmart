@@ -22,7 +22,7 @@ from typing import Optional
 
 from sqlalchemy import func
 
-from ..extensions import db
+from ..extensions import db, cache as _cache_ext
 from ..models.product import Product
 from ..models.online_order import OnlineOrder, OnlineOrderItem
 from ..models.sale import Sale, SaleItem
@@ -34,16 +34,15 @@ _CACHE_TTL = 600  # 10 minutes
 
 def _cget(key: str):
     try:
-        from .cache_service import get as _g
-        return _g(f"reco:{key}")
+        from ..extensions import cache as _cache_ext
+        return _cache_ext.get(f"reco:{key}")
     except Exception:
         return None
 
 
 def _cset(key: str, value):
     try:
-        from .cache_service import set as _s
-        _s(f"reco:{key}", value, ttl=_CACHE_TTL)
+        _cache_ext.set(f"reco:{key}", value, ttl=_CACHE_TTL)
     except Exception:
         pass
     return value
@@ -366,7 +365,6 @@ def get_cart_recommendations(cart_product_ids: list[int], limit: int = 4) -> lis
 def invalidate_customer_cache(customer_phone: str) -> None:
     """Call after a customer places a new order."""
     try:
-        from .cache_service import delete as _del
-        _del(f"reco:collab:{customer_phone}")
+        _cache_ext.delete(f"reco:collab:{customer_phone}")
     except Exception:
         pass

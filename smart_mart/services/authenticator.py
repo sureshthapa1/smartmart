@@ -2,45 +2,17 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from datetime import datetime, timezone, timedelta
-from threading import Lock
 
 from flask_login import login_user, logout_user
 
 from ..extensions import bcrypt, db
 from ..models.user import User
 
-# ── Simple in-memory rate limiter (no external deps) ─────────────────────────
-_login_attempts: dict[str, list[datetime]] = defaultdict(list)
-_lock = Lock()
-_MAX_ATTEMPTS = 5
-_WINDOW_MINUTES = 10
-
 
 def _get_client_ip() -> str:
     from flask import request
     return request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
-
-
-def is_rate_limited(ip: str) -> bool:
-    """Return True if this IP has exceeded the login attempt limit."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=_WINDOW_MINUTES)
-    with _lock:
-        _login_attempts[ip] = [t for t in _login_attempts[ip] if t > cutoff]
-        return len(_login_attempts[ip]) >= _MAX_ATTEMPTS
-
-
-def record_failed_attempt(ip: str) -> int:
-    """Record a failed login attempt and return remaining attempts."""
-    with _lock:
-        _login_attempts[ip].append(datetime.now(timezone.utc))
-        return max(0, _MAX_ATTEMPTS - len(_login_attempts[ip]))
-
-
-def clear_attempts(ip: str) -> None:
-    with _lock:
-        _login_attempts.pop(ip, None)
 
 
 def login(username: str, password: str) -> User | None:
@@ -53,7 +25,8 @@ def login(username: str, password: str) -> User | None:
     ).scalar_one_or_none()
 
     if user is None or not check_password(password, user.password_hash):
-        record_failed_attempt(ip)
+        # Rate limiting is handled by Flask-Limiter on the login route decorator.
+        # Record to LoginAttempt table for audit log.
         try:
             from ..models.login_attempt import LoginAttempt
             db.session.add(LoginAttempt(
@@ -66,7 +39,6 @@ def login(username: str, password: str) -> User | None:
             db.session.rollback()
         return None
 
-    clear_attempts(ip)
     login_user(user)
 
     try:

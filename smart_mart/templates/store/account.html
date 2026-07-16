@@ -46,10 +46,13 @@
             <div style="font-size:.65rem;color:var(--muted);margin-top:.15rem;">Redeemable at checkout</div>
           </div>
           {% endif %}
-          <a href="{{ url_for('store.logout') }}"
-             style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:600;color:var(--danger);">
-            <i class="bi bi-box-arrow-right" style="font-size:1rem;"></i> Sign Out
-          </a>
+          <form method="post" action="{{ url_for('store.logout') }}" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit"
+               style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1.25rem;text-decoration:none;font-size:.85rem;font-weight:600;color:var(--danger);background:none;border:none;width:100%;cursor:pointer;">
+              <i class="bi bi-box-arrow-right" style="font-size:1rem;"></i> Sign Out
+            </button>
+          </form>
         </div>
       </div>
     </div>

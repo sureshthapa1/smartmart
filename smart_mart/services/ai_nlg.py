@@ -81,7 +81,8 @@ def generate_daily_report() -> dict:
     # Top product today
     top_today = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
         .group_by(Product.id)
@@ -106,7 +107,8 @@ def generate_daily_report() -> dict:
             func.coalesce(SaleItem.cost_price, Product.cost_price).label("cost_price"),
             func.sum(SaleItem.quantity).label("qty")
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
         .group_by(Product.id)
@@ -206,7 +208,8 @@ def generate_weekly_report() -> dict:
     # Top 3 products this week
     top3 = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= _dt(week_start))
         .group_by(Product.id)
@@ -282,7 +285,8 @@ def generate_monthly_report() -> dict:
             func.coalesce(SaleItem.cost_price, Product.cost_price).label("cost_price"),
             func.sum(SaleItem.quantity).label("qty")
         )
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= _dt(month_start))
         .group_by(Product.id)

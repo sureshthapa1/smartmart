@@ -51,7 +51,8 @@ def get_eod_summary(target_date: date | None = None) -> dict:
         db.select(func.coalesce(
             func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
         ))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= day_start, Sale.sale_date < day_end)
     ).scalar() or 0
@@ -76,7 +77,8 @@ def get_eod_summary(target_date: date | None = None) -> dict:
     top_products = db.session.execute(
         db.select(Product.name, func.sum(SaleItem.quantity).label("qty"),
                   func.sum(SaleItem.subtotal).label("rev"))
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        .select_from(SaleItem)
+        .join(Product, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= day_start, Sale.sale_date < day_end)
         .group_by(Product.id)

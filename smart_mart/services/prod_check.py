@@ -138,21 +138,6 @@ def run_checks(app) -> dict[str, Any]:
         except Exception as e:
             checks.append(_check("Backup history", False, str(e)[:100], critical=False))
 
-        # ── 12. Backup plan — at least one backup log ─────────────────────
-        try:
-            from smart_mart.models.backup_log import BackupLog
-            backup_count = db.session.execute(
-                db.select(db.func.count(BackupLog.id))
-            ).scalar() or 0
-            checks.append(_check(
-                "Backup history",
-                backup_count > 0,
-                f"{backup_count} backup(s) on record",
-                critical=False,
-            ))
-        except Exception as e:
-            checks.append(_check("Backup history", False, str(e)[:100], critical=False))
-
     # Summary
     critical_failures = [c for c in checks if not c["passed"] and c["critical"]]
     warnings = [c for c in checks if not c["passed"] and not c["critical"]]

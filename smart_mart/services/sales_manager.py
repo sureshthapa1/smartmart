@@ -9,6 +9,7 @@ from io import BytesIO
 from sqlalchemy import and_
 
 from ..extensions import db
+from .cache_service import invalidate_prefix
 from ..models.product import Product
 from ..models.sale import Sale, SaleItem
 from ..models.stock_movement import StockMovement
@@ -328,7 +329,6 @@ def create_sale(items: list[dict], user_id: int,
 
     # Invalidate BI dashboard cache so next load reflects the new sale
     try:
-        from .cache_service import invalidate_prefix
         invalidate_prefix("bi_dashboard")
         invalidate_prefix("alert_count:")  # reset alert badge cache
     except Exception:

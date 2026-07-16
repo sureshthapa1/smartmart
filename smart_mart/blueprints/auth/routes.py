@@ -29,7 +29,7 @@ def login():
     return render_template("auth/login.html", now=datetime.now())
 
 
-@auth_bp.route("/logout")
+@auth_bp.route("/logout", methods=["POST"])
 def logout():
     authenticator.logout()
     return redirect(url_for("auth.login"))

@@ -18,7 +18,7 @@ from flask import (
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from ...extensions import db, limiter
+from ...extensions import db, limiter, cache
 from ...models.product import Product
 from ...models.online_order import OnlineOrder, OnlineOrderItem
 from ...models.customer import Customer
@@ -35,7 +35,6 @@ from ...services.customer_auth import (
     get_current_customer, login_customer,
     logout_customer, register, authenticate,
 )
-from ...services.cache_service import get as _cache_get, set as _cache_set
 from ...services.store_ai_service import (
     selling_fast_ids as _selling_fast_ids,
     get_velocity_map,
@@ -781,11 +780,11 @@ def checkout():
             try:
                 from ...models.promotion import Promotion
                 from datetime import date
-                # Promotion model has no 'code' column — match against name (case-insensitive).
-                # A dedicated 'code' column should be added via schema migration for production use.
+                # Match on Promotion.code (case-insensitive) — consistent with the
+                # apply_promo AJAX endpoint which also queries by .code
                 promo = db.session.execute(
                     db.select(Promotion).where(
-                        func.upper(Promotion.name) == promo_code,
+                        func.upper(Promotion.code) == promo_code,
                         Promotion.is_active == True,
                     )
                 ).scalar_one_or_none()
@@ -1093,7 +1092,7 @@ def register_view():
                            form_data={}, customer=None)
 
 
-@store_bp.route("/logout")
+@store_bp.route("/logout", methods=["POST"])
 def logout():
     logout_customer()
     flash("You've been logged out.", "info")
@@ -1661,9 +1660,11 @@ def forgot_password():
                 db.select(CustomerAccount).where(CustomerAccount.phone == clean)
             ).scalar_one_or_none()
             if account:
-                import secrets as _secrets
-                token = _secrets.token_urlsafe(32)
-                session[f"pwd_reset_{clean}"] = token
+                # Use HMAC-signed token (not session) so the link works in any browser.
+                # Signed with SECRET_KEY; includes phone + timestamp so it's time-limited
+                # and phone-scoped. Single-use: token is invalidated after use.
+                from ...services.password_reset_service import generate_customer_reset_token
+                token = generate_customer_reset_token(clean)
                 reset_url = url_for("store.reset_password", phone=clean, token=token, _external=True)
                 from flask import current_app
                 current_app.logger.warning(
@@ -1680,8 +1681,8 @@ def reset_password():
     settings = _settings()
     phone = request.args.get("phone", "").strip()
     token = request.args.get("token", "").strip()
-    stored = session.get(f"pwd_reset_{phone}")
-    valid = stored and stored == token
+    from ...services.password_reset_service import verify_customer_reset_token
+    valid = verify_customer_reset_token(phone, token)
     if not valid:
         flash("This reset link is invalid or has expired.", "danger")
         return redirect(url_for("store.login"))
@@ -2078,8 +2079,7 @@ def autofill_all_products():
 def price_justify(product_id: int):
     """Return a 1-sentence price justification. Cached 24h — same call all day."""
     cache_key = f"pj:{product_id}"
-    from ...services import cache_service
-    cached = cache_service.get(cache_key)
+    cached = cache.get(cache_key)
     if cached is not None:
         return jsonify({"ok": True, "text": cached})
 
@@ -2097,7 +2097,7 @@ def price_justify(product_id: int):
         if product.pack_size:
             parts.append(f"available in {product.pack_size}")
         text = (", ".join(parts) + ".") if parts else ""
-        cache_service.set(cache_key, text, ttl=86400)
+        cache.set(cache_key, text, timeout=86400)
         return jsonify({"ok": True, "text": text})
 
     try:
@@ -2118,7 +2118,7 @@ def price_justify(product_id: int):
                      "content-type": "application/json"})
         with _ureq4.urlopen(req, timeout=8) as resp:
             text = _json4.loads(resp.read())["content"][0]["text"].strip()
-        cache_service.set(cache_key, text, ttl=86400)
+        cache.set(cache_key, text, timeout=86400)
         return jsonify({"ok": True, "text": text})
     except Exception:
         return jsonify({"ok": True, "text": ""})

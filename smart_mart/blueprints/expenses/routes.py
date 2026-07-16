@@ -72,9 +72,13 @@ def list_expenses():
     ).scalars().all()
 
     # By-type totals for summary cards and donut chart
-    by_type: dict = {}
-    for e in all_expenses:
-        by_type[e.expense_type] = by_type.get(e.expense_type, 0) + float(e.amount)
+    # Run a separate lightweight aggregate query (not paginated) for accurate totals
+    type_rows = db.session.execute(
+        db.select(Expense.expense_type, _f3.sum(Expense.amount).label("total"))
+        .where(*stmt.whereclause.clauses if hasattr(stmt, 'whereclause') and stmt.whereclause is not None else [])
+        .group_by(Expense.expense_type)
+    ).all()
+    by_type: dict = {r.expense_type: float(r.total or 0) for r in type_rows}
 
     # Monthly breakdown for stacked bar chart (last 6 months, all data)
     from sqlalchemy import extract

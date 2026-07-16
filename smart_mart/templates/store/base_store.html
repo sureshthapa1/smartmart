@@ -428,7 +428,7 @@
           <li><a href="{{ url_for('store.my_account') }}">{{ _('My Account') }}</a></li>
           <li><a href="{{ url_for('store.my_account') }}">{{ _('My Orders') }}</a></li>
           <li><a href="{{ url_for('store.wishlist') }}">{{ _('Wishlist') }}</a></li>
-          <li><a href="{{ url_for('store.logout') }}">{{ _('Sign Out') }}</a></li>
+          <li><form method="post" action="{{ url_for('store.logout') }}" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;font:inherit;">{{ _('Sign Out') }}</button></form></li>
           {% else %}
           <li><a href="{{ url_for('store.login') }}">{{ _('Sign In') }}</a></li>
           <li><a href="{{ url_for('store.register_view') }}">{{ _('Register') }}</a></li>

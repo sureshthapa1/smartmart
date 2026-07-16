@@ -28,6 +28,14 @@ def create_app(config_name="development"):
     if hasattr(config_object, "init_app"):
         config_object.init_app(app)
 
+    # Fail hard in production if DATABASE_URL is not set — class-body raises
+    # can't be used because they fire on import and break test collection.
+    if config_name == "production" and not os.environ.get("DATABASE_URL"):
+        raise RuntimeError(
+            "DATABASE_URL is not set. Production requires PostgreSQL — "
+            "refusing to start. Set DATABASE_URL in your Render environment."
+        )
+
     # ── Trust Render's reverse proxy ────────────────────────────────────────
     # Render terminates TLS at its edge and forwards plain HTTP to this app
     # via a single proxy hop. Without ProxyFix, request.remote_addr and
@@ -540,9 +548,10 @@ def _register_blueprints(app):
     # (forcing a victim to authenticate as an attacker-controlled account).
     # Logout remains exempt: it's a GET-based redirect with no persistent
     # state mutation beyond ending the session (acceptable tradeoff).
+    # csrf.exempt(logout) was previously here — logout is now POST+CSRF
+    # protected, so the exemption is no longer needed or appropriate.
     try:
-        from .blueprints.auth.routes import logout
-        csrf.exempt(logout)
+        pass  # placeholder — exemption block removed
     except Exception:
         pass
 

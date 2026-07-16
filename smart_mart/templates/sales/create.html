@@ -50,7 +50,7 @@
       <a href="{{ url_for('sales.list_sales') }}" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:none;border-radius:8px">
         <i class="bi bi-cart3 me-1"></i>Sales
       </a>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border:none;border-radius:8px">
+      <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#f87171;border:none;border-radius:8px">
         <i class="bi bi-box-arrow-right me-1"></i>Logout
       </a>
     </div>
