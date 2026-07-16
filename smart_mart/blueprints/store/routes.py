@@ -71,7 +71,7 @@ DELIVERY_CHARGE        = 100.0
 MAX_QTY_PER_ITEM       = 50
 MIN_ORDER_AMOUNT       = 200.0
 NEPAL_PHONE_RE         = re.compile(r"^(97|98)\d{8}$")
-VALID_PAYMENT_METHODS  = {"cod", "esewa", "khalti", "ime_pay"}
+VALID_PAYMENT_METHODS  = {"cod", "esewa", "khalti"}
 
 # ── Reservation expiry cooldown ───────────────────────────────────────────────
 _last_expiry_run: float = 0.0
@@ -845,7 +845,7 @@ def checkout():
             session.modified = True
             session.pop("cart", None)
 
-            payment_redirect = {"esewa": True, "khalti": True, "ime_pay": True}.get(method, False)
+            payment_redirect = {"esewa": True, "khalti": True}.get(method, False)
             if payment_redirect:
                 return redirect(url_for("store.payment_pending", order_number=order_number))
             else:
