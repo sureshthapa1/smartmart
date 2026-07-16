@@ -11,7 +11,7 @@ from ...extensions import db, limiter
 from ...services import ecommerce_sync
 from ...services.ecommerce_sync import EcommerceSyncError
 
-ecommerce_api_bp = Blueprint("ecommerce_api", __name__, url_prefix="/api")
+ecommerce_api_bp = Blueprint("ecommerce_api", __name__, url_prefix="/api/v1")
 
 
 def _candidate_keys() -> set[str]:
