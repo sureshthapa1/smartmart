@@ -1,12 +1,13 @@
 """Dashboard blueprint — enhanced business insights."""
 
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user as cu
 from sqlalchemy import func
 
-from ...extensions import db
+from ...extensions import db, limiter
 from ...models.product import Product
 from ...models.sale import Sale, SaleItem
 from ...models.expense import Expense
@@ -15,6 +16,7 @@ from ...services.decorators import login_required
 from ...services.cache_service import get as _cache_get, set as _cache_set
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
+_logger = logging.getLogger(__name__)
 
 
 def _to_dt(d: date) -> datetime:
@@ -48,6 +50,7 @@ def _parse_filter():
 
 
 @dashboard_bp.route("/")
+@limiter.limit("30 per minute")
 @login_required
 def index():
     today_date  = date.today()
@@ -136,8 +139,8 @@ def index():
                 db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
                 .where(WasteRecord.created_at >= month_start)
             ).scalar() or 0)
-        except Exception:
-            pass
+        except Exception as _waste_exc:
+            _logger.warning("waste_cost_month calculation failed (defaulting to 0): %s", _waste_exc)
 
         total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
 

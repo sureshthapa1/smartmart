@@ -168,8 +168,6 @@ with app.app_context():
             safe_add(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)")
             safe_add(conn, "shop_settings", "website_url",     "VARCHAR(255)")
 
-   # Table already exists on PostgreSQL
-
             # ── Products enrichment columns (AI autofill) ─────────────────────────
             safe_add(conn, "products", "benefits",      "TEXT")
             safe_add(conn, "products", "origin",        "VARCHAR(120)")

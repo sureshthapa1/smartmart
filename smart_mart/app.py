@@ -140,7 +140,7 @@ def create_app(config_name="development"):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         # Prevent admin/API pages from being indexed by search engines
-        if request.path.startswith(("/admin", "/api", "/dashboard", "/auth")):
+        if request.path.startswith(("/admin", "/api", "/api/v1", "/dashboard", "/auth")):
             response.headers["X-Robots-Tag"] = "noindex, nofollow"
         # HSTS: tell browsers to always use HTTPS (production only)
         if not app.debug:
@@ -392,6 +392,7 @@ def create_app(config_name="development"):
             "Disallow: /dashboard/\n"
             "Disallow: /admin/\n"
             "Disallow: /api/\n"
+            "Disallow: /api/v1/\n"
             "Disallow: /mcp/\n"
             "Disallow: /bi/\n"
             f"Sitemap: {base}/store/sitemap.xml\n"

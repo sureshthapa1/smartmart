@@ -28,7 +28,7 @@ services:
         sync: false
 
       # REQUIRED for AI-powered features (chatbot, autofill, insights).
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
 
       # ── eSewa Payment Gateway ────────────────────────────────────────────

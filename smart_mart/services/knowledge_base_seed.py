@@ -34,9 +34,9 @@ DEFAULT_ARTICLES = [
         "category": "payment",
         "keywords": "payment,pay,esewa,khalti,cod,cash,online,how to pay,payment method",
         "body": (
-            "We accept: Cash on Delivery (COD), eSewa, Khalti, and IME Pay. "
+            "We accept: Cash on Delivery (COD), eSewa, and Khalti. "
             "COD: Pay cash when your order arrives. "
-            "eSewa/Khalti/IME Pay: Pay online at checkout for instant confirmation. "
+            "eSewa/Khalti: Pay online at checkout for instant confirmation. "
             "For online payments, you'll be redirected to the payment page after placing your order. "
             "All online transactions are secure and encrypted."
         ),

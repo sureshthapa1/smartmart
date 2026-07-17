@@ -38,7 +38,7 @@ POS_TO_WEB_STATUS = {
 
 CONFIRMED_POS_STATUSES = {"confirmed", "preparing", "out_for_delivery", "delivered"}
 TERMINAL_POS_STATUSES = {"delivered", "cancelled", "returned"}
-PAYMENT_METHODS = {"cod", "esewa", "khalti", "ime_pay", "online", "card", "qr"}
+PAYMENT_METHODS = {"cod", "esewa", "khalti", "online", "card", "qr"}
 PAYMENT_STATUSES = {"pending", "paid", "failed", "refunded"}
 
 
@@ -65,7 +65,7 @@ def clamp_reservation_minutes(value: Any) -> int:
         minutes = int(value)
     except (TypeError, ValueError):
         minutes = 30
-    return max(15, min(minutes, 30))
+    return max(15, min(minutes, 60))
 
 
 def generate_order_number() -> str:

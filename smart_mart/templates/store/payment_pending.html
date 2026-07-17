@@ -6,8 +6,8 @@
     <div class="ucard fu" style="overflow:hidden;">
 
       <div style="background:var(--brand-grad);padding:2rem;text-align:center;color:#fff;">
-        {% set pm_icons = {'esewa':'📱','khalti':'💜','ime_pay':'🏦'} %}
-        {% set pm_names = {'esewa':'eSewa','khalti':'Khalti','ime_pay':'IME Pay'} %}
+        {% set pm_icons = {'esewa':'📱','khalti':'💜'} %}
+        {% set pm_names = {'esewa':'eSewa','khalti':'Khalti'} %}
         <div style="font-size:2.5rem;margin-bottom:.6rem;">{{ pm_icons.get(order.payment_mode,'💳') }}</div>
         <h2 style="font-size:1.2rem;font-weight:900;margin:0 0 .3rem;">Complete Your Payment</h2>
         <p style="color:rgba(255,255,255,.82);font-size:.875rem;margin:0;">Order placed! Pay to confirm your items.</p>
@@ -70,12 +70,11 @@
             <li>Send screenshot to <a href="{{ url_for('store.contact') }}" style="color:#1e40af;font-weight:700;">confirm payment</a></li>
           </ol>
           {% else %}
-          <ol style="font-size:.84rem;color:#1e40af;margin:0;padding-left:1.25rem;line-height:1.9;">
-            <li>Open <strong>IME Pay</strong> app</li>
-            <li>Transfer <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong></li>
-            <li>Reference: <strong>{{ order.order_number }}</strong></li>
-            <li>Send confirmation screenshot to us</li>
-          </ol>
+          <p style="font-size:.84rem;color:#1e40af;margin:0;">
+            Please <a href="{{ url_for('store.contact') }}" style="color:#1e40af;font-weight:700;">contact us</a>
+            with your order number <strong>{{ order.order_number }}</strong> and payment amount
+            <strong>NPR {{ "%.0f"|format(order.grand_total) }}</strong> to confirm.
+          </p>
           {% endif %}
         </div>
 
