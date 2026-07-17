@@ -65,7 +65,7 @@ def clamp_reservation_minutes(value: Any) -> int:
         minutes = int(value)
     except (TypeError, ValueError):
         minutes = 30
-    return max(15, min(minutes, 30))
+    return max(15, min(minutes, 60))
 
 
 def generate_order_number() -> str:
