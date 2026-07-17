@@ -1305,8 +1305,8 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         )
         return False
     try:
-        verify_url = "https://khalti.com/api/v2/payment/verify/"
-        payload = _json.dumps({"token": token, "amount": amount_paisa}).encode()
+        verify_url = "https://khalti.com/api/v2/payment/lookup/"
+        payload = _json.dumps({"pidx": token, "amount": amount_paisa}).encode()
         req = _req.Request(verify_url, data=payload, method="POST")
         req.add_header("Authorization", f"Key {secret_key}")
         req.add_header("Content-Type", "application/json")
