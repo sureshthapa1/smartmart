@@ -137,8 +137,8 @@ def index():
                 db.select(func.coalesce(func.sum(WasteRecord.cost_value), 0))
                 .where(WasteRecord.created_at >= month_start)
             ).scalar() or 0)
-        except Exception:
-            pass
+        except Exception as _waste_exc:
+            _logger.warning("waste_cost_month calculation failed (defaulting to 0): %s", _waste_exc)
 
         total_products = db.session.execute(db.select(func.count(Product.id))).scalar() or 0
 
