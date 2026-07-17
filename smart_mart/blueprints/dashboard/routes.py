@@ -48,6 +48,7 @@ def _parse_filter():
 
 
 @dashboard_bp.route("/")
+@limiter.limit("30 per minute")
 @login_required
 def index():
     today_date  = date.today()
