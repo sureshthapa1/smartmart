@@ -5,8 +5,8 @@ AI-powered product enrichment for SmartMart.
 
 Priority
 --------
-1. Claude API (ANTHROPIC_API_KEY set) — generates rich, accurate content
-   for ANY product name using Claude claude-haiku-4-5-20251001 (fast + cheap).
+1. Gemini API (GEMINI_API_KEY set) — generates rich, accurate content
+   for ANY product name.
 2. Keyword catalogue fallback — works offline, covers ~30 common product types.
 
 Fields auto-filled
@@ -103,7 +103,7 @@ def _pexels_image(search_query: str, filename: str) -> bool:
     return _download_image(PEXELS_MAP["default"], filename)
 
 
-# ── Claude AI autofill ────────────────────────────────────────────────────────
+# ── Gemini AI autofill ────────────────────────────────────────────────────────
 
 _AI_SYSTEM = """You are a product content writer for GoldKernel, a premium retail store in Nepal.
 Given a product name and optional category, generate rich product information.
@@ -137,7 +137,7 @@ Generate product content. Respond with this exact JSON structure:
 }}"""
 
 
-def _claude_autofill(product_name: str, category: str = "") -> Optional[dict]:
+def _ai_autofill(product_name: str, category: str = "") -> Optional[dict]:
     """
     Call Gemini API to generate product content.
     Returns parsed dict or None on failure.
@@ -245,7 +245,7 @@ def _safe_filename(product_id: int, name: str) -> str:
 
 def autofill_product(product, force: bool = False) -> dict:
     """
-    Auto-fill product fields using Claude AI (or keyword fallback).
+    Auto-fill product fields using Gemini AI (or keyword fallback).
     Only fills empty fields unless force=True.
 
     Fields updated: description, pack_size, image_filename, slug
@@ -273,8 +273,8 @@ def autofill_product(product, force: bool = False) -> dict:
     need_seo_title    = force or not getattr(product, "seo_title", None)
 
     if need_description or need_pack_size or need_image or need_benefits or need_origin or need_storage_tips or need_tags or need_meta_desc or need_seo_title:
-        # Try Claude first
-        data = _claude_autofill(name, category)
+        # Try Gemini first
+        data = _ai_autofill(name, category)
         if not data:
             # Keyword fallback
             data = _keyword_fallback(name, category)

@@ -225,7 +225,7 @@ def run_reorder_bot(user_id: int = 1) -> dict:
 
         return {"task": "reorder_bot", "pos_created": len(pos_created),
                 "details": pos_created, "festival_context": _festival_ctx,
-                "claude_summary": _gemini_summ}
+                "ai_summary": _gemini_summ}
     except Exception as e:
         logger.warning("reorder_bot failed: %s", e)
         return {"task": "reorder_bot", "pos_created": 0, "error": str(e)}

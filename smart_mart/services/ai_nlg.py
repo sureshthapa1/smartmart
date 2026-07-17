@@ -169,7 +169,7 @@ def generate_daily_report() -> dict:
         "type": "daily",
         "date": str(today),
         "title": f"Daily Business Report — {today.strftime('%B %d, %Y')}",
-        "narrative": _claude_daily_narrative(data, "\n\n".join(paragraphs)),
+        "narrative": _ai_daily_narrative(data, "\n\n".join(paragraphs)),
         "paragraphs": paragraphs,
         "data": {
             "today_sales": float(today_sales),
@@ -347,7 +347,7 @@ def generate_smart_summary() -> dict:
         "weekly": weekly["data"],
     }
 
-def _claude_daily_narrative(data: dict, fallback: str = "") -> str:
+def _ai_daily_narrative(data: dict, fallback: str = "") -> str:
     """Generate a Gemini-powered 3-bullet daily business briefing."""
     from .gemini_client import gemini_generate, gemini_available
     if not gemini_available():

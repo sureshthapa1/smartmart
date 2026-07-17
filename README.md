@@ -105,7 +105,8 @@ Create a `.env` file:
 ```
 SECRET_KEY=your-secret-key-here
 FLASK_ENV=development
-ANTHROPIC_API_KEY=sk-ant-...      # Optional locally; required for AI Advisor replies
+GEMINI_API_KEY=AIza...            # Required for AI chat, autofill, image recognition, smart search
+ANTHROPIC_API_KEY=sk-ant-...      # Optional locally; required for AI Advisor commentary
 ```
 
 Generate a secret key:
@@ -116,7 +117,8 @@ python -c "import secrets; print(secrets.token_hex(32))"
 Production/Render environment variables:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...      # Required for AI chatbot
+GEMINI_API_KEY=AIza...            # Required for AI chatbot, autofill, image recognition
+ANTHROPIC_API_KEY=sk-ant-...      # Optional — required for AI Advisor commentary
 FLASK_ENV=production
 SECRET_KEY=<random 32-byte hex>
 DATABASE_URL=postgresql://...     # Render provides this automatically

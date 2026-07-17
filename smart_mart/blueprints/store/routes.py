@@ -2095,7 +2095,12 @@ def price_justify(product_id: int):
         if product.pack_size:
             parts.append(f"available in {product.pack_size}")
         text = (", ".join(parts) + ".") if parts else ""
-        cache_service.set(cache_key, text, ttl=86400)
+        # Only cache for the full 24h if we produced real content. An empty
+        # result (no API key AND no origin/pack_size data) gets a short 5-min
+        # cache instead — otherwise the price-justify badge stays blank for a
+        # full day even after someone fills in the product's origin/pack_size
+        # or configures the API key.
+        cache_service.set(cache_key, text, ttl=86400 if text else 300)
         return jsonify({"ok": True, "text": text})
 
     try:
@@ -2116,9 +2121,16 @@ def price_justify(product_id: int):
                      "content-type": "application/json"})
         with _ureq4.urlopen(req, timeout=8) as resp:
             text = _json4.loads(resp.read())["content"][0]["text"].strip()
-        cache_service.set(cache_key, text, ttl=86400)
+        # Same reasoning as the fallback path above: only cache for 24h if
+        # the API actually returned content. An unexpectedly empty response
+        # gets a short cache so it retries soon rather than staying blank
+        # for a full day.
+        cache_service.set(cache_key, text, ttl=86400 if text else 300)
         return jsonify({"ok": True, "text": text})
     except Exception:
+        # Never cache on exception (rate limit, timeout, bad response, etc.)
+        # — these are transient failures and should retry on the very next
+        # request, not stay blank for hours.
         return jsonify({"ok": True, "text": ""})
 
 

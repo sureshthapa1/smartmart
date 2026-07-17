@@ -7,7 +7,9 @@ from smart_mart.services.ai_nlg import generate_daily_report
 
 
 def test_daily_report_includes_week_to_date_sales(db, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # generate_daily_report() is template-based and doesn't call any AI
+    # provider directly (the Gemini-powered narrative overlay is optional
+    # and falls back gracefully), so no API key needs to be unset here.
     user = User(username="nlg_admin", password_hash="hash", role="admin")
     db.session.add(user)
     db.session.flush()

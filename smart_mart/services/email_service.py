@@ -31,7 +31,7 @@ def _get_mail():
         return None
 
 
-def _claude_personalised_email_section(items: list) -> str:
+def _ai_personalised_email_section(items: list) -> str:
     """Generate personalised product tips + upsell using Gemini."""
     from .gemini_client import gemini_generate, gemini_available
     if not gemini_available() or not items:
@@ -52,7 +52,7 @@ def _claude_personalised_email_section(items: list) -> str:
 
 
 def send_order_confirmation(order, items: list) -> bool:
-    """Send personalised order confirmation email — Claude generates product tips."""
+    """Send personalised order confirmation email — Gemini generates product tips."""
     customer_email = getattr(order, "customer_email", None)
     if not customer_email:
         logger.info("No customer email for order %s", order.order_number)
@@ -66,8 +66,8 @@ def send_order_confirmation(order, items: list) -> bool:
         return False
     try:
         from flask_mail import Message
-        # Generate Claude personalisation (non-blocking — empty string if fails)
-        personalised_tips = _claude_personalised_email_section(items)
+        # Generate AI personalisation (non-blocking — empty string if fails)
+        personalised_tips = _ai_personalised_email_section(items)
         subject = f"Order Confirmed — {order.order_number} | GoldKernel Dry Fruits"
         html_body = _order_confirmation_html(order, items, personalised_tips)
         text_body = _order_confirmation_text(order, items)

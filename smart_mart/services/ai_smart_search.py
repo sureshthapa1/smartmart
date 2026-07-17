@@ -18,7 +18,7 @@ from sqlalchemy import func
 from ..extensions import db
 
 
-def _parse_query_with_claude(query: str) -> dict | None:
+def _parse_query_with_ai(query: str) -> dict | None:
     """Use Gemini to convert natural language to a structured search intent."""
     from .gemini_client import gemini_generate, gemini_available
     if not gemini_available():
@@ -82,7 +82,7 @@ def smart_search(query: str) -> dict:
             pass  # fall through to intent-based search
 
     results = []
-    intent = _parse_query_with_claude(query)
+    intent = _parse_query_with_ai(query)
 
     if not intent:
         # Fallback: simple keyword search across all entities
