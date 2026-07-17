@@ -262,3 +262,99 @@ def test_track_route_is_rate_limited(client):
 
     resp = client.get("/store/track")
     assert resp.status_code == 429
+
+
+# ── Khalti payment verification ─────────────────────────────────────────────
+# Regression tests for a critical bug: the Khalti endpoint was migrated from
+# /payment/verify/ (nested {"state": {"name": "Completed"}}, flat "amount")
+# to /epayment/lookup/ (flat {"status": "Completed", "total_amount": ...}),
+# but the response-parsing code was never updated to match. This meant every
+# genuinely successful Khalti payment was silently rejected as unverified.
+
+def test_khalti_verification_accepts_real_lookup_response_format(monkeypatch):
+    """The /epayment/lookup/ response is FLAT: {"status": "Completed",
+    "total_amount": N, ...} — NOT nested under "state", and the amount
+    field is "total_amount", not "amount". Verified against Khalti's
+    official API documentation."""
+    from unittest.mock import patch, MagicMock
+    import json as _json
+    from smart_mart.blueprints.store.routes import _verify_khalti_callback
+
+    monkeypatch.setenv("KHALTI_SECRET_KEY", "test_secret")
+
+    real_response = _json.dumps({
+        "pidx": "vNTeXkSEaEXK2J4i7cQU6e",
+        "total_amount": 10000,
+        "status": "Completed",
+        "transaction_id": "abc123",
+        "fee": 0,
+        "refunded": False,
+    }).encode()
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = real_response
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        assert _verify_khalti_callback("vNTeXkSEaEXK2J4i7cQU6e", 10000) is True
+
+
+def test_khalti_verification_rejects_amount_mismatch(monkeypatch):
+    """Amount tampering (partial-payment attack) must still be rejected
+    even with the corrected field names."""
+    from unittest.mock import patch, MagicMock
+    import json as _json
+    from smart_mart.blueprints.store.routes import _verify_khalti_callback
+
+    monkeypatch.setenv("KHALTI_SECRET_KEY", "test_secret")
+
+    real_response = _json.dumps({
+        "pidx": "vNTeXkSEaEXK2J4i7cQU6e",
+        "total_amount": 10000,
+        "status": "Completed",
+        "transaction_id": "abc123",
+        "fee": 0,
+        "refunded": False,
+    }).encode()
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = real_response
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        # Expected 5000 paisa, Khalti confirms 10000 paisa was actually paid
+        assert _verify_khalti_callback("vNTeXkSEaEXK2J4i7cQU6e", 5000) is False
+
+
+def test_khalti_verification_rejects_non_completed_status(monkeypatch):
+    from unittest.mock import patch, MagicMock
+    import json as _json
+    from smart_mart.blueprints.store.routes import _verify_khalti_callback
+
+    monkeypatch.setenv("KHALTI_SECRET_KEY", "test_secret")
+
+    real_response = _json.dumps({
+        "pidx": "vNTeXkSEaEXK2J4i7cQU6e",
+        "total_amount": 10000,
+        "status": "User canceled",
+        "transaction_id": None,
+        "fee": 0,
+        "refunded": False,
+    }).encode()
+
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = real_response
+    mock_resp.__enter__.return_value = mock_resp
+    mock_resp.__exit__.return_value = False
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        assert _verify_khalti_callback("vNTeXkSEaEXK2J4i7cQU6e", 10000) is False
+
+
+def test_khalti_verification_fails_closed_without_secret_key(monkeypatch):
+    from smart_mart.blueprints.store.routes import _verify_khalti_callback
+
+    monkeypatch.delenv("KHALTI_SECRET_KEY", raising=False)
+    assert _verify_khalti_callback("any-pidx", 10000) is False

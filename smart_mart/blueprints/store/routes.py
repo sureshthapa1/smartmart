@@ -1287,7 +1287,7 @@ def _verify_esewa_callback(args: dict) -> bool:
 
 def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
     """
-    Verify Khalti payment by calling Khalti's verification API.
+    Verify Khalti payment by calling Khalti's lookup API.
     amount_paisa is the expected amount in paisa (NPR * 100).
 
     Verifies both:
@@ -1295,6 +1295,11 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
     2. That the returned amount matches what we expected (prevents partial-payment attacks
        where an attacker pays NPR 1 for a NPR 1000 order and Khalti returns 'Completed'
        but for a different amount than we charged)
+
+    NOTE: The /epayment/lookup/ response format is FLAT — {"pidx", "total_amount",
+    "status", "transaction_id", "fee", "refunded"} — unlike the older /payment/verify/
+    endpoint which nested the state under {"state": {"name": ...}} and used "amount".
+    Using the old field names here silently breaks verification for every payment.
     """
     import os as _os, urllib.request as _req, json as _json
     secret_key = _os.environ.get("KHALTI_SECRET_KEY", "")
@@ -1305,24 +1310,26 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         )
         return False
     try:
-        verify_url = "https://khalti.com/api/v2/payment/lookup/"
-        payload = _json.dumps({"pidx": token, "amount": amount_paisa}).encode()
-        req = _req.Request(verify_url, data=payload, method="POST")
+        lookup_url = "https://khalti.com/api/v2/epayment/lookup/"
+        payload = _json.dumps({"pidx": token}).encode()
+        req = _req.Request(lookup_url, data=payload, method="POST")
         req.add_header("Authorization", f"Key {secret_key}")
         req.add_header("Content-Type", "application/json")
         with _req.urlopen(req, timeout=15) as resp:
             data = _json.loads(resp.read())
 
-        # Must be Completed
-        if data.get("state", {}).get("name") != "Completed":
+        # Must be Completed — status is a flat string field in the lookup response,
+        # NOT nested under "state" (that was the old /payment/verify/ format).
+        if data.get("status") != "Completed":
             return False
 
-        # Amount returned by Khalti MUST match what we sent
-        returned_amount = data.get("amount")
+        # Amount returned by Khalti MUST match what we sent.
+        # The lookup response uses "total_amount", not "amount".
+        returned_amount = data.get("total_amount")
         if returned_amount is None:
             import logging as _log2
             _log2.getLogger(__name__).error(
-                "Khalti response missing 'amount' field — rejecting as precaution"
+                "Khalti response missing 'total_amount' field — rejecting as precaution"
             )
             return False
         if int(returned_amount) != int(amount_paisa):
