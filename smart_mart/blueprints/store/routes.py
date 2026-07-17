@@ -2194,3 +2194,14 @@ Sitemap: {base}/store/sitemap.xml
 
 # ── Cart count API (for nav badge) ───────────────────────────────────────────
 
+
+
+@store_bp.route("/sw.js")
+def service_worker():
+    """Serve the PWA service worker from the store blueprint scope."""
+    from flask import send_from_directory, current_app
+    return send_from_directory(
+        current_app.static_folder,
+        "sw.js",
+        mimetype="application/javascript",
+    )
