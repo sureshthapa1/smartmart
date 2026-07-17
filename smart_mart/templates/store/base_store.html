@@ -688,5 +688,15 @@ document.addEventListener('click',function(e){
 })();
 </script>
 {% block scripts %}{% endblock %}
-</body>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('{{ url_for("store.service_worker") }}')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+  </body>
 </html>
