@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ settings.shop_name if settings else 'GoldKernel' }} — Premium Dry Fruits Nepal{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Premium dry fruits delivered fresh to your door in Nepal. Almonds, cashews, pistachios & more.{% endblock %}">
+    {# ── Canonical URL — prevents duplicate content for paginated/filtered pages ── #}
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥜</text></svg>">
