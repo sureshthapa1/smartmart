@@ -190,7 +190,7 @@ def notify_order_status(
     first_name = (customer_name or "Customer").split()[0]
     track_suffix = f" Track: {track_url}" if track_url else ""
     status_msgs = {
-        "confirmed":        f"Hi {first_name}! Your order {order_number} is confirmed. We'll prepare it shortly.{track_suffix}",
+        "confirmed":        f"Hi {first_name}! Your order {order_number} is confirmed. We'll prepare it shortly.{track_suffix} धन्यवाद!",
         "preparing":        f"Hi {first_name}! Your order {order_number} is being packed and will be shipped soon.{track_suffix}",
         "shipped":          f"Hi {first_name}! Your order {order_number} has been shipped.{track_suffix}",
         "out_for_delivery": f"Hi {first_name}! 🚚 Your order {order_number} is out for delivery today. Be ready!{track_suffix}",
