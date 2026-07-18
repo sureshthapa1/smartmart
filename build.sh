@@ -190,6 +190,14 @@ with app.app_context():
                 except Exception:
                     pass  # index already exists or table not yet created
 
+        # saved_address fields on customer_accounts
+        for _col_def in [
+            ("customer_accounts", "saved_address",     "TEXT"),
+            ("customer_accounts", "saved_area",        "VARCHAR(100)"),
+            ("customer_accounts", "save_address_pref", "BOOLEAN DEFAULT FALSE"),
+        ]:
+            safe_add(conn, _col_def[0], _col_def[1], _col_def[2])
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
