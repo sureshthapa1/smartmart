@@ -320,8 +320,8 @@ def send_welcome_email(customer_name: str, customer_email: str,
             html=html_body,
         )
         mail.send(msg)
-        _logger.info("Welcome email sent to %s", customer_email)
+        logger.info("Welcome email sent to %s", customer_email)
         return True
     except Exception as exc:
-        _logger.warning("Welcome email failed for %s: %s", customer_email, exc)
+        logger.warning("Welcome email failed for %s: %s", customer_email, exc)
         return False
