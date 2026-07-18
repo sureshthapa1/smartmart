@@ -1093,3 +1093,12 @@ def run_all_agents():
         return jsonify({"ok": True, "result": result})
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@api_bp.route("/bot/daily-summary", methods=["POST"])
+@login_required
+def run_daily_summary():
+    """Trigger end-of-day summary bot — call from Render cron or manually."""
+    from ...services.bot_runner import run_daily_summary_bot
+    result = run_daily_summary_bot()
+    return jsonify({"status": "ok", "result": result})
