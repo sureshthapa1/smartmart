@@ -83,6 +83,7 @@
             <div style="display:flex;gap:.65rem;align-items:flex-start;">
               <div class="fwrap" style="flex:1;">
                 <i class="bi bi-tag fico"></i>
+                <label for="promo-input" class="visually-hidden">{{ _('Promo Code') }}</label>
                 <input type="text" name="promo_code" id="promo-input" class="finput has-ico" placeholder="{{ _('Enter promo code') }}"
                        value="{{ form_data.get('promo_code','') }}" maxlength="30" style="text-transform:uppercase;" autocomplete="off">
               </div>
