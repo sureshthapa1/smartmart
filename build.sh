@@ -198,6 +198,21 @@ with app.app_context():
         ]:
             safe_add(conn, _col_def[0], _col_def[1], _col_def[2])
 
+        # phone_otps table for store registration OTP
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS phone_otps (
+                id         SERIAL PRIMARY KEY,
+                phone      VARCHAR(20) NOT NULL,
+                code       VARCHAR(6)  NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL,
+                used       BOOLEAN     DEFAULT FALSE,
+                attempts   INTEGER     DEFAULT 0
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_phone_otps_phone ON phone_otps(phone)"))
+        conn.commit()
+
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
