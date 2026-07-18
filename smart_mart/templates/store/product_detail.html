@@ -130,6 +130,10 @@
         {% if product.unit and product.unit not in ('pcs','piece') %}
         <span style="font-size:.8rem;color:var(--muted);">/ {{ product.unit }}</span>
         {% endif %}
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.25rem;">
+          <i class="bi bi-info-circle"></i>
+          Price inclusive of 13% VAT &nbsp;|&nbsp; मूल्यमा १३% VAT समावेश
+        </div>
       </div>
 
       {# Stock status #}
