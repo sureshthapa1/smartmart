@@ -21,6 +21,10 @@ class CustomerAccount(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     address = db.Column(db.String(255), nullable=True)
+    # Saved delivery address — auto-filled at checkout for repeat customers
+    saved_address   = db.Column(db.Text,    nullable=True)
+    saved_area      = db.Column(db.String(100), nullable=True)
+    save_address_pref = db.Column(db.Boolean, default=False)
     area = db.Column(db.String(120), nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False,
