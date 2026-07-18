@@ -52,13 +52,13 @@
               <div class="col-12">
                 <label class="flabel" for="f-address">{{ _('Delivery Address') }} *</label>
                 <div class="fwrap"><i class="bi bi-geo-alt fico"></i>
-                <input id="f-address" type="text" name="address" class="finput has-ico" placeholder="{{ _('House no., street, landmark') }}"
+                <input id="f-address" type="text" name="address" value="{{ g.customer.saved_address or '' if g.customer else '' }}" class="finput has-ico" placeholder="{{ _('House no., street, landmark') }}"
                        value="{{ form_data.get('address', customer.address if customer else '') }}"
                        required maxlength="255" autocomplete="street-address"></div>
               </div>
               <div class="col-sm-6">
                 <label class="flabel" for="f-area">{{ _('Area / Zone') }}</label>
-                <input id="f-area" type="text" name="area" class="finput" placeholder="Lazimpat, Baneshwor…"
+                <input id="f-area" type="text" name="area" value="{{ g.customer.saved_area or '' if g.customer else '' }}" class="finput" placeholder="Lazimpat, Baneshwor…"
                        value="{{ form_data.get('area', customer.area if customer else '') }}"
                        maxlength="80" list="nepal-areas" autocomplete="off">
                 <datalist id="nepal-areas">
