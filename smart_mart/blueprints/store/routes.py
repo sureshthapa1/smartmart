@@ -1081,6 +1081,15 @@ def register_view():
                                email=email, address=address, area=area)
             login_customer(account)
             flash(f"Account created! Welcome, {account.name} 🎉", "success")
+            # ── Welcome email (non-blocking) ─────────────────────
+            try:
+                from ...services.email_service import send_welcome_email
+                send_welcome_email(
+                    customer_name=account.name,
+                    customer_email=account.email or "",
+                )
+            except Exception as _we:
+                current_app.logger.warning("Welcome email failed: %s", _we)
             return redirect(url_for("store.home"))
         except ValueError as exc:
             flash(str(exc), "danger")
