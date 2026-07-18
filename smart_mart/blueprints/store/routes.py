@@ -2214,3 +2214,52 @@ def service_worker():
         "sw.js",
         mimetype="application/javascript",
     )
+
+
+# ── Phone OTP verification (store registration) ────────────────────────────────
+
+@store_bp.route("/send-otp", methods=["POST"])
+@limiter.limit("5 per minute; 10 per hour")
+def send_otp():
+    """Send a 6-digit OTP to the given Nepal phone number."""
+    phone = request.form.get("phone", "").strip()
+    clean = _validate_phone(phone)
+    if not clean:
+        return jsonify({"ok": False, "error": "Invalid Nepal phone number"}), 400
+    try:
+        from ...models.phone_otp import PhoneOTP
+        from ...services.notification_service import send_notification
+        otp = PhoneOTP.generate(clean)
+        settings = _settings()
+        shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+        send_notification(
+            clean,
+            f"[{shop}] Your verification code is {otp.code}. Valid for 10 minutes. "
+            f"यो कोड {otp.code} हो — 10 मिनेटभित्र प्रयोग गर्नुहोस्।"
+        )
+        return jsonify({"ok": True, "message": "OTP sent"})
+    except Exception as exc:
+        current_app.logger.warning("OTP send failed: %s", exc)
+        return jsonify({"ok": False, "error": "Could not send OTP"}), 500
+
+
+@store_bp.route("/verify-otp", methods=["POST"])
+@limiter.limit("10 per minute")
+def verify_otp():
+    """Verify a 6-digit OTP before allowing registration to proceed."""
+    phone = request.form.get("phone", "").strip()
+    code  = request.form.get("code", "").strip()
+    clean = _validate_phone(phone)
+    if not clean or not code:
+        return jsonify({"ok": False, "error": "Phone and code required"}), 400
+    try:
+        from ...models.phone_otp import PhoneOTP
+        valid = PhoneOTP.verify(clean, code)
+        if valid:
+            # Store verified status in session so register_view can confirm
+            session[f"phone_verified_{clean}"] = True
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Invalid or expired OTP"}), 400
+    except Exception as exc:
+        current_app.logger.warning("OTP verify failed: %s", exc)
+        return jsonify({"ok": False, "error": "Verification failed"}), 500
