@@ -289,3 +289,39 @@ def _admin_order_html(order) -> str:
     </table>
     <p><a href="/admin/ecommerce/orders/{order.id}">View Order in Admin →</a></p>
     """
+
+
+def send_welcome_email(customer_name: str, customer_email: str,
+                        promo_code: str = "", discount_percent: int = 10) -> bool:
+    """Send a welcome email to a newly registered store customer."""
+    if not customer_email or "@" not in customer_email:
+        return False
+    try:
+        from flask import current_app, render_template
+        from flask_mail import Message
+        from ..extensions import mail
+        from ..models.shop_settings import ShopSettings
+        settings = ShopSettings.get()
+        shop_name  = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+        shop_url   = current_app.config.get("APP_URL", "").rstrip("/")
+        whatsapp   = getattr(settings, "whatsapp_number", "") or ""
+        html_body  = render_template(
+            "email/welcome.html",
+            customer_name=customer_name or "Customer",
+            customer_email=customer_email,
+            shop_url=shop_url or "https://goldkernel.com.np",
+            whatsapp_number=whatsapp,
+            promo_code=promo_code,
+            discount_percent=discount_percent,
+        )
+        msg = Message(
+            subject=f"नमस्ते! Welcome to {shop_name} 🛒",
+            recipients=[customer_email],
+            html=html_body,
+        )
+        mail.send(msg)
+        _logger.info("Welcome email sent to %s", customer_email)
+        return True
+    except Exception as exc:
+        _logger.warning("Welcome email failed for %s: %s", customer_email, exc)
+        return False
