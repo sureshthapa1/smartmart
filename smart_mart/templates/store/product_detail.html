@@ -134,6 +134,13 @@
           <i class="bi bi-info-circle"></i>
           Price inclusive of 13% VAT &nbsp;|&nbsp; मूल्यमा १३% VAT समावेश
         </div>
+      {# ── Loyalty points preview ──────────────────────────────────── #}
+      <div style="display:inline-flex;align-items:center;gap:.4rem;
+                  background:#fdf4ff;border:1px solid #e9d5ff;border-radius:20px;
+                  padding:.25rem .75rem;font-size:.78rem;color:#7c3aed;margin-top:.5rem;">
+        <i class="bi bi-star-fill" style="color:#a855f7;font-size:.7rem"></i>
+        <span>Earn <strong>{{ (product.selling_price // 10)|int }}</strong> loyalty points with this purchase</span>
+      </div>
       </div>
 
       {# Stock status #}
