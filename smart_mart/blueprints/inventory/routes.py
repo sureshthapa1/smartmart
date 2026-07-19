@@ -47,6 +47,59 @@ def _delete_product_image(identifier: str) -> None:
     delete_product_image(identifier)
 
 
+def _relink_product_images() -> int:
+    """
+    Scan uploads/products folder and auto-link images to products that
+    have no image set. Matches by slugified product name in the filename.
+    Returns count of products relinked.
+    """
+    import re as _re
+    upload_dir = os.path.join(current_app.static_folder, "uploads", "products")
+    if not os.path.exists(upload_dir):
+        return 0
+
+    # Build list of valid image files (non-zero)
+    valid_files = []
+    for f in os.listdir(upload_dir):
+        if f == ".gitkeep":
+            continue
+        path = os.path.join(upload_dir, f)
+        if os.path.getsize(path) > 100:
+            valid_files.append(f)
+
+    if not valid_files:
+        return 0
+
+    def _slugify(text: str) -> str:
+        return _re.sub(r"[^a-z0-9]", "", text.lower())
+
+    relinked = 0
+    products = db.session.execute(
+        db.select(Product).where(
+            db.or_(Product.image_filename.is_(None), Product.image_filename == "")
+        )
+    ).scalars().all()
+
+    for product in products:
+        name_slug = _slugify(product.name)
+        if not name_slug:
+            continue
+        best = None
+        for fname in valid_files:
+            fname_slug = _slugify(fname.rsplit(".", 1)[0])
+            # Match if product name appears in filename
+            if name_slug in fname_slug or fname_slug in name_slug:
+                best = fname
+                break
+        if best:
+            product.image_filename = best
+            relinked += 1
+
+    if relinked:
+        db.session.commit()
+    return relinked
+
+
 @inventory_bp.route("/")
 @login_required
 def list_products():
@@ -688,12 +741,38 @@ def bulk_upload():
             flash(f"Error saving data: {e}", "danger")
             return render_template("inventory/bulk_upload.html")
 
+        # ── Auto-relink images after upload ──────────────────────────────────
+        # When products are cleared and re-uploaded, old image files stay on
+        # disk but lose their DB link. Scan the uploads folder and match any
+        # image whose filename contains the product name (slug-style match).
+        try:
+            relinked = _relink_product_images()
+            if relinked:
+                flash(f"📸 Auto-linked {relinked} product image(s) from previous uploads.", "info")
+        except Exception:
+            pass
+
         flash(f"✅ Bulk upload complete — {created} created, {updated} updated, {skipped} skipped.", "success")
         for err in errors:
             flash(err, "warning")
         return redirect(url_for("inventory.list_products"))
 
     return render_template("inventory/bulk_upload.html")
+
+
+@inventory_bp.route("/relink-images", methods=["POST"])
+@admin_required
+def relink_images():
+    """Manually re-link product images from the uploads folder by name matching."""
+    try:
+        relinked = _relink_product_images()
+        if relinked:
+            flash(f"✅ Re-linked {relinked} product image(s) from uploads folder.", "success")
+        else:
+            flash("No unmatched images found — all products already have images or no matching files exist.", "info")
+    except Exception as e:
+        flash(f"Error re-linking images: {e}", "danger")
+    return redirect(url_for("inventory.list_products"))
 
 
 
