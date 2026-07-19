@@ -182,7 +182,7 @@ with app.app_context():
                 "CREATE INDEX IF NOT EXISTS ix_online_orders_customer_phone ON online_orders(customer_phone)",
                 "CREATE INDEX IF NOT EXISTS ix_sales_sale_date ON sales(sale_date)",
                 "CREATE INDEX IF NOT EXISTS ix_products_category ON products(category)",
-                "CREATE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
             ]:
                 try:
                     conn.execute(text(idx_sql))
