@@ -33,6 +33,9 @@ class ShopSettings(db.Model):
     tiktok_url       = db.Column(db.String(255), nullable=True)
     whatsapp_number  = db.Column(db.String(30),  nullable=True)   # e.g. 9841234567 (no + or spaces)
     website_url      = db.Column(db.String(255), nullable=True)   # full URL e.g. https://goldkernel.com
+    # ── Delivery settings ────────────────────────────────────────
+    delivery_charge          = db.Column(db.Numeric(10, 2), default=0)
+    free_delivery_above_npr  = db.Column(db.Numeric(10, 2), default=0)  # 0 = never free
     created_at  = db.Column(db.DateTime(timezone=True), default=lambda: __import__("datetime").datetime.now(__import__("datetime").timezone.utc))
     updated_at  = db.Column(db.DateTime(timezone=True), default=lambda: __import__("datetime").datetime.now(__import__("datetime").timezone.utc), onupdate=lambda: __import__("datetime").datetime.now(__import__("datetime").timezone.utc))
 
