@@ -766,3 +766,59 @@ def run_winback_bot(inactive_days: int = 45) -> dict:
     except Exception as e:
         logger.warning("winback_bot failed: %s", e)
         return {"task": "winback_bot", "sent": 0, "error": str(e)}
+
+
+def run_owner_sms_summary() -> str:
+    """Send end-of-day POS+online sales summary SMS to shop owner.
+    Called from /api/bot/daily-summary endpoint or Render cron.
+    आजको बिक्री सारांश — दैनिक रिपोर्ट।
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import func
+    from ..models.sale import Sale
+    from ..models.online_order import OnlineOrder
+    from ..models.shop_settings import ShopSettings
+    from ..extensions import db
+    from .notification_service import send_notification
+
+    try:
+        now         = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        pos_row = db.session.execute(
+            db.select(
+                func.count(Sale.id).label("cnt"),
+                func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
+            ).where(Sale.sale_date >= today_start)
+        ).one()
+
+        online_row = db.session.execute(
+            db.select(
+                func.count(OnlineOrder.id).label("cnt"),
+                func.coalesce(func.sum(OnlineOrder.total_amount), 0).label("total"),
+            ).where(
+                OnlineOrder.created_at >= today_start,
+                OnlineOrder.payment_status == "paid",
+            )
+        ).one()
+
+        grand = float(pos_row.total) + float(online_row.total)
+        settings    = ShopSettings.get()
+        owner_phone = getattr(settings, "phone", None) or getattr(settings, "contact_phone", None)
+        shop_name   = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+
+        if not owner_phone:
+            return "no_owner_phone"
+
+        msg = (
+            f"[{shop_name}] आजको सारांश / Today's Summary\n"
+            f"POS Sales: {pos_row.cnt} = NPR {float(pos_row.total):,.0f}\n"
+            f"Online Orders: {online_row.cnt} = NPR {float(online_row.total):,.0f}\n"
+            f"Total: NPR {grand:,.0f} ({now.strftime('%d %b')})"
+        )
+        send_notification(owner_phone, msg)
+        return f"sent_to:{owner_phone}"
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("run_owner_sms_summary failed: %s", exc)
+        return f"error:{exc}"
