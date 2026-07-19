@@ -47,6 +47,19 @@
 
           <div class="row g-3">
 
+            <!-- ── Opening Stock Purchase Info (Create mode only) ─────────────── -->
+            {% if not product %}
+            <div class="col-12">
+              <div class="alert alert-info d-flex gap-2 align-items-start py-2 mb-0" style="border-radius:10px;">
+                <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+                <div class="small">
+                  <strong>Product + Purchase in one step.</strong>
+                  Fill in the opening quantity and supplier below — this automatically creates a purchase record and tracks the expense. No need to go to Purchases separately.
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
             <!-- Product Name — Tom Select with suggestions + free type -->
             <div class="col-md-8">
               <label class="form-label fw-medium">Product Name <span class="text-danger">*</span></label>
@@ -112,12 +125,32 @@
               </div>
             </div>
 
-            <!-- Quantity -->
+            <!-- Quantity + Purchase Date -->
             <div class="col-md-3">
-              <label class="form-label fw-medium">Initial Quantity</label>
+              <label class="form-label fw-medium">
+                {% if not product %}Opening Stock (Qty){% else %}Current Stock{% endif %}
+              </label>
+              {% if not product %}
               <input type="number" class="form-control" name="quantity" min="0"
-                     value="{{ product.quantity if product else 0 }}">
+                     value="0" placeholder="e.g. 50">
+              <div class="form-text text-info">Creates a purchase record automatically.</div>
+              {% else %}
+              <input type="number" class="form-control bg-light" name="quantity" min="0"
+                     value="{{ product.quantity }}" readonly
+                     title="Stock quantity is managed via Purchases and Stock Takes — not directly editable here.">
+              <div class="form-text text-muted">Use <a href="{{ url_for('purchases.create_purchase') }}">Add Purchase</a> or <a href="{{ url_for('stock_take.create') }}">Stock Take</a> to change stock.</div>
+              {% endif %}
             </div>
+
+            <!-- Purchase Date (create mode only) -->
+            {% if not product %}
+            <div class="col-md-3">
+              <label class="form-label fw-medium">Purchase Date</label>
+              <input type="date" class="form-control" name="purchase_date"
+                     value="{{ today.strftime('%Y-%m-%d') if today else '' }}">
+              <div class="form-text">Date you bought this stock.</div>
+            </div>
+            {% endif %}
 
             <!-- Unit -->
             <div class="col-md-3">

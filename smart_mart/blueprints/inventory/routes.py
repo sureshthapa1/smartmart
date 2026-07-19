@@ -203,6 +203,8 @@ def create_product():
         categories = []
     if request.method == "POST":
         data = _form_to_data(request.form)
+        # Pass user_id and purchase_date so inventory_manager creates purchase record
+        data["user_id"] = current_user.id
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
@@ -219,24 +221,19 @@ def create_product():
                     pass
         try:
             inventory_manager.create_product(data)
-            # Auto-fill description, image, pack_size via AI if missing
-            try:
-                from ...services.product_autofill import autofill_product as _autofill
-                from ...models.product import Product as _Product
-                from ...extensions import db as _db
-                _new_product = _db.session.execute(
-                    _db.select(_Product).order_by(_Product.id.desc()).limit(1)
-                ).scalar_one_or_none()
-                if _new_product and not data.get("image_filename"):
-                    _autofill(_new_product, force=False)
-            except Exception:
-                pass
-            flash("Product created successfully.", "success")
+            qty = data.get("quantity", 0)
+            if qty and int(qty) > 0 and data.get("supplier_id"):
+                flash(f"✅ Product added and opening stock of {qty} units recorded as a purchase.", "success")
+            elif qty and int(qty) > 0:
+                flash(f"✅ Product added with opening stock of {qty} units. Add a supplier to track it as a purchase expense.", "info")
+            else:
+                flash("✅ Product created. Add stock by recording a purchase.", "success")
             return redirect(url_for("inventory.list_products"))
         except ValueError as e:
             flash(str(e), "danger")
     return render_template("inventory/form.html", product=None, suppliers=suppliers,
-                           categories=categories, action="Create")
+                           categories=categories, action="Create",
+                           today=__import__("datetime").date.today())
 
 
 @inventory_bp.route("/<int:product_id>/edit", methods=["GET", "POST"])
@@ -286,7 +283,8 @@ def edit_product(product_id):
         except ValueError as e:
             flash(str(e), "danger")
     return render_template("inventory/form.html", product=product, suppliers=suppliers,
-                           categories=categories, action="Edit")
+                           categories=categories, action="Edit",
+                           today=__import__("datetime").date.today())
 
 
 @inventory_bp.route("/<int:product_id>/delete", methods=["POST"])
@@ -1371,6 +1369,7 @@ def _form_to_data(form) -> dict:
         "selling_price": form.get("selling_price", "0") or "0",
         "quantity": int(form.get("quantity", 0) or 0),
         "supplier_id": int(form.get("supplier_id")) if form.get("supplier_id") else None,
+        "purchase_date": None,
         "expiry_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
         "reorder_point": int(form.get("reorder_point", 10) or 10),
@@ -1389,6 +1388,13 @@ def _form_to_data(form) -> dict:
         "meta_description":  form.get("meta_description", "").strip()[:320] or None,
         "seo_title":         form.get("seo_title", "").strip()[:120] or None,
     }
+    # Purchase date
+    purchase_date_raw = form.get("purchase_date", "").strip()
+    if purchase_date_raw:
+        try:
+            data["purchase_date"] = date.fromisoformat(purchase_date_raw)
+        except ValueError:
+            pass
     max_disc_raw = form.get("max_discount_pct", "").strip()
     if max_disc_raw:
         try:
