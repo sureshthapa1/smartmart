@@ -30,6 +30,7 @@ class CustomerAccount(db.Model):
     created_at = db.Column(db.DateTime, nullable=False,
                            default=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, nullable=True)
+    notes       = db.Column(db.Text, nullable=True)  # Staff notes: preferences, allergies, special requests
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
