@@ -219,6 +219,7 @@ with app.app_context():
         ]:
             safe_add(conn, _dc[0], _dc[1], _dc[2])
 
+                safe_add(conn, "customer_accounts", "notes", "TEXT")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
