@@ -563,9 +563,15 @@ def bulk_upload():
                 continue
 
             try:
-                cost = float(cost_raw) if cost_raw else 0.0
-                sell = float(sell_raw) if sell_raw else cost
-                qty = int(float(qty_raw)) if qty_raw else 0
+                # Strip commas, currency symbols and whitespace so values like
+                # "1,500", "NPR 850", "Rs.400" or "₹ 200" parse correctly
+                def _clean_num(raw: str) -> str:
+                    import re as _re
+                    return _re.sub(r"[^\d.\-]", "", raw.replace(",", ""))
+
+                cost = float(_clean_num(cost_raw)) if cost_raw else 0.0
+                sell = float(_clean_num(sell_raw)) if sell_raw else cost
+                qty  = int(float(_clean_num(qty_raw))) if qty_raw else 0
             except ValueError:
                 errors.append(f"Row {row_num}: invalid number for '{name}', skipped.")
                 skipped += 1
