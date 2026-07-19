@@ -4,6 +4,40 @@
 {% block og_image %}{% set _img = product_image_url(product.image_filename, 800) %}{% if _img %}{{ _img }}{% else %}{{ super() }}{% endif %}{% endblock %}
 
 {% block head %}
+  {# ── BreadcrumbList JSON-LD for Google rich results ─────────────── #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "{{ request.url_root }}"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Shop",
+        "item": "{{ url_for('store.home', _external=True) }}"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "{{ product.category or 'Products' }}",
+        "item": "{{ url_for('store.home', category=product.category, _external=True) }}"
+      },
+      {
+        "@type": "ListItem",
+        "position": 4,
+        "name": "{{ product.name }}",
+        "item": "{{ request.url }}"
+      }
+    ]
+  }
+  </script>
+
 <link rel="canonical" href="{{ url_for('store.product_detail', product_id=product.id, _external=True) }}">
 <script type="application/ld+json">
 {
