@@ -65,7 +65,7 @@ def _local_upload_dir(app=None) -> str:
 
 # ── Core API ──────────────────────────────────────────────────────────────────
 
-def save_product_image(file_storage, app=None) -> Optional[str]:
+def save_product_image(file_storage, app=None, product_name: Optional[str] = None) -> Optional[str]:
     """
     Upload *file_storage* (a Werkzeug FileStorage object).
 
@@ -73,6 +73,9 @@ def save_product_image(file_storage, app=None) -> Optional[str]:
         - Cloudinary public_id  (prefixed with "cld:")  when Cloudinary is active.
         - Local filename                                  when using local storage.
         - None                                            on failure / invalid file.
+
+    If product_name is provided, the local file is saved as
+    product_<slugified_name>.<ext> so images survive product re-uploads.
     """
     if not file_storage or file_storage.filename == "":
         return None
@@ -98,9 +101,14 @@ def save_product_image(file_storage, app=None) -> Optional[str]:
             except Exception:
                 pass
 
-    # Local fallback
+    # Local fallback — use product name in filename so it survives re-uploads
     ext = file_storage.filename.rsplit(".", 1)[1].lower()
-    filename = f"{uuid.uuid4().hex}.{ext}"
+    if product_name:
+        import re as _re
+        safe_name = _re.sub(r"[^\w]", "_", product_name.lower().strip())[:40]
+        filename = f"{safe_name}.{ext}"
+    else:
+        filename = f"{uuid.uuid4().hex}.{ext}"
     dest = os.path.join(_local_upload_dir(app), filename)
     file_storage.save(dest)
     return filename

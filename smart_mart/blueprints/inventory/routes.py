@@ -35,10 +35,10 @@ def _allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _save_product_image(file) -> str | None:
+def _save_product_image(file, product_name: str = None) -> str | None:
     """Upload product image via image_service (Cloudinary or local fallback)."""
     from ...services.image_service import save_product_image
-    return save_product_image(file)
+    return save_product_image(file, product_name=product_name)
 
 
 def _delete_product_image(identifier: str) -> None:
@@ -208,7 +208,7 @@ def create_product():
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
-            img_filename = _save_product_image(img_file)
+            img_filename = _save_product_image(img_file, product_name=data.get("name"))
             if img_filename:
                 data["image_filename"] = img_filename
             # Save custom emoji to ProductIconMap
@@ -255,7 +255,7 @@ def edit_product(product_id):
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
-            img_filename = _save_product_image(img_file)
+            img_filename = _save_product_image(img_file, product_name=product.name)
             if img_filename:
                 data["image_filename"] = img_filename
             # Handle image removal
