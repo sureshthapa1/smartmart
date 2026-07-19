@@ -529,7 +529,7 @@
           ? `<span class="ppick-stock" style="background:#fee2e2;color:#dc2626;">OUT</span>`
           : (low ? `<span class="ppick-stock" style="background:#fef3c7;color:#92400e;">${p.stock} left</span>` : '');
         const imgHtml = p.img
-          ? `<img src="${p.img}" alt="${p.name.replace(/"/g,'')}" loading="lazy" onerror="this.outerHTML='<div class=\'ppick-ph\'>🥜</div>'">`
+          ? `<img src="${p.img}" class="ppick-img" alt="${p.name.replace(/"/g,'')}" loading="lazy" onerror="this.outerHTML='<div class=\'ppick-ph\'>🥜</div>'">`
           : `<div class="ppick-ph">🥜</div>`;
         return `<div class="ppick${oos ? ' oos' : ''}" onclick="${oos ? '' : `addRow(${p.id},1,${p.price})`}" title="${p.name} — NPR ${p.price}">
           ${imgHtml}

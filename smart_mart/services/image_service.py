@@ -92,7 +92,11 @@ def save_product_image(file_storage, app=None) -> Optional[str]:
             )
             return "cld:" + result["public_id"]
         except Exception:
-            pass  # Fall through to local save
+            # Cloudinary failed — seek back so local fallback can read the file
+            try:
+                file_storage.seek(0)
+            except Exception:
+                pass
 
     # Local fallback
     ext = file_storage.filename.rsplit(".", 1)[1].lower()
