@@ -138,7 +138,7 @@
               <input type="number" class="form-control bg-light" name="quantity" min="0"
                      value="{{ product.quantity }}" readonly
                      title="Stock quantity is managed via Purchases and Stock Takes — not directly editable here.">
-              <div class="form-text text-muted">Use <a href="{{ url_for('purchases.create_purchase') }}">Add Purchase</a> or <a href="{{ url_for('stock_take.create') }}">Stock Take</a> to change stock.</div>
+              <div class="form-text text-muted">Use <a href="{{ url_for('purchases.create_purchase') }}">Add Purchase</a> or <a href="{{ url_for('stock_take.create_take') }}">Stock Take</a> to change stock.</div>
               {% endif %}
             </div>
 
