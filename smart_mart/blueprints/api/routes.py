@@ -1099,6 +1099,6 @@ def run_all_agents():
 @login_required
 def run_daily_summary():
     """Trigger end-of-day summary bot — call from Render cron or manually."""
-    from ...services.bot_runner import run_daily_summary_bot
-    result = run_daily_summary_bot()
+    from ...services.bot_runner import run_owner_sms_summary
+    result = run_owner_sms_summary()
     return jsonify({"status": "ok", "result": result})
