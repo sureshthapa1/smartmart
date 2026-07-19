@@ -537,6 +537,14 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "products", "seo_title",        "VARCHAR(120)"),
             ),
         ),
+        (
+            "2026_07_19_shop_settings_timestamps",
+            "Add created_at and updated_at timestamp columns to shop_settings.",
+            lambda conn: (
+                _safe_add_column(conn, "shop_settings", "created_at", "DATETIME"),
+                _safe_add_column(conn, "shop_settings", "updated_at", "DATETIME"),
+            ),
+        ),
     ]
 
 
