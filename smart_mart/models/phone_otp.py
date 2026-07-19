@@ -1,7 +1,8 @@
 """OTP model for phone verification — used by store customer registration."""
 from __future__ import annotations
 from datetime import datetime, timezone, timedelta
-import random
+import hmac
+import secrets
 import string
 from ..extensions import db
 
@@ -28,7 +29,7 @@ class PhoneOTP(db.Model):
             .where(cls.phone == phone, cls.used == False)
             .values(used=True)
         )
-        code = "".join(random.choices(string.digits, k=6))
+        code = "".join(secrets.choice(string.digits) for _ in range(6))
         otp  = cls(
             phone=phone,
             code=code,
@@ -61,7 +62,7 @@ class PhoneOTP(db.Model):
             db.session.commit()
             return False
 
-        if otp.code == code:
+        if hmac.compare_digest(otp.code, code):
             otp.used = True
             db.session.commit()
             return True
