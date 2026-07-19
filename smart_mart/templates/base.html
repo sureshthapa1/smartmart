@@ -451,6 +451,8 @@
                    href="{{ url_for('admin.audit_log') }}"><i class="bi bi-journal-check"></i> Audit Log</a></li>
             <li><a class="nav-link {% if request.endpoint == 'admin.backup' %}active{% endif %}"
                    href="{{ url_for('admin.backup') }}"><i class="bi bi-cloud-arrow-up"></i> Backup</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'admin.data_management' %}active{% endif %}"
+                   href="{{ url_for('admin.data_management') }}"><i class="bi bi-trash3"></i> Data Management</a></li>
           </ul>
         </div>
       </li>
