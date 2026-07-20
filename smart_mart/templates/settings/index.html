@@ -163,7 +163,33 @@
           </div>
 
           <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary px-4">
+            
+          {# ── Delivery Settings ─────────────────────────────────────── #}
+          <div class="row g-3 mb-4 mt-2">
+            <div class="col-12">
+              <div class="fw-semibold text-muted mb-2" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;">
+                <i class="bi bi-truck me-1"></i>Delivery Settings
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Delivery Charge (NPR)</label>
+              <input type="number" class="form-control" name="delivery_charge"
+                     min="0" step="0.01"
+                     value="{{ s.delivery_charge or 0 }}"
+                     placeholder="e.g. 100">
+              <div class="form-text">Charged per online order. Set 0 for always-free delivery.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Free Delivery Above (NPR)</label>
+              <input type="number" class="form-control" name="free_delivery_above_npr"
+                     min="0" step="0.01"
+                     value="{{ s.free_delivery_above_npr or 0 }}"
+                     placeholder="e.g. 1000">
+              <div class="form-text">Orders above this get free delivery. Set 0 to disable.</div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary px-4">
               <i class="bi bi-check-lg me-1"></i>Save Settings
             </button>
           </div>
