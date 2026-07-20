@@ -182,7 +182,7 @@ with app.app_context():
                 "CREATE INDEX IF NOT EXISTS ix_online_orders_customer_phone ON online_orders(customer_phone)",
                 "CREATE INDEX IF NOT EXISTS ix_sales_sale_date ON sales(sale_date)",
                 "CREATE INDEX IF NOT EXISTS ix_products_category ON products(category)",
-                "CREATE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
             ]:
                 try:
                     conn.execute(text(idx_sql))
@@ -213,6 +213,13 @@ with app.app_context():
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_phone_otps_phone ON phone_otps(phone)"))
         conn.commit()
 
+                for _dc in [
+            ("shop_settings","delivery_charge","NUMERIC(10,2) DEFAULT 0"),
+            ("shop_settings","free_delivery_above_npr","NUMERIC(10,2) DEFAULT 0"),
+        ]:
+            safe_add(conn, _dc[0], _dc[1], _dc[2])
+
+                safe_add(conn, "customer_accounts", "notes", "TEXT")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
