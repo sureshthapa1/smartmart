@@ -252,6 +252,12 @@ def edit_product(product_id):
         categories = []
     if request.method == "POST":
         data = _form_to_data(request.form)
+        # Quantity is never editable here, regardless of what the client
+        # sends — stock levels must only change via a tracked Purchase
+        # (restocking) or a Stock Take (correcting a count). The form's
+        # readonly attribute on this field is client-side only and gives no
+        # protection against a direct POST bypassing the UI.
+        data["quantity"] = product.quantity
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
