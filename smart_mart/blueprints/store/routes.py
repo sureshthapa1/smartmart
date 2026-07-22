@@ -807,7 +807,9 @@ def checkout():
                 pass  # promo system not available
 
         gift_wrap_charge = 50.0 if gift_wrap else 0.0
-        grand_total = subtotal + delivery + gift_wrap_charge - discount_amount
+        grand_total = max(0.0, subtotal + delivery + gift_wrap_charge - discount_amount)
+        # Ensure discount never produces a negative total
+        discount_amount = min(discount_amount, subtotal + delivery + gift_wrap_charge)
 
         payload = {
             "customer": {"name": name, "phone": phone, "email": email,
