@@ -37,7 +37,7 @@
 <div class="tstrip">
   <div class="tstrip-i">
     {% for icon, title, sub in [
-      ('🚚', _('Free Delivery'), _('On orders above NPR 2000')),
+      ('🚚', _('Free Delivery'), _('On orders above NPR %(amount)s', amount='{:,.0f}'.format(free_delivery_threshold))),
       ('✅', _('100 Percent Genuine'), _('Handpicked & verified')),
       ('💳', _('Easy Payment'), 'COD · eSewa · Khalti'),
       ('🔄', _('7-Day Returns'), _('Hassle-free returns')),

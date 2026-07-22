@@ -16,7 +16,7 @@
     ('💵','What payment methods do you accept?',
      'Cash on Delivery (COD), eSewa, and Khalti. COD is available for all locations. For digital payments, follow the instructions shown after placing your order.'),
     ('📦','What is your minimum order amount?',
-     'The minimum order is NPR 200. Orders above NPR 2,000 qualify for free delivery — otherwise a flat NPR 100 delivery charge applies.'),
+     'The minimum order is NPR 200. Orders above NPR ' ~ '{:,.0f}'.format(free_delivery_threshold) ~ ' qualify for free delivery — otherwise a flat NPR ' ~ '{:,.0f}'.format(delivery_charge) ~ ' delivery charge applies.'),
     ('🔄','What is your return policy?',
      'We offer a 7-day return policy. If you receive a damaged, expired, or incorrect item, contact us immediately with a photo and we will arrange a replacement or full refund.'),
     ('⚖️','How are dry fruits weighed and packed?',
