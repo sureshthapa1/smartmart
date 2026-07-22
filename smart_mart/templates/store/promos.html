@@ -70,7 +70,7 @@
     <div class="section-title" style="margin-bottom:1rem;">🎁 Always-On Deals</div>
     <div class="row g-3">
       {% for icon, title, desc, badge in [
-        ('🚚','Free Delivery','On orders above NPR 2,000','Always active'),
+        ('🚚','Free Delivery','On orders above NPR ' ~ '{:,.0f}'.format(free_delivery_threshold),'Always active'),
         ('💰','Bulk Discount','Buy 3+ items, ask us for a special price','Contact us'),
         ('🎁','Gift Packaging','Free gift wrap on any order above NPR 500','Always active'),
       ] %}

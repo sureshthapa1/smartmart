@@ -545,6 +545,19 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "shop_settings", "updated_at", "DATETIME"),
             ),
         ),
+        (
+            "2026_07_19_shop_settings_delivery_config",
+            "Add delivery_charge and free_delivery_above_npr columns to shop_settings "
+            "(admin-configurable checkout delivery pricing, read by store/routes.py). "
+            "This was previously only added via a raw ALTER in build.sh, which never ran "
+            "on local dev environments and also had a broken indentation that caused the "
+            "entire build.sh database-init script to fail to parse — moved to the proper "
+            "versioned migration system so it's applied consistently everywhere.",
+            lambda conn: (
+                _safe_add_column(conn, "shop_settings", "delivery_charge", "NUMERIC(10,2) DEFAULT 0"),
+                _safe_add_column(conn, "shop_settings", "free_delivery_above_npr", "NUMERIC(10,2) DEFAULT 0"),
+            ),
+        ),
     ]
 
 

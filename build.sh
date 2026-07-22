@@ -213,13 +213,7 @@ with app.app_context():
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_phone_otps_phone ON phone_otps(phone)"))
         conn.commit()
 
-                for _dc in [
-            ("shop_settings","delivery_charge","NUMERIC(10,2) DEFAULT 0"),
-            ("shop_settings","free_delivery_above_npr","NUMERIC(10,2) DEFAULT 0"),
-        ]:
-            safe_add(conn, _dc[0], _dc[1], _dc[2])
-
-                safe_add(conn, "customer_accounts", "notes", "TEXT")
+        safe_add(conn, "customer_accounts", "notes", "TEXT")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")

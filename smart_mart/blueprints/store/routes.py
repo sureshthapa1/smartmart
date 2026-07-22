@@ -66,8 +66,8 @@ SEARCH_ALIASES = {
 }
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-FREE_DELIVERY_THRESHOLD = 2000.0
-DELIVERY_CHARGE        = 100.0
+FREE_DELIVERY_THRESHOLD = 2000.0   # fallback default — used only if ShopSettings value is unset (0)
+DELIVERY_CHARGE        = 100.0     # fallback default — used only if ShopSettings value is unset (0)
 MAX_QTY_PER_ITEM       = 50
 MIN_ORDER_AMOUNT       = 200.0
 NEPAL_PHONE_RE         = re.compile(r"^(97|98)\d{8}$")
@@ -155,10 +155,36 @@ def _save_cart(cart: dict):
     session["cart"] = cart
     session.modified = True
 
+def _delivery_charge() -> float:
+    """Admin-configured flat delivery fee (ShopSettings.delivery_charge).
+    Falls back to the hardcoded default when unset (0) — treating 0 as
+    'not configured yet' rather than 'intentionally free delivery', so
+    this stays a no-op for any shop that hasn't touched the Settings page
+    since this field was added."""
+    try:
+        settings = _settings()
+        val = float(settings.delivery_charge or 0) if settings else 0
+        return val if val > 0 else DELIVERY_CHARGE
+    except Exception:
+        return DELIVERY_CHARGE
+
+
+def _free_delivery_threshold() -> float:
+    """Admin-configured free-delivery threshold (ShopSettings.free_delivery_above_npr).
+    Same 0-means-unconfigured fallback as _delivery_charge() above."""
+    try:
+        settings = _settings()
+        val = float(settings.free_delivery_above_npr or 0) if settings else 0
+        return val if val > 0 else FREE_DELIVERY_THRESHOLD
+    except Exception:
+        return FREE_DELIVERY_THRESHOLD
+
 
 def _calc_delivery(subtotal: float) -> float:
-    """Free delivery above threshold, NPR 100 otherwise."""
-    return 0.0 if subtotal >= FREE_DELIVERY_THRESHOLD else DELIVERY_CHARGE
+    """Free delivery above the configured threshold, flat fee otherwise.
+    Reads from ShopSettings (admin-configurable) with a safe fallback to
+    the hardcoded defaults if not yet configured."""
+    return 0.0 if subtotal >= _free_delivery_threshold() else _delivery_charge()
 
 
 def _safe_next(next_url: str | None) -> str:
@@ -346,7 +372,7 @@ def home():
         per_page=per_page,
         total_products=total_products,
         customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
     )
 
 # ── Category Browse ──────────────────────────────────────────────────────────
@@ -424,7 +450,7 @@ def category_browse(slug: str):
         per_page=per_page,
         total_products=total,
         customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
     )
 
 
@@ -597,7 +623,7 @@ def cart():
         "store/cart.html",
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings, customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
         raw_cart_count=len(raw_cart),
         cart_recommendations=cart_recs,
     )
@@ -765,7 +791,7 @@ def checkout():
                 items=items, subtotal=subtotal, delivery=delivery,
                 grand_total=grand_total, settings=settings,
                 form_data=request.form, customer=cust,
-                free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+                free_delivery_threshold=_free_delivery_threshold(),
                 loyalty_pts=0, loyalty_npr=0.0, discount=0.0,
             )
 
@@ -860,7 +886,7 @@ def checkout():
                 items=items, subtotal=subtotal, delivery=delivery,
                 grand_total=grand_total, settings=settings,
                 form_data=request.form, customer=cust,
-                free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+                free_delivery_threshold=_free_delivery_threshold(),
                 loyalty_pts=0, loyalty_npr=0.0, discount=0.0,
             )
 
@@ -891,7 +917,7 @@ def checkout():
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings,
         form_data=form_data, customer=cust,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
         loyalty_pts=loyalty_pts,
         loyalty_npr=loyalty_npr,
         discount=0.0,
@@ -1744,7 +1770,9 @@ def contact():
 @store_bp.route("/faq")
 def faq():
     settings = _settings()
-    return render_template("store/faq.html", settings=settings, customer=g.customer)
+    return render_template("store/faq.html", settings=settings, customer=g.customer,
+                           free_delivery_threshold=_free_delivery_threshold(),
+                           delivery_charge=_delivery_charge())
 
 
 # ── SEO: Product by Slug (Improvement 13) ────────────────────────────────────
@@ -1870,7 +1898,8 @@ def promos():
         .order_by(Promotion.end_date)
     ).scalars().all()
     return render_template("store/promos.html", promos=active,
-                           settings=settings, customer=g.customer)
+                           settings=settings, customer=g.customer,
+                           free_delivery_threshold=_free_delivery_threshold())
 
 
 # ── FEATURE 4: Product reviews ────────────────────────────────────────────────
