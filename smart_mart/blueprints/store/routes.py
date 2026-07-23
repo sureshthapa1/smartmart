@@ -1504,6 +1504,26 @@ def payment_callback(order_number, provider):
         gateway_ref = "cod"
 
     if verified:
+        # ── Amount sanity check (prevents paying NPR 1 to clear full order) ──
+        try:
+            _expected = float(order.grand_total or 0)
+            _paid_npr = None
+            if provider == "esewa":
+                # eSewa sends total_amount in rupees in the decoded response
+                _paid_npr = float(args.get("total_amount", 0) or 0)
+            elif provider == "khalti":
+                # Khalti lookup returns total_amount in paisa
+                _paid_npr = float(args.get("total_amount", 0) or 0) / 100
+            if _paid_npr is not None and _expected > 0:
+                if abs(_paid_npr - _expected) > 1.0:  # allow NPR 1 rounding tolerance
+                    _logger.warning(
+                        "Amount mismatch for order %s: expected NPR %.2f, paid NPR %.2f via %s — rejecting",
+                        order_number, _expected, _paid_npr, provider
+                    )
+                    flash("Payment amount mismatch. Please contact support.", "danger")
+                    return redirect(url_for("store.order_pending", order_number=order_number))
+        except Exception as _amt_exc:
+            _logger.warning("Amount check failed (non-fatal): %s", _amt_exc)
         order.payment_status = "paid"
         from ...models.ecommerce import EcommercePayment
         payment = db.session.execute(
