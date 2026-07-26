@@ -1,6 +1,8 @@
 """AI Business Advisor blueprint — rule-based analysis + Gemini narrative commentary."""
 from __future__ import annotations
 
+import json
+
 from flask import Blueprint, jsonify, render_template, request
 from ...services.decorators import admin_required, login_required
 from ...services import ai_business_advisor
@@ -44,45 +46,11 @@ def _gemini_advisor_commentary(report: dict) -> str | None:
             "kpi_scores":         {k.get("kpi"): k.get("score") for k in kpis},
         }
 
-        import json
         prompt = (
             f"Business data for GoldKernel dry fruits retail shop (Dhangadhi, Nepal): "
             f"{json.dumps(condensed)}\n\n"
             "Give a 2-3 sentence executive summary of the business health and the single most "
             "important action to take right now. Be direct and specific. Currency is NPR. No markdown."
-        )
-        system = (
-            "You are a concise business advisor for GoldKernel, a premium dry fruits "
-            "retail shop in Dhangadhi, Nepal. Currency is NPR."
-        )
-        api_key = ""
-        return gemini_generate(prompt, system=system, max_tokens=220)
-        payload = json.dumps({
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 220,
-            "system": (
-                "You are a concise business advisor for GoldKernel, a premium dry fruits "
-                "retail shop in Dhangadhi, Nepal. Write a 2-3 sentence executive summary "
-                "of the business health. Be direct, specific, and action-oriented. "
-                "Currency is NPR. No markdown."
-            ),
-            "messages": [{
-                "role": "user",
-                "content": (
-                    f"Here is the current business data: {json.dumps(condensed)}\n\n"
-                    "Give me a brief executive commentary on the state of the business "
-                    "and the single most important action to take right now."
-                ),
-            }],
-        }).encode()
-
-        import urllib.request as _req
-        req = _req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            method="POST",
         )
         system = (
             "You are a concise business advisor for GoldKernel, a premium dry fruits "
@@ -140,5 +108,5 @@ def api_commentary():
     """Just the AI commentary — called via AJAX to avoid blocking page load."""
     _require_perm("can_view_advisor")
     report = ai_business_advisor.full_advisor_report()
-    commentary = _claude_advisor_commentary(report)
+    commentary = _gemini_advisor_commentary(report)
     return jsonify({"commentary": commentary, "ai_enhanced": commentary is not None})
