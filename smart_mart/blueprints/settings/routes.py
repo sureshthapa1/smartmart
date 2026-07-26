@@ -66,6 +66,12 @@ def index():
         s.vat_number = request.form.get("vat_number", "").strip() or None
         s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
         s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
+        # ── Delivery settings ─────────────────────────────────────────
+        try:
+            s.delivery_charge         = Decimal(str(request.form.get("delivery_charge") or 0))
+            s.free_delivery_above_npr = Decimal(str(request.form.get("free_delivery_above_npr") or 0))
+        except (ValueError, TypeError):
+            pass
         # Loyalty rates
         try:
             s.loyalty_points_per_rupee = Decimal(str(request.form.get("loyalty_points_per_rupee", "0.01") or 0.01 or 0))

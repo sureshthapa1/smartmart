@@ -15,20 +15,21 @@
   </div>
 </div>
 
-<!-- Individual Section Cards -->
+<!-- ── POS / Transactions ── -->
+<h6 class="text-muted text-uppercase fw-bold small mb-2 mt-3">
+  <i class="bi bi-shop me-1"></i> POS &amp; Transactions
+</h6>
 <div class="row g-3 mb-4">
-
-  {% set sections = [
-    ("sales", "Sales & Transactions", "bi-cart3", "danger", counts.sales, "Clears all sales, sale items. Stock is NOT reversed."),
-    ("purchases", "Purchases", "bi-truck", "warning", counts.purchases, "Clears all purchase records and purchase items."),
-    ("expenses", "Expenses", "bi-cash-stack", "warning", counts.expenses, "Clears all manually recorded expenses."),
-    ("stock_movements", "Stock Movement History", "bi-arrow-left-right", "secondary", counts.stock_movements, "Clears the stock movement audit log only. Stock quantities are unchanged."),
-    ("products", "Products", "bi-box-seam", "danger", counts.products, "Clears all products AND all related sales, purchases, stock movements."),
-    ("suppliers", "Suppliers", "bi-building", "warning", counts.suppliers, "Clears all suppliers and their purchase records."),
-    ("categories", "Categories", "bi-tags", "secondary", counts.categories, "Clears all product categories."),
+  {% set pos_sections = [
+    ("sales",           "Sales & Transactions",      "bi-cart3",           "danger",    counts.sales,           "Clears all sales and sale items. Stock quantities are NOT reversed."),
+    ("purchases",       "Purchases",                 "bi-truck",           "warning",   counts.purchases,       "Clears all purchase records and purchase items."),
+    ("expenses",        "Expenses",                  "bi-cash-stack",      "warning",   counts.expenses,        "Clears all manually recorded expenses."),
+    ("stock_movements", "Stock Movement History",    "bi-arrow-left-right","secondary", counts.stock_movements, "Clears the stock audit log only. Stock quantities are unchanged."),
+    ("products",        "Products",                  "bi-box-seam",        "danger",    counts.products,        "Clears all products AND all related sales, purchases, stock movements."),
+    ("suppliers",       "Suppliers",                 "bi-building",        "warning",   counts.suppliers,       "Clears all suppliers and their purchase records."),
+    ("categories",      "Categories",                "bi-tags",            "secondary", counts.categories,      "Clears all product categories."),
   ] %}
-
-  {% for section_id, title, icon, color, count, note in sections %}
+  {% for section_id, title, icon, color, count, note in pos_sections %}
   <div class="col-md-6 col-xl-4">
     <div class="card shadow-sm border-0 h-100">
       <div class="card-body">
@@ -44,21 +45,91 @@
         </div>
         <p class="text-muted small mb-3">{{ note }}</p>
         <button class="btn btn-outline-{{ color }} btn-sm w-100"
-                data-bs-toggle="modal"
-                data-bs-target="#clearModal"
-                data-section="{{ section_id }}"
-                data-title="{{ title }}"
-                data-count="{{ count }}">
+                data-bs-toggle="modal" data-bs-target="#clearModal"
+                data-section="{{ section_id }}" data-title="{{ title }}" data-count="{{ count }}">
           <i class="bi bi-trash me-1"></i>Clear {{ title }}
         </button>
       </div>
     </div>
   </div>
   {% endfor %}
-
 </div>
 
-<!-- Clear All Card -->
+<!-- ── Online Store ── -->
+<h6 class="text-muted text-uppercase fw-bold small mb-2 mt-2">
+  <i class="bi bi-globe me-1"></i> Online Store
+</h6>
+<div class="row g-3 mb-4">
+  {% set store_sections = [
+    ("online_orders",  "Online Orders",             "bi-bag-check",       "danger",    counts.online_orders,   "Clears online orders, order items, payments and stock reservations."),
+    ("customers",      "Customer Accounts",         "bi-people",          "warning",   counts.customers,       "Clears all registered customer profiles."),
+    ("payments",       "Payment Records",           "bi-credit-card",     "warning",   counts.payments,        "Clears eSewa/Khalti payment transaction records only."),
+    ("reservations",   "Stock Reservations",        "bi-hourglass-split", "secondary", counts.reservations,    "Clears expired and active stock holds from checkout sessions."),
+    ("sync_logs",      "Sync Logs",                 "bi-arrow-repeat",    "secondary", counts.sync_logs,       "Clears the website-to-POS sync event log."),
+  ] %}
+  {% for section_id, title, icon, color, count, note in store_sections %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="rounded-2 d-flex align-items-center justify-content-center"
+               style="width:42px;height:42px;background:var(--bs-{{ color }}-bg, #f8fafc);">
+            <i class="bi {{ icon }} text-{{ color }} fs-5"></i>
+          </div>
+          <div>
+            <div class="fw-semibold" style="color:#0f172a;">{{ title }}</div>
+            <div class="text-muted small">{{ count }} record{{ 's' if count != 1 else '' }}</div>
+          </div>
+        </div>
+        <p class="text-muted small mb-3">{{ note }}</p>
+        <button class="btn btn-outline-{{ color }} btn-sm w-100"
+                data-bs-toggle="modal" data-bs-target="#clearModal"
+                data-section="{{ section_id }}" data-title="{{ title }}" data-count="{{ count }}">
+          <i class="bi bi-trash me-1"></i>Clear {{ title }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Logs & System Data ── -->
+<h6 class="text-muted text-uppercase fw-bold small mb-2 mt-2">
+  <i class="bi bi-journal-text me-1"></i> Logs &amp; System Data
+</h6>
+<div class="row g-3 mb-4">
+  {% set log_sections = [
+    ("notifications",      "App Notifications",         "bi-bell",            "secondary", counts.notifications,      "Clears the internal alert/notification inbox (low stock, overdue, etc)."),
+    ("audit_logs",         "Audit Log",                 "bi-shield-check",    "secondary", counts.audit_logs,         "Clears the admin action audit trail. Cannot be recovered."),
+    ("notification_logs",  "SMS / Email Delivery Log",  "bi-envelope-check",  "secondary", counts.notification_logs,  "Clears the SMS and email delivery history log."),
+  ] %}
+  {% for section_id, title, icon, color, count, note in log_sections %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="rounded-2 d-flex align-items-center justify-content-center"
+               style="width:42px;height:42px;background:var(--bs-{{ color }}-bg, #f8fafc);">
+            <i class="bi {{ icon }} text-{{ color }} fs-5"></i>
+          </div>
+          <div>
+            <div class="fw-semibold" style="color:#0f172a;">{{ title }}</div>
+            <div class="text-muted small">{{ count }} record{{ 's' if count != 1 else '' }}</div>
+          </div>
+        </div>
+        <p class="text-muted small mb-3">{{ note }}</p>
+        <button class="btn btn-outline-{{ color }} btn-sm w-100"
+                data-bs-toggle="modal" data-bs-target="#clearModal"
+                data-section="{{ section_id }}" data-title="{{ title }}" data-count="{{ count }}">
+          <i class="bi bi-trash me-1"></i>Clear {{ title }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Clear All ── -->
 <div class="card border-danger shadow-sm">
   <div class="card-body">
     <div class="d-flex align-items-center gap-3">
@@ -69,16 +140,15 @@
       <div class="flex-grow-1">
         <div class="fw-bold text-danger fs-6">Clear ALL Data</div>
         <div class="text-muted small">
-          Permanently removes all sales, purchases, expenses, stock movements, products, suppliers and categories.
-          Users are NOT deleted.
+          Permanently removes everything — sales, purchases, expenses, stock movements, products,
+          suppliers, categories, online orders, customers, payments, reservations, sync logs,
+          notifications and audit logs. Staff user accounts are <strong>not</strong> deleted.
         </div>
       </div>
       <button class="btn btn-danger"
-              data-bs-toggle="modal"
-              data-bs-target="#clearModal"
-              data-section="all"
-              data-title="ALL DATA"
-              data-count="{{ counts.sales + counts.purchases + counts.products + counts.expenses }}">
+              data-bs-toggle="modal" data-bs-target="#clearModal"
+              data-section="all" data-title="ALL DATA"
+              data-count="{{ counts.sales + counts.purchases + counts.products + counts.expenses + counts.online_orders + counts.customers }}">
         <i class="bi bi-trash3 me-1"></i>Clear Everything
       </button>
     </div>
@@ -131,7 +201,6 @@ clearModal.addEventListener('show.bs.modal', function(e) {
   document.getElementById('confirmInput').value = '';
   document.getElementById('confirmBtn').disabled = true;
 });
-
 document.getElementById('confirmInput').addEventListener('input', function() {
   document.getElementById('confirmBtn').disabled = this.value !== 'DELETE';
 });

@@ -350,7 +350,7 @@ and gifting questions, and assist with orders and delivery.
 RULES:
 - Reply in 2-4 SHORT sentences. Be warm, friendly, knowledgeable.
 - Currency is NPR (Nepali Rupees). Free delivery above NPR 2000, NPR 100 flat below.
-- Delivery across all Nepal. COD, eSewa, Khalti, IME Pay accepted. 7-day returns.
+- Delivery across all Nepal. COD, eSewa, Khalti accepted. 7-day returns.
 - Only reference products shown in RELEVANT PRODUCTS — do NOT invent prices or stock.
 - If asked about a product not in the list, say "Browse /store/products for our full range."
 - Reply in the same language the customer writes in (Nepali or English).
@@ -516,7 +516,7 @@ def _keyword_chatbot_reply(message: str) -> str:
     if any(w in msg for w in ["delivery", "deliver", "shipping", "ship"]):
         return "We deliver across Nepal! Free delivery on orders above NPR 2000, otherwise NPR 100 flat delivery charge."
     if any(w in msg for w in ["payment", "pay", "esewa", "khalti", "cod", "cash"]):
-        return "We accept Cash on Delivery (COD), eSewa, Khalti, and IME Pay."
+        return "We accept Cash on Delivery (COD), eSewa, and Khalti."
     if any(w in msg for w in ["return", "refund", "exchange"]):
         return "We have a 7-day return policy. If you received a damaged or wrong product, please call us immediately."
     if any(w in msg for w in ["gift", "gifting", "present"]):

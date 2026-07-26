@@ -1,4 +1,4 @@
-"""AI Business Advisor blueprint — rule-based analysis + Claude narrative commentary."""
+"""AI Business Advisor blueprint — rule-based analysis + Gemini narrative commentary."""
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request
@@ -84,9 +84,11 @@ def _gemini_advisor_commentary(report: dict) -> str | None:
                      "content-type": "application/json"},
             method="POST",
         )
-        with _req.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        return data["content"][0]["text"].strip()
+        system = (
+            "You are a concise business advisor for GoldKernel, a premium dry fruits "
+            "retail shop in Dhangadhi, Nepal. Currency is NPR."
+        )
+        return gemini_generate(prompt, system=system, max_tokens=220)
     except Exception:
         return None
 

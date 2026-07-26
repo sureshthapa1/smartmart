@@ -25,7 +25,25 @@
         <div style="background:var(--brand-l);border:1.5px solid #fde68a;border-radius:var(--r-l);padding:1.25rem;text-align:center;margin-bottom:1.5rem;">
           <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.3rem;">Your Order Number</div>
           <div style="font-size:1.6rem;font-weight:900;color:var(--brand-d);font-family:monospace;letter-spacing:.05em;">{{ order.order_number }}</div>
-          <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;">Save this number to track your order anytime</div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:.3rem;">Save this number to 
+      {# ── Loyalty points earned ──────────────────────────────────── #}
+      {% if loyalty_points_earned and loyalty_points_earned > 0 %}
+      <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;
+                  border-radius:12px;padding:1rem 1.25rem;margin:1rem 0;text-align:center;">
+        <div style="font-size:1.5rem;margin-bottom:.25rem">🎁</div>
+        <div style="font-weight:700;color:#6d28d9;font-size:1rem;">
+          You earned {{ loyalty_points_earned }} loyalty points!
+        </div>
+        <div style="font-size:.8rem;color:#7c3aed;margin-top:.2rem;">
+          तपाईंले {{ loyalty_points_earned }} loyalty points कमाउनुभयो।
+          {% if loyalty_balance %}
+          Total balance: <strong>{{ loyalty_balance }} points</strong>
+          (worth NPR {{ "%.0f"|format(loyalty_balance / 10) }})
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      track your order anytime</div>
         </div>
 
         {# Details grid #}

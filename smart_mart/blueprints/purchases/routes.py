@@ -337,8 +337,12 @@ def bulk_upload():
                 parse_errors.append(f"Row {row_num}: missing product name, skipped.")
                 continue
             try:
-                qty = int(float(qty_raw))
-                cost = float(cost_raw)
+                # Strip commas, currency symbols so "1,500" / "NPR 400" parse correctly
+                import re as _re
+                def _clean(raw: str) -> str:
+                    return _re.sub(r"[^\d.\-]", "", raw.replace(",", ""))
+                qty = int(float(_clean(qty_raw)))
+                cost = float(_clean(cost_raw))
             except ValueError:
                 parse_errors.append(f"Row {row_num}: invalid quantity or cost for '{product_name}', skipped.")
                 continue

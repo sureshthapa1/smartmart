@@ -168,8 +168,6 @@ with app.app_context():
             safe_add(conn, "shop_settings", "whatsapp_number", "VARCHAR(30)")
             safe_add(conn, "shop_settings", "website_url",     "VARCHAR(255)")
 
-   # Table already exists on PostgreSQL
-
             # ── Products enrichment columns (AI autofill) ─────────────────────────
             safe_add(conn, "products", "benefits",      "TEXT")
             safe_add(conn, "products", "origin",        "VARCHAR(120)")
@@ -184,7 +182,7 @@ with app.app_context():
                 "CREATE INDEX IF NOT EXISTS ix_online_orders_customer_phone ON online_orders(customer_phone)",
                 "CREATE INDEX IF NOT EXISTS ix_sales_sale_date ON sales(sale_date)",
                 "CREATE INDEX IF NOT EXISTS ix_products_category ON products(category)",
-                "CREATE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_products_slug ON products(slug)",
             ]:
                 try:
                     conn.execute(text(idx_sql))
@@ -192,6 +190,35 @@ with app.app_context():
                 except Exception:
                     pass  # index already exists or table not yet created
 
+        # saved_address fields on customer_accounts
+        for _col_def in [
+            ("customer_accounts", "saved_address",     "TEXT"),
+            ("customer_accounts", "saved_area",        "VARCHAR(100)"),
+            ("customer_accounts", "save_address_pref", "BOOLEAN DEFAULT FALSE"),
+        ]:
+            safe_add(conn, _col_def[0], _col_def[1], _col_def[2])
+
+        # phone_otps table for store registration OTP
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS phone_otps (
+                id         SERIAL PRIMARY KEY,
+                phone      VARCHAR(20) NOT NULL,
+                code       VARCHAR(6)  NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL,
+                used       BOOLEAN     DEFAULT FALSE,
+                attempts   INTEGER     DEFAULT 0
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_phone_otps_phone ON phone_otps(phone)"))
+        conn.commit()
+
+        safe_add(conn, "customer_accounts", "notes", "TEXT")
+                safe_add(conn, "shop_settings", "delivery_charge", "NUMERIC(10,2) DEFAULT 0")
+        safe_add(conn, "shop_settings", "free_delivery_above_npr", "NUMERIC(10,2) DEFAULT 0")
+        safe_add(conn, "customer_accounts", "saved_address", "TEXT")
+        safe_add(conn, "customer_accounts", "saved_area", "VARCHAR(100)")
+        safe_add(conn, "customer_accounts", "save_address_pref", "BOOLEAN DEFAULT FALSE")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")

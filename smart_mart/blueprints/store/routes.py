@@ -66,12 +66,12 @@ SEARCH_ALIASES = {
 }
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-FREE_DELIVERY_THRESHOLD = 2000.0
-DELIVERY_CHARGE        = 100.0
+FREE_DELIVERY_THRESHOLD = 2000.0   # fallback default — used only if ShopSettings value is unset (0)
+DELIVERY_CHARGE        = 100.0     # fallback default — used only if ShopSettings value is unset (0)
 MAX_QTY_PER_ITEM       = 50
 MIN_ORDER_AMOUNT       = 200.0
 NEPAL_PHONE_RE         = re.compile(r"^(97|98)\d{8}$")
-VALID_PAYMENT_METHODS  = {"cod", "esewa", "khalti", "ime_pay"}
+VALID_PAYMENT_METHODS  = {"cod", "esewa", "khalti"}
 
 # ── Reservation expiry cooldown ───────────────────────────────────────────────
 _last_expiry_run: float = 0.0
@@ -155,10 +155,36 @@ def _save_cart(cart: dict):
     session["cart"] = cart
     session.modified = True
 
+def _delivery_charge() -> float:
+    """Admin-configured flat delivery fee (ShopSettings.delivery_charge).
+    Falls back to the hardcoded default when unset (0) — treating 0 as
+    'not configured yet' rather than 'intentionally free delivery', so
+    this stays a no-op for any shop that hasn't touched the Settings page
+    since this field was added."""
+    try:
+        settings = _settings()
+        val = float(settings.delivery_charge or 0) if settings else 0
+        return val if val > 0 else DELIVERY_CHARGE
+    except Exception:
+        return DELIVERY_CHARGE
+
+
+def _free_delivery_threshold() -> float:
+    """Admin-configured free-delivery threshold (ShopSettings.free_delivery_above_npr).
+    Same 0-means-unconfigured fallback as _delivery_charge() above."""
+    try:
+        settings = _settings()
+        val = float(settings.free_delivery_above_npr or 0) if settings else 0
+        return val if val > 0 else FREE_DELIVERY_THRESHOLD
+    except Exception:
+        return FREE_DELIVERY_THRESHOLD
+
 
 def _calc_delivery(subtotal: float) -> float:
-    """Free delivery above threshold, NPR 100 otherwise."""
-    return 0.0 if subtotal >= FREE_DELIVERY_THRESHOLD else DELIVERY_CHARGE
+    """Free delivery above the configured threshold, flat fee otherwise.
+    Reads from ShopSettings (admin-configurable) with a safe fallback to
+    the hardcoded defaults if not yet configured."""
+    return 0.0 if subtotal >= _free_delivery_threshold() else _delivery_charge()
 
 
 def _safe_next(next_url: str | None) -> str:
@@ -346,7 +372,7 @@ def home():
         per_page=per_page,
         total_products=total_products,
         customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
     )
 
 # ── Category Browse ──────────────────────────────────────────────────────────
@@ -424,7 +450,7 @@ def category_browse(slug: str):
         per_page=per_page,
         total_products=total,
         customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
     )
 
 
@@ -597,7 +623,7 @@ def cart():
         "store/cart.html",
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings, customer=g.customer,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
         raw_cart_count=len(raw_cart),
         cart_recommendations=cart_recs,
     )
@@ -765,7 +791,7 @@ def checkout():
                 items=items, subtotal=subtotal, delivery=delivery,
                 grand_total=grand_total, settings=settings,
                 form_data=request.form, customer=cust,
-                free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+                free_delivery_threshold=_free_delivery_threshold(),
                 loyalty_pts=0, loyalty_npr=0.0, discount=0.0,
             )
 
@@ -807,7 +833,9 @@ def checkout():
                 pass  # promo system not available
 
         gift_wrap_charge = 50.0 if gift_wrap else 0.0
-        grand_total = subtotal + delivery + gift_wrap_charge - discount_amount
+        grand_total = max(0.0, subtotal + delivery + gift_wrap_charge - discount_amount)
+        # Ensure discount never produces a negative total
+        discount_amount = min(discount_amount, subtotal + delivery + gift_wrap_charge)
 
         payload = {
             "customer": {"name": name, "phone": phone, "email": email,
@@ -845,7 +873,7 @@ def checkout():
             session.modified = True
             session.pop("cart", None)
 
-            payment_redirect = {"esewa": True, "khalti": True, "ime_pay": True}.get(method, False)
+            payment_redirect = {"esewa": True, "khalti": True}.get(method, False)
             if payment_redirect:
                 return redirect(url_for("store.payment_pending", order_number=order_number))
             else:
@@ -858,7 +886,7 @@ def checkout():
                 items=items, subtotal=subtotal, delivery=delivery,
                 grand_total=grand_total, settings=settings,
                 form_data=request.form, customer=cust,
-                free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+                free_delivery_threshold=_free_delivery_threshold(),
                 loyalty_pts=0, loyalty_npr=0.0, discount=0.0,
             )
 
@@ -889,7 +917,7 @@ def checkout():
         items=items, subtotal=subtotal, delivery=delivery,
         grand_total=grand_total, settings=settings,
         form_data=form_data, customer=cust,
-        free_delivery_threshold=FREE_DELIVERY_THRESHOLD,
+        free_delivery_threshold=_free_delivery_threshold(),
         loyalty_pts=loyalty_pts,
         loyalty_npr=loyalty_npr,
         discount=0.0,
@@ -1081,6 +1109,15 @@ def register_view():
                                email=email, address=address, area=area)
             login_customer(account)
             flash(f"Account created! Welcome, {account.name} 🎉", "success")
+            # ── Welcome email (non-blocking) ─────────────────────
+            try:
+                from ...services.email_service import send_welcome_email
+                send_welcome_email(
+                    customer_name=account.name,
+                    customer_email=account.email or "",
+                )
+            except Exception as _we:
+                current_app.logger.warning("Welcome email failed: %s", _we)
             return redirect(url_for("store.home"))
         except ValueError as exc:
             flash(str(exc), "danger")
@@ -1287,7 +1324,7 @@ def _verify_esewa_callback(args: dict) -> bool:
 
 def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
     """
-    Verify Khalti payment by calling Khalti's verification API.
+    Verify Khalti payment by calling Khalti's lookup API.
     amount_paisa is the expected amount in paisa (NPR * 100).
 
     Verifies both:
@@ -1295,6 +1332,11 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
     2. That the returned amount matches what we expected (prevents partial-payment attacks
        where an attacker pays NPR 1 for a NPR 1000 order and Khalti returns 'Completed'
        but for a different amount than we charged)
+
+    NOTE: The /epayment/lookup/ response format is FLAT — {"pidx", "total_amount",
+    "status", "transaction_id", "fee", "refunded"} — unlike the older /payment/verify/
+    endpoint which nested the state under {"state": {"name": ...}} and used "amount".
+    Using the old field names here silently breaks verification for every payment.
     """
     import os as _os, urllib.request as _req, json as _json
     secret_key = _os.environ.get("KHALTI_SECRET_KEY", "")
@@ -1305,24 +1347,26 @@ def _verify_khalti_callback(token: str, amount_paisa: int) -> bool:
         )
         return False
     try:
-        verify_url = "https://khalti.com/api/v2/payment/verify/"
-        payload = _json.dumps({"token": token, "amount": amount_paisa}).encode()
-        req = _req.Request(verify_url, data=payload, method="POST")
+        lookup_url = "https://khalti.com/api/v2/epayment/lookup/"
+        payload = _json.dumps({"pidx": token}).encode()
+        req = _req.Request(lookup_url, data=payload, method="POST")
         req.add_header("Authorization", f"Key {secret_key}")
         req.add_header("Content-Type", "application/json")
         with _req.urlopen(req, timeout=15) as resp:
             data = _json.loads(resp.read())
 
-        # Must be Completed
-        if data.get("state", {}).get("name") != "Completed":
+        # Must be Completed — status is a flat string field in the lookup response,
+        # NOT nested under "state" (that was the old /payment/verify/ format).
+        if data.get("status") != "Completed":
             return False
 
-        # Amount returned by Khalti MUST match what we sent
-        returned_amount = data.get("amount")
+        # Amount returned by Khalti MUST match what we sent.
+        # The lookup response uses "total_amount", not "amount".
+        returned_amount = data.get("total_amount")
         if returned_amount is None:
             import logging as _log2
             _log2.getLogger(__name__).error(
-                "Khalti response missing 'amount' field — rejecting as precaution"
+                "Khalti response missing 'total_amount' field — rejecting as precaution"
             )
             return False
         if int(returned_amount) != int(amount_paisa):
@@ -1460,6 +1504,26 @@ def payment_callback(order_number, provider):
         gateway_ref = "cod"
 
     if verified:
+        # ── Amount sanity check (prevents paying NPR 1 to clear full order) ──
+        try:
+            _expected = float(order.grand_total or 0)
+            _paid_npr = None
+            if provider == "esewa":
+                # eSewa sends total_amount in rupees in the decoded response
+                _paid_npr = float(args.get("total_amount", 0) or 0)
+            elif provider == "khalti":
+                # Khalti lookup returns total_amount in paisa
+                _paid_npr = float(args.get("total_amount", 0) or 0) / 100
+            if _paid_npr is not None and _expected > 0:
+                if abs(_paid_npr - _expected) > 1.0:  # allow NPR 1 rounding tolerance
+                    _logger.warning(
+                        "Amount mismatch for order %s: expected NPR %.2f, paid NPR %.2f via %s — rejecting",
+                        order_number, _expected, _paid_npr, provider
+                    )
+                    flash("Payment amount mismatch. Please contact support.", "danger")
+                    return redirect(url_for("store.order_pending", order_number=order_number))
+        except Exception as _amt_exc:
+            _logger.warning("Amount check failed (non-fatal): %s", _amt_exc)
         order.payment_status = "paid"
         from ...models.ecommerce import EcommercePayment
         payment = db.session.execute(
@@ -1726,7 +1790,9 @@ def contact():
 @store_bp.route("/faq")
 def faq():
     settings = _settings()
-    return render_template("store/faq.html", settings=settings, customer=g.customer)
+    return render_template("store/faq.html", settings=settings, customer=g.customer,
+                           free_delivery_threshold=_free_delivery_threshold(),
+                           delivery_charge=_delivery_charge())
 
 
 # ── SEO: Product by Slug (Improvement 13) ────────────────────────────────────
@@ -1852,7 +1918,8 @@ def promos():
         .order_by(Promotion.end_date)
     ).scalars().all()
     return render_template("store/promos.html", promos=active,
-                           settings=settings, customer=g.customer)
+                           settings=settings, customer=g.customer,
+                           free_delivery_threshold=_free_delivery_threshold())
 
 
 # ── FEATURE 4: Product reviews ────────────────────────────────────────────────
@@ -1901,9 +1968,9 @@ def submit_review(product_id):
         )
         # AI Review Classification — auto-approve genuine reviews, flag suspicious ones
         try:
-            import os as _os3, json as _json3, urllib.request as _ureq3
-            _ak = _os3.environ.get("ANTHROPIC_API_KEY", "")
-            if _ak and (review.body or review.title):
+            from ...services.gemini_client import gemini_generate, gemini_available
+            if gemini_available() and (review.body or review.title):
+                import json as _json3
                 _review_text = f"Rating: {review.rating}/5\nTitle: {review.title or ''}\nBody: {review.body or ''}"
                 _prompt = (
                     "Classify this product review for a Nepal dry fruits store.\n\n"
@@ -1913,29 +1980,19 @@ def submit_review(product_id):
                     '"reason": "one sentence"}\n'
                     "Auto-approve if: genuine, rating 4-5, confidence > 0.85, no suspicious patterns."
                 )
-                _pl = _json3.dumps({
-                    "model": "claude-haiku-4-5-20251001", "max_tokens": 120,
-                    "messages": [{"role": "user", "content": _prompt}],
-                }).encode()
-                _rq = _ureq3.Request(
-                    "https://api.anthropic.com/v1/messages", data=_pl, method="POST",
-                    headers={"x-api-key": _ak, "anthropic-version": "2023-06-01",
-                             "content-type": "application/json"},
-                )
-                with _ureq3.urlopen(_rq, timeout=10) as _rs:
-                    _res = _json3.loads(_rs.read())
-                _raw = _res["content"][0]["text"].strip()
-                # Strip markdown code fences if present
-                if _raw.startswith("```"):
-                    _raw = _raw.split("```")[1].strip()
-                    if _raw.startswith("json"):
-                        _raw = _raw[4:].strip()
-                _cls = _json3.loads(_raw)
-                if _cls.get("classification") == "toxic":
-                    flash("Your review contains inappropriate content and could not be submitted.", "danger")
-                    return redirect(url_for("store.product_detail", product_id=product_id))
-                if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
-                    review.is_approved = True   # Auto-approve high-confidence genuine reviews
+                _raw = gemini_generate(_prompt, max_tokens=120, temperature=0.1)
+                if _raw:
+                    # Strip markdown code fences if present
+                    if _raw.startswith("```"):
+                        _raw = _raw.split("```")[1].strip()
+                        if _raw.startswith("json"):
+                            _raw = _raw[4:].strip()
+                    _cls = _json3.loads(_raw)
+                    if _cls.get("classification") == "toxic":
+                        flash("Your review contains inappropriate content and could not be submitted.", "danger")
+                        return redirect(url_for("store.product_detail", product_id=product_id))
+                    if _cls.get("auto_approve") and _cls.get("classification") == "genuine":
+                        review.is_approved = True   # Auto-approve high-confidence genuine reviews
         except Exception as exc:
             current_app.logger.debug("AI review classification failed, going to manual queue: %s", exc)
 
@@ -2209,3 +2266,63 @@ Sitemap: {base}/store/sitemap.xml
 
 # ── Cart count API (for nav badge) ───────────────────────────────────────────
 
+
+
+@store_bp.route("/sw.js")
+def service_worker():
+    """Serve the PWA service worker from the store blueprint scope."""
+    from flask import send_from_directory, current_app
+    return send_from_directory(
+        current_app.static_folder,
+        "sw.js",
+        mimetype="application/javascript",
+    )
+
+
+# ── Phone OTP verification (store registration) ────────────────────────────────
+
+@store_bp.route("/send-otp", methods=["POST"])
+@limiter.limit("5 per minute; 10 per hour")
+def send_otp():
+    """Send a 6-digit OTP to the given Nepal phone number."""
+    phone = request.form.get("phone", "").strip()
+    clean = _validate_phone(phone)
+    if not clean:
+        return jsonify({"ok": False, "error": "Invalid Nepal phone number"}), 400
+    try:
+        from ...models.phone_otp import PhoneOTP
+        from ...services.notification_service import send_notification
+        otp = PhoneOTP.generate(clean)
+        settings = _settings()
+        shop = getattr(settings, "shop_name", "GoldKernel") or "GoldKernel"
+        send_notification(
+            clean,
+            f"[{shop}] Your verification code is {otp.code}. Valid for 10 minutes. "
+            f"यो कोड {otp.code} हो — 10 मिनेटभित्र प्रयोग गर्नुहोस्।"
+        )
+        return jsonify({"ok": True, "message": "OTP sent"})
+    except Exception as exc:
+        current_app.logger.warning("OTP send failed: %s", exc)
+        return jsonify({"ok": False, "error": "Could not send OTP"}), 500
+
+
+@store_bp.route("/verify-otp", methods=["POST"])
+@limiter.limit("10 per minute")
+def verify_otp():
+    """Verify a 6-digit OTP before allowing registration to proceed."""
+    phone = request.form.get("phone", "").strip()
+    code  = request.form.get("code", "").strip()
+    clean = _validate_phone(phone)
+    if not clean or not code:
+        return jsonify({"ok": False, "error": "Phone and code required"}), 400
+    try:
+        from ...models.phone_otp import PhoneOTP
+        valid = PhoneOTP.verify(clean, code)
+        if valid:
+            # Store verified status in session so register_view can confirm
+            session[f"phone_verified_{clean}"] = True
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": "Invalid or expired OTP"}), 400
+    except Exception as exc:
+        current_app.logger.warning("OTP verify failed: %s", exc)
+        return jsonify({"ok": False, "error": "Verification failed"}), 500

@@ -15,8 +15,13 @@
     <a href="{{ url_for('inventory.print_labels') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-upc me-1"></i>Labels</a>
     <a href="{{ url_for('inventory.list_categories') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-tags me-1"></i>Categories</a>
     <a href="{{ url_for('inventory.bulk_upload') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-cloud-upload me-1"></i>Bulk Upload</a>
+    <form method="post" action="{{ url_for('inventory.relink_images') }}" style="display:inline;"
+          onsubmit="return confirm('Re-link product images from the uploads folder?\n\nThis matches images already on disk to products by name. Use this after re-uploading products.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-outline-info btn-sm"><i class="bi bi-images me-1"></i>Re-link Images</button>
+    </form>
     <form method="post" action="{{ url_for('inventory.autofill_all') }}" style="display:inline;"
-          onsubmit="return confirm('Auto-fill descriptions and images for all products missing them?\n\nThis uses the Claude AI API and may take 1-2 minutes.')">
+          onsubmit="return confirm('Auto-fill descriptions and images for all products missing them?\n\nThis uses the Gemini AI API and may take 1-2 minutes.')">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="limit" value="100">
       <button type="submit" class="btn btn-outline-warning btn-sm"><i class="bi bi-stars me-1"></i>AI Autofill All</button>

@@ -5,8 +5,8 @@ AI-powered product enrichment for SmartMart.
 
 Priority
 --------
-1. Claude API (ANTHROPIC_API_KEY set) — generates rich, accurate content
-   for ANY product name using Claude claude-haiku-4-5-20251001 (fast + cheap).
+1. Gemini API (GEMINI_API_KEY set) — generates rich, accurate content
+   for ANY product name using Gemini Flash Lite (fast + free tier friendly).
 2. Keyword catalogue fallback — works offline, covers ~30 common product types.
 
 Fields auto-filled
@@ -245,7 +245,7 @@ def _safe_filename(product_id: int, name: str) -> str:
 
 def autofill_product(product, force: bool = False) -> dict:
     """
-    Auto-fill product fields using Claude AI (or keyword fallback).
+    Auto-fill product fields using Gemini AI (or keyword fallback).
     Only fills empty fields unless force=True.
 
     Fields updated: description, pack_size, image_filename, slug

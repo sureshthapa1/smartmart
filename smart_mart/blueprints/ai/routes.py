@@ -474,8 +474,8 @@ def anomalies_page():
 @ai_bp.route("/api/nlg/daily")
 @login_required
 def api_nlg_daily():
-    from ...services.ai_nlg import generate_claude_daily_report
-    return jsonify(generate_claude_daily_report())
+    from ...services.ai_nlg import generate_daily_report
+    return jsonify(generate_daily_report())
 
 
 @ai_bp.route("/api/nlg/weekly")

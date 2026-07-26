@@ -101,6 +101,12 @@ def data_management():
     from ...models.product import Product
     from ...models.supplier import Supplier
     from ...models.category import Category
+    from ...models.online_order import OnlineOrder
+    from ...models.customer import Customer
+    from ...models.ecommerce import EcommercePayment, StockReservation, SyncLog
+    from ...models.operations import AppNotification
+    from ...models.audit_log import AuditLog
+    from ...models.notification_log import NotificationLog
 
     counts = {
         "sales": db.session.execute(db.select(db.func.count(Sale.id))).scalar() or 0,
@@ -110,6 +116,14 @@ def data_management():
         "products": db.session.execute(db.select(db.func.count(Product.id))).scalar() or 0,
         "suppliers": db.session.execute(db.select(db.func.count(Supplier.id))).scalar() or 0,
         "categories": db.session.execute(db.select(db.func.count(Category.id))).scalar() or 0,
+        "online_orders": db.session.execute(db.select(db.func.count(OnlineOrder.id))).scalar() or 0,
+        "customers": db.session.execute(db.select(db.func.count(Customer.id))).scalar() or 0,
+        "payments": db.session.execute(db.select(db.func.count(EcommercePayment.id))).scalar() or 0,
+        "reservations": db.session.execute(db.select(db.func.count(StockReservation.id))).scalar() or 0,
+        "sync_logs": db.session.execute(db.select(db.func.count(SyncLog.id))).scalar() or 0,
+        "notifications": db.session.execute(db.select(db.func.count(AppNotification.id))).scalar() or 0,
+        "audit_logs": db.session.execute(db.select(db.func.count(AuditLog.id))).scalar() or 0,
+        "notification_logs": db.session.execute(db.select(db.func.count(NotificationLog.id))).scalar() or 0,
     }
     return render_template("admin/data_management.html", counts=counts)
 
@@ -125,6 +139,12 @@ def clear_data():
     from ...models.product import Product
     from ...models.supplier import Supplier
     from ...models.category import Category
+    from ...models.online_order import OnlineOrder, OnlineOrderItem
+    from ...models.customer import Customer
+    from ...models.ecommerce import EcommercePayment, StockReservation, SyncLog
+    from ...models.operations import AppNotification
+    from ...models.audit_log import AuditLog
+    from ...models.notification_log import NotificationLog
 
     section = request.form.get("section", "")
     confirm = request.form.get("confirm", "")
@@ -156,12 +176,57 @@ def clear_data():
             db.session.commit()
             flash("Stock movement history cleared.", "success")
 
+        elif section == "online_orders":
+            db.session.execute(db.delete(StockReservation))
+            db.session.execute(db.delete(EcommercePayment))
+            db.session.execute(db.delete(OnlineOrderItem))
+            db.session.execute(db.delete(OnlineOrder))
+            db.session.commit()
+            flash("All online orders, payments and reservations cleared.", "success")
+
+        elif section == "customers":
+            db.session.execute(db.delete(Customer))
+            db.session.commit()
+            flash("All customer records cleared.", "success")
+
+        elif section == "payments":
+            db.session.execute(db.delete(EcommercePayment))
+            db.session.commit()
+            flash("All payment records cleared.", "success")
+
+        elif section == "reservations":
+            db.session.execute(db.delete(StockReservation))
+            db.session.commit()
+            flash("All stock reservations cleared.", "success")
+
+        elif section == "sync_logs":
+            db.session.execute(db.delete(SyncLog))
+            db.session.commit()
+            flash("All sync logs cleared.", "success")
+
+        elif section == "notifications":
+            db.session.execute(db.delete(AppNotification))
+            db.session.commit()
+            flash("All app notifications cleared.", "success")
+
+        elif section == "audit_logs":
+            db.session.execute(db.delete(AuditLog))
+            db.session.commit()
+            flash("Audit log cleared.", "success")
+
+        elif section == "notification_logs":
+            db.session.execute(db.delete(NotificationLog))
+            db.session.commit()
+            flash("SMS/notification delivery log cleared.", "success")
+
         elif section == "products":
             db.session.execute(db.delete(SaleItem))
             db.session.execute(db.delete(Sale))
             db.session.execute(db.delete(PurchaseItem))
             db.session.execute(db.delete(Purchase))
             db.session.execute(db.delete(StockMovement))
+            db.session.execute(db.delete(StockReservation))
+            db.session.execute(db.delete(OnlineOrderItem))
             db.session.execute(db.delete(Product))
             db.session.commit()
             flash("All products and related records cleared.", "success")
@@ -179,6 +244,15 @@ def clear_data():
             flash("All categories cleared.", "success")
 
         elif section == "all":
+            # Delete in dependency order
+            db.session.execute(db.delete(AuditLog))
+            db.session.execute(db.delete(NotificationLog))
+            db.session.execute(db.delete(AppNotification))
+            db.session.execute(db.delete(SyncLog))
+            db.session.execute(db.delete(StockReservation))
+            db.session.execute(db.delete(EcommercePayment))
+            db.session.execute(db.delete(OnlineOrderItem))
+            db.session.execute(db.delete(OnlineOrder))
             db.session.execute(db.delete(SaleItem))
             db.session.execute(db.delete(Sale))
             db.session.execute(db.delete(PurchaseItem))
@@ -188,6 +262,7 @@ def clear_data():
             db.session.execute(db.delete(Product))
             db.session.execute(db.delete(Supplier))
             db.session.execute(db.delete(Category))
+            db.session.execute(db.delete(Customer))
             db.session.commit()
             flash("⚠️ All data has been permanently cleared.", "warning")
 

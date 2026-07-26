@@ -47,7 +47,7 @@ def _order_payload(product, quantity=2):
 def test_products_include_available_stock(client):
     _product(quantity=7)
 
-    response = client.get("/api/products")
+    response = client.get("/api/v1/products")
 
     assert response.status_code == 200
     data = response.get_json()
@@ -59,7 +59,7 @@ def test_website_order_creates_pos_online_order_and_reservation(client):
     product = _product(quantity=10)
 
     response = client.post(
-        "/api/orders/create",
+        "/api/v1/orders/create",
         json=_order_payload(product, quantity=2),
         headers={"Idempotency-Key": "cart-123"},
     )
@@ -81,11 +81,11 @@ def test_website_order_creates_pos_online_order_and_reservation(client):
 
 def test_confirming_order_consumes_reservation_and_deducts_stock(client):
     product = _product(quantity=10)
-    create_response = client.post("/api/orders/create", json=_order_payload(product, quantity=3))
+    create_response = client.post("/api/v1/orders/create", json=_order_payload(product, quantity=3))
     order_number = create_response.get_json()["order"]["order_number"]
 
     response = client.put(
-        "/api/orders/update-status",
+        "/api/v1/orders/update-status",
         json={"order_number": order_number, "status": "confirmed"},
     )
 
@@ -102,8 +102,8 @@ def test_idempotency_key_prevents_duplicate_orders(client):
     product = _product(quantity=10)
     payload = _order_payload(product, quantity=2)
 
-    first = client.post("/api/orders/create", json=payload, headers={"Idempotency-Key": "same-cart"})
-    second = client.post("/api/orders/create", json=payload, headers={"Idempotency-Key": "same-cart"})
+    first = client.post("/api/v1/orders/create", json=payload, headers={"Idempotency-Key": "same-cart"})
+    second = client.post("/api/v1/orders/create", json=payload, headers={"Idempotency-Key": "same-cart"})
 
     assert first.status_code == 201
     assert second.status_code == 200
@@ -113,8 +113,8 @@ def test_idempotency_key_prevents_duplicate_orders(client):
 
 def test_active_reservations_prevent_overselling(client):
     product = _product(quantity=3)
-    first = client.post("/api/orders/create", json=_order_payload(product, quantity=2))
-    second = client.post("/api/orders/create", json=_order_payload(product, quantity=2))
+    first = client.post("/api/v1/orders/create", json=_order_payload(product, quantity=2))
+    second = client.post("/api/v1/orders/create", json=_order_payload(product, quantity=2))
 
     assert first.status_code == 201
     assert second.status_code == 409

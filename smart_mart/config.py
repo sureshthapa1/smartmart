@@ -50,7 +50,9 @@ class DevelopmentConfig(Config):
 
     # Warn loudly if using the insecure fallback key so it's never silently
     # used in a staging/shared environment.
-    if not os.environ.get("SECRET_KEY"):
+    # Skip in test runs — pytest always imports all configs and the warning
+    # is noise when SECRET_KEY is intentionally absent in CI/test environments.
+    if not os.environ.get("SECRET_KEY") and not os.environ.get("TESTING"):
         import warnings
         warnings.warn(
             "SECRET_KEY is not set — using insecure dev fallback. "

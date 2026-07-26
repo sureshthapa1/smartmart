@@ -25,7 +25,7 @@ API Backend / Integration Facade
   |                          |
   v                          v
 Existing POS Database        Payment Providers
-PostgreSQL recommended       eSewa, Khalti, IME Pay, COD
+PostgreSQL recommended       eSewa, Khalti, COD
   |                          |
   v                          v
 Existing POS UI              Payment callbacks/webhooks
@@ -447,7 +447,7 @@ Pages to build next:
 - Product listing with search/filter/category
 - Product details with stock availability
 - Cart with reservation countdown
-- Checkout with COD/eSewa/Khalti/IME Pay
+- Checkout with COD/eSewa/Khalti
 - Login/register
 - Order tracking
 - Order history
@@ -517,7 +517,6 @@ Supported methods in the order/payment model:
 
 - `esewa`
 - `khalti`
-- `ime_pay`
 - `cod`
 
 Payment adapter flow:

@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ settings.shop_name if settings else 'GoldKernel' }} — Premium Dry Fruits Nepal{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Premium dry fruits delivered fresh to your door in Nepal. Almonds, cashews, pistachios & more.{% endblock %}">
+    {# ── Canonical URL — prevents duplicate content for paginated/filtered pages ── #}
+    <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ request.path }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="GoldKernel">
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥜</text></svg>">
@@ -440,7 +447,7 @@
       <div class="col-6 col-md-2">
         <div class="sf-head">{{ _('We Accept') }}</div>
         <div style="display:flex;flex-wrap:wrap;gap:.45rem;">
-          {% for icon, label in [('💵','COD'),('📱','eSewa'),('💜','Khalti'),('🏦','IME Pay')] %}
+          {% for icon, label in [('💵','COD'),('📱','eSewa'),('💜','Khalti')] %}
           <span style="background:#292524;border-radius:8px;padding:.3em .65em;font-size:.72rem;color:#d6d3d1;display:flex;align-items:center;gap:.3rem;">{{ icon }} {{ label }}</span>
           {% endfor %}
         </div>
@@ -680,5 +687,15 @@ document.addEventListener('click',function(e){
 })();
 </script>
 {% block scripts %}{% endblock %}
-</body>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('{{ url_for("store.service_worker") }}')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
+  </body>
 </html>

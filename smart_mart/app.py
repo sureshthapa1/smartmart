@@ -140,7 +140,7 @@ def create_app(config_name="development"):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         # Prevent admin/API pages from being indexed by search engines
-        if request.path.startswith(("/admin", "/api", "/dashboard", "/auth")):
+        if request.path.startswith(("/admin", "/api", "/api/v1", "/dashboard", "/auth")):
             response.headers["X-Robots-Tag"] = "noindex, nofollow"
         # HSTS: tell browsers to always use HTTPS (production only)
         if not app.debug:
@@ -392,6 +392,7 @@ def create_app(config_name="development"):
             "Disallow: /dashboard/\n"
             "Disallow: /admin/\n"
             "Disallow: /api/\n"
+            "Disallow: /api/v1/\n"
             "Disallow: /mcp/\n"
             "Disallow: /bi/\n"
             f"Sitemap: {base}/store/sitemap.xml\n"
@@ -572,11 +573,31 @@ def _register_blueprints(app):
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
         from flask import request as _req, flash as _flash, redirect as _redir
+        from flask_login import current_user as _cu
+
         _flash(
             "Your session has expired or the form was submitted twice. "
             "Please try again.",
             "warning",
         )
-        # Redirect back to the page the user came from, or home
-        referrer = _req.referrer or url_for("dashboard.index")
-        return _redir(referrer), 303
+
+        # Prefer the page the user came from — but NEVER fall back to a
+        # page that requires authentication, since a CSRF failure on a
+        # login/register form means the user is (or may be) unauthenticated.
+        # Falling back to an @login_required page here would silently
+        # bounce them straight back to the login page with no visible
+        # error, looking exactly like "the dashboard won't open".
+        referrer = _req.referrer
+
+        if referrer:
+            return _redir(referrer), 303
+
+        if _cu.is_authenticated:
+            return _redir(url_for("dashboard.index")), 303
+
+        # Not authenticated and no referrer — safest fallback is the
+        # login page itself, preserving where they were headed if known.
+        next_url = _req.form.get("next") or _req.args.get("next")
+        if next_url:
+            return _redir(url_for("auth.login", next=next_url)), 303
+        return _redir(url_for("auth.login")), 303

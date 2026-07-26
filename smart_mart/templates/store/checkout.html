@@ -52,13 +52,13 @@
               <div class="col-12">
                 <label class="flabel" for="f-address">{{ _('Delivery Address') }} *</label>
                 <div class="fwrap"><i class="bi bi-geo-alt fico"></i>
-                <input id="f-address" type="text" name="address" class="finput has-ico" placeholder="{{ _('House no., street, landmark') }}"
+                <input id="f-address" type="text" name="address" value="{{ g.customer.saved_address or '' if g.customer else '' }}" class="finput has-ico" placeholder="{{ _('House no., street, landmark') }}"
                        value="{{ form_data.get('address', customer.address if customer else '') }}"
                        required maxlength="255" autocomplete="street-address"></div>
               </div>
               <div class="col-sm-6">
                 <label class="flabel" for="f-area">{{ _('Area / Zone') }}</label>
-                <input id="f-area" type="text" name="area" class="finput" placeholder="Lazimpat, Baneshwor…"
+                <input id="f-area" type="text" name="area" value="{{ g.customer.saved_area or '' if g.customer else '' }}" class="finput" placeholder="Lazimpat, Baneshwor…"
                        value="{{ form_data.get('area', customer.area if customer else '') }}"
                        maxlength="80" list="nepal-areas" autocomplete="off">
                 <datalist id="nepal-areas">
@@ -83,6 +83,7 @@
             <div style="display:flex;gap:.65rem;align-items:flex-start;">
               <div class="fwrap" style="flex:1;">
                 <i class="bi bi-tag fico"></i>
+                <label for="promo-input" class="visually-hidden">{{ _('Promo Code') }}</label>
                 <input type="text" name="promo_code" id="promo-input" class="finput has-ico" placeholder="{{ _('Enter promo code') }}"
                        value="{{ form_data.get('promo_code','') }}" maxlength="30" style="text-transform:uppercase;" autocomplete="off">
               </div>
@@ -150,7 +151,18 @@
           </div>
         </div>
 
-        <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.8rem;font-size:.95rem;" id="submit-btn">
+        
+      {# ── Estimated delivery ──────────────────────────────────────── #}
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
+                  padding:.75rem 1rem;margin-bottom:1rem;font-size:.83rem;">
+        <i class="bi bi-truck" style="color:#16a34a"></i>
+        <strong style="color:#15803d">Estimated Delivery:</strong>
+        <span style="color:#166534">2–4 business days after confirmation</span>
+        <div style="color:#6b7280;font-size:.75rem;margin-top:.2rem;">
+          ⏱️ Kathmandu Valley: 1–2 days &nbsp;|&nbsp; Outside Valley: 3–5 days
+        </div>
+      </div>
+      <button type="submit" class="btn-brand w-100 justify-content-center" style="padding:.8rem;font-size:.95rem;" id="submit-btn">
           <i class="bi bi-shield-lock-fill"></i> {{ _('Place Order') }}
         </button>
         <div style="text-align:center;font-size:.72rem;color:var(--muted);margin-top:.65rem;">

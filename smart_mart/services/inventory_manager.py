@@ -13,14 +13,27 @@ from ..models.stock_movement import StockMovement
 
 
 def create_product(data: dict) -> Product:
-    """Create a new product. Raises ValueError on duplicate SKU."""
+    """Create a new product and immediately log the opening stock as a Purchase record.
+
+    This ensures:
+    - The product exists in inventory
+    - The initial stock quantity is tracked as a real purchase expense
+    - StockMovement audit trail is created
+    - cash_flow_manager records the expense
+
+    data must include: name, sku, cost_price, selling_price, quantity
+    data may include:  supplier_id, purchase_date, user_id, category, unit, etc.
+    """
+    from datetime import date as _date
+    purchase_qty = int(data.get("quantity", 0) or 0)
+
     product = Product(
         name=data["name"],
         category=data.get("category"),
         sku=data["sku"],
         cost_price=data["cost_price"],
         selling_price=data["selling_price"],
-        quantity=data.get("quantity", 0),
+        quantity=0,  # always start at 0 — purchase below will add stock
         low_stock_threshold=data.get("low_stock_threshold", 10),
         supplier_id=data.get("supplier_id"),
         expiry_date=data.get("expiry_date"),
@@ -41,10 +54,49 @@ def create_product(data: dict) -> Product:
     )
     db.session.add(product)
     try:
-        db.session.commit()
+        db.session.flush()  # get product.id without committing yet
     except IntegrityError:
         db.session.rollback()
         raise ValueError(f"A product with SKU '{data['sku']}' already exists.")
+
+    # ── Create opening purchase record if quantity > 0 ────────────────────
+    if purchase_qty > 0:
+        from .purchase_manager import create_purchase as _create_purchase
+        supplier_id = data.get("supplier_id")
+        purchase_date = data.get("purchase_date") or _date.today()
+        user_id = data.get("user_id", 1)
+
+        if supplier_id:
+            # Route through purchase_manager for full expense + stock tracking
+            try:
+                db.session.commit()  # commit product first so purchase FK works
+                _create_purchase(
+                    supplier_id=supplier_id,
+                    items=[{
+                        "product_id": product.id,
+                        "quantity": purchase_qty,
+                        "unit_cost": float(data["cost_price"]),
+                    }],
+                    purchase_date=purchase_date,
+                    user_id=user_id,
+                )
+            except Exception as exc:
+                raise ValueError(f"Product created but purchase record failed: {exc}")
+        else:
+            # No supplier — still add stock + movement, but no Purchase record
+            product.quantity = purchase_qty
+            db.session.add(StockMovement(
+                product_id=product.id,
+                change_amount=purchase_qty,
+                change_type="opening_stock",
+                reference_id=None,
+                created_by=data.get("user_id", 1),
+                timestamp=datetime.now(timezone.utc),
+            ))
+            db.session.commit()
+    else:
+        db.session.commit()
+
     # Audit log
     try:
         from . import audit_service

@@ -35,16 +35,69 @@ def _allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _save_product_image(file) -> str | None:
+def _save_product_image(file, product_name: str = None) -> str | None:
     """Upload product image via image_service (Cloudinary or local fallback)."""
     from ...services.image_service import save_product_image
-    return save_product_image(file)
+    return save_product_image(file, product_name=product_name)
 
 
 def _delete_product_image(identifier: str) -> None:
     """Delete product image via image_service."""
     from ...services.image_service import delete_product_image
     delete_product_image(identifier)
+
+
+def _relink_product_images() -> int:
+    """
+    Scan uploads/products folder and auto-link images to products that
+    have no image set. Matches by slugified product name in the filename.
+    Returns count of products relinked.
+    """
+    import re as _re
+    upload_dir = os.path.join(current_app.static_folder, "uploads", "products")
+    if not os.path.exists(upload_dir):
+        return 0
+
+    # Build list of valid image files (non-zero)
+    valid_files = []
+    for f in os.listdir(upload_dir):
+        if f == ".gitkeep":
+            continue
+        path = os.path.join(upload_dir, f)
+        if os.path.getsize(path) > 100:
+            valid_files.append(f)
+
+    if not valid_files:
+        return 0
+
+    def _slugify(text: str) -> str:
+        return _re.sub(r"[^a-z0-9]", "", text.lower())
+
+    relinked = 0
+    products = db.session.execute(
+        db.select(Product).where(
+            db.or_(Product.image_filename.is_(None), Product.image_filename == "")
+        )
+    ).scalars().all()
+
+    for product in products:
+        name_slug = _slugify(product.name)
+        if not name_slug:
+            continue
+        best = None
+        for fname in valid_files:
+            fname_slug = _slugify(fname.rsplit(".", 1)[0])
+            # Match if product name appears in filename
+            if name_slug in fname_slug or fname_slug in name_slug:
+                best = fname
+                break
+        if best:
+            product.image_filename = best
+            relinked += 1
+
+    if relinked:
+        db.session.commit()
+    return relinked
 
 
 @inventory_bp.route("/")
@@ -150,10 +203,12 @@ def create_product():
         categories = []
     if request.method == "POST":
         data = _form_to_data(request.form)
+        # Pass user_id and purchase_date so inventory_manager creates purchase record
+        data["user_id"] = current_user.id
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
-            img_filename = _save_product_image(img_file)
+            img_filename = _save_product_image(img_file, product_name=data.get("name"))
             if img_filename:
                 data["image_filename"] = img_filename
             # Save custom emoji to ProductIconMap
@@ -166,24 +221,19 @@ def create_product():
                     pass
         try:
             inventory_manager.create_product(data)
-            # Auto-fill description, image, pack_size via AI if missing
-            try:
-                from ...services.product_autofill import autofill_product as _autofill
-                from ...models.product import Product as _Product
-                from ...extensions import db as _db
-                _new_product = _db.session.execute(
-                    _db.select(_Product).order_by(_Product.id.desc()).limit(1)
-                ).scalar_one_or_none()
-                if _new_product and not data.get("image_filename"):
-                    _autofill(_new_product, force=False)
-            except Exception:
-                pass
-            flash("Product created successfully.", "success")
+            qty = data.get("quantity", 0)
+            if qty and int(qty) > 0 and data.get("supplier_id"):
+                flash(f"✅ Product added and opening stock of {qty} units recorded as a purchase.", "success")
+            elif qty and int(qty) > 0:
+                flash(f"✅ Product added with opening stock of {qty} units. Add a supplier to track it as a purchase expense.", "info")
+            else:
+                flash("✅ Product created. Add stock by recording a purchase.", "success")
             return redirect(url_for("inventory.list_products"))
         except ValueError as e:
             flash(str(e), "danger")
     return render_template("inventory/form.html", product=None, suppliers=suppliers,
-                           categories=categories, action="Create")
+                           categories=categories, action="Create",
+                           today=__import__("datetime").date.today())
 
 
 @inventory_bp.route("/<int:product_id>/edit", methods=["GET", "POST"])
@@ -202,10 +252,16 @@ def edit_product(product_id):
         categories = []
     if request.method == "POST":
         data = _form_to_data(request.form)
+        # Quantity is never editable here, regardless of what the client
+        # sends — stock levels must only change via a tracked Purchase
+        # (restocking) or a Stock Take (correcting a count). The form's
+        # readonly attribute on this field is client-side only and gives no
+        # protection against a direct POST bypassing the UI.
+        data["quantity"] = product.quantity
         # Handle image upload (admin only)
         if current_user.role == "admin":
             img_file = request.files.get("product_image")
-            img_filename = _save_product_image(img_file)
+            img_filename = _save_product_image(img_file, product_name=product.name)
             if img_filename:
                 data["image_filename"] = img_filename
             # Handle image removal
@@ -233,7 +289,8 @@ def edit_product(product_id):
         except ValueError as e:
             flash(str(e), "danger")
     return render_template("inventory/form.html", product=product, suppliers=suppliers,
-                           categories=categories, action="Edit")
+                           categories=categories, action="Edit",
+                           today=__import__("datetime").date.today())
 
 
 @inventory_bp.route("/<int:product_id>/delete", methods=["POST"])
@@ -563,9 +620,15 @@ def bulk_upload():
                 continue
 
             try:
-                cost = float(cost_raw) if cost_raw else 0.0
-                sell = float(sell_raw) if sell_raw else cost
-                qty = int(float(qty_raw)) if qty_raw else 0
+                # Strip commas, currency symbols and whitespace so values like
+                # "1,500", "NPR 850", "Rs.400" or "₹ 200" parse correctly
+                def _clean_num(raw: str) -> str:
+                    import re as _re
+                    return _re.sub(r"[^\d.\-]", "", raw.replace(",", ""))
+
+                cost = float(_clean_num(cost_raw)) if cost_raw else 0.0
+                sell = float(_clean_num(sell_raw)) if sell_raw else cost
+                qty  = int(float(_clean_num(qty_raw))) if qty_raw else 0
             except ValueError:
                 errors.append(f"Row {row_num}: invalid number for '{name}', skipped.")
                 skipped += 1
@@ -682,12 +745,38 @@ def bulk_upload():
             flash(f"Error saving data: {e}", "danger")
             return render_template("inventory/bulk_upload.html")
 
+        # ── Auto-relink images after upload ──────────────────────────────────
+        # When products are cleared and re-uploaded, old image files stay on
+        # disk but lose their DB link. Scan the uploads folder and match any
+        # image whose filename contains the product name (slug-style match).
+        try:
+            relinked = _relink_product_images()
+            if relinked:
+                flash(f"📸 Auto-linked {relinked} product image(s) from previous uploads.", "info")
+        except Exception:
+            pass
+
         flash(f"✅ Bulk upload complete — {created} created, {updated} updated, {skipped} skipped.", "success")
         for err in errors:
             flash(err, "warning")
         return redirect(url_for("inventory.list_products"))
 
     return render_template("inventory/bulk_upload.html")
+
+
+@inventory_bp.route("/relink-images", methods=["POST"])
+@admin_required
+def relink_images():
+    """Manually re-link product images from the uploads folder by name matching."""
+    try:
+        relinked = _relink_product_images()
+        if relinked:
+            flash(f"✅ Re-linked {relinked} product image(s) from uploads folder.", "success")
+        else:
+            flash("No unmatched images found — all products already have images or no matching files exist.", "info")
+    except Exception as e:
+        flash(f"Error re-linking images: {e}", "danger")
+    return redirect(url_for("inventory.list_products"))
 
 
 
@@ -1286,6 +1375,7 @@ def _form_to_data(form) -> dict:
         "selling_price": form.get("selling_price", "0") or "0",
         "quantity": int(form.get("quantity", 0) or 0),
         "supplier_id": int(form.get("supplier_id")) if form.get("supplier_id") else None,
+        "purchase_date": None,
         "expiry_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
         "reorder_point": int(form.get("reorder_point", 10) or 10),
@@ -1304,6 +1394,13 @@ def _form_to_data(form) -> dict:
         "meta_description":  form.get("meta_description", "").strip()[:320] or None,
         "seo_title":         form.get("seo_title", "").strip()[:120] or None,
     }
+    # Purchase date
+    purchase_date_raw = form.get("purchase_date", "").strip()
+    if purchase_date_raw:
+        try:
+            data["purchase_date"] = date.fromisoformat(purchase_date_raw)
+        except ValueError:
+            pass
     max_disc_raw = form.get("max_discount_pct", "").strip()
     if max_disc_raw:
         try:
