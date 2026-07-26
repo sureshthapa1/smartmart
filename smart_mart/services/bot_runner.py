@@ -18,7 +18,7 @@ Tasks:
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from ..extensions import db
 
@@ -160,6 +160,8 @@ def run_reorder_bot(user_id: int = 1) -> dict:
 
         plan = auto_replenishment_plan(lookback_days=30, safety_days=3, coverage_days=14)
         pos_created = []
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_start = today_start + timedelta(days=1)
 
         for grp in plan["supplier_groups"]:
             critical_items = [i for i in grp["items"] if i["urgency"] == "critical"]
@@ -171,7 +173,8 @@ def run_reorder_bot(user_id: int = 1) -> dict:
                 db.select(PurchaseOrder).where(
                     PurchaseOrder.supplier_id == grp["supplier_id"],
                     PurchaseOrder.status == "draft",
-                    db.PurchaseOrder.created_at.between(date, date).today(),
+                    PurchaseOrder.created_at >= today_start,
+                    PurchaseOrder.created_at < tomorrow_start,
                 )
             ).scalars().first()
             if existing_po:
@@ -203,7 +206,7 @@ def run_reorder_bot(user_id: int = 1) -> dict:
             _festival_ctx = get_festival_context_for_ai(45)
             from .gemini_client import gemini_generate, gemini_available
             if gemini_available() and pos_created:
-                _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items_count",0)} items' for p in pos_created[:5])
+                _ptxt = '\n'.join(f'  PO for {p.get("supplier","?")}: {p.get("items",0)} items' for p in pos_created[:5])
                 _pr = f'2-sentence reorder briefing for Nepal dry fruits store.\nPOs created:\n{_ptxt}\n\n{_festival_ctx}\nMention festivals if within 3 weeks.'
                 _gemini_summ = gemini_generate(_pr, max_tokens=150) or ''
         except Exception:
@@ -225,7 +228,7 @@ def run_reorder_bot(user_id: int = 1) -> dict:
 
         return {"task": "reorder_bot", "pos_created": len(pos_created),
                 "details": pos_created, "festival_context": _festival_ctx,
-                "claude_summary": _gemini_summ}
+                "gemini_summary": _gemini_summ}
     except Exception as e:
         logger.warning("reorder_bot failed: %s", e)
         return {"task": "reorder_bot", "pos_created": 0, "error": str(e)}

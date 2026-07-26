@@ -59,7 +59,7 @@ Website to POS order flow:
 
 ```text
 Customer checkout
-  -> POST /api/orders/create with Idempotency-Key
+  -> POST /api/v1/orders/create with Idempotency-Key
   -> API validates customer/items/payment
   -> API checks POS product.quantity minus active reservations
   -> API creates online_orders + online_order_items
@@ -74,14 +74,14 @@ POS staff updates order status
   -> POS route calls ecommerce_sync.apply_order_status()
   -> confirmed/packed/shipped/delivered consumes reservation once
   -> cancelled releases reservation or restores consumed stock
-  -> Website reads GET /api/orders or receives future webhook/event
+  -> Website reads GET /api/v1/orders or receives future webhook/event
 ```
 
 POS to website inventory flow:
 
 ```text
 POS inventory is master
-  -> Website reads GET /api/products and GET /api/inventory
+  -> Website reads GET /api/v1/products and GET /api/v1/inventory
   -> available_quantity = products.quantity - active unexpired reservations
   -> Future worker publishes inventory.updated events after POS stock changes
 ```
@@ -115,7 +115,7 @@ Authentication:
 - Existing admin browser sessions can also access protected endpoints.
 - Local debug/testing mode allows calls without keys only when no API key env var is configured.
 
-### POST /api/orders/create
+### POST /api/v1/orders/create
 
 Creates a website order inside POS Online Orders and reserves stock.
 
@@ -187,7 +187,7 @@ Errors:
 - 404 product not found
 - 409 insufficient stock
 
-### GET /api/orders
+### GET /api/v1/orders
 
 Lists orders for admin website/sync clients.
 
@@ -218,7 +218,7 @@ Response:
 }
 ```
 
-### PUT /api/orders/update-status
+### PUT /api/v1/orders/update-status
 
 Updates order status and applies reservation/stock rules.
 
@@ -245,7 +245,7 @@ Response:
 }
 ```
 
-### GET /api/products
+### GET /api/v1/products
 
 Public product catalog for the website.
 
@@ -278,7 +278,7 @@ Response:
 }
 ```
 
-### GET /api/inventory
+### GET /api/v1/inventory
 
 Protected inventory snapshot from POS.
 
@@ -293,9 +293,9 @@ Response:
 }
 ```
 
-### POST /api/sync-pos-order
+### POST /api/v1/sync-pos-order
 
-Creates/syncs an order into POS Online Orders. Same payload as `/api/orders/create`; intended for a website backend or queue worker.
+Creates/syncs an order into POS Online Orders. Same payload as `/api/v1/orders/create`; intended for a website backend or queue worker.
 
 Response includes:
 
@@ -307,7 +307,7 @@ Response includes:
 }
 ```
 
-### POST /api/sync-inventory
+### POST /api/v1/sync-inventory
 
 Accepts POS inventory updates and returns the latest snapshot.
 

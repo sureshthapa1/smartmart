@@ -70,7 +70,7 @@ PRODUCT_KNOWLEDGE_BASE = {
 }
 
 
-def _claude_vision_analyze(image_path: str) -> dict | None:
+def _gemini_vision_analyze(image_path: str) -> dict | None:
     """Use Gemini vision to analyze a product image.
     Returns None if API key not set or call fails.
     """
@@ -203,7 +203,7 @@ def _title_case(s: str) -> str:
 
 
 def recognize_from_filename(filename: str) -> dict:
-    """Analyze a product image by filename — tries Claude vision if file exists."""
+    """Analyze a product image by filename — tries Gemini vision if file exists."""
     import os
     from flask import current_app
     image_path = None
@@ -216,7 +216,7 @@ def recognize_from_filename(filename: str) -> dict:
         pass
 
     if image_path:
-        vision_result = _claude_vision_analyze(image_path)
+        vision_result = _gemini_vision_analyze(image_path)
         if vision_result:
             return vision_result
 

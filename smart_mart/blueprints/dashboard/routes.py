@@ -188,7 +188,7 @@ def index():
     ).unique().scalars().all()
 
     # ── Top 5 selling products (this month) ──────────────────────────────
-    top5 = db.session.execute(
+    _top5_rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
@@ -197,6 +197,17 @@ def index():
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(5)
     ).all()
+    # Normalise to simple namespace so templates can use p.name, p.total, p.qty_sold
+    from types import SimpleNamespace
+    top5 = [
+        SimpleNamespace(
+            name=row.Product.name,
+            total=float(row.qty_sold or 0),
+            qty_sold=float(row.qty_sold or 0),
+            Product=row.Product,
+        )
+        for row in _top5_rows
+    ]
 
     # ── Dead/slow stock (no sales in 30 days) ────────────────────────────
     cutoff_30 = today - timedelta(days=30)

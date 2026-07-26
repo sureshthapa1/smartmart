@@ -190,28 +190,28 @@
                   <label class="form-check-label" for="pm_cash">💵 Cash</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_qr" value="qr">
-                  <label class="form-check-label" for="pm_qr">📱 QR / eSewa / Khalti</label>
-                </div>
-                <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_fonepay" value="fonepay">
-                  <label class="form-check-label" for="pm_fonepay"><i class="bi bi-phone me-1"></i>Fonepay</label>
-                </div>
-                <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa">
-                  <label class="form-check-label" for="pm_esewa"><i class="bi bi-wallet2 me-1"></i>eSewa</label>
+                  <label class="form-check-label" for="pm_esewa"><img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style="height:14px;margin-right:4px">eSewa</label>
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_khalti" value="khalti">
                   <label class="form-check-label" for="pm_khalti"><i class="bi bi-lightning-charge me-1"></i>Khalti</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_bank" value="bank">
-                  <label class="form-check-label" for="pm_bank"><i class="bi bi-bank me-1"></i>Bank Transfer</label>
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_fonepay" value="fonepay">
+                  <label class="form-check-label" for="pm_fonepay"><i class="bi bi-phone me-1"></i>Fonepay</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_qr" value="qr">
+                  <label class="form-check-label" for="pm_qr">📱 QR / Other</label>
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_card" value="card">
                   <label class="form-check-label" for="pm_card">💳 Card</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_bank" value="bank">
+                  <label class="form-check-label" for="pm_bank"><i class="bi bi-bank me-1"></i>Bank Transfer</label>
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_credit" value="credit">
@@ -465,7 +465,9 @@
         <!-- Main total row -->
         <div class="d-flex justify-content-between align-items-center px-0 py-0" style="padding:1.1rem 1.5rem;">
           <div class="d-flex flex-column gap-1">
-            <span class="text-white-50 small">Total Amount</span>
+            <span class="text-white-50 small">
+              Subtotal: <span class="text-white fw-semibold" id="subtotalDisplay">NPR 0.00</span>
+            </span>
             <button type="button" class="btn btn-sm" id="addOfferForNextVisitBtn"
                     style="background:rgba(99,102,241,.25);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);font-size:.75rem;display:none;">
               <i class="bi bi-gift me-1"></i>Add Offer for Next Visit
@@ -738,6 +740,10 @@
 
       const net = Math.max(0, subtotal - totalDiscount);
       document.getElementById('grandTotal').textContent = net.toFixed(2);
+
+      // Always update the subtotal display
+      const subtotalEl = document.getElementById('subtotalDisplay');
+      if (subtotalEl) subtotalEl.textContent = `NPR ${subtotal.toFixed(2)}`;
 
       // Update change due calculator
       const cashInput = document.getElementById('cashReceivedInput');

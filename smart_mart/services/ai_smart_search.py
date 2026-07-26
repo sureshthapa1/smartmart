@@ -1,4 +1,4 @@
-"""AI Smart Search — Natural language search using Claude API.
+"""AI Smart Search — Natural language search using Gemini API.
 
 Allows staff to search using plain English queries like:
   "show me sales over 5000 yesterday"
@@ -18,7 +18,7 @@ from sqlalchemy import func
 from ..extensions import db
 
 
-def _parse_query_with_claude(query: str) -> dict | None:
+def _parse_query_with_gemini(query: str) -> dict | None:
     """Use Gemini to convert natural language to a structured search intent."""
     from .gemini_client import gemini_generate, gemini_available
     if not gemini_available():
@@ -51,7 +51,7 @@ def smart_search(query: str) -> dict:
     """Execute a natural language search and return structured results.
 
     For product queries, RAG semantic search is tried first (more accurate),
-    then Claude NLP intent parsing, then keyword fallback.
+    then Gemini NLP intent parsing, then keyword fallback.
     """
     from ..models.product import Product
     from ..models.sale import Sale
@@ -82,7 +82,7 @@ def smart_search(query: str) -> dict:
             pass  # fall through to intent-based search
 
     results = []
-    intent = _parse_query_with_claude(query)
+    intent = _parse_query_with_gemini(query)
 
     if not intent:
         # Fallback: simple keyword search across all entities

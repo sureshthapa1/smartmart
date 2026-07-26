@@ -102,13 +102,14 @@ class ProductionConfig(Config):
     # ── PostgreSQL connection pool — prevents Render idle connection drops ──
     # PostgreSQL on Render's free tier closes idle connections after ~5 min.
     # pool_recycle=280 ensures SQLAlchemy recycles connections before that.
+    # connect_timeout is PostgreSQL-only — omitted here and added dynamically
+    # in init_app() only when a PostgreSQL URI is configured.
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_recycle": 280,
         "pool_pre_ping": True,
         "pool_timeout": 20,
         "pool_size": 5,
         "max_overflow": 10,
-        "connect_args": {"connect_timeout": 10},
     }
 
     # ── Cache: Redis if available, fallback to SimpleCache ──────────────────
@@ -124,6 +125,13 @@ class ProductionConfig(Config):
         secret = os.environ.get("SECRET_KEY")
         if not secret:
             raise RuntimeError("SECRET_KEY must be set in production environment.")
+
+        # Add connect_timeout only for PostgreSQL — SQLite doesn't support it
+        db_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI", ""))
+        if db_uri.startswith("postgresql"):
+            opts = app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {})
+            opts["connect_args"] = {"connect_timeout": 10}
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = opts
 
 
 class TestingConfig(Config):

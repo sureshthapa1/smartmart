@@ -447,6 +447,8 @@
                    href="{{ url_for('admin.staff_permissions') }}"><i class="bi bi-shield-lock"></i> Permissions</a></li>
             <li><a class="nav-link {% if request.endpoint == 'admin.staff_activity' %}active{% endif %}"
                    href="{{ url_for('admin.staff_activity') }}"><i class="bi bi-activity"></i> Activity Log</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'admin.login_history' %}active{% endif %}"
+                   href="{{ url_for('admin.login_history') }}"><i class="bi bi-shield-lock"></i> Login History</a></li>
             <li><a class="nav-link {% if request.endpoint == 'admin.audit_log' %}active{% endif %}"
                    href="{{ url_for('admin.audit_log') }}"><i class="bi bi-journal-check"></i> Audit Log</a></li>
             <li><a class="nav-link {% if request.endpoint == 'admin.backup' %}active{% endif %}"

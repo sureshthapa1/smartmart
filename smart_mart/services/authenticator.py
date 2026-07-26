@@ -70,17 +70,19 @@ def login(username: str, password: str) -> User | None:
     login_user(user)
 
     try:
+        from ..models.login_attempt import LoginAttempt as _LA
         from ..models.user_activity import UserActivity
         session = UserActivity(
             user_id=user.id,
-            ip_address=flask_request.remote_addr,
+            ip_address=ip,
         )
         db.session.add(session)
+        db.session.add(_LA(username=username, ip_address=ip, successful=True))
         db.session.commit()
         from flask import session as flask_session
         flask_session["activity_id"] = session.id
     except Exception:
-        pass
+        db.session.rollback()
 
     return user
 

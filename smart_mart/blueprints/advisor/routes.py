@@ -1,9 +1,6 @@
 """AI Business Advisor blueprint — rule-based analysis + Claude narrative commentary."""
 from __future__ import annotations
 
-import json
-import os
-
 from flask import Blueprint, jsonify, render_template, request
 from ...services.decorators import admin_required, login_required
 from ...services import ai_business_advisor
@@ -21,15 +18,15 @@ def _require_perm(perm: str):
             abort(403)
 
 
-# ── Claude narrative overlay ──────────────────────────────────────────────────
+# ── Gemini narrative overlay ──────────────────────────────────────────────────
 
-def _claude_advisor_commentary(report: dict) -> str | None:
+def _gemini_advisor_commentary(report: dict) -> str | None:
     """
-    Ask Claude to write a short executive commentary on the full advisor report.
+    Ask Gemini to write a short executive commentary on the full advisor report.
     Returns plain text paragraph or None if API key missing / call fails.
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    from ...services.gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
         return None
     try:
         summary = report.get("summary", {})
@@ -47,6 +44,19 @@ def _claude_advisor_commentary(report: dict) -> str | None:
             "kpi_scores":         {k.get("kpi"): k.get("score") for k in kpis},
         }
 
+        import json
+        prompt = (
+            f"Business data for GoldKernel dry fruits retail shop (Dhangadhi, Nepal): "
+            f"{json.dumps(condensed)}\n\n"
+            "Give a 2-3 sentence executive summary of the business health and the single most "
+            "important action to take right now. Be direct and specific. Currency is NPR. No markdown."
+        )
+        system = (
+            "You are a concise business advisor for GoldKernel, a premium dry fruits "
+            "retail shop in Dhangadhi, Nepal. Currency is NPR."
+        )
+        api_key = ""
+        return gemini_generate(prompt, system=system, max_tokens=220)
         payload = json.dumps({
             "model": "claude-haiku-4-5-20251001",
             "max_tokens": 220,
@@ -88,7 +98,7 @@ def _claude_advisor_commentary(report: dict) -> str | None:
 def index():
     _require_perm("can_view_advisor")
     report = ai_business_advisor.full_advisor_report()
-    commentary = _claude_advisor_commentary(report)
+    commentary = _gemini_advisor_commentary(report)
     return render_template("advisor/index.html", report=report, commentary=commentary)
 
 
@@ -97,7 +107,7 @@ def index():
 def api_report():
     _require_perm("can_view_advisor")
     report = ai_business_advisor.full_advisor_report()
-    commentary = _claude_advisor_commentary(report)
+    commentary = _gemini_advisor_commentary(report)
     return jsonify({**report, "ai_commentary": commentary})
 
 

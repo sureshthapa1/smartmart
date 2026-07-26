@@ -103,7 +103,7 @@ def _pexels_image(search_query: str, filename: str) -> bool:
     return _download_image(PEXELS_MAP["default"], filename)
 
 
-# ── Claude AI autofill ────────────────────────────────────────────────────────
+# ── Gemini AI autofill ────────────────────────────────────────────────────────
 
 _AI_SYSTEM = """You are a product content writer for GoldKernel, a premium retail store in Nepal.
 Given a product name and optional category, generate rich product information.
@@ -137,7 +137,7 @@ Generate product content. Respond with this exact JSON structure:
 }}"""
 
 
-def _claude_autofill(product_name: str, category: str = "") -> Optional[dict]:
+def _gemini_autofill(product_name: str, category: str = "") -> Optional[dict]:
     """
     Call Gemini API to generate product content.
     Returns parsed dict or None on failure.
@@ -273,8 +273,8 @@ def autofill_product(product, force: bool = False) -> dict:
     need_seo_title    = force or not getattr(product, "seo_title", None)
 
     if need_description or need_pack_size or need_image or need_benefits or need_origin or need_storage_tips or need_tags or need_meta_desc or need_seo_title:
-        # Try Claude first
-        data = _claude_autofill(name, category)
+        # Try Gemini first
+        data = _gemini_autofill(name, category)
         if not data:
             # Keyword fallback
             data = _keyword_fallback(name, category)

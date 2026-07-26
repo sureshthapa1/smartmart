@@ -11,7 +11,7 @@ from ...extensions import db, limiter
 from ...services import ecommerce_sync
 from ...services.ecommerce_sync import EcommerceSyncError
 
-ecommerce_api_bp = Blueprint("ecommerce_api", __name__, url_prefix="/api")
+ecommerce_api_bp = Blueprint("ecommerce_api", __name__, url_prefix="/api/v1")
 
 
 def _candidate_keys() -> set[str]:
@@ -197,3 +197,59 @@ def sync_inventory():
         return jsonify(ecommerce_sync.sync_inventory(payload))
     except Exception as exc:
         return _handle_error(exc, payload=payload, action="sync_inventory")
+
+# ── Backward-compatibility aliases (/api → /api/v1) ──────────────────────────
+# The blueprint moved from url_prefix="/api" to "/api/v1" to avoid a route
+# collision with the internal api_bp blueprint. These aliases keep existing
+# website/POS clients working without requiring an immediate contract change.
+# Remove once all external clients have migrated to /api/v1/*.
+
+_compat_bp = Blueprint("ecommerce_api_compat", __name__, url_prefix="/api")
+
+
+@_compat_bp.route("/products", methods=["GET"])
+@limiter.limit("120/minute")
+def compat_products():
+    return products()
+
+
+@_compat_bp.route("/inventory", methods=["GET"])
+@api_key_required
+@limiter.limit("60/minute")
+def compat_inventory():
+    return inventory()
+
+
+@_compat_bp.route("/orders/create", methods=["POST"])
+@api_key_required
+@limiter.limit("30/minute")
+def compat_create_order():
+    return create_order()
+
+
+@_compat_bp.route("/orders", methods=["GET"])
+@api_key_required
+@limiter.limit("60/minute")
+def compat_orders():
+    return orders()
+
+
+@_compat_bp.route("/orders/update-status", methods=["PUT"])
+@api_key_required
+@limiter.limit("60/minute")
+def compat_update_status():
+    return update_status()
+
+
+@_compat_bp.route("/sync-pos-order", methods=["POST"])
+@api_key_required
+@limiter.limit("30/minute")
+def compat_sync_pos_order():
+    return sync_pos_order()
+
+
+@_compat_bp.route("/sync-inventory", methods=["POST"])
+@api_key_required
+@limiter.limit("60/minute")
+def compat_sync_inventory():
+    return sync_inventory()

@@ -7,7 +7,7 @@ from smart_mart.services.ai_nlg import generate_daily_report
 
 
 def test_daily_report_includes_week_to_date_sales(db, monkeypatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     user = User(username="nlg_admin", password_hash="hash", role="admin")
     db.session.add(user)
     db.session.flush()

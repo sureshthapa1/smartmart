@@ -496,6 +496,7 @@ def _register_blueprints(app):
         (".blueprints.settings", "settings_bp"),
         (".blueprints.operations", "operations_bp"),
         (".blueprints.ecommerce_api", "ecommerce_api_bp"),
+        (".blueprints.ecommerce_api", "_compat_bp"),
         (".blueprints.store", "store_bp"),
         (".blueprints.api", "api_bp"),
         (".blueprints.expenses", "expenses_bp"),
@@ -547,7 +548,9 @@ def _register_blueprints(app):
 
     try:
         from .blueprints.ecommerce_api import ecommerce_api_bp as _ecommerce_api_bp
+        from .blueprints.ecommerce_api import _compat_bp as _ecommerce_compat_bp
         csrf.exempt(_ecommerce_api_bp)
+        csrf.exempt(_ecommerce_compat_bp)
     except Exception:
         pass
 

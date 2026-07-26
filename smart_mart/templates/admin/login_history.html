@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Login History — Smart Mart{% endblock %}
+
+{% block page_title %}Login History{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">Login History</li>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header-title">Login History</div>
+    <div class="page-header-sub">All login attempts with IP addresses — success and failed</div>
+  </div>
+</div>
+
+{# ── Summary stats ──────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(99,102,241,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-key-fill" style="color:#6366f1;font-size:1.1rem"></i>
+        </div>
+        <div>
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">Total Attempts</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#0f172a;line-height:1.1">{{ stats_total }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(34,197,94,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-check-circle-fill" style="color:#22c55e;font-size:1.1rem"></i>
+        </div>
+        <div>
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">Successful</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#166534;line-height:1.1">{{ stats_success }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(239,68,68,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-x-circle-fill" style="color:#ef4444;font-size:1.1rem"></i>
+        </div>
+        <div>
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">Failed</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#991b1b;line-height:1.1">{{ stats_failed }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card h-100">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-globe" style="color:#f59e0b;font-size:1.1rem"></i>
+        </div>
+        <div>
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b">Unique IPs (7d)</div>
+          <div style="font-size:1.5rem;font-weight:800;color:#0f172a;line-height:1.1">{{ unique_ips_7d }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Filters ────────────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="GET" action="{{ url_for('admin.login_history') }}" class="row g-2 align-items-end">
+      <div class="col-12 col-sm-4 col-md-3">
+        <label class="form-label mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value=""      {% if filter_status == '' %}selected{% endif %}>All</option>
+          <option value="success" {% if filter_status == 'success' %}selected{% endif %}>Success only</option>
+          <option value="failed"  {% if filter_status == 'failed'  %}selected{% endif %}>Failed only</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-4 col-md-3">
+        <label class="form-label mb-1">Username</label>
+        <input type="text" name="username" class="form-control form-control-sm"
+               placeholder="Filter by username" value="{{ filter_user }}">
+      </div>
+      <div class="col-12 col-sm-4 col-md-3">
+        <label class="form-label mb-1">IP Address</label>
+        <input type="text" name="ip" class="form-control form-control-sm"
+               placeholder="Filter by IP" value="{{ filter_ip }}">
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm px-3">
+          <i class="bi bi-funnel me-1"></i>Filter
+        </button>
+        {% if filter_status or filter_user or filter_ip %}
+        <a href="{{ url_for('admin.login_history') }}" class="btn btn-outline-secondary btn-sm px-3">
+          <i class="bi bi-x-lg me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Table ──────────────────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-shield-lock me-2 text-primary"></i>Login Attempts</span>
+    <span class="badge bg-secondary" style="font-size:.72rem">{{ total }} record{{ 's' if total != 1 }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th style="width:48px">#</th>
+          <th>Timestamp</th>
+          <th>Username</th>
+          <th>IP Address</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in attempts %}
+        <tr>
+          <td class="text-muted" style="font-size:.78rem">{{ (page - 1) * 50 + loop.index }}</td>
+          <td style="white-space:nowrap">
+            <span style="font-size:.85rem">
+              {{ a.created_at.strftime('%Y-%m-%d') }}
+            </span>
+            <span class="text-muted ms-1" style="font-size:.78rem">
+              {{ a.created_at.strftime('%H:%M:%S') }} UTC
+            </span>
+          </td>
+          <td>
+            {% if a.username %}
+              <span class="d-flex align-items-center gap-2">
+                <span style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:.7rem;font-weight:700;flex-shrink:0">
+                  {{ a.username[0].upper() }}
+                </span>
+                <code style="font-size:.83rem;background:transparent;color:inherit;padding:0">{{ a.username }}</code>
+              </span>
+            {% else %}
+              <span class="text-muted fst-italic" style="font-size:.83rem">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.ip_address %}
+              <span class="d-inline-flex align-items-center gap-1">
+                <i class="bi bi-geo-alt text-muted" style="font-size:.8rem"></i>
+                <a href="{{ url_for('admin.login_history', ip=a.ip_address) }}"
+                   class="text-decoration-none"
+                   style="font-family:monospace;font-size:.85rem;color:#6366f1"
+                   title="Filter by this IP">{{ a.ip_address }}</a>
+              </span>
+            {% else %}
+              <span class="text-muted fst-italic" style="font-size:.83rem">unknown</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.successful %}
+              <span class="badge" style="background:#dcfce7;color:#166534;font-size:.75rem">
+                <i class="bi bi-check-circle-fill me-1"></i>Success
+              </span>
+            {% else %}
+              <span class="badge" style="background:#fee2e2;color:#991b1b;font-size:.75rem">
+                <i class="bi bi-x-circle-fill me-1"></i>Failed
+              </span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center py-5 text-muted">
+            <i class="bi bi-shield-check d-block mb-2" style="font-size:2rem;opacity:.3"></i>
+            No login attempts found{% if filter_status or filter_user or filter_ip %} matching the current filters{% endif %}.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Pagination ─────────────────────────────────────────────────────── #}
+  {% if total_pages > 1 %}
+  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2 py-2">
+    <small class="text-muted">
+      Showing {{ (page - 1) * 50 + 1 }}–{{ [(page * 50), total] | min }} of {{ total }}
+    </small>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('admin.login_history', page=page-1, status=filter_status, ip=filter_ip, username=filter_user) }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+        {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('admin.login_history', page=p, status=filter_status, ip=filter_ip, username=filter_user) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('admin.login_history', page=page+1, status=filter_status, ip=filter_ip, username=filter_user) }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -511,6 +511,71 @@ def sync_visit_counts():
     return redirect(url_for("admin.staff_activity"))
 
 
+# ── Login History ────────────────────────────────────────────────────────
+
+@admin_bp.route("/login-history")
+@admin_required
+def login_history():
+    from ...models.login_attempt import LoginAttempt
+    from ...extensions import db
+
+    page = request.args.get("page", 1, type=int)
+    per_page = 50
+    filter_status = request.args.get("status", "")      # "success" | "failed" | ""
+    filter_ip     = request.args.get("ip", "").strip()
+    filter_user   = request.args.get("username", "").strip()
+
+    q = db.select(LoginAttempt).order_by(LoginAttempt.created_at.desc())
+    if filter_status == "success":
+        q = q.filter(LoginAttempt.successful == True)   # noqa: E712
+    elif filter_status == "failed":
+        q = q.filter(LoginAttempt.successful == False)  # noqa: E712
+    if filter_ip:
+        q = q.filter(LoginAttempt.ip_address.ilike(f"%{filter_ip}%"))
+    if filter_user:
+        q = q.filter(LoginAttempt.username.ilike(f"%{filter_user}%"))
+
+    total = db.session.execute(
+        db.select(db.func.count()).select_from(q.subquery())
+    ).scalar() or 0
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    offset = (page - 1) * per_page
+    attempts = db.session.execute(q.limit(per_page).offset(offset)).scalars().all()
+
+    # Summary stats (unfiltered)
+    from sqlalchemy import func as _func
+    stats_row = db.session.execute(
+        db.select(
+            _func.count(LoginAttempt.id).label("total"),
+            _func.sum(db.case((LoginAttempt.successful == True, 1), else_=0)).label("successes"),
+            _func.sum(db.case((LoginAttempt.successful == False, 1), else_=0)).label("failures"),
+        )
+    ).one()
+
+    # Unique IPs (last 7 days)
+    from datetime import datetime, timezone, timedelta
+    since_7d = datetime.now(timezone.utc) - timedelta(days=7)
+    unique_ips_7d = db.session.execute(
+        db.select(_func.count(_func.distinct(LoginAttempt.ip_address)))
+        .filter(LoginAttempt.created_at >= since_7d)
+    ).scalar() or 0
+
+    return render_template(
+        "admin/login_history.html",
+        attempts=attempts,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        filter_status=filter_status,
+        filter_ip=filter_ip,
+        filter_user=filter_user,
+        stats_total=stats_row.total or 0,
+        stats_success=stats_row.successes or 0,
+        stats_failed=stats_row.failures or 0,
+        unique_ips_7d=unique_ips_7d,
+    )
+
+
 # ── Notification Dashboard ────────────────────────────────────────────────
 
 @admin_bp.route("/notifications")

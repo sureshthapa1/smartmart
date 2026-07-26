@@ -474,9 +474,9 @@ def _tool_ask_advisor(args: dict) -> dict:
     if not question:
         return {"error": "question required"}
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return {"answer": "ANTHROPIC_API_KEY not configured."}
+    from ...services.gemini_client import gemini_generate, gemini_available
+    if not gemini_available():
+        return {"answer": "GEMINI_API_KEY not configured."}
 
     try:
         from ...blueprints.ai_chat.routes import build_business_context
@@ -490,28 +490,13 @@ def _tool_ask_advisor(args: dict) -> dict:
         except Exception:
             pass
 
-        import json as _json, urllib.request as _req
-        payload = _json.dumps({
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 800,
-            "system": (
-                "You are the Goldkernel Business AI, answering questions about a premium dry fruits "
-                "retail shop in Nepal. Use the live data provided. Currency is NPR.\n\n"
-                f"[LIVE DATA]\n{context}\n[/LIVE DATA]"
-            ),
-            "messages": [{"role": "user", "content": question}],
-        }).encode()
-
-        r = _req.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            method="POST",
+        system = (
+            "You are the Goldkernel Business AI, answering questions about a premium dry fruits "
+            "retail shop in Nepal. Use the live data provided. Currency is NPR.\n\n"
+            f"[LIVE DATA]\n{context}\n[/LIVE DATA]"
         )
-        with _req.urlopen(r, timeout=30) as resp:
-            data = _json.loads(resp.read())
-        return {"question": question, "answer": data["content"][0]["text"].strip()}
+        answer = gemini_generate(question, system=system, max_tokens=800) or "No answer generated."
+        return {"question": question, "answer": answer}
     except Exception as exc:
         return {"error": str(exc)}
 
