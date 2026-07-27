@@ -228,6 +228,7 @@
       {# ── SALES ─────────────────────────────────────────────────────────── #}
       <div class="nav-section" style="margin-top:.5rem">Sales</div>
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_sales %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint in ['sales','returns'] and request.endpoint != 'sales.create_sale' %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#salesMenu" role="button">
@@ -238,14 +239,20 @@
           <ul class="nav flex-column">
             <li><a class="nav-link {% if request.endpoint == 'sales.list_sales' %}active{% endif %}"
                    href="{{ url_for('sales.list_sales') }}"><i class="bi bi-list-ul"></i> All Sales</a></li>
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_returns %}
             <li><a class="nav-link {% if request.blueprint == 'returns' %}active{% endif %}"
                    href="{{ url_for('returns.list_returns') }}"><i class="bi bi-arrow-return-left"></i> Returns</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_customer_statement %}
             <li><a class="nav-link {% if request.endpoint == 'sales.customer_statement' %}active{% endif %}"
                    href="{{ url_for('sales.customer_statement') }}"><i class="bi bi-person-lines-fill"></i> Statements</a></li>
+            {% endif %}
           </ul>
         </div>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_online_orders %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint == 'online_orders' %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#onlineOrdersMenu" role="button">
@@ -265,21 +272,27 @@
           </ul>
         </div>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_customers %}
       <li class="nav-item">
         <a class="nav-link {% if request.blueprint == 'customers' %}active{% endif %}"
            href="{{ url_for('customers.list_customers') }}">
           <i class="bi bi-people"></i> Customers
         </a>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_manage_credits %}
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'operations.credit_risk' or request.blueprint == 'loyalty' %}active{% endif %}"
            href="{{ url_for('operations.credit_risk') }}">
           <i class="bi bi-credit-card"></i> Udharo / Credit
         </a>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_promotions %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint in ['promotions','offers','bundles'] %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#promoMenu" role="button">
@@ -290,15 +303,19 @@
           <ul class="nav flex-column">
             <li><a class="nav-link {% if request.blueprint == 'promotions' %}active{% endif %}"
                    href="{{ url_for('promotions.list_promotions') }}"><i class="bi bi-percent"></i> Promo Codes</a></li>
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_offers %}
             <li><a class="nav-link {% if request.endpoint == 'offers.list_offers' %}active{% endif %}"
                    href="{{ url_for('offers.list_offers') }}"><i class="bi bi-gift"></i> Customer Offers</a></li>
+            {% endif %}
             <li><a class="nav-link {% if request.blueprint == 'bundles' %}active{% endif %}"
                    href="{{ url_for('bundles.index') }}"><i class="bi bi-boxes"></i> Bundles</a></li>
           </ul>
         </div>
       </li>
+      {% endif %}
 
       {# ── INVENTORY ─────────────────────────────────────────────────────── #}
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_inventory %}
       <div class="nav-section" style="margin-top:.5rem">Inventory</div>
 
       <li class="nav-item">
@@ -318,47 +335,63 @@
           <ul class="nav flex-column">
             <li><a class="nav-link {% if request.endpoint in ['inventory.list_products'] and request.args.get('status') == 'low' %}active{% endif %}"
                    href="{{ url_for('inventory.list_products', status='low') }}"><i class="bi bi-exclamation-triangle"></i> Low Stock</a></li>
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_stock_take %}
             <li><a class="nav-link {% if request.blueprint == 'stock_take' %}active{% endif %}"
                    href="{{ url_for('stock_take.list_takes') }}"><i class="bi bi-clipboard-check"></i> Stock Take</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_purchases %}
             <li><a class="nav-link {% if request.blueprint == 'purchases' %}active{% endif %}"
                    href="{{ url_for('purchases.list_purchases') }}"><i class="bi bi-truck"></i> Purchases</a></li>
             <li><a class="nav-link {% if request.blueprint == 'purchase_orders' %}active{% endif %}"
                    href="{{ url_for('purchase_orders.list_pos') }}"><i class="bi bi-file-earmark-text"></i> Purchase Orders</a></li>
             <li><a class="nav-link {% if request.endpoint == 'purchases.list_suppliers' %}active{% endif %}"
                    href="{{ url_for('purchases.list_suppliers') }}"><i class="bi bi-building"></i> Suppliers</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_transfers %}
             <li><a class="nav-link {% if request.blueprint == 'transfers' %}active{% endif %}"
                    href="{{ url_for('transfers.list_transfers') }}"><i class="bi bi-arrow-left-right"></i> Transfers</a></li>
+            {% endif %}
             <li><a class="nav-link {% if request.blueprint == 'waste' %}active{% endif %}"
                    href="{{ url_for('waste.index') }}"><i class="bi bi-trash3"></i> Waste / Loss</a></li>
           </ul>
         </div>
       </li>
+      {% endif %}
 
       {# ── FINANCE ───────────────────────────────────────────────────────── #}
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_expenses or current_user.permissions.can_view_reports or current_user.permissions.can_manage_cash_session %}
       <div class="nav-section" style="margin-top:.5rem">Finance</div>
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_expenses %}
       <li class="nav-item">
         <a class="nav-link {% if request.blueprint == 'expenses' %}active{% endif %}"
            href="{{ url_for('expenses.list_expenses') }}">
           <i class="bi bi-receipt-cutoff"></i> Expenses
         </a>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_reports %}
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'reports.cash_flow' %}active{% endif %}"
            href="{{ url_for('reports.cash_flow') }}">
           <i class="bi bi-cash-coin"></i> Cash Flow
         </a>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_manage_cash_session %}
       <li class="nav-item">
         <a class="nav-link {% if request.endpoint == 'operations.eod_summary' %}active{% endif %}"
            href="{{ url_for('operations.eod_summary') }}">
           <i class="bi bi-moon-stars"></i> Day Close
         </a>
       </li>
+      {% endif %}
+      {% endif %}
 
       {# ── REPORTS ───────────────────────────────────────────────────────── #}
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_reports or current_user.permissions.can_view_sales_report or current_user.permissions.can_view_profit_report or current_user.permissions.can_view_stock_report or current_user.permissions.can_view_credit_report %}
       <div class="nav-section" style="margin-top:.5rem">Reports</div>
 
       <li class="nav-item">
@@ -369,27 +402,42 @@
         </a>
         <div class="collapse submenu {% if request.blueprint == 'reports' and request.endpoint != 'reports.cash_flow' %}show{% endif %}" id="reportsMenu">
           <ul class="nav flex-column">
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_sales_report %}
             <li><a class="nav-link {% if request.endpoint == 'reports.sales_report' %}active{% endif %}"
                    href="{{ url_for('reports.sales_report') }}"><i class="bi bi-graph-up"></i> Sales</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_profit_report %}
             <li><a class="nav-link {% if request.endpoint in ['reports.profitability','reports.bi_profit_loss','reports.profit_margin'] %}active{% endif %}"
                    href="{{ url_for('reports.profitability') }}"><i class="bi bi-currency-dollar"></i> Profit & Margins</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_sales_report %}
             <li><a class="nav-link {% if request.endpoint in ['reports.top_products','reports.least_products','reports.category_performance'] %}active{% endif %}"
                    href="{{ url_for('reports.top_products') }}"><i class="bi bi-trophy"></i> Products</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_stock_report %}
             <li><a class="nav-link {% if request.endpoint in ['reports.stock_analysis','reports.inventory_valuation','reports.dead_stock'] %}active{% endif %}"
                    href="{{ url_for('reports.stock_analysis') }}"><i class="bi bi-boxes"></i> Inventory</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_reports %}
             <li><a class="nav-link {% if request.endpoint in ['reports.customer_spend','reports.customer_analysis'] %}active{% endif %}"
                    href="{{ url_for('reports.customer_spend') }}"><i class="bi bi-people"></i> Customers</a></li>
             <li><a class="nav-link {% if request.endpoint == 'reports.vat_report' %}active{% endif %}"
                    href="{{ url_for('reports.vat_report') }}"><i class="bi bi-receipt"></i> VAT Report</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_credit_report %}
             <li><a class="nav-link {% if request.endpoint == 'reports.credit_udharo' %}active{% endif %}"
                    href="{{ url_for('reports.credit_udharo') }}"><i class="bi bi-credit-card"></i> Udharo Report</a></li>
+            {% endif %}
           </ul>
         </div>
       </li>
+      {% endif %}
 
       {# ── AI & ANALYTICS ────────────────────────────────────────────────── #}
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_ai_insights or current_user.permissions.can_view_advisor or current_user.permissions.can_view_bi_dashboard %}
       <div class="nav-section" style="margin-top:.5rem">AI & Analytics</div>
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_ai_insights %}
       <li class="nav-item">
         <a class="nav-link {% if request.blueprint == 'ai_chat' %}active{% endif %}"
            href="{{ url_for('ai_chat.index') }}"
@@ -397,7 +445,9 @@
           <i class="bi bi-chat-dots" style="color:#8b5cf6"></i> AI Advisor
         </a>
       </li>
+      {% endif %}
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_view_bi_dashboard or current_user.permissions.can_view_advisor %}
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint in ['advisor','bi_dashboard'] or (request.blueprint == 'ai' and request.endpoint not in ['ai.voice_assistant']) %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#aiMenu" role="button">
@@ -406,21 +456,31 @@
         </a>
         <div class="collapse submenu {% if request.blueprint in ['advisor','bi_dashboard'] or (request.blueprint == 'ai' and request.endpoint not in ['ai.voice_assistant']) %}show{% endif %}" id="aiMenu">
           <ul class="nav flex-column">
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_bi_dashboard %}
             <li><a class="nav-link {% if request.endpoint == 'bi_dashboard.bi_dashboard_page' %}active{% endif %}"
                    href="{{ url_for('bi_dashboard.bi_dashboard_page') }}"><i class="bi bi-speedometer"></i> BI Dashboard</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_advisor %}
             <li><a class="nav-link {% if request.blueprint == 'advisor' %}active{% endif %}"
                    href="{{ url_for('advisor.index') }}"><i class="bi bi-lightbulb"></i> Business Advisor</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_ai_insights %}
             <li><a class="nav-link {% if request.endpoint == 'ai.customer_intelligence' %}active{% endif %}"
                    href="{{ url_for('ai.customer_intelligence') }}"><i class="bi bi-person-bounding-box"></i> Customer Intel</a></li>
             <li><a class="nav-link {% if request.endpoint == 'ai.anomalies_page' %}active{% endif %}"
                    href="{{ url_for('ai.anomalies_page') }}"><i class="bi bi-shield-exclamation"></i> Anomalies</a></li>
+            {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_profit_report %}
             <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
             <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-file-earmark-bar-graph"></i> P&L Statement</a></li>
+            {% endif %}
           </ul>
         </div>
       </li>
+      {% endif %}
+      {% endif %}
 
       {# ── ADMIN & SETTINGS ──────────────────────────────────────────────── #}
       {% if current_user.role in ('admin', 'manager') %}

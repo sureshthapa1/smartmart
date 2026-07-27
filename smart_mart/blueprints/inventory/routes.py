@@ -135,7 +135,7 @@ def list_products():
             ))
         products = db.session.execute(
             stmt_products.limit(100).offset((page - 1) * 100)
-        ).scalars().all()
+        ).unique().scalars().all()
     else:
         products = inventory_manager.get_products(search=search, page=page, active_only=active_only)
 

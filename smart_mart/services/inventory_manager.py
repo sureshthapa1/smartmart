@@ -168,21 +168,94 @@ def update_product(product_id: int, data: dict) -> Product:
 
 
 def delete_product(product_id: int) -> None:
-    """Delete a product. Raises ValueError if it has sale/purchase records."""
+    """Delete a product and all its dependent records."""
     product: Product = db.get_or_404(Product, product_id)
-    from sqlalchemy import select
+    from sqlalchemy import select, delete as _delete
     from ..models.sale import SaleItem
     from ..models.purchase import PurchaseItem
+
+    # Block deletion if the product has sales or purchase records —
+    # those are financial records that must not be silently destroyed.
     has_sales = db.session.execute(
         select(SaleItem.id).where(SaleItem.product_id == product_id).limit(1)
     ).first()
     if has_sales:
-        raise ValueError(f"Cannot delete '{product.name}': has associated sale records.")
+        raise ValueError(
+            f"Cannot delete '{product.name}': it has sale records. "
+            "Mark it as Inactive instead."
+        )
     has_purchases = db.session.execute(
         select(PurchaseItem.id).where(PurchaseItem.product_id == product_id).limit(1)
     ).first()
     if has_purchases:
-        raise ValueError(f"Cannot delete '{product.name}': has associated purchase records.")
+        raise ValueError(
+            f"Cannot delete '{product.name}': it has purchase records. "
+            "Mark it as Inactive instead."
+        )
+
+    # Delete all non-financial dependent records before deleting the product
+    # to avoid FK constraint violations.
+    try:
+        from ..models.stock_movement import StockMovement
+        db.session.execute(_delete(StockMovement).where(StockMovement.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.product_variant import ProductVariant
+        db.session.execute(_delete(ProductVariant).where(ProductVariant.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.stock_take import StockTakeItem
+        db.session.execute(_delete(StockTakeItem).where(StockTakeItem.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.stock_notification import StockNotification
+        db.session.execute(_delete(StockNotification).where(StockNotification.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.product_review import ProductReview
+        db.session.execute(_delete(ProductReview).where(ProductReview.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.wishlist_item import WishlistItem
+        db.session.execute(_delete(WishlistItem).where(WishlistItem.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.ecommerce import StockReservation
+        db.session.execute(_delete(StockReservation).where(StockReservation.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.supplier_price_record import SupplierPriceRecord
+        db.session.execute(_delete(SupplierPriceRecord).where(SupplierPriceRecord.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.supplier_return import SupplierReturnItem
+        db.session.execute(_delete(SupplierReturnItem).where(SupplierReturnItem.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.ai_enhancements import CompetitorPriceEntry, CompetitorPriceSuggestion
+        db.session.execute(_delete(CompetitorPriceEntry).where(CompetitorPriceEntry.product_id == product_id))
+        db.session.execute(_delete(CompetitorPriceSuggestion).where(CompetitorPriceSuggestion.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.product_icon_map import ProductIconMap
+        icon = db.session.execute(
+            select(ProductIconMap).where(ProductIconMap.product_name == product.name)
+        ).scalar_one_or_none()
+        if icon:
+            db.session.delete(icon)
+    except Exception:
+        pass
+
     db.session.delete(product)
     db.session.commit()
 
@@ -195,7 +268,8 @@ def get_products(search: str | None = None, page: int = 1, per_page: int = 100,
     active_only=False → only inactive/discontinued products
     active_only=None  → all products (default)
     """
-    stmt = db.select(Product).order_by(Product.name)
+    from sqlalchemy.orm import joinedload
+    stmt = db.select(Product).options(joinedload(Product.supplier)).order_by(Product.name)
     if search:
         term = search.strip().lower()
         stmt = stmt.where(
@@ -211,7 +285,7 @@ def get_products(search: str | None = None, page: int = 1, per_page: int = 100,
         stmt = stmt.where(Product.is_active == False)
     offset = (page - 1) * per_page
     stmt = stmt.limit(per_page).offset(offset)
-    return db.session.execute(stmt).scalars().all()
+    return db.session.execute(stmt).unique().scalars().all()
 
 
 def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: int,

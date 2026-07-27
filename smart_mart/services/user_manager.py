@@ -80,21 +80,72 @@ def reset_password(user_id: int, new_password: str) -> None:
 
 
 def delete_user(user_id: int, current_user_id: int) -> None:
-    """Delete a user by ID.
-
-    Raises ValueError if the user attempts to delete their own account.
-    """
+    """Delete a user and all their dependent records."""
     if user_id == current_user_id:
         raise ValueError("You cannot delete your own account.")
     user: User = db.get_or_404(User, user_id)
-    # Remove associated permissions first to avoid FK constraint violations
-    from ..models.user_permissions import UserPermissions
-    perm = db.session.execute(
-        db.select(UserPermissions).where(UserPermissions.user_id == user_id)
-    ).scalar_one_or_none()
-    if perm:
-        db.session.delete(perm)
-        db.session.flush()
+
+    from sqlalchemy import delete as _delete, update as _update
+
+    # Delete/nullify all FK references to this user before deleting the user row
+    try:
+        from ..models.user_permissions import UserPermissions
+        db.session.execute(_delete(UserPermissions).where(UserPermissions.user_id == user_id))
+    except Exception:
+        pass
+    try:
+        from ..models.user_activity import UserActivity
+        db.session.execute(_delete(UserActivity).where(UserActivity.user_id == user_id))
+    except Exception:
+        pass
+    try:
+        from ..models.login_attempt import LoginAttempt
+        db.session.execute(_delete(LoginAttempt).where(LoginAttempt.username == user.username))
+    except Exception:
+        pass
+    try:
+        from ..models.sales_target import SalesTarget
+        db.session.execute(_delete(SalesTarget).where(SalesTarget.user_id == user_id))
+    except Exception:
+        pass
+    try:
+        from ..models.shift import Shift
+        db.session.execute(_delete(Shift).where(Shift.user_id == user_id))
+    except Exception:
+        pass
+    try:
+        from ..models.audit_log import AuditLog
+        db.session.execute(_delete(AuditLog).where(AuditLog.user_id == user_id))
+    except Exception:
+        pass
+    try:
+        from ..models.operations import CashSession
+        db.session.execute(_delete(CashSession).where(CashSession.user_id == user_id))
+    except Exception:
+        pass
+    # Nullify user_id on financial records rather than deleting them
+    try:
+        from ..models.sale import Sale
+        db.session.execute(_update(Sale).where(Sale.user_id == user_id).values(user_id=None))
+    except Exception:
+        pass
+    try:
+        from ..models.purchase import Purchase
+        db.session.execute(_update(Purchase).where(Purchase.created_by == user_id).values(created_by=None))
+    except Exception:
+        pass
+    try:
+        from ..models.expense import Expense
+        db.session.execute(_update(Expense).where(Expense.created_by == user_id).values(created_by=None))
+    except Exception:
+        pass
+    try:
+        from ..models.stock_movement import StockMovement
+        db.session.execute(_update(StockMovement).where(StockMovement.created_by == user_id).values(created_by=None))
+    except Exception:
+        pass
+
+    db.session.flush()
     db.session.delete(user)
     db.session.commit()
 
