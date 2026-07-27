@@ -25,3 +25,7 @@ Markdown==3.8.1
 redis==5.2.1
 # Windows-compatible WSGI server (replaces gunicorn which is Linux-only)
 # waitress==3.0.1  # Windows-only dev server — not needed on Render (uses gunicorn)
+
+# ESC/POS direct thermal printing (TVS RP3200 Lite and compatible printers)
+python-escpos==3.1
+pywin32==308

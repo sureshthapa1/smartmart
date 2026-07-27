@@ -425,6 +425,62 @@ def credit_notes():
     return render_template("sales/credit_notes.html", notes=notes, sales=sales)
 
 
+@sales_bp.route("/<int:sale_id>/escpos-print", methods=["POST"])
+@login_required
+def escpos_print(sale_id):
+    """Print receipt directly to thermal printer via ESC/POS (no browser dialog)."""
+    from flask import jsonify as _json
+    from ...services import escpos_printer
+    from ...models.shop_settings import ShopSettings
+
+    sale = sales_manager.get_sale(sale_id)
+    if sale is None:
+        return _json({"ok": False, "error": "Sale not found"}), 404
+
+    shop = None
+    try:
+        shop = ShopSettings.get()
+    except Exception:
+        pass
+
+    # Loyalty info (optional)
+    loyalty_txns   = None
+    loyalty_balance = None
+    try:
+        from ...models.ai_enhancements import LoyaltyWallet, LoyaltyWalletTransaction
+        from ...models.customer import Customer
+        if sale.customer_name:
+            cust = db.session.execute(
+                db.select(Customer).where(
+                    db.func.lower(Customer.name) == sale.customer_name.lower()
+                )
+            ).scalar_one_or_none()
+            if cust:
+                wallet = db.session.execute(
+                    db.select(LoyaltyWallet).where(LoyaltyWallet.customer_id == cust.id)
+                ).scalar_one_or_none()
+                if wallet:
+                    loyalty_balance = int(wallet.points_balance)
+                    loyalty_txns = db.session.execute(
+                        db.select(LoyaltyWalletTransaction)
+                        .where(LoyaltyWalletTransaction.wallet_id == wallet.id)
+                        .where(LoyaltyWalletTransaction.sale_id == sale.id)
+                    ).scalars().all()
+    except Exception:
+        pass
+
+    try:
+        escpos_printer.print_receipt(
+            sale=sale,
+            shop=shop,
+            loyalty_txns=loyalty_txns,
+            loyalty_balance=loyalty_balance,
+        )
+        return _json({"ok": True, "message": "Receipt sent to printer."})
+    except Exception as exc:
+        return _json({"ok": False, "error": str(exc)}), 500
+
+
 @sales_bp.route("/<int:sale_id>/delete", methods=["POST"])
 @admin_required
 def delete_sale(sale_id):
