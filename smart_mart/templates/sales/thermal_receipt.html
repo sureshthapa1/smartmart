@@ -7,21 +7,30 @@
   <style>
     @page { size: 80mm auto; margin: 0 }
     * { box-sizing: border-box; margin: 0; padding: 0 }
-    body { font-family: 'Courier New', monospace; font-size: 11px; width: 80mm; padding: 4mm; color: #000; background: #fff }
+    body {
+      font-family: Arial, 'Arial Narrow', Helvetica, sans-serif;
+      font-size: 12px;
+      width: 80mm;
+      padding: 4mm;
+      color: #000;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .center { text-align: center }
     .right { text-align: right }
     .bold { font-weight: bold }
-    .shop-name { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
-    .divider { border-top: 1px dashed #000; margin: 4px 0 }
-    .divider-solid { border-top: 1px solid #000; margin: 4px 0 }
+    .shop-name { font-size: 16px; font-weight: 900; text-align: center; margin-bottom: 2px; letter-spacing: 0.3px }
+    .divider { border-top: 1px dashed #000; margin: 5px 0 }
+    .divider-solid { border-top: 2px solid #000; margin: 5px 0 }
     table { width: 100%; border-collapse: collapse }
-    td { padding: 1px 0; vertical-align: top }
-    .item-name { width: 55% }
+    td { padding: 2px 0; vertical-align: top; font-size: 12px }
+    .item-name { width: 52% }
     .item-qty { width: 10%; text-align: center }
-    .item-price { width: 15%; text-align: right }
-    .item-total { width: 20%; text-align: right }
-    .total-row td { font-weight: bold; font-size: 13px; padding-top: 3px }
-    .footer { text-align: center; font-size: 10px; margin-top: 6px }
+    .item-price { width: 18%; text-align: right }
+    .item-total { width: 20%; text-align: right; font-weight: bold }
+    .total-row td { font-weight: 900; font-size: 14px; padding-top: 4px }
+    .footer { text-align: center; font-size: 11px; margin-top: 6px; line-height: 1.5 }
     @media print {
       body { width: 80mm }
       .no-print { display: none }
@@ -30,16 +39,16 @@
 </head>
 <body>
   {% if shop and (shop.logo_filename or shop.logo_data) %}
-  <div class="center" style="margin-bottom:4px">
+  <div class="center" style="margin-bottom:5px">
     <img src="{{ shop.logo_data if shop.logo_data else url_for('static', filename='uploads/shop/' ~ shop.logo_filename) }}"
-         alt="Logo" style="max-height:40px;max-width:60mm;object-fit:contain;">
+         alt="Logo" style="max-height:56px;max-width:62mm;width:auto;object-fit:contain;image-rendering:crisp-edges;">
   </div>
   {% endif %}
   <div class="shop-name">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
-  {% if shop and shop.address %}<div class="center" style="font-size:10px">{{ shop.address }}</div>{% endif %}
-  {% if shop and shop.phone %}<div class="center" style="font-size:10px">Tel: {{ shop.phone }}</div>{% endif %}
-  {% if shop and shop.pan_number %}<div class="center" style="font-size:10px">PAN: {{ shop.pan_number }}</div>{% endif %}
-  {% if shop and shop.vat_enabled and shop.vat_number %}<div class="center" style="font-size:10px">VAT No: {{ shop.vat_number }}</div>{% endif %}
+  {% if shop and shop.address %}<div class="center" style="font-size:11px;margin-top:1px">{{ shop.address }}</div>{% endif %}
+  {% if shop and shop.phone %}<div class="center" style="font-size:11px">Tel: {{ shop.phone }}</div>{% endif %}
+  {% if shop and shop.pan_number %}<div class="center" style="font-size:11px">PAN: {{ shop.pan_number }}</div>{% endif %}
+  {% if shop and shop.vat_enabled and shop.vat_number %}<div class="center" style="font-size:11px">VAT No: {{ shop.vat_number }}</div>{% endif %}
 
   <div class="divider-solid"></div>
   <div class="center bold">RECEIPT</div>
