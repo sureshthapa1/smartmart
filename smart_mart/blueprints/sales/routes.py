@@ -475,24 +475,35 @@ def void_sale(sale_id):
 # ---------------------------------------------------------------------------
 
 def _parse_items(form) -> list[dict]:
-    """Parse items[N][product_id/quantity/unit_price] fields from form data."""
+    """Parse items[N][product_id/quantity/unit_price] fields from form data.
+
+    Supports both sequential keys (items[0], items[1]…) and sparse/gapped
+    keys that can arise if the JS renumber step is somehow skipped. Scans
+    all form keys to collect every index present rather than stopping at the
+    first gap.
+    """
+    import re
+    # Collect all unique indices present in the form
+    indices: list[int] = []
+    _idx_re = re.compile(r"^items\[(\d+)\]\[product_id\]$")
+    for key in form.keys():
+        m = _idx_re.match(key)
+        if m:
+            indices.append(int(m.group(1)))
+
     items: list[dict] = []
-    index = 0
-    while True:
-        product_id = form.get(f"items[{index}][product_id]")
-        if product_id is None:
-            break
-        quantity_raw = form.get(f"items[{index}][quantity]", "0")
+    for index in sorted(indices):
+        product_id    = form.get(f"items[{index}][product_id]")
+        quantity_raw  = form.get(f"items[{index}][quantity]",   "0")
         unit_price_raw = form.get(f"items[{index}][unit_price]", "0")
         try:
-            pid = int(product_id)
-            qty = int(quantity_raw)
+            pid   = int(product_id)
+            qty   = int(quantity_raw)
             price = float(unit_price_raw)
             if pid > 0 and qty > 0 and price >= 0:
                 items.append({"product_id": pid, "quantity": qty, "unit_price": price})
         except (ValueError, TypeError):
             pass
-        index += 1
     return items
 
 

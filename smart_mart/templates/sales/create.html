@@ -990,6 +990,21 @@
   document.getElementById('saleForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
+    // ── Renumber item rows sequentially (0, 1, 2 …) before submit ────────
+    // rowIndex only increments — it never resets when rows are deleted.
+    // Without renumbering, deleting the first row leaves a gap (e.g. only
+    // items[1] exists) and the server-side parser stops at items[0] → empty.
+    const allRows = document.querySelectorAll('tr.sale-item-row');
+    allRows.forEach((tr, newIdx) => {
+      const sel   = tr.querySelector('.product-select');
+      const qty   = tr.querySelector('.qty-input');
+      const price = tr.querySelector('.price-input');
+      if (sel)   sel.name   = `items[${newIdx}][product_id]`;
+      if (qty)   qty.name   = `items[${newIdx}][quantity]`;
+      if (price) price.name = `items[${newIdx}][unit_price]`;
+      tr.dataset.idx = newIdx;
+    });
+
     // Client-side stock check — block submit if any qty exceeds stock
     if (checkStockLevels()) {
       const div = document.createElement('div');
