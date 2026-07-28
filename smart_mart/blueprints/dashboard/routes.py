@@ -191,6 +191,8 @@ def index():
     ).unique().scalars().all()
 
     # ── Top 5 selling products (this month) ──────────────────────────────
+    # Query returns (Product, qty_sold) tuples; normalise to SimpleNamespace
+    # so templates can use p.name, p.total, p.qty_sold directly.
     _top5_rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
         .join(SaleItem, SaleItem.product_id == Product.id)
@@ -200,7 +202,6 @@ def index():
         .order_by(func.sum(SaleItem.quantity).desc())
         .limit(5)
     ).all()
-    # Normalise to simple namespace so templates can use p.name, p.total, p.qty_sold
     from types import SimpleNamespace
     top5 = [
         SimpleNamespace(
@@ -276,7 +277,7 @@ def index():
                           "text": f"{len(low_stock)} product(s) running low on stock"})
     if top5:
         insights.append({"type": "info", "icon": "bi-trophy",
-                          "text": f"Top seller this month: {top5[0].Product.name}"})
+                          "text": f"Top seller this month: {top5[0].name}"})
 
     # ── Cash session balance (open session for current user) ─────────────
     cash_session_balance = None
