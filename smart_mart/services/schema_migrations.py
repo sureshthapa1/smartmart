@@ -558,6 +558,24 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_add_column(conn, "shop_settings", "free_delivery_above_npr", "NUMERIC(10,2) DEFAULT 0"),
             ),
         ),
+        (
+            "2026_07_28_wishlist_customer_account_id",
+            "Add customer_account_id FK column to wishlist_items for logged-in store "
+            "customer wishlists. Column was added to the model but the DB table was "
+            "created before this column existed, so existing installs are missing it — "
+            "causing a crash on product delete (CASCADE query references the column).",
+            lambda conn: (
+                _safe_add_column(
+                    conn, "wishlist_items", "customer_account_id",
+                    "INTEGER REFERENCES customer_accounts(id) ON DELETE SET NULL"
+                ),
+                _safe_exec(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS ix_wishlist_customer_account_id "
+                    "ON wishlist_items(customer_account_id)"
+                ),
+            ),
+        ),
     ]
 
 
