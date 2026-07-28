@@ -301,6 +301,9 @@ def delete_product(product_id):
         flash("Product deleted successfully.", "success")
     except ValueError as e:
         flash(str(e), "danger")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Cannot delete product: {e}", "danger")
     return redirect(url_for("inventory.list_products"))
 
 

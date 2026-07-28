@@ -169,13 +169,17 @@ def update_product(product_id: int, data: dict) -> Product:
 
 def delete_product(product_id: int) -> None:
     """Delete a product and all its dependent records."""
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
     product: Product = db.get_or_404(Product, product_id)
-    from sqlalchemy import select, delete as _delete
-    from ..models.sale import SaleItem
-    from ..models.purchase import PurchaseItem
+    from sqlalchemy import select, text
 
     # Block deletion if the product has sales or purchase records —
     # those are financial records that must not be silently destroyed.
+    from ..models.sale import SaleItem
+    from ..models.purchase import PurchaseItem
+
     has_sales = db.session.execute(
         select(SaleItem.id).where(SaleItem.product_id == product_id).limit(1)
     ).first()
@@ -193,90 +197,41 @@ def delete_product(product_id: int) -> None:
             "Mark it as Inactive instead."
         )
 
-    # Delete all non-financial dependent records before deleting the product
-    # to avoid FK constraint violations.
-    try:
-        from ..models.stock_movement import StockMovement
-        db.session.execute(_delete(StockMovement).where(StockMovement.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.product_variant import ProductVariant
-        db.session.execute(_delete(ProductVariant).where(ProductVariant.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.stock_take import StockTakeItem
-        db.session.execute(_delete(StockTakeItem).where(StockTakeItem.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.stock_notification import StockNotification
-        db.session.execute(_delete(StockNotification).where(StockNotification.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.product_review import ProductReview
-        db.session.execute(_delete(ProductReview).where(ProductReview.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.wishlist_item import WishlistItem
-        db.session.execute(_delete(WishlistItem).where(WishlistItem.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.ecommerce import StockReservation
-        db.session.execute(_delete(StockReservation).where(StockReservation.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.supplier_price_record import SupplierPriceRecord
-        db.session.execute(_delete(SupplierPriceRecord).where(SupplierPriceRecord.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.supplier_return import SupplierReturnItem
-        db.session.execute(_delete(SupplierReturnItem).where(SupplierReturnItem.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.ai_enhancements import CompetitorPriceEntry, CompetitorPriceSuggestion
-        db.session.execute(_delete(CompetitorPriceEntry).where(CompetitorPriceEntry.product_id == product_id))
-        db.session.execute(_delete(CompetitorPriceSuggestion).where(CompetitorPriceSuggestion.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.stock_transfer import StockTransferItem
-        db.session.execute(_delete(StockTransferItem).where(StockTransferItem.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.waste_record import WasteRecord
-        db.session.execute(_delete(WasteRecord).where(WasteRecord.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..models.operations import ProductBatch, ProductInventoryProfile
-        db.session.execute(_delete(ProductBatch).where(ProductBatch.product_id == product_id))
-        db.session.execute(_delete(ProductInventoryProfile).where(ProductInventoryProfile.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..bi.models.purchase_batch import PurchaseBatchItem
-        db.session.execute(_delete(PurchaseBatchItem).where(PurchaseBatchItem.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..bi.models.inventory_ledger import InventoryLedgerEntry
-        db.session.execute(_delete(InventoryLedgerEntry).where(InventoryLedgerEntry.product_id == product_id))
-    except Exception:
-        pass
-    try:
-        from ..bi.models.operating_expense import OperatingExpense
-        db.session.execute(_delete(OperatingExpense).where(OperatingExpense.product_id == product_id))
-    except Exception:
-        pass
+    # Use raw SQL DELETE to clean all FK dependencies in one shot.
+    # This avoids broken transaction state from per-table try/except blocks.
+    dependent_tables = [
+        "stock_movements",
+        "product_variants",
+        "stock_take_items",
+        "stock_notifications",
+        "product_reviews",
+        "wishlist_items",
+        "stock_reservations",
+        "supplier_price_records",
+        "supplier_return_items",
+        "stock_transfer_items",
+        "waste_records",
+        "product_batches",
+        "product_inventory_profiles",
+        "competitor_price_entries",
+        "competitor_price_suggestions",
+        "bi_purchase_batch_items",
+        "bi_inventory_ledger",
+        "bi_operating_expenses",
+        "dismissed_alerts",
+        "app_notifications",
+    ]
+
+    for table in dependent_tables:
+        try:
+            db.session.execute(
+                text(f'DELETE FROM "{table}" WHERE product_id = :pid'),
+                {"pid": product_id}
+            )
+        except Exception as exc:
+            _log.debug("delete_product cleanup skip %s: %s", table, exc)
+
+    # Remove icon map entry by product name
     try:
         from ..models.product_icon_map import ProductIconMap
         icon = db.session.execute(
