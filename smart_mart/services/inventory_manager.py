@@ -247,6 +247,37 @@ def delete_product(product_id: int) -> None:
     except Exception:
         pass
     try:
+        from ..models.stock_transfer import StockTransferItem
+        db.session.execute(_delete(StockTransferItem).where(StockTransferItem.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.waste_record import WasteRecord
+        db.session.execute(_delete(WasteRecord).where(WasteRecord.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..models.operations import ProductBatch, ProductInventoryProfile
+        db.session.execute(_delete(ProductBatch).where(ProductBatch.product_id == product_id))
+        db.session.execute(_delete(ProductInventoryProfile).where(ProductInventoryProfile.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..bi.models.purchase_batch import PurchaseBatchItem
+        db.session.execute(_delete(PurchaseBatchItem).where(PurchaseBatchItem.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..bi.models.inventory_ledger import InventoryLedgerEntry
+        db.session.execute(_delete(InventoryLedgerEntry).where(InventoryLedgerEntry.product_id == product_id))
+    except Exception:
+        pass
+    try:
+        from ..bi.models.operating_expense import OperatingExpense
+        db.session.execute(_delete(OperatingExpense).where(OperatingExpense.product_id == product_id))
+    except Exception:
+        pass
+    try:
         from ..models.product_icon_map import ProductIconMap
         icon = db.session.execute(
             select(ProductIconMap).where(ProductIconMap.product_name == product.name)
