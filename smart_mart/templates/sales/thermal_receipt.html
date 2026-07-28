@@ -62,8 +62,14 @@
 
   <table>
     <tr><td>Invoice:</td><td class="right">{{ sale.invoice_number or '#' ~ sale.id }}</td></tr>
-    <tr><td class="miti">मिति:</td><td class="right miti" style="font-size:13px;">{{ sale.sale_date | bs_date }}</td></tr>
-    <tr><td style="font-size:10px;color:#555">Date:</td><td class="right" style="font-size:10px;color:#555">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td></tr>
+    <tr>
+      <td class="miti" style="font-size:13px;">मिति:</td>
+      <td class="right miti" style="font-size:13px;">{{ sale.sale_date | bs_date }}</td>
+    </tr>
+    <tr>
+      <td style="font-size:10px;padding-left:2px;">Date:</td>
+      <td class="right" style="font-size:10px;">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td>
+    </tr>
     {% if sale.customer_name %}<tr><td>Customer:</td><td class="right">{{ sale.customer_name }}</td></tr>{% endif %}
     <tr><td>Payment:</td><td class="right">{{ sale.payment_mode | upper }}</td></tr>
   </table>
@@ -132,8 +138,8 @@
   <div class="divider-solid"></div>
   <div class="footer">
     {{ shop.footer_note if shop and shop.footer_note else 'Thank you for shopping with us!' }}<br>
-    <span class="miti" style="font-size:10px">{{ sale.sale_date | bs_date }}</span>
-    <span style="font-size:9px;color:#555"> ({{ sale.sale_date | nst('%Y-%m-%d %H:%M') }})</span>
+    <span class="miti" style="font-size:10px;">{{ sale.sale_date | bs_date }}</span>
+    <span style="font-size:9px;"> ({{ sale.sale_date | nst('%Y-%m-%d %H:%M') }})</span>
   </div>
 
   <div class="no-print" style="margin-top:12px;text-align:center">

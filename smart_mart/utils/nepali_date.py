@@ -6,6 +6,15 @@ BS_MONTHS = [
     "Kartik", "Mangsir", "Poush", "Magh", "Falgun", "Chaitra",
 ]
 
+# Nepali (Devanagari) month names
+_NP_MONTHS = [
+    "बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज",
+    "कात्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत",
+]
+
+# Nepali digit mapping
+_NP_DIGITS = str.maketrans("0123456789", "०१२३४५६७८९")
+
 _EPOCH_AD = date(2025, 4, 14)
 _EPOCH_BS = (2082, 1, 1)
 _BS_MONTH_DAYS = {
@@ -48,7 +57,14 @@ def ad_to_bs(ad_date):
     return year, month, day
 
 
-def format_bs(year, month, day):
+def format_bs(year, month, day, nepali: bool = True) -> str:
+    """Return BS date as Nepali script by default: २०८३ साउन १२
+    Pass nepali=False for ASCII: 2083 Shrawan 12"""
+    if nepali:
+        y = str(year).translate(_NP_DIGITS)
+        m = _NP_MONTHS[month - 1]
+        d = str(day).translate(_NP_DIGITS)
+        return f"{y} {m} {d}"
     month_name = BS_MONTHS[month - 1]
     return f"{day} {month_name} {year} BS"
 
