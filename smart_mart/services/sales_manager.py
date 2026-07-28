@@ -120,7 +120,7 @@ def create_sale(items: list[dict], user_id: int,
                     _prospective_gross = sum(
                         item["unit_price"] * item["quantity"] for item in items
                     )
-                    _prospective_total = max(0, _prospective_gross - (discount_amount or 0))
+                    _prospective_total = max(0, _prospective_gross - float(discount_amount or 0))
                     if float(outstanding) + float(_prospective_total) > float(cust.credit_limit):
                         raise ValueError(
                             f"Credit limit exceeded for {cust.name}. "
@@ -165,7 +165,7 @@ def create_sale(items: list[dict], user_id: int,
                 )
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
-        total_amount = max(0, gross_total_amount - (discount_amount or 0))
+        total_amount = max(0, gross_total_amount - float(discount_amount or 0))
         normalized_payment = (payment_method or payment_mode or "cash").strip().lower()
 
         redeemed_points = 0
@@ -227,7 +227,7 @@ def create_sale(items: list[dict], user_id: int,
             payment_mode=normalized_payment,
             payment_method=normalized_payment,
             sale_type=sale_type or "regular",
-            discount_amount=(discount_amount or 0) + loyalty_discount_amount,
+            discount_amount=float(discount_amount or 0) + loyalty_discount_amount,
             commission_amount=commission_amount,
             discount_note=discount_note,
             promotion_id=promotion_id,
