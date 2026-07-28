@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Receipt #{{ sale.invoice_number or sale.id }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
   <style>
     @page { size: 80mm auto; margin: 0 }
     * { box-sizing: border-box; margin: 0; padding: 0 }
@@ -16,6 +18,10 @@
       background: #fff;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    .miti {
+      font-family: 'Noto Sans Devanagari', Arial, sans-serif;
+      font-weight: 700;
     }
     .center { text-align: center }
     .right { text-align: right }
@@ -56,8 +62,8 @@
 
   <table>
     <tr><td>Invoice:</td><td class="right">{{ sale.invoice_number or '#' ~ sale.id }}</td></tr>
-    <tr><td>Date:</td><td class="right">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td></tr>
-    <tr><td>मिति:</td><td class="right">{{ sale.sale_date | bs_date }}</td></tr>
+    <tr><td class="miti">मिति:</td><td class="right miti" style="font-size:13px;">{{ sale.sale_date | bs_date }}</td></tr>
+    <tr><td style="font-size:10px;color:#555">Date:</td><td class="right" style="font-size:10px;color:#555">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td></tr>
     {% if sale.customer_name %}<tr><td>Customer:</td><td class="right">{{ sale.customer_name }}</td></tr>{% endif %}
     <tr><td>Payment:</td><td class="right">{{ sale.payment_mode | upper }}</td></tr>
   </table>
@@ -126,7 +132,8 @@
   <div class="divider-solid"></div>
   <div class="footer">
     {{ shop.footer_note if shop and shop.footer_note else 'Thank you for shopping with us!' }}<br>
-    <span style="font-size:9px">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</span>
+    <span class="miti" style="font-size:10px">{{ sale.sale_date | bs_date }}</span>
+    <span style="font-size:9px;color:#555"> ({{ sale.sale_date | nst('%Y-%m-%d %H:%M') }})</span>
   </div>
 
   <div class="no-print" style="margin-top:12px;text-align:center">
