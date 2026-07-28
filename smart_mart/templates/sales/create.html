@@ -838,15 +838,13 @@
     promoTimer = setTimeout(async () => {
       if (subtotal <= 0) { removePromoBar(); return; }
       try {
-        // Collect current cart items
+        // Collect current cart items — query actual DOM rows (not index loop)
+        // so deleted rows with non-sequential indices don't cause early exit
         const cartItems = [];
-        let idx = 0;
-        while (true) {
-          const pid = document.querySelector(`[name="items[${idx}][product_id]"]`);
-          if (!pid) break;
-          if (pid.value) cartItems.push({ product_id: parseInt(pid.value) });
-          idx++;
-        }
+        document.querySelectorAll('tr.sale-item-row').forEach(row => {
+          const sel = row.querySelector('.product-select');
+          if (sel && sel.value) cartItems.push({ product_id: parseInt(sel.value) });
+        });
         const res = await fetch('/promotions/api/check', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},

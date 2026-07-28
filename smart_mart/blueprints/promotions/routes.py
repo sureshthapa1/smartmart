@@ -39,6 +39,7 @@ def list_promotions():
 @login_required
 def create_promotion():
     _require_perm("can_manage_promotions")
+    from datetime import timedelta
     categories = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
     if request.method == "POST":
         data = _form_to_data(request.form)
@@ -49,14 +50,18 @@ def create_promotion():
             return redirect(url_for("promotions.list_promotions"))
         except Exception as e:
             flash(str(e), "danger")
+    today = date.today()
     return render_template("promotions/form.html", promo=None, categories=categories,
-                           today=date.today().isoformat(), action="Create")
+                           today=today.isoformat(),
+                           today_plus_30=(today + timedelta(days=30)).isoformat(),
+                           action="Create")
 
 
 @promotions_bp.route("/<int:promo_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_promotion(promo_id):
     _require_perm("can_manage_promotions")
+    from datetime import timedelta
     from ...models.promotion import Promotion
     promo = db.get_or_404(Promotion, promo_id)
     categories = db.session.execute(db.select(Category).order_by(Category.name)).scalars().all()
@@ -68,8 +73,11 @@ def edit_promotion(promo_id):
             return redirect(url_for("promotions.list_promotions"))
         except Exception as e:
             flash(str(e), "danger")
+    today = date.today()
     return render_template("promotions/form.html", promo=promo, categories=categories,
-                           today=date.today().isoformat(), action="Edit")
+                           today=today.isoformat(),
+                           today_plus_30=(today + timedelta(days=30)).isoformat(),
+                           action="Edit")
 
 
 @promotions_bp.route("/<int:promo_id>/delete", methods=["POST"])

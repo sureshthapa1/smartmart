@@ -85,7 +85,7 @@
             <div class="col-md-6">
               <label class="form-label">End Date <span class="text-danger">*</span></label>
               <input type="date" name="end_date" class="form-control" required
-                     value="{{ promo.end_date.isoformat() if promo else today }}">
+                     value="{{ promo.end_date.isoformat() if promo else today_plus_30 }}">
             </div>
           </div>
           <div class="mb-4">
