@@ -469,13 +469,22 @@ This will OVERWRITE existing description, image and pack size.')">
   ];
 
   // ── Product Name: Tom Select on a <select>, create=true ─────────────────
+  // Always include the current product's name in the options so Tom Select
+  // can pre-select it even when the name isn't in COMMON_PRODUCTS.
+  const _nameOptions = COMMON_PRODUCTS.map(v => ({ value: v, text: v }));
+  {% if product %}
+  const _curName = {{ product.name | tojson }};
+  if (!COMMON_PRODUCTS.includes(_curName)) {
+    _nameOptions.unshift({ value: _curName, text: _curName });
+  }
+  {% endif %}
   const nameSel = new TomSelect('#productNameSelect', {
     create: true,
     createOnBlur: true,
     persist: false,
     maxOptions: 20,
     placeholder: 'Type or search product name…',
-    options: COMMON_PRODUCTS.map(v => ({ value: v, text: v })),
+    options: _nameOptions,
     {% if product %}items: [{{ product.name | tojson }}],{% endif %}
     render: {
       option_create(data, escape) {
@@ -486,7 +495,7 @@ This will OVERWRITE existing description, image and pack size.')">
       document.getElementById('nameHidden').value = val || '';
     }
   });
-  // Set initial value
+  // Set initial value explicitly — Tom Select fires onChange lazily
   document.getElementById('nameHidden').value = nameSel.getValue() || '';
 
   // ── Category: Tom Select with create ────────────────────────────────────

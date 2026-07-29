@@ -74,6 +74,7 @@ class SaleItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey("sales.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    variant_id = db.Column(db.Integer, db.ForeignKey("product_variants.id", ondelete="SET NULL"), nullable=True)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     cost_price = db.Column(db.Numeric(10, 2), nullable=True)   # cost at time of sale
@@ -82,6 +83,7 @@ class SaleItem(db.Model):
     # Relationships
     sale = db.relationship("Sale", back_populates="items")
     product = db.relationship("Product", back_populates="sale_items", lazy="selectin")
+    variant = db.relationship("ProductVariant", foreign_keys=[variant_id], lazy="selectin")
     return_items = db.relationship(
         "SaleReturnItem", back_populates="sale_item", cascade="all, delete-orphan"
     )

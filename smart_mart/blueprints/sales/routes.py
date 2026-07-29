@@ -78,13 +78,23 @@ def create_sale():
     products = db.session.execute(
         db.select(Product).where(Product.is_active == True).order_by(Product.name)
     ).scalars().all()
+    # Load active variants so they can be billed alongside parent products
+    from ...models.product_variant import ProductVariant
+    variants = db.session.execute(
+        db.select(ProductVariant)
+        .where(ProductVariant.is_active == True, ProductVariant.quantity > 0)
+        .order_by(ProductVariant.product_id, ProductVariant.variant_name)
+    ).scalars().all()
+    # Build a product_id → product map for quick lookup in the template
+    product_map = {p.id: p for p in products}
     target_progress = _target_progress()
 
     if request.method == "POST":
         items = _parse_items(request.form)
         if not items:
             flash("Please add at least one item to the sale.", "danger")
-            return render_template("sales/create.html", products=products, target_progress=target_progress)
+            return render_template("sales/create.html", products=products, variants=variants,
+                                   product_map=product_map, target_progress=target_progress)
 
         products_by_id = {
             p.id: p for p in db.session.execute(
@@ -178,7 +188,8 @@ def create_sale():
         except ValueError as e:
             flash(str(e), "danger")
 
-    return render_template("sales/create.html", products=products, target_progress=target_progress)
+    return render_template("sales/create.html", products=products, variants=variants,
+                           product_map=product_map, target_progress=target_progress)
 
 
 @sales_bp.route("/<int:sale_id>")
@@ -534,12 +545,13 @@ def _parse_items(form) -> list[dict]:
     """Parse items[N][product_id/quantity/unit_price] fields from form data.
 
     Supports both sequential keys (items[0], items[1]…) and sparse/gapped
-    keys that can arise if the JS renumber step is somehow skipped. Scans
-    all form keys to collect every index present rather than stopping at the
-    first gap.
+    keys that can arise if the JS renumber step is somehow skipped.
+
+    product_id may be a plain integer (regular product) or the string
+    "v:<variant_id>" (a product variant). Variant items carry an extra
+    "variant_id" key so sales_manager can deduct the correct stock.
     """
     import re
-    # Collect all unique indices present in the form
     indices: list[int] = []
     _idx_re = re.compile(r"^items\[(\d+)\]\[product_id\]$")
     for key in form.keys():
@@ -549,15 +561,24 @@ def _parse_items(form) -> list[dict]:
 
     items: list[dict] = []
     for index in sorted(indices):
-        product_id    = form.get(f"items[{index}][product_id]")
-        quantity_raw  = form.get(f"items[{index}][quantity]",   "0")
+        product_id_raw = form.get(f"items[{index}][product_id]")
+        quantity_raw   = form.get(f"items[{index}][quantity]",   "0")
         unit_price_raw = form.get(f"items[{index}][unit_price]", "0")
         try:
-            pid   = int(product_id)
             qty   = int(quantity_raw)
             price = float(unit_price_raw)
-            if pid > 0 and qty > 0 and price >= 0:
-                items.append({"product_id": pid, "quantity": qty, "unit_price": price})
+            if qty <= 0 or price < 0:
+                continue
+
+            # Variant item encoded as "v:<variant_id>"
+            if str(product_id_raw).startswith("v:"):
+                vid = int(str(product_id_raw)[2:])
+                items.append({"product_id": None, "variant_id": vid,
+                               "quantity": qty, "unit_price": price})
+            else:
+                pid = int(product_id_raw)
+                if pid > 0:
+                    items.append({"product_id": pid, "quantity": qty, "unit_price": price})
         except (ValueError, TypeError):
             pass
     return items

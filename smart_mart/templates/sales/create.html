@@ -495,14 +495,29 @@
         price: {{ p.selling_price | float }},
         stock: {{ p.quantity }},
         category: {{ (p.category or '') | tojson }},
-        img: {{ (product_image_url(p.image_filename, 80) or '') | tojson }}
+        img: {{ (product_image_url(p.image_filename, 80) or '') | tojson }},
+        is_variant: false
+      }{% if not loop.last or variants %},{% endif %}
+      {% endfor %}
+      {% for v in variants %}
+      {
+        id: {{ "\"v:\" + v.id | string }},
+        name: {{ (product_map[v.product_id].name ~ ' – ' ~ v.variant_name) | tojson }},
+        sku: {{ v.sku | tojson }},
+        barcode: {{ (v.barcode or '') | tojson }},
+        price: {{ v.selling_price | float }},
+        stock: {{ v.quantity }},
+        category: {{ (product_map[v.product_id].category or '') | tojson }},
+        img: {{ (product_image_url(product_map[v.product_id].image_filename, 80) or '') | tojson }},
+        is_variant: true,
+        variant_label: {{ v.variant_name | tojson }}
       }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
 
-    // Quick-lookup by id
+    // Quick-lookup by id (string key so variant ids like "v:5" work too)
     const PRODUCT_MAP = {};
-    PRODUCTS.forEach(p => { PRODUCT_MAP[p.id] = p; });
+    PRODUCTS.forEach(p => { PRODUCT_MAP[String(p.id)] = p; });
 
     // ── Quick Product Picker ──────────────────────────────────────────────
     let pickerOpen = true;
@@ -565,15 +580,23 @@
 
     function buildOptions(selectedId) {
       let html = '<option value="">— Select product —</option>';
-      PRODUCTS.forEach(p => {
-        const sel = p.id === selectedId ? ' selected' : '';
+      // Group: regular products first, then variants under a separator
+      const regulars = PRODUCTS.filter(p => !p.is_variant);
+      const variantItems = PRODUCTS.filter(p => p.is_variant);
+      const renderOpt = (p) => {
+        const sel = String(p.id) === String(selectedId) ? ' selected' : '';
         const outOfStock = p.stock <= 0;
         const lowStock = p.stock > 0 && p.stock <= 5;
-        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (only ${p.stock} left)` : ` (${p.stock} in stock)`);
+        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (${p.stock} left)` : ` (${p.stock})`);
         const disabled = outOfStock ? ' disabled' : '';
         const style = outOfStock ? ' style="color:#ef4444"' : (lowStock ? ' style="color:#f97316"' : '');
-        html += `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}" data-img="${p.img || ''}" data-category="${p.category || ''}">${p.name}${stockLabel}</option>`;
-      });
+        return `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}" data-img="${p.img || ''}" data-category="${p.category || ''}">${p.name}${stockLabel}</option>`;
+      };
+      regulars.forEach(p => { html += renderOpt(p); });
+      if (variantItems.length > 0) {
+        html += '<option disabled>── Variants ──</option>';
+        variantItems.forEach(p => { html += renderOpt(p); });
+      }
       return html;
     }
 
@@ -583,8 +606,7 @@
       if (!opt || !opt.value) return;
       const tr = selectEl.closest('tr');
       if (!tr) return;
-      const pid = parseInt(opt.value);
-      const prod = PRODUCT_MAP[pid];
+      const prod = PRODUCT_MAP[opt.value];
       if (!prod) return;
       // Update price input
       const priceInput = tr.querySelector('.price-input');
@@ -1079,7 +1101,7 @@
       let found = false;
       document.querySelectorAll('tr.sale-item-row').forEach(row => {
         const sel = row.querySelector('.product-select');
-        if (sel && parseInt(sel.value) === product.id) {
+        if (sel && String(sel.value) === String(product.id)) {
           const qtyInput = row.querySelector('.qty-input');
           if (qtyInput) {
             qtyInput.value = parseInt(qtyInput.value || 1) + 1;
@@ -1698,7 +1720,7 @@
     let total = 0;
     document.querySelectorAll('tr.sale-item-row').forEach(row => {
       const sel = row.querySelector('.product-select');
-      if (sel && parseInt(sel.value) === productId) {
+      if (sel && String(sel.value) === String(productId)) {
         total += parseFloat(row.querySelector('.subtotal-cell')?.textContent || 0);
       }
     });

@@ -576,6 +576,22 @@ def _migration_steps() -> list[MigrationStep]:
                 ),
             ),
         ),
+        (
+            "2026_07_29_sale_items_variant_id",
+            "Add nullable variant_id column to sale_items so variant-based sales "
+            "can record which specific variant (size/unit/colour) was sold.",
+            lambda conn: (
+                _safe_add_column(
+                    conn, "sale_items", "variant_id",
+                    "INTEGER REFERENCES product_variants(id) ON DELETE SET NULL"
+                ),
+                _safe_exec(
+                    conn,
+                    "CREATE INDEX IF NOT EXISTS ix_sale_items_variant_id "
+                    "ON sale_items(variant_id)"
+                ),
+            ),
+        ),
     ]
 
 

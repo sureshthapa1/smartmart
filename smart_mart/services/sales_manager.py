@@ -135,6 +135,28 @@ def create_sale(items: list[dict], user_id: int,
 
         invoice_number = None
 
+        # ── Resolve variant items → parent product ────────────────────────
+        # Items from the billing page may carry variant_id instead of product_id
+        # (encoded as "v:<id>" in the form, parsed to {"variant_id": id} in
+        # _parse_items). Resolve each one to its parent product so the rest of
+        # the sale logic works unchanged.
+        variant_items: dict[int, object] = {}  # variant_id → ProductVariant
+        if any(item.get("variant_id") for item in items):
+            from ..models.product_variant import ProductVariant as _PV
+            variant_ids = [item["variant_id"] for item in items if item.get("variant_id")]
+            _variants = db.session.execute(
+                db.select(_PV).where(_PV.id.in_(variant_ids)).with_for_update()
+            ).scalars().all()
+            variant_items = {v.id: v for v in _variants}
+            # Back-fill product_id so downstream code can use items uniformly
+            for item in items:
+                vid = item.get("variant_id")
+                if vid:
+                    v = variant_items.get(vid)
+                    if not v:
+                        raise ValueError(f"Variant id {vid} not found.")
+                    item["product_id"] = v.product_id
+
         # ── Lock product rows to prevent concurrent oversell ──────────────
         # SELECT ... FOR UPDATE acquires a row-level lock so two concurrent
         # sales of the same product cannot both pass the stock check.
@@ -157,12 +179,23 @@ def create_sale(items: list[dict], user_id: int,
             pid = item["product_id"]
             if pid not in products:
                 raise ValueError(f"Product with id {pid} not found.")
-            product = products[pid]
-            if item["quantity"] > product.quantity:
-                raise InsufficientStockError(
-                    f"Insufficient stock for '{product.name}': "
-                    f"requested {item['quantity']}, available {product.quantity}."
-                )
+            vid = item.get("variant_id")
+            if vid:
+                # Check variant stock, not parent product stock
+                v = variant_items[vid]
+                if item["quantity"] > v.quantity:
+                    product = products[pid]
+                    raise InsufficientStockError(
+                        f"Insufficient stock for '{product.name} – {v.variant_name}': "
+                        f"requested {item['quantity']}, available {v.quantity}."
+                    )
+            else:
+                product = products[pid]
+                if item["quantity"] > product.quantity:
+                    raise InsufficientStockError(
+                        f"Insufficient stock for '{product.name}': "
+                        f"requested {item['quantity']}, available {product.quantity}."
+                    )
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
         total_amount = max(0, gross_total_amount - float(discount_amount or 0))
@@ -242,13 +275,21 @@ def create_sale(items: list[dict], user_id: int,
             product = products[item["product_id"]]
             qty = item["quantity"]
             unit_price = item["unit_price"]
+            vid = item.get("variant_id")
+            cost = product.cost_price
+            if vid and vid in variant_items:
+                v = variant_items[vid]
+                cost = v.cost_price
+                v.quantity -= qty   # deduct variant stock
+            else:
+                product.quantity -= qty  # deduct parent product stock
             db.session.add(SaleItem(
                 sale_id=sale.id, product_id=product.id,
+                variant_id=vid if vid else None,
                 quantity=qty, unit_price=unit_price,
-                cost_price=product.cost_price,   # snapshot cost at time of sale
+                cost_price=cost,        # snapshot cost at time of sale
                 subtotal=unit_price * qty,
             ))
-            product.quantity -= qty
             db.session.add(StockMovement(
                 product_id=product.id, change_amount=-qty, change_type="sale",
                 reference_id=sale.id, created_by=user_id,
