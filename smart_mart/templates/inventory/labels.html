@@ -37,10 +37,19 @@
       break-inside:avoid;
     }
     .label.size-small  { width:40mm; min-height:25mm; }
+    .label.size-50x25  { width:48mm; min-height:23mm; padding:1.5mm 2mm; }   /* 50×25mm sticker */
     .label.size-medium { width:60mm; min-height:35mm; }
     .label.size-large  { width:80mm; min-height:45mm; }
     /* Thermal roll: one label per line, full 80mm width */
     .label.size-roll   { width:74mm; min-height:auto; padding:1.5mm 2mm; }
+
+    /* 50×25mm specific font tuning — fits in tight space */
+    .label.size-50x25 .lbl-shop  { font-size:5pt;  font-weight:700; }
+    .label.size-50x25 .lbl-name  { font-size:7.5pt; font-weight:900; margin:.4mm 0; }
+    .label.size-50x25 .lbl-price { font-size:11pt; font-weight:900; line-height:1; }
+    .label.size-50x25 .lbl-mrp   { font-size:4.5pt; }
+    .label.size-50x25 .lbl-sku   { font-size:4.5pt; }
+    .label.size-50x25 .lbl-qr img{ width:16mm; height:16mm; }
 
     .label .lbl-shop   { font-size:5.5pt; font-weight:700; color:#475569; letter-spacing:.03em; line-height:1.2; }
     .label .lbl-name   { font-size:8pt;   font-weight:900; color:#0f172a; line-height:1.25; margin:.5mm 0; word-break:break-word; }
@@ -113,6 +122,7 @@
       body.thermal-roll   { }
     }
     @page thermal-small  { size: 40mm  25mm; margin: 0; }
+    @page thermal-50x25  { size: 50mm  25mm; margin: 0; }
     @page thermal-medium { size: 60mm  35mm; margin: 0; }
     @page thermal-large  { size: 80mm  45mm; margin: 0; }
     @page thermal-roll   { size: 80mm auto;  margin: 1mm; }
@@ -174,7 +184,8 @@
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="text-muted small fw-semibold align-self-center">Size:</span>
           <button type="button" class="label-size-btn" data-size="small"  onclick="setSize('small')">Small (40×25mm)</button>
-          <button type="button" class="label-size-btn active" data-size="medium" onclick="setSize('medium')">Medium (60×35mm)</button>
+          <button type="button" class="label-size-btn active" data-size="50x25" onclick="setSize('50x25')">★ 50×25mm (Your sticker)</button>
+          <button type="button" class="label-size-btn" data-size="medium" onclick="setSize('medium')">Medium (60×35mm)</button>
           <button type="button" class="label-size-btn" data-size="large"  onclick="setSize('large')">Large (80×45mm)</button>
           <button type="button" class="label-size-btn" data-size="roll"   onclick="setSize('roll')">🖨️ Thermal Roll (80mm)</button>
         </div>
@@ -182,10 +193,11 @@
         <!-- Thermal printer tip -->
         <div id="thermalTip" class="alert alert-info py-2 px-3 mb-3" style="font-size:.8rem;display:none;">
           <i class="bi bi-info-circle me-1"></i>
-          <strong>Thermal printer tip:</strong> In the browser print dialog, set
-          <strong>Paper size → Custom (40×25mm / 60×35mm / 80×45mm)</strong>,
-          <strong>Margins → None</strong>, and uncheck <strong>Headers and footers</strong>.
-          For a label roll, set <em>paper size = 80mm wide</em> and let height auto-fit.
+          <strong>Thermal printer tip:</strong> In the browser print dialog set
+          <strong>Paper size → Custom</strong> matching your sticker
+          (<span id="tipSize">50mm × 25mm</span>),
+          <strong>Margins → None</strong>, uncheck <strong>Headers &amp; footers</strong>.
+          For a roll set <em>width = 80mm</em>, height = auto.
         </div>
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check form-switch">
@@ -252,20 +264,26 @@
     {% endfor %}
   };
 
-  let currentSize = 'medium';
+  let currentSize = '50x25';
 
   // QR size per label size
-  const QR_SIZE = { small:'16mm', medium:'22mm', large:'28mm', roll:'26mm' };
+  const QR_SIZE = { small:'16mm', '50x25':'16mm', medium:'22mm', large:'28mm', roll:'26mm' };
 
   function setSize(size) {
     currentSize = size;
     document.querySelectorAll('.label-size-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.size === size)
     );
-    // Show thermal tip for any size — always helpful
+    // Show thermal tip and update dimensions hint
+    const tipSize = document.getElementById('tipSize');
+    const tipMap = {
+      'small': '40mm × 25mm', '50x25': '50mm × 25mm',
+      'medium': '60mm × 35mm', 'large': '80mm × 45mm', 'roll': '80mm wide roll'
+    };
+    if (tipSize) tipSize.textContent = tipMap[size] || '';
     document.getElementById('thermalTip').style.display = '';
 
-    // For roll mode: make print sheet a single column
+    // Roll mode: single column layout
     const ps = document.getElementById('printSheet');
     if (size === 'roll') {
       ps.style.flexDirection = 'column';
@@ -371,7 +389,10 @@
     });
   }
 
-  document.addEventListener('DOMContentLoaded', () => { rebuildLabels(); });
+  document.addEventListener('DOMContentLoaded', () => {
+    setSize('50x25');   // pre-select the user's sticker size
+    rebuildLabels();
+  });
 
   async function ensureQr(pid) {
     if (LABEL_DATA[pid]?.qr) return;
