@@ -1189,7 +1189,6 @@ def price_alerts():
 
 @inventory_bp.route("/labels", methods=["GET", "POST"])
 @login_required
-@login_required
 def print_labels():
     """Generate printable barcode/price labels for products."""
     _require_perm("can_print_labels")
@@ -1199,7 +1198,7 @@ def print_labels():
 
     if request.method == "POST":
         selected_ids = [int(x) for x in request.form.getlist("product_ids") if x.isdigit()]
-        # Generate barcode images as base64 for selected products
+        # Generate QR/barcode images as base64 for selected products
         for p in products:
             if p.id in selected_ids:
                 barcode_b64 = _generate_barcode_b64(p.sku)
@@ -1212,11 +1211,28 @@ def print_labels():
                     "barcode_b64": barcode_b64,
                 })
 
+    from flask import jsonify as _jsonify
+    shop = None
+    try:
+        shop = __import__('smart_mart.models.shop_settings', fromlist=['ShopSettings']).ShopSettings.get()
+    except Exception:
+        pass
     return render_template("inventory/labels.html",
                            products=products,
                            selected_ids=selected_ids,
                            label_data=label_data,
-                           shop=__import__('smart_mart.models.shop_settings', fromlist=['ShopSettings']).ShopSettings.get())
+                           shop=shop)
+
+
+@inventory_bp.route("/labels/qr")
+@login_required
+def label_qr():
+    """Return a base64 QR PNG for a given SKU — used for on-demand label generation."""
+    sku = request.args.get("sku", "").strip()
+    if not sku:
+        return {"qr": ""}
+    from flask import jsonify as _jsonify
+    return _jsonify({"qr": _generate_barcode_b64(sku)})
 
 
 def _generate_barcode_b64(sku: str) -> str:

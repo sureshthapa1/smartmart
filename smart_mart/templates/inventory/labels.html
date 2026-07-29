@@ -1,164 +1,308 @@
-{% extends "base.html" %}
-{% block title %}Print Labels — Goldkernel{% endblock %}
-{% block page_title %}Product Labels{% endblock %}
-{% block breadcrumb %}
-<li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
-<li class="breadcrumb-item active">Print Labels</li>
-{% endblock %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print Labels — {{ shop.shop_name if shop else 'Smart Mart' }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    /* ── Screen styles ────────────────────────────────────────────────── */
+    body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; }
+    .top-bar { background:#0f172a; padding:.6rem 1.2rem; color:#fff; display:flex; align-items:center; gap:1rem; }
+    .top-bar a { color:#94a3b8; text-decoration:none; font-size:.85rem; }
+    .top-bar a:hover { color:#fff; }
+    .section-card { background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:1.5rem; margin-bottom:1.5rem; }
+    .label-size-btn { border:2px solid #e2e8f0; border-radius:8px; padding:.4rem .9rem; cursor:pointer; font-size:.82rem; font-weight:600; background:#f8fafc; transition:.15s; }
+    .label-size-btn.active, .label-size-btn:hover { border-color:#6366f1; background:#eef2ff; color:#6366f1; }
+    .product-check-row { border:1px solid #e2e8f0; border-radius:8px; padding:.45rem .8rem; margin-bottom:.35rem; display:flex; align-items:center; gap:.6rem; cursor:pointer; }
+    .product-check-row:hover { background:#f8fafc; }
+    .qty-input { width:60px; border:1px solid #e2e8f0; border-radius:6px; padding:.2rem .4rem; font-size:.8rem; text-align:center; }
 
-{% block head %}
-<style>
-  @media print {
-    /* Hide everything except the label sheet */
-    body > * { display: none !important; }
-    #printArea { display: block !important; }
-    #printArea .label-grid {
-      display: flex !important;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 10px;
+    /* ── Label sheet ──────────────────────────────────────────────────── */
+    #labelSheet { display:flex; flex-wrap:wrap; gap:4mm; padding:4mm; background:#fff; }
+
+    /* ── Individual label sizes ───────────────────────────────────────── */
+    .label {
+      box-sizing:border-box;
+      border:1px solid #000;
+      padding:2mm;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      overflow:hidden;
+      page-break-inside:avoid;
+      break-inside:avoid;
     }
-    .label-card {
-      width: 85mm;
-      border: 1px solid #000 !important;
-      page-break-inside: avoid;
+    .label.size-small  { width:40mm; min-height:25mm; }
+    .label.size-medium { width:60mm; min-height:35mm; }
+    .label.size-large  { width:80mm; min-height:45mm; }
+
+    .label .lbl-shop   { font-size:5.5pt; font-weight:700; color:#475569; letter-spacing:.03em; line-height:1.2; }
+    .label .lbl-name   { font-size:8pt;   font-weight:900; color:#0f172a; line-height:1.25; margin:.5mm 0; word-break:break-word; }
+    .label .lbl-cat    { font-size:5.5pt; color:#64748b; margin-bottom:.5mm; }
+    .label .lbl-price  { font-size:12pt;  font-weight:900; color:#1e3a5f; line-height:1; }
+    .label .lbl-mrp    { font-size:5.5pt; color:#64748b; }
+    .label .lbl-sku    { font-size:5pt;   color:#94a3b8; margin-top:.5mm; letter-spacing:.04em; }
+    .label .lbl-qr     { margin:.5mm 0; }
+    .label .lbl-qr img { display:block; }
+
+    .label.size-small  .lbl-name  { font-size:7pt; }
+    .label.size-small  .lbl-price { font-size:10pt; }
+    .label.size-small  .lbl-qr img{ width:18mm; height:18mm; }
+    .label.size-medium .lbl-qr img{ width:22mm; height:22mm; }
+    .label.size-large  .lbl-name  { font-size:10pt; }
+    .label.size-large  .lbl-price { font-size:14pt; }
+    .label.size-large  .lbl-qr img{ width:28mm; height:28mm; }
+
+    /* ── Print styles ─────────────────────────────────────────────────── */
+    @media print {
+      body * { visibility:hidden; }
+      #printArea, #printArea * { visibility:visible; }
+      #printArea {
+        position:fixed; top:0; left:0; width:100%;
+        background:#fff;
+      }
+      #labelSheet {
+        gap:2mm;
+        padding:6mm;
+      }
+      .label { border:1px solid #000 !important; }
+      @page { margin:6mm; }
     }
-  }
+  </style>
+</head>
+<body>
 
-  .label-card {
-    width: 85mm;
-    min-height: 45mm;
-    border: 1px dashed #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 10px;
-    background: #fff;
-    display: inline-flex;
-    flex-direction: column;
-    justify-content: space-between;
-    margin: 4px;
-    box-sizing: border-box;
-  }
-  .label-shop { font-size: 8px; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-  .label-name { font-size: 11px; font-weight: 700; color: #0f172a; margin: 3px 0 2px; line-height: 1.2; }
-  .label-price { font-size: 20px; font-weight: 800; color: #6366f1; line-height: 1; }
-  .label-sku { font-size: 9px; color: #64748b; margin-top: 2px; }
-  .label-barcode-wrap { text-align: center; margin-top: 4px; }
-  .label-barcode-wrap img { width: 60px; height: 60px; }
-  .label-sku-text { font-size: 8px; color: #475569; text-align: center; margin-top: 1px; font-family: monospace; }
-</style>
-{% endblock %}
+<!-- Top nav -->
+<div class="top-bar no-print">
+  <a href="{{ url_for('inventory.list_products') }}"><i class="bi bi-arrow-left me-1"></i>Inventory</a>
+  <span style="color:#fff;font-weight:700;">Print Labels</span>
+  <button onclick="window.print()" class="btn btn-sm ms-auto"
+          style="background:#6366f1;color:#fff;border:none;border-radius:8px;">
+    <i class="bi bi-printer me-1"></i>Print Labels
+  </button>
+</div>
 
-{% block content %}
-
-<!-- Selection form (hidden on print) -->
-<div class="row g-3" id="selectionArea">
-  <div class="col-lg-4">
-    <div class="card">
-      <div class="card-header fw-semibold">
-        <i class="bi bi-upc me-2 text-primary"></i>Select Products
-      </div>
-      <div class="card-body">
-        <form method="post" id="labelForm">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div style="max-height:420px;overflow-y:auto" class="mb-3">
-            {% for p in products %}
-            <div class="form-check mb-1">
-              <input class="form-check-input" type="checkbox" name="product_ids"
-                     value="{{ p.id }}" id="p{{ p.id }}"
-                     {% if p.id in selected_ids %}checked{% endif %}>
-              <label class="form-check-label small" for="p{{ p.id }}">
-                {{ p.name }}
-                <span class="text-muted">({{ p.sku }})</span>
-              </label>
-            </div>
-            {% endfor %}
+<div class="container-fluid py-3 no-print" style="max-width:1100px;">
+  <!-- Controls -->
+  <div class="row g-3">
+    <!-- Left: product selector -->
+    <div class="col-lg-5">
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h6 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Select Products</h6>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAll()">All</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAll()">None</button>
           </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-                    onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=true)">
-              All
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-                    onclick="document.querySelectorAll('[name=product_ids]').forEach(c=>c.checked=false)">
-              None
-            </button>
-            <button type="submit" class="btn btn-primary btn-sm ms-auto">
-              <i class="bi bi-eye me-1"></i>Generate Labels
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+        </div>
 
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">
-          Label Preview
-          {% if label_data %}
-          <span class="badge bg-primary ms-2">{{ label_data|length }} labels</span>
-          {% endif %}
-        </span>
-        {% if label_data %}
-        <button onclick="window.print()" class="btn btn-sm btn-primary">
-          <i class="bi bi-printer me-1"></i>Print Labels
-        </button>
-        {% endif %}
-      </div>
-      <div class="card-body p-2">
-        {% if label_data %}
-        <div class="d-flex flex-wrap">
-          {% for item in label_data %}
-          <div class="label-card">
-            <div>
-              <div class="label-shop">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
-              <div class="label-name">{{ item.name }}</div>
-              <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
-              <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>
+        <!-- Search -->
+        <input type="text" id="productSearch" class="form-control form-control-sm mb-2"
+               placeholder="Search products…" oninput="filterProducts()">
+
+        <div id="productList" style="max-height:420px;overflow-y:auto;">
+          {% for p in products %}
+          <label class="product-check-row" data-name="{{ p.name|lower }}" data-cat="{{ (p.category or '')|lower }}">
+            <input type="checkbox" class="product-cb" value="{{ p.id }}"
+                   {% if p.id in selected_ids %}checked{% endif %}
+                   onchange="onCbChange(this)">
+            <div class="flex-grow-1">
+              <div style="font-size:.83rem;font-weight:600;">{{ p.name }}</div>
+              <div style="font-size:.72rem;color:#64748b;">{{ p.sku }} · NPR {{ "%.0f"|format(p.selling_price|float) }}{% if p.category %} · {{ p.category }}{% endif %}</div>
             </div>
-            <div class="label-barcode-wrap">
-              {% if item.barcode_b64 %}
-              <img src="{{ item.barcode_b64 }}" alt="{{ item.sku }}">
-              {% endif %}
-              <div class="label-sku-text">{{ item.sku }}</div>
-            </div>
-          </div>
+            <input type="number" class="qty-input" min="1" max="100" value="1"
+                   title="Copies" onclick="event.stopPropagation()"
+                   oninput="rebuildLabels()" data-pid="{{ p.id }}">
+          </label>
           {% endfor %}
         </div>
-        {% else %}
-        <div class="text-center text-muted py-5">
-          <i class="bi bi-upc fs-1 d-block mb-2 opacity-25"></i>
-          Select products and click Generate Labels.
+      </div>
+    </div>
+
+    <!-- Right: options + preview -->
+    <div class="col-lg-7">
+      <div class="section-card mb-3">
+        <h6 class="fw-bold mb-3"><i class="bi bi-sliders me-2 text-primary"></i>Label Options</h6>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="text-muted small fw-semibold align-self-center">Size:</span>
+          <button type="button" class="label-size-btn" data-size="small"  onclick="setSize('small')">Small (40×25mm)</button>
+          <button type="button" class="label-size-btn active" data-size="medium" onclick="setSize('medium')">Medium (60×35mm)</button>
+          <button type="button" class="label-size-btn" data-size="large"  onclick="setSize('large')">Large (80×45mm)</button>
         </div>
-        {% endif %}
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showQr" checked onchange="rebuildLabels()">
+            <label class="form-check-label small" for="showQr">Show QR code</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showShop" checked onchange="rebuildLabels()">
+            <label class="form-check-label small" for="showShop">Show shop name</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showCat" onchange="rebuildLabels()">
+            <label class="form-check-label small" for="showCat">Show category</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="showSku" onchange="rebuildLabels()">
+            <label class="form-check-label small" for="showSku">Show SKU</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="fw-bold mb-0"><i class="bi bi-eye me-2 text-primary"></i>Preview</h6>
+          <span id="labelCount" class="badge bg-secondary">0 labels</span>
+        </div>
+        <div id="previewArea" style="background:#f8fafc;border-radius:8px;padding:8px;min-height:120px;overflow:auto;max-height:380px;">
+          <div id="labelSheet"></div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Print-only area (invisible on screen, shown on print) -->
-<div id="printArea" style="display:none;">
-  {% if label_data %}
-  <div class="label-grid">
+<!-- Print area — only this renders when printing -->
+<div id="printArea">
+  <div id="printSheet" style="display:flex;flex-wrap:wrap;gap:2mm;padding:6mm;background:#fff;"></div>
+</div>
+
+<script>
+  const SHOP_NAME = {{ (shop.shop_name if shop else 'Smart Mart') | tojson }};
+  const LABEL_DATA = {
     {% for item in label_data %}
-    <div class="label-card">
-      <div>
-        <div class="label-shop">{{ shop.shop_name if shop else 'Goldkernel' }}</div>
-        <div class="label-name">{{ item.name }}</div>
-        <div class="label-price">NPR {{ "%.2f"|format(item.price) }}</div>
-        <div class="label-sku">{{ item.sku }}{% if item.category %} · {{ item.category }}{% endif %}</div>
-      </div>
-      <div class="label-barcode-wrap">
-        {% if item.barcode_b64 %}
-        <img src="{{ item.barcode_b64 }}" alt="{{ item.sku }}">
-        {% endif %}
-        <div class="label-sku-text">{{ item.sku }}</div>
-      </div>
-    </div>
+    {{ item.id }}: {
+      name: {{ item.name | tojson }},
+      sku: {{ item.sku | tojson }},
+      price: {{ item.price }},
+      category: {{ item.category | tojson }},
+      qr: {{ item.barcode_b64 | tojson }}
+    }{% if not loop.last %},{% endif %}
     {% endfor %}
-  </div>
-  {% endif %}
-</div>
+  };
 
-{% endblock %}
+  // Also store ALL product data for on-the-fly label generation
+  const ALL_PRODUCTS = {
+    {% for p in products %}
+    {{ p.id }}: {
+      name: {{ p.name | tojson }},
+      sku: {{ p.sku | tojson }},
+      price: {{ p.selling_price | float }},
+      category: {{ (p.category or '') | tojson }},
+      qr: null  // loaded on demand
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  let currentSize = 'medium';
+
+  function setSize(size) {
+    currentSize = size;
+    document.querySelectorAll('.label-size-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.size === size);
+    });
+    rebuildLabels();
+  }
+
+  function makeLabelHTML(pid, copies) {
+    const p = ALL_PRODUCTS[pid];
+    if (!p) return '';
+    const ld = LABEL_DATA[pid];  // has QR if pre-generated
+    const showQr  = document.getElementById('showQr').checked  && ld && ld.qr;
+    const showShop = document.getElementById('showShop').checked;
+    const showCat  = document.getElementById('showCat').checked  && p.category;
+    const showSku  = document.getElementById('showSku').checked;
+
+    const qrSize = currentSize === 'small' ? '18mm' : currentSize === 'large' ? '28mm' : '22mm';
+
+    let inner = '';
+    if (showShop) inner += `<div class="lbl-shop">${SHOP_NAME}</div>`;
+    inner += `<div class="lbl-name">${p.name}</div>`;
+    if (showCat)  inner += `<div class="lbl-cat">${p.category}</div>`;
+    inner += `<div class="lbl-price">NPR ${p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2)}</div>`;
+    inner += `<div class="lbl-mrp">MRP inc. all taxes</div>`;
+    if (showQr)   inner += `<div class="lbl-qr"><img src="${ld.qr}" style="width:${qrSize};height:${qrSize};" alt="QR"></div>`;
+    if (showSku)  inner += `<div class="lbl-sku">${p.sku}</div>`;
+
+    let labels = '';
+    for (let i = 0; i < copies; i++) {
+      labels += `<div class="label size-${currentSize}">${inner}</div>`;
+    }
+    return labels;
+  }
+
+  function rebuildLabels() {
+    const checkboxes = document.querySelectorAll('.product-cb:checked');
+    let html = '';
+    let total = 0;
+    checkboxes.forEach(cb => {
+      const pid = parseInt(cb.value);
+      const qtyInput = document.querySelector(`.qty-input[data-pid="${pid}"]`);
+      const copies = Math.max(1, parseInt(qtyInput?.value || 1));
+      html += makeLabelHTML(pid, copies);
+      total += copies;
+    });
+    document.getElementById('labelSheet').innerHTML = html;
+    document.getElementById('printSheet').innerHTML = html;
+    document.getElementById('labelCount').textContent = total + ' label' + (total !== 1 ? 's' : '');
+  }
+
+  function onCbChange(cb) {
+    if (cb.checked) {
+      const pid = parseInt(cb.value);
+      ensureQr(pid).then(() => rebuildLabels());
+    }
+    rebuildLabels();
+  }
+
+  function selectAll() {
+    document.querySelectorAll('.product-cb').forEach(cb => {
+      if (!cb.checked) { cb.checked = true; ensureQr(parseInt(cb.value)); }
+    });
+    rebuildLabels();
+  }
+
+  function clearAll() {
+    document.querySelectorAll('.product-cb').forEach(cb => cb.checked = false);
+    rebuildLabels();
+  }
+
+  function filterProducts() {
+    const q = document.getElementById('productSearch').value.toLowerCase();
+    document.querySelectorAll('#productList label').forEach(row => {
+      const match = row.dataset.name.includes(q) || row.dataset.cat.includes(q);
+      row.style.display = match ? '' : 'none';
+    });
+  }
+
+  // If products were preselected via POST, build immediately
+  document.addEventListener('DOMContentLoaded', () => {
+    rebuildLabels();
+    // Pre-select any checked items from server-side POST
+    {% if selected_ids %}
+    rebuildLabels();
+    {% endif %}
+  });
+
+  // Generate QR for any checked product that doesn't have pre-generated data
+  // by requesting QR on-demand from the server
+  async function ensureQr(pid) {
+    if (LABEL_DATA[pid] && LABEL_DATA[pid].qr) return;
+    try {
+      const resp = await fetch(`/inventory/labels/qr?sku=${encodeURIComponent(ALL_PRODUCTS[pid].sku)}`);
+      if (resp.ok) {
+        const d = await resp.json();
+        if (!LABEL_DATA[pid]) LABEL_DATA[pid] = { ...ALL_PRODUCTS[pid] };
+        LABEL_DATA[pid].qr = d.qr;
+        rebuildLabels();
+      }
+    } catch(e) {}
+  }
+</script>
+
+</body>
+</html>
