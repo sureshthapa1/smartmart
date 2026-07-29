@@ -39,6 +39,8 @@
     .label.size-small  { width:40mm; min-height:25mm; }
     .label.size-medium { width:60mm; min-height:35mm; }
     .label.size-large  { width:80mm; min-height:45mm; }
+    /* Thermal roll: one label per line, full 80mm width */
+    .label.size-roll   { width:74mm; min-height:auto; padding:1.5mm 2mm; }
 
     .label .lbl-shop   { font-size:5.5pt; font-weight:700; color:#475569; letter-spacing:.03em; line-height:1.2; }
     .label .lbl-name   { font-size:8pt;   font-weight:900; color:#0f172a; line-height:1.25; margin:.5mm 0; word-break:break-word; }
@@ -57,21 +59,63 @@
     .label.size-large  .lbl-price { font-size:14pt; }
     .label.size-large  .lbl-qr img{ width:28mm; height:28mm; }
 
-    /* ── Print styles ─────────────────────────────────────────────────── */
+    /* ── Print styles — optimised for thermal label printers ─────────── */
     @media print {
-      body * { visibility:hidden; }
-      #printArea, #printArea * { visibility:visible; }
-      #printArea {
-        position:fixed; top:0; left:0; width:100%;
-        background:#fff;
+      /* Hide everything except the print area */
+      .no-print, .top-bar { display:none !important; }
+      #previewArea, .section-card, .container-fluid { display:none !important; }
+
+      /* Reset body */
+      body { background:#fff !important; margin:0 !important; padding:0 !important; }
+
+      /* Show the print area */
+      #printArea { display:block !important; }
+
+      /* Label sheet — no gap, no padding for thermal rolls */
+      #printSheet {
+        display:flex !important;
+        flex-wrap:wrap;
+        gap:0 !important;
+        padding:0 !important;
+        margin:0 !important;
+        background:#fff !important;
       }
-      #labelSheet {
-        gap:2mm;
-        padding:6mm;
+
+      /* Every label: force black on white, exact dimensions */
+      .label {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color:#000 !important;
+        background:#fff !important;
+        border:1px solid #000 !important;
+        page-break-inside:avoid !important;
+        break-inside:avoid !important;
       }
-      .label { border:1px solid #000 !important; }
-      @page { margin:6mm; }
+
+      /* All text elements: force black */
+      .label .lbl-shop,
+      .label .lbl-name,
+      .label .lbl-cat,
+      .label .lbl-price,
+      .label .lbl-mrp,
+      .label .lbl-sku { color:#000 !important; }
+
+      /* Page size — thermal label paper */
+      /* Default: fits labels across a standard A4/letter roll width */
+      @page { size: auto; margin: 2mm; }
     }
+
+    /* ── Thermal-specific page sizes (user selects via JS) ────────────── */
+    @media print {
+      body.thermal-small  { }
+      body.thermal-medium { }
+      body.thermal-large  { }
+      body.thermal-roll   { }
+    }
+    @page thermal-small  { size: 40mm  25mm; margin: 0; }
+    @page thermal-medium { size: 60mm  35mm; margin: 0; }
+    @page thermal-large  { size: 80mm  45mm; margin: 0; }
+    @page thermal-roll   { size: 80mm auto;  margin: 1mm; }
   </style>
 </head>
 <body>
@@ -132,6 +176,16 @@
           <button type="button" class="label-size-btn" data-size="small"  onclick="setSize('small')">Small (40×25mm)</button>
           <button type="button" class="label-size-btn active" data-size="medium" onclick="setSize('medium')">Medium (60×35mm)</button>
           <button type="button" class="label-size-btn" data-size="large"  onclick="setSize('large')">Large (80×45mm)</button>
+          <button type="button" class="label-size-btn" data-size="roll"   onclick="setSize('roll')">🖨️ Thermal Roll (80mm)</button>
+        </div>
+
+        <!-- Thermal printer tip -->
+        <div id="thermalTip" class="alert alert-info py-2 px-3 mb-3" style="font-size:.8rem;display:none;">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Thermal printer tip:</strong> In the browser print dialog, set
+          <strong>Paper size → Custom (40×25mm / 60×35mm / 80×45mm)</strong>,
+          <strong>Margins → None</strong>, and uncheck <strong>Headers and footers</strong>.
+          For a label roll, set <em>paper size = 80mm wide</em> and let height auto-fit.
         </div>
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check form-switch">
@@ -200,33 +254,75 @@
 
   let currentSize = 'medium';
 
+  // QR size per label size
+  const QR_SIZE = { small:'16mm', medium:'22mm', large:'28mm', roll:'26mm' };
+
   function setSize(size) {
     currentSize = size;
-    document.querySelectorAll('.label-size-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.size === size);
-    });
+    document.querySelectorAll('.label-size-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.size === size)
+    );
+    // Show thermal tip for any size — always helpful
+    document.getElementById('thermalTip').style.display = '';
+
+    // For roll mode: make print sheet a single column
+    const ps = document.getElementById('printSheet');
+    if (size === 'roll') {
+      ps.style.flexDirection = 'column';
+      ps.style.alignItems    = 'flex-start';
+      ps.style.gap           = '1mm';
+      ps.style.padding       = '1mm';
+    } else {
+      ps.style.flexDirection = 'row';
+      ps.style.alignItems    = '';
+      ps.style.gap           = '2mm';
+      ps.style.padding       = '4mm';
+    }
     rebuildLabels();
   }
 
   function makeLabelHTML(pid, copies) {
     const p = ALL_PRODUCTS[pid];
     if (!p) return '';
-    const ld = LABEL_DATA[pid];  // has QR if pre-generated
-    const showQr  = document.getElementById('showQr').checked  && ld && ld.qr;
+    const ld = LABEL_DATA[pid];
+    const showQr   = document.getElementById('showQr').checked && ld && ld.qr;
     const showShop = document.getElementById('showShop').checked;
-    const showCat  = document.getElementById('showCat').checked  && p.category;
+    const showCat  = document.getElementById('showCat').checked && p.category;
     const showSku  = document.getElementById('showSku').checked;
+    const qrSize   = QR_SIZE[currentSize] || '22mm';
+    const priceStr = `NPR ${p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2)}`;
 
-    const qrSize = currentSize === 'small' ? '18mm' : currentSize === 'large' ? '28mm' : '22mm';
-
+    // Roll layout: horizontal — QR left, text right
     let inner = '';
-    if (showShop) inner += `<div class="lbl-shop">${SHOP_NAME}</div>`;
-    inner += `<div class="lbl-name">${p.name}</div>`;
-    if (showCat)  inner += `<div class="lbl-cat">${p.category}</div>`;
-    inner += `<div class="lbl-price">NPR ${p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2)}</div>`;
-    inner += `<div class="lbl-mrp">MRP inc. all taxes</div>`;
-    if (showQr)   inner += `<div class="lbl-qr"><img src="${ld.qr}" style="width:${qrSize};height:${qrSize};" alt="QR"></div>`;
-    if (showSku)  inner += `<div class="lbl-sku">${p.sku}</div>`;
+    if (currentSize === 'roll') {
+      let textCol = '';
+      if (showShop) textCol += `<div class="lbl-shop">${SHOP_NAME}</div>`;
+      textCol += `<div class="lbl-name" style="font-size:9pt;">${p.name}</div>`;
+      if (showCat)  textCol += `<div class="lbl-cat">${p.category}</div>`;
+      textCol += `<div class="lbl-price" style="font-size:13pt;">${priceStr}</div>`;
+      textCol += `<div class="lbl-mrp">MRP inc. all taxes</div>`;
+      if (showSku)  textCol += `<div class="lbl-sku">${p.sku}</div>`;
+
+      if (showQr) {
+        inner = `<div style="display:flex;align-items:center;gap:2mm;width:100%;">
+          <div class="lbl-qr" style="flex-shrink:0;">
+            <img src="${ld.qr}" style="width:${qrSize};height:${qrSize};display:block;" alt="QR">
+          </div>
+          <div style="flex:1;text-align:left;">${textCol}</div>
+        </div>`;
+      } else {
+        inner = `<div style="width:100%;text-align:center;">${textCol}</div>`;
+      }
+    } else {
+      // Stacked layout for small/medium/large
+      if (showShop) inner += `<div class="lbl-shop">${SHOP_NAME}</div>`;
+      inner += `<div class="lbl-name">${p.name}</div>`;
+      if (showCat)  inner += `<div class="lbl-cat">${p.category}</div>`;
+      inner += `<div class="lbl-price">${priceStr}</div>`;
+      inner += `<div class="lbl-mrp">MRP inc. all taxes</div>`;
+      if (showQr)   inner += `<div class="lbl-qr"><img src="${ld.qr}" style="width:${qrSize};height:${qrSize};display:block;" alt="QR"></div>`;
+      if (showSku)  inner += `<div class="lbl-sku">${p.sku}</div>`;
+    }
 
     let labels = '';
     for (let i = 0; i < copies; i++) {
@@ -237,8 +333,7 @@
 
   function rebuildLabels() {
     const checkboxes = document.querySelectorAll('.product-cb:checked');
-    let html = '';
-    let total = 0;
+    let html = '', total = 0;
     checkboxes.forEach(cb => {
       const pid = parseInt(cb.value);
       const qtyInput = document.querySelector(`.qty-input[data-pid="${pid}"]`);
@@ -248,14 +343,12 @@
     });
     document.getElementById('labelSheet').innerHTML = html;
     document.getElementById('printSheet').innerHTML = html;
-    document.getElementById('labelCount').textContent = total + ' label' + (total !== 1 ? 's' : '');
+    document.getElementById('labelCount').textContent =
+      total + ' label' + (total !== 1 ? 's' : '');
   }
 
   function onCbChange(cb) {
-    if (cb.checked) {
-      const pid = parseInt(cb.value);
-      ensureQr(pid).then(() => rebuildLabels());
-    }
+    if (cb.checked) ensureQr(parseInt(cb.value)).then(() => rebuildLabels());
     rebuildLabels();
   }
 
@@ -274,31 +367,20 @@
   function filterProducts() {
     const q = document.getElementById('productSearch').value.toLowerCase();
     document.querySelectorAll('#productList label').forEach(row => {
-      const match = row.dataset.name.includes(q) || row.dataset.cat.includes(q);
-      row.style.display = match ? '' : 'none';
+      row.style.display = (row.dataset.name.includes(q) || row.dataset.cat.includes(q)) ? '' : 'none';
     });
   }
 
-  // If products were preselected via POST, build immediately
-  document.addEventListener('DOMContentLoaded', () => {
-    rebuildLabels();
-    // Pre-select any checked items from server-side POST
-    {% if selected_ids %}
-    rebuildLabels();
-    {% endif %}
-  });
+  document.addEventListener('DOMContentLoaded', () => { rebuildLabels(); });
 
-  // Generate QR for any checked product that doesn't have pre-generated data
-  // by requesting QR on-demand from the server
   async function ensureQr(pid) {
-    if (LABEL_DATA[pid] && LABEL_DATA[pid].qr) return;
+    if (LABEL_DATA[pid]?.qr) return;
     try {
       const resp = await fetch(`/inventory/labels/qr?sku=${encodeURIComponent(ALL_PRODUCTS[pid].sku)}`);
       if (resp.ok) {
         const d = await resp.json();
         if (!LABEL_DATA[pid]) LABEL_DATA[pid] = { ...ALL_PRODUCTS[pid] };
         LABEL_DATA[pid].qr = d.qr;
-        rebuildLabels();
       }
     } catch(e) {}
   }
