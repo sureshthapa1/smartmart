@@ -501,7 +501,7 @@
       {% endfor %}
       {% for v in variants %}
       {
-        id: {{ "\"v:\" + v.id | string }},
+        id: {{ ("v:" ~ v.id) | tojson }},
         name: {{ (product_map[v.product_id].name ~ ' – ' ~ v.variant_name) | tojson }},
         sku: {{ v.sku | tojson }},
         barcode: {{ (v.barcode or '') | tojson }},
