@@ -1475,8 +1475,8 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Rotate CCW 90° → portrait 160x240 matching printer DC exactly
-                img_rotated = img.rotate(90, expand=True)
+                # Rotate CW 90° → portrait 160x240 matching printer DC exactly
+                img_rotated = img.rotate(-90, expand=True)
 
                 # Send 1:1 to printer DC — no stretching needed
                 hdc.StartPage()
