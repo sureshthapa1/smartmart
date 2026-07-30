@@ -7,7 +7,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
-    /* ── SCREEN ────────────────────────────────────────────────── */
     body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; }
     .topbar { background:#0f172a; padding:.6rem 1.2rem; color:#fff; display:flex; align-items:center; gap:1rem; }
     .topbar a { color:#94a3b8; text-decoration:none; font-size:.85rem; }
@@ -17,97 +16,42 @@
     .prow { border:1px solid #e2e8f0; border-radius:8px; padding:.4rem .75rem; margin-bottom:.3rem; display:flex; align-items:center; gap:.6rem; cursor:pointer; }
     .prow:hover { background:#f8fafc; }
     .qin { width:52px; border:1px solid #e2e8f0; border-radius:6px; padding:.15rem .35rem; font-size:.8rem; text-align:center; }
-
-    /* ── SCREEN PREVIEW ────────────────────────────────────────── */
     #prevSheet { display:flex; flex-wrap:wrap; gap:3mm; padding:4mm; }
-    /* Preview uses 2× scale so it's visible on screen */
-    .lbl {
-      box-sizing:border-box; border:1.5px solid #333; background:#fff;
-      font-family:Arial,sans-serif; display:flex; overflow:hidden;
-      flex-direction:column;
-    }
-    /* 40×20 preview: 2.5× scale = 100mm × 50mm */
-    .lbl.s40x20 { width:100mm; height:50mm; padding:1.5mm 2mm; }
-    .lbl.s50x25 { width:125mm; height:62mm; padding:2mm 2.5mm; }
-    .lbl.s40x25 { width:100mm; height:62mm; padding:2mm; }
-    .lbl.s60x35 { width:120mm; height:70mm; padding:3mm; }
-    .lbl.s80x45 { width:160mm; height:90mm; padding:4mm; }
-
+    .lbl { box-sizing:border-box; border:1.5px solid #333; background:#fff; font-family:Arial,sans-serif; display:flex; flex-direction:column; overflow:hidden; }
+    .lbl.s75x50  { width:150mm; height:100mm; padding:3mm 4mm; }
+    .lbl.s50x30  { width:100mm; height:60mm;  padding:2mm 3mm; }
+    .lbl.s60x40  { width:120mm; height:80mm;  padding:3mm; }
+    .lbl.s100x50 { width:150mm; height:75mm;  padding:3mm 4mm; }
     .lbl .ltxt { flex:1; overflow:hidden; }
-    .lbl .lshop { font-size:6pt;  font-weight:700; color:#000; }
-    .lbl .lname { font-size:10pt; font-weight:900; color:#000; line-height:1.2; word-break:break-word; }
-    .lbl .lcat  { font-size:6pt;  color:#444; }
-    .lbl .lprice{ font-size:14pt; font-weight:900; color:#000; line-height:1.1; }
-    .lbl .lmrp  { font-size:5pt;  color:#444; }
-    .lbl .lsku  { font-size:5pt;  color:#444; }
-    .lbl .lbc   { width:100%; margin-top:1.5mm; }
+    .lbl .lshop  { font-size:7pt;  font-weight:700; color:#000; }
+    .lbl .lname  { font-size:12pt; font-weight:900; color:#000; line-height:1.2; word-break:break-word; }
+    .lbl .lprice { font-size:18pt; font-weight:900; color:#000; line-height:1.1; }
+    .lbl .lmrp   { font-size:6pt;  color:#444; }
+    .lbl .lsku   { font-size:6pt;  color:#444; }
+    .lbl .lbc    { width:100%; margin-top:2mm; }
     .lbl .lbc img { width:100%; height:auto; display:block; image-rendering:crisp-edges; }
-
-    /* ── PRINT ─────────────────────────────────────────────────── */
-    /*
-      Your sticker: 50mm wide × 25mm tall (landscape orientation).
-      @page size: 50mm 25mm = width 50, height 25 = landscape.
-      Content fills 100% width × 100% height of that page.
-
-      We also suppress browser headers/footers via the margin trick:
-      setting @page margin to 0 removes them on most browsers.
-      Tell user to also uncheck in dialog as backup.
-    */
     @media print {
-      /* Hide all screen chrome */
       body > * { display:none !important; }
-
-      /* Show only printArea */
       #printArea { display:block !important; }
-
-      /* Each .plbl is one full sticker */
       .plbl {
-        display: flex;
-        flex-direction: column;
-        width:  100%;
-        height: 100%;
-        box-sizing: border-box;
-        padding: 1.2mm 2mm 0.8mm 2mm;
-        background: #fff;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        page-break-after: always;
-        break-after: page;
+        display:flex; flex-direction:column;
+        width:100%; height:100%;
+        box-sizing:border-box; padding:2mm 3mm 1mm 3mm;
+        background:#fff;
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+        page-break-after:always; break-after:page;
       }
-      .plbl:last-child {
-        page-break-after: avoid;
-        break-after: avoid;
-      }
-
-      /* Text block */
-      .plbl .ltxt  { flex:0 0 auto; }
-      .plbl .lshop { font-size:4pt;   font-weight:700; color:#000 !important; line-height:1.2; }
-      .plbl .lname { font-size:6.5pt; font-weight:900; color:#000 !important; line-height:1.15; word-break:break-word; }
-      .plbl .lcat  { font-size:3.5pt; color:#000 !important; line-height:1.2; }
-      .plbl .lprice{ font-size:9pt;   font-weight:900; color:#000 !important; line-height:1.1; }
-      .plbl .lmrp  { font-size:3pt;   color:#000 !important; line-height:1.2; }
-      .plbl .lsku  { font-size:3pt;   color:#000 !important; line-height:1.2; }
-
-      /* Barcode strip — fills full width, auto height */
-      .plbl .lbc {
-        width: 100%;
-        margin-top: auto;
-        padding-top: 0.5mm;
-      }
-      .plbl .lbc img {
-        width: 100%;
-        height: auto;
-        display: block;
-        image-rendering: crisp-edges;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      /* Suppress browser header/footer text */
-      @page {
-        size: 50mm 25mm;
-        margin: 0;
-      }
+      .plbl:last-child { page-break-after:avoid; break-after:avoid; }
+      .plbl .ltxt  { flex:1; overflow:hidden; }
+      .plbl .lshop { font-size:6pt;  font-weight:700; color:#000 !important; }
+      .plbl .lname { font-size:10pt; font-weight:900; color:#000 !important; line-height:1.2; word-break:break-word; }
+      .plbl .lprice{ font-size:14pt; font-weight:900; color:#000 !important; line-height:1.1; }
+      .plbl .lmrp  { font-size:5pt;  color:#000 !important; }
+      .plbl .lsku  { font-size:5pt;  color:#000 !important; }
+      .plbl .lbc   { width:100%; margin-top:auto; padding-top:1mm; }
+      .plbl .lbc img { width:100%; height:auto; display:block; image-rendering:crisp-edges; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+      @page { size:75mm 50mm; margin:0; }
     }
   </style>
 </head>
@@ -117,13 +61,13 @@
   <a href="{{ url_for('inventory.list_products') }}"><i class="bi bi-arrow-left me-1"></i>Inventory</a>
   <span style="font-weight:700;">Print Labels</span>
   <div class="ms-auto d-flex gap-2">
-    <button onclick="downloadPDF()" class="btn btn-sm"
-            style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;font-weight:600;">
+    <button id="btnPdf" onclick="downloadPDF()" class="btn btn-sm fw-semibold"
+            style="background:#22c55e;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;">
       <i class="bi bi-file-earmark-pdf me-1"></i>Download PDF
     </button>
-    <button onclick="doPrint()" class="btn btn-sm"
-            style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;">
-      <i class="bi bi-printer me-1"></i>Print (browser)
+    <button onclick="printDirect()" class="btn btn-sm fw-semibold"
+            style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;">
+      <i class="bi bi-printer-fill me-1"></i>Print Direct
     </button>
   </div>
 </div>
@@ -163,28 +107,19 @@
     <div class="col-lg-7">
       <div class="card2 mb-3">
         <h6 class="fw-bold mb-3">Options</h6>
-
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="text-muted small fw-semibold align-self-center">Size:</span>
-          <button class="sbtn on" data-s="s40x20" onclick="setSize('s40x20')">★ 40×20mm</button>
-          <button class="sbtn" data-s="s50x25" onclick="setSize('s50x25')">50×25mm</button>
-          <button class="sbtn" data-s="s40x25" onclick="setSize('s40x25')">40×25mm</button>
-          <button class="sbtn" data-s="s60x35" onclick="setSize('s60x35')">60×35mm</button>
-          <button class="sbtn" data-s="s80x45" onclick="setSize('s80x45')">80×45mm</button>
+          <button class="sbtn on" data-s="s75x50"  onclick="setSize('s75x50')">★ 75×50mm</button>
+          <button class="sbtn" data-s="s50x30"  onclick="setSize('s50x30')">50×30mm</button>
+          <button class="sbtn" data-s="s60x40"  onclick="setSize('s60x40')">60×40mm</button>
+          <button class="sbtn" data-s="s100x50" onclick="setSize('s100x50')">100×50mm</button>
         </div>
 
         <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.8rem;">
-          <strong>✅ Recommended: click <em>Download PDF</em></strong> — opens a PDF where every page
-          is exactly one label at <span id="tipSz">40 × 20 mm</span>. In your PDF viewer, print with:
-          <ul class="mb-0 mt-1 ps-3">
-            <li>Scale: <strong>Actual size</strong> (no fit-to-page)</li>
-            <li>Margins: <strong>None</strong></li>
-            <li>Paper: your label size</li>
-          </ul>
-        </div>
-        <div class="alert alert-secondary py-2 px-3 mb-2" style="font-size:.75rem;display:none;" id="browserPrintTip">
-          <strong>Browser print fallback:</strong> Paper = Custom <span class="tipSz2">40×20mm</span>,
-          Orientation = Landscape, Margins = None, uncheck Headers/footers.
+          <strong>✅ Recommended:</strong> Click <strong>Download PDF</strong> → open in PDF viewer →
+          print with <strong>Actual Size, No margins</strong>.<br>
+          <strong>⚡ Or:</strong> Click <strong>Print Direct</strong> to send straight to
+          <em>sticker printer</em> — no dialog needed.
         </div>
 
         <div class="d-flex flex-wrap gap-3">
@@ -197,16 +132,12 @@
             <label class="form-check-label small" for="chkShop">Shop name</label>
           </div>
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="chkCat" onchange="rebuild()">
-            <label class="form-check-label small" for="chkCat">Category</label>
+            <input class="form-check-input" type="checkbox" id="chkMrp" checked onchange="rebuild()">
+            <label class="form-check-label small" for="chkMrp">MRP line</label>
           </div>
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" id="chkSku" onchange="rebuild()">
             <label class="form-check-label small" for="chkSku">SKU</label>
-          </div>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="chkMrp" checked onchange="rebuild()">
-            <label class="form-check-label small" for="chkMrp">MRP line</label>
           </div>
         </div>
       </div>
@@ -224,47 +155,31 @@
   </div>
 </div>
 
-<!-- PRINT AREA — the only thing that prints -->
-<div id="printArea">
-  <div id="printSheet"></div>
-</div>
+<div id="printArea"><div id="printSheet"></div></div>
 
 <script>
   const SHOP = {{ (shop.shop_name if shop else 'Smart Mart') | tojson }};
-
   const PRE_BC = {
-    {% for item in label_data %}
-    {{ item.id }}: {{ item.barcode_b64 | tojson }}{% if not loop.last %},{% endif %}
-    {% endfor %}
+    {% for item in label_data %}{{ item.id }}: {{ item.barcode_b64 | tojson }}{% if not loop.last %},{% endif %}{% endfor %}
   };
-
   const PRODS = {
     {% for p in products %}
-    {{ p.id }}: {
-      name:    {{ p.name | tojson }},
-      sku:     {{ p.sku | tojson }},
-      barcode: {{ (p.barcode or p.sku) | tojson }},
-      price:   {{ p.selling_price | float }},
-      cat:     {{ (p.category or '') | tojson }}
-    }{% if not loop.last %},{% endif %}
+    {{ p.id }}: { name:{{ p.name|tojson }}, sku:{{ p.sku|tojson }}, barcode:{{ (p.barcode or p.sku)|tojson }}, price:{{ p.selling_price|float }}, cat:{{ (p.category or '')|tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   };
-
   const BC = { ...PRE_BC };
 
   const SIZES = {
-    s40x20:{ page:'40mm 20mm', tip:'40 × 20 mm' },
-    s50x25:{ page:'50mm 25mm', tip:'50 × 25 mm' },
-    s40x25:{ page:'40mm 25mm', tip:'40 × 25 mm' },
-    s60x35:{ page:'60mm 35mm', tip:'60 × 35 mm' },
-    s80x45:{ page:'80mm 45mm', tip:'80 × 45 mm' },
+    s75x50:  { w:75,  h:50,  tip:'75 × 50 mm'  },
+    s50x30:  { w:50,  h:30,  tip:'50 × 30 mm'  },
+    s60x40:  { w:60,  h:40,  tip:'60 × 40 mm'  },
+    s100x50: { w:100, h:50,  tip:'100 × 50 mm' },
   };
-  let cur = 's40x20';
+  let cur = 's75x50';
 
   function setSize(s) {
     cur = s;
     document.querySelectorAll('.sbtn').forEach(b => b.classList.toggle('on', b.dataset.s === s));
-    document.getElementById('tipSz').textContent = SIZES[s].tip;
     rebuild();
   }
 
@@ -272,35 +187,28 @@
     const p = PRODS[pid]; if (!p) return '';
     const showBc  = document.getElementById('chkBc').checked && BC[pid];
     const showShp = document.getElementById('chkShop').checked;
-    const showCat = document.getElementById('chkCat').checked && p.cat;
-    const showSku = document.getElementById('chkSku').checked;
     const showMrp = document.getElementById('chkMrp').checked;
+    const showSku = document.getElementById('chkSku').checked;
     const price   = 'NPR ' + (p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2));
-
     let txt = '<div class="ltxt">';
     if (showShp) txt += `<div class="lshop">${SHOP}</div>`;
     txt += `<div class="lname">${p.name}</div>`;
-    if (showCat) txt += `<div class="lcat">${p.cat}</div>`;
     txt += `<div class="lprice">${price}</div>`;
-    if (showMrp) txt += `<div class="lmrp">MRP incl. taxes</div>`;
+    if (showMrp) txt += `<div class="lmrp">MRP incl. all taxes</div>`;
     if (showSku) txt += `<div class="lsku">${p.sku}</div>`;
     txt += '</div>';
-
-    const bcPart = showBc
-      ? `<div class="lbc"><img src="${BC[pid]}" alt="barcode"></div>`
-      : '';
-
+    const bcPart = showBc ? `<div class="lbc"><img src="${BC[pid]}" alt="barcode"></div>` : '';
     return txt + bcPart;
   }
 
   function rebuild() {
     const cbs = document.querySelectorAll('.pcb:checked');
-    let prev = '', print = '', total = 0;
+    let prev='', print='', total=0;
     cbs.forEach(cb => {
       const pid = parseInt(cb.value);
-      const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value || 1));
+      const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value||1));
       const inn = labelInner(pid);
-      for (let i = 0; i < n; i++) {
+      for (let i=0;i<n;i++) {
         prev  += `<div class="lbl ${cur}">${inn}</div>`;
         print += `<div class="plbl">${inn}</div>`;
       }
@@ -308,111 +216,83 @@
     });
     document.getElementById('prevSheet').innerHTML  = prev;
     document.getElementById('printSheet').innerHTML = print;
-    document.getElementById('cnt').textContent = total + (total === 1 ? ' label' : ' labels');
+    document.getElementById('cnt').textContent = total + (total===1?' label':' labels');
+  }
+
+  function buildPayload() {
+    const items = [];
+    document.querySelectorAll('.pcb:checked').forEach(cb => {
+      const pid = parseInt(cb.value);
+      const p   = PRODS[pid]; if (!p) return;
+      const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value||1));
+      items.push({ pid, name:p.name, sku:p.sku, barcode:p.barcode||p.sku, price:p.price, copies:n });
+    });
+    return { items,
+      w_mm: SIZES[cur].w, h_mm: SIZES[cur].h,
+      show_barcode: document.getElementById('chkBc').checked,
+      show_shop:    document.getElementById('chkShop').checked,
+      show_mrp:     document.getElementById('chkMrp').checked,
+      show_sku:     document.getElementById('chkSku').checked,
+    };
   }
 
   async function downloadPDF() {
-    const cbs = document.querySelectorAll('.pcb:checked');
-    if (!cbs.length) { alert('Select at least one product first.'); return; }
-
-    const btn = document.querySelector('[onclick="downloadPDF()"]');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
-
-    // Build item list
-    const items = [];
-    cbs.forEach(cb => {
-      const pid = parseInt(cb.value);
-      const p   = PRODS[pid]; if (!p) return;
-      const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value || 1));
-      items.push({
-        pid, name: p.name, sku: p.sku,
-        barcode: p.barcode || p.sku,
-        price: p.price, copies: n,
-      });
-    });
-
-    // Parse selected size
-    const sz   = SIZES[cur].page.split(' ');
-    const w_mm = parseFloat(sz[0]);
-    const h_mm = parseFloat(sz[1]);
-
+    const payload = buildPayload();
+    if (!payload.items.length) { alert('Select at least one product.'); return; }
+    const btn = document.getElementById('btnPdf');
+    btn.disabled=true; btn.textContent='⏳ Generating…';
     try {
-      const resp = await fetch('/inventory/labels/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          w_mm, h_mm,
-          show_barcode: document.getElementById('chkBc').checked,
-          show_shop:    document.getElementById('chkShop').checked,
-          show_mrp:     document.getElementById('chkMrp').checked,
-          show_sku:     document.getElementById('chkSku').checked,
-        }),
+      const r = await fetch('/inventory/labels/pdf', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
       });
-      if (!resp.ok) { alert('PDF generation failed. Check server logs.'); return; }
-      const blob = await resp.blob();
-      const url  = URL.createObjectURL(blob);
-      // Open in new tab — user prints from PDF viewer with correct settings
-      window.open(url, '_blank');
-    } catch(e) {
-      alert('Error: ' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf me-1"></i>Download PDF'; }
-    }
+      if (!r.ok) { alert('PDF failed: ' + await r.text()); return; }
+      const blob = await r.blob();
+      window.open(URL.createObjectURL(blob), '_blank');
+    } catch(e) { alert('Error: '+e.message); }
+    finally { btn.disabled=false; btn.innerHTML='<i class="bi bi-file-earmark-pdf me-1"></i>Download PDF'; }
   }
 
-  function doPrint() {
-    // Show browser print tip
-    document.getElementById('browserPrintTip').style.display = '';
-    const pending = [];
-    document.querySelectorAll('.pcb:checked').forEach(cb => {
-      const pid = parseInt(cb.value);
-      if (!BC[pid]) pending.push(loadBc(pid));
-    });
-    Promise.all(pending).then(() => {
-      rebuild();
-      let s = document.getElementById('dynPg');
-      if (!s) { s = document.createElement('style'); s.id = 'dynPg'; document.head.appendChild(s); }
-      s.textContent = `@page { size: ${SIZES[cur].page}; margin: 0; }`;
-      setTimeout(() => window.print(), 150);
-    });
+  async function printDirect() {
+    const payload = buildPayload();
+    if (!payload.items.length) { alert('Select at least one product.'); return; }
+    payload.printer = 'sticker printer';
+    try {
+      const r = await fetch('/inventory/labels/print-direct', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.ok) { alert(`✅ Sent ${d.printed} label(s) to sticker printer.`); }
+      else { alert('Print failed: ' + (d.error||'unknown error')); }
+    } catch(e) { alert('Error: '+e.message); }
   }
 
   async function loadBc(pid) {
     if (BC[pid]) return;
     try {
-      const v = encodeURIComponent(PRODS[pid].barcode || PRODS[pid].sku);
+      const v = encodeURIComponent(PRODS[pid].barcode||PRODS[pid].sku);
       const r = await fetch(`/inventory/labels/barcode?value=${v}`);
-      if (r.ok) { const d = await r.json(); BC[pid] = d.barcode; }
+      if (r.ok) { const d=await r.json(); BC[pid]=d.barcode; }
     } catch(e) {}
   }
 
   function onChk(cb) {
-    if (cb.checked) loadBc(parseInt(cb.value)).then(rebuild);
-    else rebuild();
+    if (cb.checked) loadBc(parseInt(cb.value)).then(rebuild); else rebuild();
   }
-
   function selAll() {
-    const ps = [];
-    document.querySelectorAll('.pcb').forEach(cb => {
-      if (!cb.checked) { cb.checked = true; ps.push(loadBc(parseInt(cb.value))); }
-    });
+    const ps=[];
+    document.querySelectorAll('.pcb').forEach(cb=>{ if(!cb.checked){cb.checked=true;ps.push(loadBc(parseInt(cb.value)));} });
     Promise.all(ps).then(rebuild);
   }
-
-  function selNone() {
-    document.querySelectorAll('.pcb').forEach(cb => cb.checked = false);
-    rebuild();
-  }
-
+  function selNone() { document.querySelectorAll('.pcb').forEach(cb=>cb.checked=false); rebuild(); }
   function filterList() {
-    const q = document.getElementById('srch').value.toLowerCase();
-    document.querySelectorAll('#plist label').forEach(r => {
-      r.style.display = (r.dataset.n.includes(q) || r.dataset.c.includes(q)) ? '' : 'none';
+    const q=document.getElementById('srch').value.toLowerCase();
+    document.querySelectorAll('#plist label').forEach(r=>{
+      r.style.display=(r.dataset.n.includes(q)||r.dataset.c.includes(q))?'':'none';
     });
   }
-
-  document.addEventListener('DOMContentLoaded', () => { setSize('s40x20'); });
+  document.addEventListener('DOMContentLoaded', ()=>{ setSize('s75x50'); });
 </script>
 </body>
 </html>
