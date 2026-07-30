@@ -30,11 +30,14 @@
       display:flex;
       overflow:hidden;
     }
-    /* sizes for PREVIEW only (screen) */
-    .lbl.s50 { width:100mm; height:50mm; padding:2mm; flex-direction:row; align-items:center; gap:2mm; }
-    .lbl.s40 { width:80mm;  height:50mm; padding:2mm; flex-direction:row; align-items:center; gap:2mm; }
-    .lbl.s60 { width:120mm; height:70mm; padding:3mm; flex-direction:row; align-items:center; gap:3mm; }
-    .lbl.s80 { width:160mm; height:90mm; padding:4mm; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+    /* sizes for PREVIEW only (screen) — all column layout: text top, barcode bottom */
+    .lbl.s50 { width:100mm; height:50mm; padding:2mm; flex-direction:column; justify-content:space-between; }
+    .lbl.s40 { width:80mm;  height:50mm; padding:2mm; flex-direction:column; justify-content:space-between; }
+    .lbl.s60 { width:120mm; height:70mm; padding:3mm; flex-direction:column; justify-content:space-between; }
+    .lbl.s80 { width:160mm; height:90mm; padding:4mm; flex-direction:column; justify-content:space-between; }
+
+    .lbl .lbc  { width:100%; text-align:center; margin-top:auto; }
+    .lbl .lbc img { width:100%; height:auto; display:block; image-rendering:crisp-edges; }
 
     .lbl .lqr  { flex-shrink:0; }
     .lbl .lqr img { display:block; }
@@ -86,8 +89,8 @@
       /* Vertical layout (80×45) */
       .plbl.vert  { flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2mm; }
 
-      .plbl .lqr  { flex-shrink:0; }
-      .plbl .lqr img { display:block; }
+    .plbl .lbc  { width:100%; text-align:center; margin-top:auto; }
+    .plbl .lbc img { width:100%; height:auto; max-height:10mm; display:block; image-rendering:crisp-edges; }
 
       /* QR sizes tuned per label size — set from JS via style attr */
       .plbl .ltxt { flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
@@ -231,22 +234,23 @@
   const PRODS = {
     {% for p in products %}
     {{ p.id }}: {
-      name:  {{ p.name | tojson }},
-      sku:   {{ p.sku | tojson }},
-      price: {{ p.selling_price | float }},
-      cat:   {{ (p.category or '') | tojson }}
+      name:    {{ p.name | tojson }},
+      sku:     {{ p.sku | tojson }},
+      barcode: {{ (p.barcode or p.sku) | tojson }},
+      price:   {{ p.selling_price | float }},
+      cat:     {{ (p.category or '') | tojson }}
     }{% if not loop.last %},{% endif %}
     {% endfor %}
   };
 
-  const QR = { ...PRE_QR };   // live cache
+  /* Barcode image cache: pid → base64 Code128 PNG */
+  const BC = { ...PRE_QR };   // live cache (pre_qr contains server-rendered barcodes)
 
-  /* ── Size config ─────────────────────────────────────────────── */
   const SIZES = {
-    s40: { label:'40×25mm', page:'40mm 25mm', layout:'horiz', qrPx:'26mm', tipTxt:'40 × 25 mm' },
-    s50: { label:'50×25mm', page:'50mm 25mm', layout:'horiz', qrPx:'15mm', tipTxt:'50 × 25 mm' },
-    s60: { label:'60×35mm', page:'60mm 35mm', layout:'horiz', qrPx:'20mm', tipTxt:'60 × 35 mm' },
-    s80: { label:'80×45mm', page:'80mm 45mm', layout:'vert',  qrPx:'28mm', tipTxt:'80 × 45 mm' },
+    s40: { label:'40×25mm', page:'40mm 25mm', tipTxt:'40 × 25 mm' },
+    s50: { label:'50×25mm', page:'50mm 25mm', tipTxt:'50 × 25 mm' },
+    s60: { label:'60×35mm', page:'60mm 35mm', tipTxt:'60 × 35 mm' },
+    s80: { label:'80×45mm', page:'80mm 45mm', tipTxt:'80 × 45 mm' },
   };
 
   let cur = 's50';
@@ -258,20 +262,18 @@
     rebuild();
   }
 
-  /* ── Build one label's inner HTML ────────────────────────────── */
   function labelInner(pid) {
     const p = PRODS[pid]; if (!p) return '';
-    const qr      = QR[pid];
-    const showQr  = document.getElementById('chkQr').checked && qr;
+    const bc      = BC[pid];
+    const showBc  = document.getElementById('chkQr').checked && bc;
     const showShp = document.getElementById('chkShop').checked;
     const showCat = document.getElementById('chkCat').checked && p.cat;
     const showSku = document.getElementById('chkSku').checked;
     const showMrp = document.getElementById('chkMrp').checked;
     const price   = 'NPR ' + (p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2));
 
-    let qrPart  = showQr
-      ? `<div class="lqr"><img src="${qr}" style="width:${SIZES[cur].qrPx};height:${SIZES[cur].qrPx};" alt=""></div>`
-      : '';
+    // Barcode is wide and short — place it BELOW the text, not beside it
+    // For 50×25mm: text on top, barcode strip along the bottom
     let txt = '<div class="ltxt">';
     if (showShp) txt += `<div class="lshop">${SHOP}</div>`;
     txt += `<div class="lname">${p.name}</div>`;
@@ -281,7 +283,13 @@
     if (showSku) txt += `<div class="lsku">${p.sku}</div>`;
     txt += '</div>';
 
-    return SIZES[cur].layout === 'horiz' ? qrPart + txt : txt + qrPart;
+    let bcPart = '';
+    if (showBc) {
+      bcPart = `<div class="lbc"><img src="${bc}" alt="${p.barcode}"></div>`;
+    }
+
+    // All sizes: text top, barcode bottom (column layout)
+    return txt + bcPart;
   }
 
   /* ── Rebuild preview + print sheet ──────────────────────────── */
@@ -296,10 +304,8 @@
       ));
       const inner = labelInner(pid);
       for (let i = 0; i < copies; i++) {
-        // Preview: scaled-up lbl div for visual feedback
         prev  += `<div class="lbl ${cur}">${inner}</div>`;
-        // Print: full-page plbl div — fills 100% of the @page
-        print += `<div class="plbl ${SIZES[cur].layout}">${inner}</div>`;
+        print += `<div class="plbl vert">${inner}</div>`;
       }
       total += copies;
     });
@@ -322,24 +328,25 @@
     window.print();
   }
 
-  /* ── QR loader ───────────────────────────────────────────────── */
-  async function loadQr(pid) {
-    if (QR[pid]) return;
+  /* ── Load barcode image on demand ───────────────────────────── */
+  async function loadBc(pid) {
+    if (BC[pid]) return;
     try {
-      const r = await fetch(`/inventory/labels/qr?sku=${encodeURIComponent(PRODS[pid].sku)}`);
-      if (r.ok) { const d = await r.json(); QR[pid] = d.qr; }
+      const val = encodeURIComponent(PRODS[pid].barcode || PRODS[pid].sku);
+      const r = await fetch(`/inventory/labels/barcode?value=${val}`);
+      if (r.ok) { const d = await r.json(); BC[pid] = d.barcode; }
     } catch(e) {}
   }
 
   function onChk(cb) {
-    if (cb.checked) loadQr(parseInt(cb.value)).then(rebuild);
+    if (cb.checked) loadBc(parseInt(cb.value)).then(rebuild);
     rebuild();
   }
 
   function selAll() {
     const ps = [];
     document.querySelectorAll('.pcb').forEach(cb => {
-      if (!cb.checked) { cb.checked = true; ps.push(loadQr(parseInt(cb.value))); }
+      if (!cb.checked) { cb.checked = true; ps.push(loadBc(parseInt(cb.value))); }
     });
     Promise.all(ps).then(rebuild);
     rebuild();

@@ -1224,34 +1224,52 @@ def print_labels():
                            shop=shop)
 
 
-@inventory_bp.route("/labels/qr")
+@inventory_bp.route("/labels/barcode")
 @login_required
-def label_qr():
-    """Return a base64 QR PNG for a given SKU — used for on-demand label generation."""
-    sku = request.args.get("sku", "").strip()
-    if not sku:
-        return {"qr": ""}
+def label_barcode():
+    """Return a base64 Code128 barcode PNG for a given value (barcode or SKU)."""
+    value = request.args.get("value", "").strip()
+    if not value:
+        from flask import jsonify as _jsonify
+        return _jsonify({"barcode": ""})
     from flask import jsonify as _jsonify
-    return _jsonify({"qr": _generate_barcode_b64(sku)})
+    return _jsonify({"barcode": _generate_barcode_b64(value)})
 
 
-def _generate_barcode_b64(sku: str) -> str:
-    """Generate a Code128 barcode as base64 PNG."""
+def _generate_barcode_b64(value: str) -> str:
+    """Generate a Code128 barcode as base64 PNG — scannable by any barcode scanner."""
     try:
-        import qrcode
-        import io
-        import base64
-        # Use QR code as barcode (works without barcode library)
-        qr = qrcode.QRCode(version=1, box_size=3, border=1,
-                           error_correction=qrcode.constants.ERROR_CORRECT_L)
-        qr.add_data(sku)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
+        import barcode as _bc
+        from barcode.writer import ImageWriter
+        import io, base64
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        code = _bc.get(
+            "code128", value,
+            writer=ImageWriter()
+        )
+        code.write(buf, options={
+            "write_text":    True,    # print the number below the bars
+            "module_height": 8.0,     # bar height in mm
+            "module_width":  0.8,     # bar width — narrower = more compact
+            "quiet_zone":    2.0,     # whitespace either side
+            "font_size":     6,       # text size below bars
+            "text_distance": 1.0,
+        })
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
     except Exception:
-        return ""
+        # Fallback: QR code (always works, readable by phone but not handheld scanner)
+        try:
+            import qrcode, io, base64
+            qr = qrcode.QRCode(version=1, box_size=3, border=1,
+                               error_correction=qrcode.constants.ERROR_CORRECT_L)
+            qr.add_data(value)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            return ""
 
 
 @inventory_bp.route("/bulk-upload/sample")

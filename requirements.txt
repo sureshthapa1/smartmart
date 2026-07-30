@@ -29,3 +29,4 @@ redis==5.2.1
 # ESC/POS direct thermal printing (TVS RP3200 Lite and compatible printers)
 python-escpos==3.1
 pywin32==308
+python-barcode==0.16.1
