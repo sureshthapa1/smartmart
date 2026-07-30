@@ -1236,6 +1236,143 @@ def label_barcode():
     return _jsonify({"barcode": _generate_barcode_b64(value)})
 
 
+@inventory_bp.route("/labels/pdf", methods=["POST"])
+@login_required
+def labels_pdf():
+    """Generate a PDF where every page is exactly one label at the chosen size.
+    The PDF can be opened in any PDF viewer and printed with:
+      - Paper size = actual label size (no scaling)
+      - Margins = none
+    This bypasses browser CSS @page limitations entirely.
+    """
+    _require_perm("can_print_labels")
+    from flask import Response as _Resp
+    import io, base64
+
+    data        = request.get_json() or {}
+    items       = data.get("items", [])        # [{pid, name, sku, barcode, price, copies}]
+    w_mm        = float(data.get("w_mm", 40))
+    h_mm        = float(data.get("h_mm", 20))
+    show_bc     = data.get("show_barcode", True)
+    show_shop   = data.get("show_shop", True)
+    show_mrp    = data.get("show_mrp", True)
+    show_sku    = data.get("show_sku", False)
+
+    shop_name = ""
+    try:
+        from ...models.shop_settings import ShopSettings
+        shop_name = ShopSettings.get().shop_name or ""
+    except Exception:
+        pass
+
+    try:
+        from reportlab.lib.units import mm
+        from reportlab.lib.pagesizes import landscape
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.utils import ImageReader
+
+        W = w_mm * mm
+        H = h_mm * mm
+        pad = 1.5 * mm
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf, pagesize=(W, H))
+
+        for item in items:
+            copies = max(1, int(item.get("copies", 1)))
+            name   = str(item.get("name", ""))
+            sku    = str(item.get("sku",  ""))
+            bc_val = str(item.get("barcode") or sku)
+            price  = float(item.get("price", 0))
+            price_str = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
+
+            # Generate barcode PNG bytes
+            bc_img = None
+            if show_bc:
+                try:
+                    import barcode as _bc
+                    from barcode.writer import ImageWriter
+                    bb = io.BytesIO()
+                    code = _bc.get("code128", bc_val, writer=ImageWriter())
+                    code.write(bb, options={
+                        "write_text": True, "module_height": 6.0,
+                        "module_width": 0.6, "quiet_zone": 1.5,
+                        "font_size": 5, "text_distance": 0.8,
+                    })
+                    bb.seek(0)
+                    bc_img = ImageReader(bb)
+                except Exception:
+                    bc_img = None
+
+            for _ in range(copies):
+                c.setPageSize((W, H))
+
+                # ── Layout (bottom-up: reportlab origin is bottom-left) ──
+                # Reserve space for barcode at bottom
+                bc_h = 7 * mm if bc_img else 0
+                text_area_top = H - pad
+                y = text_area_top
+
+                # Shop name
+                if show_shop and shop_name:
+                    c.setFont("Helvetica-Bold", 4.5)
+                    c.setFillColorRGB(0, 0, 0)
+                    c.drawString(pad, y - 4.5/72*25.4*mm, shop_name)
+                    y -= 4 * mm
+
+                # Product name (wrap if needed)
+                c.setFont("Helvetica-Bold", 6.5)
+                c.setFillColorRGB(0, 0, 0)
+                # Simple single-line truncate for 40mm width
+                max_chars = int((W - 2*pad) / (6.5/72*25.4*mm) * 1.8)
+                disp_name = name if len(name) <= max_chars else name[:max_chars-1] + "…"
+                c.drawString(pad, y - 6.5/72*25.4*mm, disp_name)
+                y -= 5.5 * mm
+
+                # Price
+                c.setFont("Helvetica-Bold", 9)
+                c.drawString(pad, y - 9/72*25.4*mm, price_str)
+                y -= 7 * mm
+
+                # MRP line
+                if show_mrp:
+                    c.setFont("Helvetica", 3.5)
+                    c.drawString(pad, y - 3.5/72*25.4*mm, "MRP incl. all taxes")
+                    y -= 3.5 * mm
+
+                # SKU
+                if show_sku:
+                    c.setFont("Helvetica", 3.5)
+                    c.drawString(pad, y - 3.5/72*25.4*mm, sku)
+
+                # Barcode at bottom
+                if bc_img:
+                    c.drawImage(bc_img,
+                                0, 0,
+                                width=W, height=bc_h,
+                                preserveAspectRatio=False)
+
+                c.showPage()
+
+        c.save()
+        buf.seek(0)
+
+        return _Resp(
+            buf.read(),
+            mimetype="application/pdf",
+            headers={
+                "Content-Disposition": "inline; filename=labels.pdf",
+                "X-Label-W-mm": str(w_mm),
+                "X-Label-H-mm": str(h_mm),
+            }
+        )
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("labels_pdf failed: %s", exc)
+        return {"error": str(exc)}, 500
+
+
 def _generate_barcode_b64(value: str) -> str:
     """Generate a Code128 barcode as base64 PNG — scannable by any barcode scanner."""
     try:
