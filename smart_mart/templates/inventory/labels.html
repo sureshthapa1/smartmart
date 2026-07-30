@@ -19,10 +19,11 @@
     .qin { width:52px; border:1px solid #e2e8f0; border-radius:6px; padding:.15rem .35rem; font-size:.8rem; text-align:center; }
     #prevSheet { display:flex; flex-wrap:wrap; gap:3mm; padding:4mm; }
     .lbl { box-sizing:border-box; border:1.5px solid #333; background:#fff; font-family:Arial,sans-serif; display:flex; flex-direction:column; overflow:hidden; }
-    .lbl.s75x50  { width:150mm; height:100mm; padding:3mm 4mm; }
-    .lbl.s50x30  { width:100mm; height:60mm;  padding:2mm 3mm; }
-    .lbl.s60x40  { width:120mm; height:80mm;  padding:3mm; }
-    .lbl.s100x50 { width:150mm; height:75mm;  padding:3mm 4mm; }
+    .lbl.s50x25  { width:50mm;  height:25mm;  padding:1mm 1.5mm; }  /* ★ Your sticker */
+    .lbl.s75x50  { width:75mm;  height:50mm;  padding:3mm 4mm; }
+    .lbl.s50x30  { width:50mm;  height:30mm;  padding:2mm 3mm; }
+    .lbl.s60x40  { width:60mm;  height:40mm;  padding:3mm; }
+    .lbl.s100x50 { width:100mm; height:50mm;  padding:3mm 4mm; }
     .lbl .ltxt { flex:1; overflow:hidden; }
     .lbl .lshop  { font-size:7pt;  font-weight:700; color:#000; }
     .lbl .lname  { font-size:12pt; font-weight:900; color:#000; line-height:1.2; word-break:break-word; }
@@ -45,14 +46,14 @@
       }
       .plbl:last-child { page-break-after:avoid; break-after:avoid; }
       .plbl .ltxt  { flex:1; overflow:hidden; }
-      .plbl .lshop { font-size:6pt;  font-weight:700; color:#000 !important; }
-      .plbl .lname { font-size:10pt; font-weight:900; color:#000 !important; line-height:1.2; word-break:break-word; }
-      .plbl .lprice{ font-size:14pt; font-weight:900; color:#000 !important; line-height:1.1; }
+      .plbl .lshop { font-size:5.5pt; font-weight:700; color:#000 !important; }
+      .plbl .lname { font-size:8pt;  font-weight:900; color:#000 !important; line-height:1.1; word-break:break-word; }
+      .plbl .lprice{ font-size:11pt; font-weight:900; color:#000 !important; line-height:1.1; }
       .plbl .lmrp  { font-size:5pt;  color:#000 !important; }
       .plbl .lsku  { font-size:5pt;  color:#000 !important; }
       .plbl .lbc   { width:100%; margin-top:auto; padding-top:1mm; }
       .plbl .lbc img { width:100%; height:auto; display:block; image-rendering:crisp-edges; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-      @page { size:75mm 50mm; margin:0; }
+      /* @page size injected dynamically by injectPageCSS() before print */
     }
   </style>
 </head>
@@ -171,16 +172,26 @@
   const BC = { ...PRE_BC };
 
   const SIZES = {
+    s50x25:  { w:50,  h:25,  tip:'50 × 25 mm (Your sticker)' },
     s75x50:  { w:75,  h:50,  tip:'75 × 50 mm'  },
     s50x30:  { w:50,  h:30,  tip:'50 × 30 mm'  },
     s60x40:  { w:60,  h:40,  tip:'60 × 40 mm'  },
     s100x50: { w:100, h:50,  tip:'100 × 50 mm' },
   };
-  let cur = 's75x50';
+  let cur = 's50x25';  // default to user's 50×25mm sticker
+
+  function injectPageCSS(s) {
+    const dim = SIZES[s] || SIZES['s50x25'];
+    const css = `@media print { @page { size: ${dim.w}mm ${dim.h}mm; margin: 0; } }`;
+    let el = document.getElementById('dynPage');
+    if (!el) { el = document.createElement('style'); el.id = 'dynPage'; document.head.appendChild(el); }
+    el.textContent = css;
+  }
 
   function setSize(s) {
     cur = s;
     document.querySelectorAll('.sbtn').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+    injectPageCSS(s);
     rebuild();
   }
 
