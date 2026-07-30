@@ -1397,26 +1397,25 @@ def labels_print_direct():
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # The XP-409B driver reports wrong canvas (20x30mm) regardless of paper setting.
-        # Use fixed dimensions: 75mm x 50mm at 203 DPI = 599 x 399 px
+        # XP-409B sticker: 1.97in x 0.98in = 50mm x 25mm landscape at 203 DPI
         DPI   = 203
-        PX_W  = int(75 / 25.4 * DPI)   # 599
-        PX_H  = int(50 / 25.4 * DPI)   # 399
+        PX_W  = int(50 / 25.4 * DPI)   # 400px wide
+        PX_H  = int(25 / 25.4 * DPI)   # 200px tall
 
-        # Open the printer DC — we still need it to print, just don't trust its size
+        # Open the printer DC — needed for print job lifecycle
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
-            try:    return ImageFont.truetype(_fp, max(8, px))
+            try:    return ImageFont.truetype(_fp, max(6, px))
             except: return ImageFont.load_default()
 
-        # Font sizes tuned for 599px wide canvas
-        f_shop  = _f(22)
-        f_name  = _f(30)
-        f_price = _f(44)
-        f_small = _f(20)
+        # Font sizes for 400x200px canvas (50x25mm at 203dpi)
+        f_shop  = _f(14)   # ~1.7mm
+        f_name  = _f(20)   # ~2.5mm
+        f_price = _f(28)   # ~3.5mm
+        f_small = _f(12)   # ~1.5mm
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1432,8 +1431,8 @@ def labels_print_direct():
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
                 draw = ImageDraw.Draw(img)
-                pad  = 8
-                gap  = 4
+                pad  = 5
+                gap  = 2
                 y    = pad
 
                 def put(text, fnt):
@@ -1465,7 +1464,7 @@ def labels_print_direct():
                         bb.seek(0)
                         bc_im = Image.open(bb); bc_im.load()
                         bc_im = bc_im.convert("RGB")
-                        bc_h  = int(PX_H * 0.35)
+                        bc_h  = int(PX_H * 0.38)   # ~9mm barcode on 25mm sticker
                         bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
                         img.paste(bc_im, (0, PX_H - bc_h))
                     except Exception:
