@@ -1398,13 +1398,13 @@ def labels_print_direct():
         from barcode.writer import ImageWriter
 
         # XP-409B sticker: 1.97in x 0.98in = 50mm x 25mm
-        # Draw in portrait orientation (200w x 400h) then rotate 90° clockwise
-        # so the printer (which feeds portrait) gets the correct orientation.
+        # Draw in portrait orientation (200w x 400h) then rotate 90° CCW
+        # so the printer (which feeds portrait) gets landscape output.
         DPI   = 203
-        PX_W  = int(25 / 25.4 * DPI)   # 200px — portrait width
-        PX_H  = int(50 / 25.4 * DPI)   # 400px — portrait height
+        PX_W  = int(25 / 25.4 * DPI)   # 200px — portrait width (= sticker height)
+        PX_H  = int(50 / 25.4 * DPI)   # 400px — portrait height (= sticker width)
 
-        # Open the printer DC — needed for print job lifecycle
+        # Open the printer DC
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
 
@@ -1415,9 +1415,9 @@ def labels_print_direct():
 
         # Font sizes for 200px wide portrait canvas
         f_shop  = _f(13)
-        f_name  = _f(18)
-        f_price = _f(26)
-        f_small = _f(11)
+        f_name  = _f(20)
+        f_price = _f(30)
+        f_small = _f(12)
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1468,14 +1468,15 @@ def labels_print_direct():
                         bc_im = bc_im.convert("RGB")
                         bc_h  = int(PX_H * 0.38)   # ~9mm barcode on 25mm sticker
                         bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        img.paste(bc_im, (0, PX_H - bc_h))
+                        # Place barcode right after text with small gap, not at absolute bottom
+                        bc_y = min(y + 4, PX_H - bc_h)
+                        img.paste(bc_im, (0, bc_y))
                     except Exception:
                         pass
 
-                # The XP-409B feeds labels portrait (short side = feed direction).
-                # Our image is landscape (400w x 200h) so rotate 90° clockwise
-                # so it prints correctly when the printer feeds portrait.
-                img_rotated = img.rotate(-90, expand=True)  # -90 = clockwise
+                # The XP-409B feeds portrait. Rotate 90° counter-clockwise
+                # (positive 90) so landscape content prints correctly.
+                img_rotated = img.rotate(90, expand=True)
 
                 # Draw into printer DC — stretch rotated image to fill printer canvas
                 hdc.StartPage()
