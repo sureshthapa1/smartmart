@@ -7,7 +7,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
-    /* ═══════════ SCREEN UI ═══════════════════════════════════════════ */
+    /* ════════════════════════════════════════════════════════════
+       SCREEN STYLES
+    ════════════════════════════════════════════════════════════ */
     body { background:#f1f5f9; font-family:'Segoe UI',Arial,sans-serif; }
     .topbar { background:#0f172a; padding:.6rem 1.2rem; color:#fff; display:flex; align-items:center; gap:1rem; }
     .topbar a { color:#94a3b8; text-decoration:none; font-size:.85rem; }
@@ -18,97 +20,90 @@
     .prow:hover { background:#f8fafc; }
     .qin { width:52px; border:1px solid #e2e8f0; border-radius:6px; padding:.15rem .35rem; font-size:.8rem; text-align:center; }
 
-    /* Preview label wrapper */
-    #prevSheet { display:flex; flex-wrap:wrap; gap:4mm; padding:4mm; }
-
-    /* ── Preview label base ───────────────────────────────────────── */
+    /* Preview label */
+    #prevSheet { display:flex; flex-wrap:wrap; gap:3mm; padding:4mm; }
     .lbl {
-      box-sizing:border-box;
-      border:1px solid #555;
-      background:#fff;
-      font-family:Arial,sans-serif;
-      display:flex;
-      overflow:hidden;
+      box-sizing:border-box; border:1px solid #555; background:#fff;
+      font-family:Arial,sans-serif; display:flex; overflow:hidden;
     }
-    /* sizes for PREVIEW only (screen) — all column layout: text top, barcode bottom */
-    .lbl.s50 { width:100mm; height:50mm; padding:2mm; flex-direction:column; justify-content:space-between; }
-    .lbl.s40 { width:80mm;  height:50mm; padding:2mm; flex-direction:column; justify-content:space-between; }
-    .lbl.s60 { width:120mm; height:70mm; padding:3mm; flex-direction:column; justify-content:space-between; }
-    .lbl.s80 { width:160mm; height:90mm; padding:4mm; flex-direction:column; justify-content:space-between; }
-
-    .lbl .lbc  { width:100%; text-align:center; margin-top:auto; }
+    .lbl.s50 { width:100mm; height:50mm; padding:2mm 2.5mm; flex-direction:column; justify-content:space-between; }
+    .lbl.s40 { width:80mm;  height:50mm; padding:2mm;       flex-direction:column; justify-content:space-between; }
+    .lbl.s60 { width:120mm; height:70mm; padding:3mm;       flex-direction:column; justify-content:space-between; }
+    .lbl.s80 { width:160mm; height:90mm; padding:4mm;       flex-direction:column; justify-content:space-between; }
+    .lbl .ltxt { flex:1; display:flex; flex-direction:column; justify-content:flex-start; overflow:hidden; }
+    .lbl .lbc  { width:100%; margin-top:1mm; }
     .lbl .lbc img { width:100%; height:auto; display:block; image-rendering:crisp-edges; }
+    .lbl .lshop { font-size:6pt;  font-weight:700; color:#000; line-height:1.3; }
+    .lbl .lname { font-size:10pt; font-weight:900; color:#000; line-height:1.2; margin:.3mm 0; word-break:break-word; }
+    .lbl .lcat  { font-size:6pt;  color:#444; }
+    .lbl .lprice{ font-size:14pt; font-weight:900; color:#000; line-height:1; }
+    .lbl .lmrp  { font-size:5pt;  color:#444; }
+    .lbl .lsku  { font-size:5pt;  color:#444; }
 
-    .lbl .lqr  { flex-shrink:0; }
-    .lbl .lqr img { display:block; }
-    .lbl.s50 .lqr img { width:30mm; height:30mm; }
-    .lbl.s40 .lqr img { width:26mm; height:26mm; }
-    .lbl.s60 .lqr img { width:36mm; height:36mm; }
-    .lbl.s80 .lqr img { width:48mm; height:48mm; }
-
-    .lbl .ltxt { flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
-    .lbl .lshop { font-size:7pt;  font-weight:700; color:#000; line-height:1.3; }
-    .lbl .lname { font-size:11pt; font-weight:900; color:#000; line-height:1.2; margin:.5mm 0; word-break:break-word; }
-    .lbl .lcat  { font-size:7pt;  color:#555; }
-    .lbl .lprice{ font-size:16pt; font-weight:900; color:#000; line-height:1; }
-    .lbl .lmrp  { font-size:6pt;  color:#555; }
-    .lbl .lsku  { font-size:6pt;  color:#555; }
-
-    /* ═══════════ PRINT ════════════════════════════════════════════════
-       Key insight: the label fills 100% of the page.
-       @page defines the physical sticker size.
-       All mm dimensions live ONLY in @page, never on the HTML element.
-    ══════════════════════════════════════════════════════════════════ */
+    /* ════════════════════════════════════════════════════════════
+       PRINT STYLES
+       NO visibility tricks — pure display:none / display:block.
+       Thermal drivers handle this correctly every time.
+    ════════════════════════════════════════════════════════════ */
     @media print {
-      /* Hide everything on screen except the print sheet */
-      * { visibility: hidden; }
-      #printArea, #printArea * { visibility: visible; }
+      /* Hide everything on screen */
+      body > *                { display:none !important; }
+      /* Show only the print area */
+      #printArea              { display:block !important; }
 
-      #printArea {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
+      /* Label sheet */
+      #printSheet {
+        display: block;
+        margin:  0;
+        padding: 0;
       }
 
-      /* One label per page — fills the full page */
+      /* One label = one page, fills 100% of the @page */
       .plbl {
-        width: 100%;
-        height: 100%;
+        display:  flex;
+        flex-direction: column;
+        justify-content: space-between;
+        width:    100%;
+        height:   100%;
         box-sizing: border-box;
-        display: flex;
+        padding:  1.5mm 2mm;
         background: #fff;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
         page-break-after: always;
         break-after: page;
       }
-      .plbl:last-child { page-break-after: avoid; break-after: avoid; }
+      .plbl:last-child {
+        page-break-after: avoid;
+        break-after: avoid;
+      }
 
-      /* Horizontal layout (50×25, 40×25, 60×35) */
-      .plbl.horiz { flex-direction:row; align-items:center; padding:1.5mm; gap:1.5mm; }
-      /* Vertical layout (80×45) */
-      .plbl.vert  { flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2mm; }
-
-    .plbl .lbc  { width:100%; text-align:center; margin-top:auto; }
-    .plbl .lbc img { width:100%; height:auto; max-height:10mm; display:block; image-rendering:crisp-edges; }
-
-      /* QR sizes tuned per label size — set from JS via style attr */
-      .plbl .ltxt { flex:1; display:flex; flex-direction:column; justify-content:center; overflow:hidden; }
-      .plbl .lshop { font-size:5pt;  font-weight:700; color:#000; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .plbl .lname { font-size:7pt;  font-weight:900; color:#000; line-height:1.2; word-break:break-word; margin:.3mm 0; }
-      .plbl .lcat  { font-size:4.5pt; color:#000; }
-      .plbl .lprice{ font-size:11pt; font-weight:900; color:#000; line-height:1; }
+      /* Text section */
+      .plbl .ltxt  { flex:1; display:flex; flex-direction:column; justify-content:flex-start; overflow:hidden; }
+      .plbl .lshop { font-size:5pt;  font-weight:700; color:#000; line-height:1.3; }
+      .plbl .lname { font-size:8pt;  font-weight:900; color:#000; line-height:1.2; word-break:break-word; margin:.2mm 0; }
+      .plbl .lcat  { font-size:4pt;  color:#000; }
+      .plbl .lprice{ font-size:12pt; font-weight:900; color:#000; line-height:1; }
       .plbl .lmrp  { font-size:4pt;  color:#000; }
-      .plbl .lsku  { font-size:4pt;  color:#000; letter-spacing:.03em; }
+      .plbl .lsku  { font-size:4pt;  color:#000; }
+      /* Barcode strip — full width, anchored to bottom */
+      .plbl .lbc   { width:100%; margin-top:auto; padding-top:.5mm; }
+      .plbl .lbc img {
+        width: 100%; height: auto;
+        display: block;
+        image-rendering: crisp-edges;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
 
-      /* Default page size = 50×25mm. doPrint() overrides this. */
+      /* Default page = 50×25mm. doPrint() overrides via dynPg style tag. */
       @page { size: 50mm 25mm; margin: 0; }
     }
   </style>
 </head>
 <body>
 
-<!-- TOP NAV -->
+<!-- TOP NAV (screen only — hidden on print via body > * { display:none }) -->
 <div class="topbar">
   <a href="{{ url_for('inventory.list_products') }}"><i class="bi bi-arrow-left me-1"></i>Inventory</a>
   <span style="font-weight:700;">Print Labels</span>
@@ -118,10 +113,11 @@
   </button>
 </div>
 
+<!-- CONTROLS (screen only) -->
 <div class="container-fluid py-3" style="max-width:1100px;">
   <div class="row g-3">
 
-    <!-- ── Products ── -->
+    <!-- Product selector -->
     <div class="col-lg-5">
       <div class="card2">
         <div class="d-flex align-items-center justify-content-between mb-3">
@@ -152,12 +148,10 @@
       </div>
     </div>
 
-    <!-- ── Options + Preview ── -->
+    <!-- Options + Preview -->
     <div class="col-lg-7">
       <div class="card2 mb-3">
         <h6 class="fw-bold mb-3">Options</h6>
-
-        <!-- Size -->
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="text-muted small fw-semibold align-self-center">Size:</span>
           <button class="sbtn" data-s="s40" onclick="setSize('s40')">40×25mm</button>
@@ -166,22 +160,19 @@
           <button class="sbtn" data-s="s80" onclick="setSize('s80')">80×45mm</button>
         </div>
 
-        <!-- Print instructions box -->
         <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.8rem;">
-          <strong>⚠ Before printing:</strong>
-          In the browser <strong>Print dialog</strong>:
-          <ol class="mb-0 mt-1 ps-3">
-            <li>Set <strong>Paper size → Custom → <span id="tipSz">50 × 25 mm</span></strong></li>
-            <li>Set <strong>Margins → None</strong></li>
-            <li><strong>Uncheck</strong> "Headers and footers"</li>
-          </ol>
+          <strong>⚠ Print dialog settings (required):</strong>
+          <ul class="mb-0 mt-1 ps-3">
+            <li>Paper size: <strong>Custom → <span id="tipSz">50 × 25 mm</span></strong></li>
+            <li>Margins: <strong>None</strong></li>
+            <li>Uncheck <strong>Headers and footers</strong></li>
+          </ul>
         </div>
 
-        <!-- Toggles -->
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="chkQr" checked onchange="rebuild()">
-            <label class="form-check-label small" for="chkQr">QR code</label>
+            <input class="form-check-input" type="checkbox" id="chkBc" checked onchange="rebuild()">
+            <label class="form-check-label small" for="chkBc">Barcode</label>
           </div>
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" id="chkShop" checked onchange="rebuild()">
@@ -202,7 +193,6 @@
         </div>
       </div>
 
-      <!-- Preview -->
       <div class="card2">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h6 class="fw-bold mb-0">Preview</h6>
@@ -216,16 +206,19 @@
   </div>
 </div>
 
-<!-- ══ PRINT AREA (hidden on screen, visible on print) ══ -->
-<div id="printArea" style="display:none;">
+<!-- ═══════════════════════════════════════════════════════════════
+     PRINT AREA — this is ALL that prints
+     Placed at root of body so "body > * { display:none }" hides
+     everything else, and "#printArea { display:block }" shows only this.
+═══════════════════════════════════════════════════════════════ -->
+<div id="printArea">
   <div id="printSheet"></div>
 </div>
 
 <script>
   const SHOP = {{ (shop.shop_name if shop else 'Smart Mart') | tojson }};
 
-  /* QR data pre-loaded from server (POST flow) */
-  const PRE_QR = {
+  const PRE_BC = {
     {% for item in label_data %}
     {{ item.id }}: {{ item.barcode_b64 | tojson }}{% if not loop.last %},{% endif %}
     {% endfor %}
@@ -243,37 +236,32 @@
     {% endfor %}
   };
 
-  /* Barcode image cache: pid → base64 Code128 PNG */
-  const BC = { ...PRE_QR };   // live cache (pre_qr contains server-rendered barcodes)
+  const BC = { ...PRE_BC };  // barcode image cache
 
   const SIZES = {
-    s40: { label:'40×25mm', page:'40mm 25mm', tipTxt:'40 × 25 mm' },
-    s50: { label:'50×25mm', page:'50mm 25mm', tipTxt:'50 × 25 mm' },
-    s60: { label:'60×35mm', page:'60mm 35mm', tipTxt:'60 × 35 mm' },
-    s80: { label:'80×45mm', page:'80mm 45mm', tipTxt:'80 × 45 mm' },
+    s40: { page:'40mm 25mm', tip:'40 × 25 mm' },
+    s50: { page:'50mm 25mm', tip:'50 × 25 mm' },
+    s60: { page:'60mm 35mm', tip:'60 × 35 mm' },
+    s80: { page:'80mm 45mm', tip:'80 × 45 mm' },
   };
-
   let cur = 's50';
 
   function setSize(s) {
     cur = s;
     document.querySelectorAll('.sbtn').forEach(b => b.classList.toggle('on', b.dataset.s === s));
-    document.getElementById('tipSz').textContent = SIZES[s].tipTxt;
+    document.getElementById('tipSz').textContent = SIZES[s].tip;
     rebuild();
   }
 
   function labelInner(pid) {
     const p = PRODS[pid]; if (!p) return '';
-    const bc      = BC[pid];
-    const showBc  = document.getElementById('chkQr').checked && bc;
+    const showBc  = document.getElementById('chkBc').checked && BC[pid];
     const showShp = document.getElementById('chkShop').checked;
     const showCat = document.getElementById('chkCat').checked && p.cat;
     const showSku = document.getElementById('chkSku').checked;
     const showMrp = document.getElementById('chkMrp').checked;
     const price   = 'NPR ' + (p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2));
 
-    // Barcode is wide and short — place it BELOW the text, not beside it
-    // For 50×25mm: text on top, barcode strip along the bottom
     let txt = '<div class="ltxt">';
     if (showShp) txt += `<div class="lshop">${SHOP}</div>`;
     txt += `<div class="lname">${p.name}</div>`;
@@ -283,52 +271,48 @@
     if (showSku) txt += `<div class="lsku">${p.sku}</div>`;
     txt += '</div>';
 
-    let bcPart = '';
-    if (showBc) {
-      bcPart = `<div class="lbc"><img src="${bc}" alt="${p.barcode}"></div>`;
-    }
+    const bcPart = showBc
+      ? `<div class="lbc"><img src="${BC[pid]}" alt="${p.barcode}"></div>`
+      : '';
 
-    // All sizes: text top, barcode bottom (column layout)
     return txt + bcPart;
   }
 
-  /* ── Rebuild preview + print sheet ──────────────────────────── */
   function rebuild() {
     const cbs = document.querySelectorAll('.pcb:checked');
     let prev = '', print = '', total = 0;
-
     cbs.forEach(cb => {
-      const pid   = parseInt(cb.value);
-      const copies = Math.max(1, parseInt(
-        document.querySelector(`.qin[data-pid="${pid}"]`)?.value || 1
-      ));
-      const inner = labelInner(pid);
-      for (let i = 0; i < copies; i++) {
-        prev  += `<div class="lbl ${cur}">${inner}</div>`;
-        print += `<div class="plbl vert">${inner}</div>`;
+      const pid = parseInt(cb.value);
+      const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value || 1));
+      const inn = labelInner(pid);
+      for (let i = 0; i < n; i++) {
+        prev  += `<div class="lbl ${cur}">${inn}</div>`;
+        print += `<div class="plbl">${inn}</div>`;
       }
-      total += copies;
+      total += n;
     });
-
     document.getElementById('prevSheet').innerHTML  = prev;
     document.getElementById('printSheet').innerHTML = print;
     document.getElementById('cnt').textContent = total + (total === 1 ? ' label' : ' labels');
   }
 
-  /* ── Print ───────────────────────────────────────────────────── */
   function doPrint() {
-    // Inject correct @page size for the selected label stock
-    let style = document.getElementById('dynPg');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'dynPg';
-      document.head.appendChild(style);
-    }
-    style.textContent = `@page { size: ${SIZES[cur].page}; margin: 0; }`;
-    window.print();
+    // Make sure barcodes are loaded before printing
+    const pending = [];
+    document.querySelectorAll('.pcb:checked').forEach(cb => {
+      const pid = parseInt(cb.value);
+      if (!BC[pid]) pending.push(loadBc(pid));
+    });
+    Promise.all(pending).then(() => {
+      rebuild(); // update printSheet with loaded barcodes
+      // Inject correct @page size
+      let s = document.getElementById('dynPg');
+      if (!s) { s = document.createElement('style'); s.id='dynPg'; document.head.appendChild(s); }
+      s.textContent = `@page{size:${SIZES[cur].page};margin:0}`;
+      setTimeout(() => window.print(), 120); // tiny delay lets DOM settle
+    });
   }
 
-  /* ── Load barcode image on demand ───────────────────────────── */
   async function loadBc(pid) {
     if (BC[pid]) return;
     try {
@@ -340,7 +324,7 @@
 
   function onChk(cb) {
     if (cb.checked) loadBc(parseInt(cb.value)).then(rebuild);
-    rebuild();
+    else rebuild();
   }
 
   function selAll() {
@@ -349,7 +333,6 @@
       if (!cb.checked) { cb.checked = true; ps.push(loadBc(parseInt(cb.value))); }
     });
     Promise.all(ps).then(rebuild);
-    rebuild();
   }
 
   function selNone() {
