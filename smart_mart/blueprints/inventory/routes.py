@@ -1371,23 +1371,143 @@ def labels_pdf():
 @inventory_bp.route("/labels/print-direct", methods=["POST"])
 @login_required
 def labels_print_direct():
-    """Print labels directly to the Windows sticker printer.
-    Uses reportlab to render each label as a PNG at 203 DPI,
-    then sends via win32print GDI — correct orientation, no scaling.
+    """Print labels directly to the Windows sticker printer using ShellExecute.
+    Renders each label as a BMP image at the printer's native resolution,
+    saves to a temp file, and prints via Windows shell — most reliable method.
     """
     _require_perm("can_print_labels")
     from flask import jsonify as _json
-    import io
+    import io, os, tempfile, time
 
     data       = request.get_json() or {}
     items      = data.get("items", [])
-    w_mm       = float(data.get("w_mm", 75))
-    h_mm       = float(data.get("h_mm", 50))
     show_bc    = data.get("show_barcode", True)
     show_shop  = data.get("show_shop", True)
     show_mrp   = data.get("show_mrp", True)
     show_sku   = data.get("show_sku", False)
     printer_nm = data.get("printer", "sticker printer")
+
+    shop_name = ""
+    try:
+        from ...models.shop_settings import ShopSettings
+        shop_name = ShopSettings.get().shop_name or ""
+    except Exception:
+        pass
+
+    try:
+        import win32api, win32print, win32ui, win32con
+        from PIL import Image, ImageDraw, ImageFont
+        import barcode as _bc
+        from barcode.writer import ImageWriter
+
+        # Get exact printer pixel dimensions
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(printer_nm)
+        PX_W = hdc.GetDeviceCaps(win32con.HORZRES)
+        PX_H = hdc.GetDeviceCaps(win32con.VERTRES)
+        hdc.DeleteDC()
+
+        _font_path = r"C:\Windows\Fonts\arial.ttf"
+        def _f(px):
+            try:    return ImageFont.truetype(_font_path, px)
+            except: return ImageFont.load_default()
+
+        # Scale font sizes to actual pixel dimensions
+        # PX_W=160 @ 203dpi = 20mm wide — scale fonts accordingly
+        scale = PX_W / 160.0
+        f_shop  = _f(int(10 * scale))
+        f_name  = _f(int(14 * scale))
+        f_price = _f(int(20 * scale))
+        f_small = _f(int(9  * scale))
+
+        printed = 0
+        tmp_files = []
+
+        for item in items:
+            copies  = max(1, int(item.get("copies", 1)))
+            name    = str(item.get("name", ""))
+            sku     = str(item.get("sku", ""))
+            bc_val  = str(item.get("barcode") or sku)
+            price   = float(item.get("price", 0))
+            price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
+
+            # Build label image at exact printer resolution
+            img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
+            draw = ImageDraw.Draw(img)
+            pad  = max(4, int(4 * scale))
+            gap  = max(2, int(2 * scale))
+            y    = pad
+
+            def put(text, fnt):
+                nonlocal y
+                # Truncate to fit width
+                while text:
+                    bb = draw.textbbox((pad, y), text, font=fnt)
+                    if bb[2] <= PX_W - pad:
+                        break
+                    text = text[:-1]
+                if not text:
+                    return
+                draw.text((pad, y), text, font=fnt, fill=(0, 0, 0))
+                bb = draw.textbbox((pad, y), text, font=fnt)
+                y += (bb[3] - bb[1]) + gap
+
+            if show_shop and shop_name:
+                put(shop_name, f_shop)
+            put(name, f_name)
+            put(price_s, f_price)
+            if show_mrp:
+                put("MRP incl. taxes", f_small)
+            if show_sku:
+                put(sku, f_small)
+
+            # Barcode at bottom — full width
+            if show_bc:
+                try:
+                    bb = io.BytesIO()
+                    code = _bc.get("code128", bc_val, writer=ImageWriter())
+                    code.write(bb, options={
+                        "write_text": True, "module_height": 8.0,
+                        "module_width": 0.5, "quiet_zone": 1.5,
+                        "font_size": 5, "text_distance": 0.8,
+                    })
+                    bb.seek(0)
+                    bc_im = Image.open(bb).convert("RGB")
+                    bc_h  = int(PX_H * 0.30)   # 30% of label height
+                    bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
+                    img.paste(bc_im, (0, PX_H - bc_h))
+                except Exception:
+                    pass
+
+            # Save to temp BMP
+            for _ in range(copies):
+                tmp = tempfile.NamedTemporaryFile(suffix=".bmp", delete=False)
+                img.save(tmp.name, "BMP")
+                tmp.close()
+                tmp_files.append(tmp.name)
+
+        # Set sticker printer as default, print all, restore
+        old_default = win32print.GetDefaultPrinter()
+        win32print.SetDefaultPrinter(printer_nm)
+        try:
+            for f in tmp_files:
+                win32api.ShellExecute(0, "print", f, None, ".", 0)
+                printed += 1
+            time.sleep(2)   # give shell time to spool before cleanup
+        finally:
+            win32print.SetDefaultPrinter(old_default)
+            for f in tmp_files:
+                try: os.unlink(f)
+                except: pass
+
+        return _json({"ok": True, "printed": printed})
+
+    except ImportError as exc:
+        return _json({"ok": False, "error": f"Missing: {exc}. Use Download PDF instead."}), 400
+    except Exception as exc:
+        import logging, traceback
+        logging.getLogger(__name__).error("print_direct failed: %s\n%s", exc, traceback.format_exc())
+        return _json({"ok": False, "error": str(exc)}), 500
 
     shop_name = ""
     try:
