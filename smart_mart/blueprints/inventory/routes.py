@@ -1413,12 +1413,11 @@ def labels_print_direct():
             except: return ImageFont.load_default()
 
         # Scale font sizes to actual pixel dimensions
-        # PX_W=160 @ 203dpi = 20mm wide — scale fonts accordingly
         scale = PX_W / 160.0
-        f_shop  = _f(int(10 * scale))
-        f_name  = _f(int(14 * scale))
-        f_price = _f(int(20 * scale))
-        f_small = _f(int(9  * scale))
+        f_shop  = _f(int(11 * scale))
+        f_name  = _f(int(16 * scale))
+        f_price = _f(int(22 * scale))
+        f_small = _f(int(10  * scale))
 
         printed = 0
         tmp_files = []
@@ -1466,18 +1465,26 @@ def labels_print_direct():
                 try:
                     bb = io.BytesIO()
                     code = _bc.get("code128", bc_val, writer=ImageWriter())
+                    # Use settings that work at 160px width
                     code.write(bb, options={
-                        "write_text": True, "module_height": 8.0,
-                        "module_width": 0.5, "quiet_zone": 1.5,
-                        "font_size": 5, "text_distance": 0.8,
+                        "write_text": True,
+                        "module_height": 10.0,
+                        "module_width":  0.4,
+                        "quiet_zone":    1.0,
+                        "font_size":     5,
+                        "text_distance": 1.0,
+                        "dpi":           203,
                     })
                     bb.seek(0)
-                    bc_im = Image.open(bb).convert("RGB")
-                    bc_h  = int(PX_H * 0.30)   # 30% of label height
+                    bc_raw = Image.open(bb)
+                    bc_raw.load()           # force load before BytesIO closes
+                    bc_im = bc_raw.convert("RGB")
+                    bc_h  = int(PX_H * 0.35)   # 35% of label height
                     bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
                     img.paste(bc_im, (0, PX_H - bc_h))
-                except Exception:
-                    pass
+                except Exception as _bc_err:
+                    import logging
+                    logging.getLogger(__name__).warning("Barcode gen failed: %s", _bc_err)
 
             # Save to temp BMP
             for _ in range(copies):
