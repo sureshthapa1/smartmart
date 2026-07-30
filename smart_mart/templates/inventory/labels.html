@@ -97,23 +97,28 @@
       body   { margin:0 !important; padding:0 !important; background:#fff !important; }
       #printArea { display:block !important; }
 
+      /* Each label fills exactly one page on the thermal printer */
       #printSheet {
-        display: flex !important;
-        flex-wrap: wrap;
-        gap: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
+        display: block !important;
         background: #fff !important;
-        align-content: flex-start;
       }
 
-      /* Force exact dimensions and pure black on print */
+      /* Every label = one page */
       .label {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
         color: #000 !important;
         background: #fff !important;
         border: 1px solid #000 !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        /* Remove margin/gap between labels — printer feeds to next sticker */
+        margin: 0 !important;
+      }
+      /* Don't add a blank page after the last label */
+      .label:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
       }
       .label * { color: #000 !important; }
 
@@ -266,15 +271,6 @@
     s60:'60mm × 35mm', s80:'80mm × 45mm', sroll:'80mm wide (roll)'
   };
 
-  // page sizes to inject dynamically before printing
-  const PAGE_CSS = {
-    s40:   '@page{size:40mm 25mm;margin:0}',
-    s50:   '@page{size:50mm 25mm;margin:0}',
-    s60:   '@page{size:60mm 35mm;margin:0}',
-    s80:   '@page{size:80mm 45mm;margin:0}',
-    sroll: '@page{size:80mm auto;margin:1mm}'
-  };
-
   function setSize(s) {
     curSize = s;
     document.querySelectorAll('.size-btn').forEach(b =>
@@ -330,14 +326,24 @@
   }
 
   function doPrint() {
-    // Inject the correct @page size for the selected label
+    // Dynamically set the correct @page size for the selected label.
+    // This overrides whatever the browser's default paper size is.
+    const pageSizes = {
+      s40:   '40mm 25mm',
+      s50:   '50mm 25mm',
+      s60:   '60mm 35mm',
+      s80:   '80mm 45mm',
+      sroll: '80mm auto'
+    };
+    const sz = pageSizes[curSize] || '50mm 25mm';
     let el = document.getElementById('dynPageCss');
     if (!el) {
       el = document.createElement('style');
       el.id = 'dynPageCss';
       document.head.appendChild(el);
     }
-    el.textContent = PAGE_CSS[curSize] || PAGE_CSS['s50'];
+    // Override the static @page rule with the selected size
+    el.textContent = `@page { size: ${sz}; margin: 0; }`;
     window.print();
   }
 
