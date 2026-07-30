@@ -1397,22 +1397,26 @@ def labels_print_direct():
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # Get exact printer canvas size from driver
+        # The XP-409B driver reports wrong canvas (20x30mm) regardless of paper setting.
+        # Use fixed dimensions: 75mm x 50mm at 203 DPI = 599 x 399 px
+        DPI   = 203
+        PX_W  = int(75 / 25.4 * DPI)   # 599
+        PX_H  = int(50 / 25.4 * DPI)   # 399
+
+        # Open the printer DC — we still need it to print, just don't trust its size
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
-        PX_W = hdc.GetDeviceCaps(win32con.HORZRES)
-        PX_H = hdc.GetDeviceCaps(win32con.VERTRES)
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(8, px))
             except: return ImageFont.load_default()
 
-        scale = PX_W / 160.0
-        f_shop  = _f(int(11 * scale))
-        f_name  = _f(int(16 * scale))
-        f_price = _f(int(22 * scale))
-        f_small = _f(int(10 * scale))
+        # Font sizes tuned for 599px wide canvas
+        f_shop  = _f(22)
+        f_name  = _f(30)
+        f_price = _f(44)
+        f_small = _f(20)
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1428,8 +1432,8 @@ def labels_print_direct():
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
                 draw = ImageDraw.Draw(img)
-                pad  = max(4, int(4 * scale))
-                gap  = max(2, int(2 * scale))
+                pad  = 8
+                gap  = 4
                 y    = pad
 
                 def put(text, fnt):
@@ -1467,15 +1471,23 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Draw into printer DC using SetDIBitsToDevice
+                # Draw into printer DC — stretch our image to fill the printer canvas
                 hdc.StartPage()
+                dc_w = hdc.GetDeviceCaps(win32con.HORZRES)
+                dc_h = hdc.GetDeviceCaps(win32con.VERTRES)
                 w, h   = img.size
                 raw    = img.convert("RGB").tobytes("raw", "BGR")
                 bi_hdr = struct.pack("<lllHHLLllLL",
                     40, w, -h, 1, 24, 0, len(raw), 0, 0, 0, 0)
-                ctypes.windll.gdi32.SetDIBitsToDevice(
-                    hdc.GetSafeHdc(), 0, 0, w, h,
-                    0, 0, 0, h, raw, bi_hdr, 0)
+                # Use StretchDIBits to scale our image to the printer DC size
+                ctypes.windll.gdi32.StretchDIBits(
+                    hdc.GetSafeHdc(),
+                    0, 0, dc_w, dc_h,    # dest rect (full printer canvas)
+                    0, 0, w, h,           # src rect (full image)
+                    raw, bi_hdr,
+                    0,                    # DIB_RGB_COLORS
+                    0x00CC0020            # SRCCOPY
+                )
                 hdc.EndPage()
                 printed += 1
 
