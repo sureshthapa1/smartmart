@@ -1397,27 +1397,28 @@ def labels_print_direct():
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # XP-409B sticker: 1.97in x 0.98in = 50mm x 25mm
-        # Draw in portrait orientation (200w x 400h) then rotate 90° CCW
-        # so the printer (which feeds portrait) gets landscape output.
-        DPI   = 203
-        PX_W  = int(25 / 25.4 * DPI)   # 200px — portrait width (= sticker height)
-        PX_H  = int(50 / 25.4 * DPI)   # 400px — portrait height (= sticker width)
-
-        # Open the printer DC
+        # Printer DC reports 160x240px. Use those exact dimensions.
+        # DC is portrait (160w x 240h). Sticker is landscape (50x25mm).
+        # Strategy: draw content in DC-landscape (240w x 160h), rotate CCW 90°
+        # to get DC-portrait (160w x 240h), send at 1:1 — no stretching.
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
+        DC_W = hdc.GetDeviceCaps(win32con.HORZRES)   # 160
+        DC_H = hdc.GetDeviceCaps(win32con.VERTRES)   # 240
+        # Draw in landscape orientation matching the DC dimensions when rotated
+        PX_W = DC_H   # 240 — landscape width = DC height
+        PX_H = DC_W   # 160 — landscape height = DC width
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(6, px))
             except: return ImageFont.load_default()
 
-        # Font sizes for 200px wide portrait canvas
-        f_shop  = _f(13)
-        f_name  = _f(20)
-        f_price = _f(30)
-        f_small = _f(12)
+        # Font sizes scaled to 240px wide landscape canvas
+        f_shop  = _f(16)
+        f_name  = _f(22)
+        f_price = _f(32)
+        f_small = _f(13)
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1433,8 +1434,8 @@ def labels_print_direct():
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
                 draw = ImageDraw.Draw(img)
-                pad  = 5
-                gap  = 2
+                pad  = 6
+                gap  = 3
                 y    = pad
 
                 def put(text, fnt):
@@ -1474,25 +1475,20 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # The XP-409B feeds portrait. Rotate 90° counter-clockwise
-                # (positive 90) so landscape content prints correctly.
+                # Rotate CCW 90° → portrait 160x240 matching printer DC exactly
                 img_rotated = img.rotate(90, expand=True)
 
-                # Draw into printer DC — stretch rotated image to fill printer canvas
+                # Send 1:1 to printer DC — no stretching needed
                 hdc.StartPage()
-                dc_w = hdc.GetDeviceCaps(win32con.HORZRES)
-                dc_h = hdc.GetDeviceCaps(win32con.VERTRES)
-                rw, rh = img_rotated.size
+                rw, rh = img_rotated.size   # should be DC_W x DC_H (160x240)
                 raw    = img_rotated.convert("RGB").tobytes("raw", "BGR")
                 bi_hdr = struct.pack("<lllHHLLllLL",
                     40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
-                ctypes.windll.gdi32.StretchDIBits(
+                ctypes.windll.gdi32.SetDIBitsToDevice(
                     hdc.GetSafeHdc(),
-                    0, 0, dc_w, dc_h,
                     0, 0, rw, rh,
-                    raw, bi_hdr,
-                    0,
-                    0x00CC0020
+                    0, 0, 0, rh,
+                    raw, bi_hdr, 0
                 )
                 hdc.EndPage()
                 printed += 1
