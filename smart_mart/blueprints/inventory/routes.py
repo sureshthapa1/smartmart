@@ -1397,10 +1397,12 @@ def labels_print_direct():
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # XP-409B sticker: 1.97in x 0.98in = 50mm x 25mm landscape at 203 DPI
+        # XP-409B sticker: 1.97in x 0.98in = 50mm x 25mm
+        # Draw in portrait orientation (200w x 400h) then rotate 90° clockwise
+        # so the printer (which feeds portrait) gets the correct orientation.
         DPI   = 203
-        PX_W  = int(50 / 25.4 * DPI)   # 400px wide
-        PX_H  = int(25 / 25.4 * DPI)   # 200px tall
+        PX_W  = int(25 / 25.4 * DPI)   # 200px — portrait width
+        PX_H  = int(50 / 25.4 * DPI)   # 400px — portrait height
 
         # Open the printer DC — needed for print job lifecycle
         hdc = win32ui.CreateDC()
@@ -1411,11 +1413,11 @@ def labels_print_direct():
             try:    return ImageFont.truetype(_fp, max(6, px))
             except: return ImageFont.load_default()
 
-        # Font sizes for 400x200px canvas (50x25mm at 203dpi)
-        f_shop  = _f(14)   # ~1.7mm
-        f_name  = _f(20)   # ~2.5mm
-        f_price = _f(28)   # ~3.5mm
-        f_small = _f(12)   # ~1.5mm
+        # Font sizes for 200px wide portrait canvas
+        f_shop  = _f(13)
+        f_name  = _f(18)
+        f_price = _f(26)
+        f_small = _f(11)
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1470,22 +1472,26 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Draw into printer DC — stretch our image to fill the printer canvas
+                # The XP-409B feeds labels portrait (short side = feed direction).
+                # Our image is landscape (400w x 200h) so rotate 90° clockwise
+                # so it prints correctly when the printer feeds portrait.
+                img_rotated = img.rotate(-90, expand=True)  # -90 = clockwise
+
+                # Draw into printer DC — stretch rotated image to fill printer canvas
                 hdc.StartPage()
                 dc_w = hdc.GetDeviceCaps(win32con.HORZRES)
                 dc_h = hdc.GetDeviceCaps(win32con.VERTRES)
-                w, h   = img.size
-                raw    = img.convert("RGB").tobytes("raw", "BGR")
+                rw, rh = img_rotated.size
+                raw    = img_rotated.convert("RGB").tobytes("raw", "BGR")
                 bi_hdr = struct.pack("<lllHHLLllLL",
-                    40, w, -h, 1, 24, 0, len(raw), 0, 0, 0, 0)
-                # Use StretchDIBits to scale our image to the printer DC size
+                    40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
                 ctypes.windll.gdi32.StretchDIBits(
                     hdc.GetSafeHdc(),
-                    0, 0, dc_w, dc_h,    # dest rect (full printer canvas)
-                    0, 0, w, h,           # src rect (full image)
+                    0, 0, dc_w, dc_h,
+                    0, 0, rw, rh,
                     raw, bi_hdr,
-                    0,                    # DIB_RGB_COLORS
-                    0x00CC0020            # SRCCOPY
+                    0,
+                    0x00CC0020
                 )
                 hdc.EndPage()
                 printed += 1
