@@ -1371,13 +1371,10 @@ def labels_pdf():
 @inventory_bp.route("/labels/print-direct", methods=["POST"])
 @login_required
 def labels_print_direct():
-    """Print labels directly to the Windows sticker printer using ShellExecute.
-    Renders each label as a BMP image at the printer's native resolution,
-    saves to a temp file, and prints via Windows shell — most reliable method.
-    """
+    """Print labels directly to the Windows sticker printer via GDI SetDIBitsToDevice."""
     _require_perm("can_print_labels")
     from flask import jsonify as _json
-    import io, os, tempfile, time
+    import io, struct, ctypes
 
     data       = request.get_json() or {}
     items      = data.get("items", [])
@@ -1395,32 +1392,30 @@ def labels_print_direct():
         pass
 
     try:
-        import win32api, win32print, win32ui, win32con
+        import win32ui, win32con
         from PIL import Image, ImageDraw, ImageFont
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # Get exact printer pixel dimensions
+        # Get exact printer canvas size from driver
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
         PX_W = hdc.GetDeviceCaps(win32con.HORZRES)
         PX_H = hdc.GetDeviceCaps(win32con.VERTRES)
-        hdc.DeleteDC()
 
-        _font_path = r"C:\Windows\Fonts\arial.ttf"
+        _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
-            try:    return ImageFont.truetype(_font_path, px)
+            try:    return ImageFont.truetype(_fp, max(8, px))
             except: return ImageFont.load_default()
 
-        # Scale font sizes to actual pixel dimensions
         scale = PX_W / 160.0
         f_shop  = _f(int(11 * scale))
         f_name  = _f(int(16 * scale))
         f_price = _f(int(22 * scale))
-        f_small = _f(int(10  * scale))
+        f_small = _f(int(10 * scale))
 
         printed = 0
-        tmp_files = []
+        hdc.StartDoc("Smart Mart Labels")
 
         for item in items:
             copies  = max(1, int(item.get("copies", 1)))
@@ -1430,345 +1425,70 @@ def labels_print_direct():
             price   = float(item.get("price", 0))
             price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
 
-            # Build label image at exact printer resolution
-            img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
-            draw = ImageDraw.Draw(img)
-            pad  = max(4, int(4 * scale))
-            gap  = max(2, int(2 * scale))
-            y    = pad
-
-            def put(text, fnt):
-                nonlocal y
-                # Truncate to fit width
-                while text:
-                    bb = draw.textbbox((pad, y), text, font=fnt)
-                    if bb[2] <= PX_W - pad:
-                        break
-                    text = text[:-1]
-                if not text:
-                    return
-                draw.text((pad, y), text, font=fnt, fill=(0, 0, 0))
-                bb = draw.textbbox((pad, y), text, font=fnt)
-                y += (bb[3] - bb[1]) + gap
-
-            if show_shop and shop_name:
-                put(shop_name, f_shop)
-            put(name, f_name)
-            put(price_s, f_price)
-            if show_mrp:
-                put("MRP incl. taxes", f_small)
-            if show_sku:
-                put(sku, f_small)
-
-            # Barcode at bottom — full width
-            if show_bc:
-                try:
-                    bb = io.BytesIO()
-                    code = _bc.get("code128", bc_val, writer=ImageWriter())
-                    # Use settings that work at 160px width
-                    code.write(bb, options={
-                        "write_text": True,
-                        "module_height": 10.0,
-                        "module_width":  0.4,
-                        "quiet_zone":    1.0,
-                        "font_size":     5,
-                        "text_distance": 1.0,
-                        "dpi":           203,
-                    })
-                    bb.seek(0)
-                    bc_raw = Image.open(bb)
-                    bc_raw.load()           # force load before BytesIO closes
-                    bc_im = bc_raw.convert("RGB")
-                    bc_h  = int(PX_H * 0.35)   # 35% of label height
-                    bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                    img.paste(bc_im, (0, PX_H - bc_h))
-                except Exception as _bc_err:
-                    import logging
-                    logging.getLogger(__name__).warning("Barcode gen failed: %s", _bc_err)
-
-            # Save to temp BMP
             for _ in range(copies):
-                tmp = tempfile.NamedTemporaryFile(suffix=".bmp", delete=False)
-                img.save(tmp.name, "BMP")
-                tmp.close()
-                tmp_files.append(tmp.name)
+                img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
+                draw = ImageDraw.Draw(img)
+                pad  = max(4, int(4 * scale))
+                gap  = max(2, int(2 * scale))
+                y    = pad
 
-        # Set sticker printer as default, print all, restore
-        old_default = win32print.GetDefaultPrinter()
-        win32print.SetDefaultPrinter(printer_nm)
-        try:
-            for f in tmp_files:
-                win32api.ShellExecute(0, "print", f, None, ".", 0)
+                def put(text, fnt):
+                    nonlocal y
+                    while len(text) > 1:
+                        bb = draw.textbbox((pad, y), text, font=fnt)
+                        if bb[2] <= PX_W - pad: break
+                        text = text[:-1]
+                    draw.text((pad, y), text, font=fnt, fill=(0, 0, 0))
+                    bb = draw.textbbox((pad, y), text, font=fnt)
+                    y += (bb[3] - bb[1]) + gap
+
+                if show_shop and shop_name: put(shop_name, f_shop)
+                put(name, f_name)
+                put(price_s, f_price)
+                if show_mrp: put("MRP incl. taxes", f_small)
+                if show_sku: put(sku, f_small)
+
+                # Barcode at bottom
+                if show_bc:
+                    try:
+                        bb = io.BytesIO()
+                        code = _bc.get("code128", bc_val, writer=ImageWriter())
+                        code.write(bb, options={
+                            "write_text": True, "module_height": 10.0,
+                            "module_width": 0.4, "quiet_zone": 1.0,
+                            "font_size": 5, "text_distance": 1.0, "dpi": 203,
+                        })
+                        bb.seek(0)
+                        bc_im = Image.open(bb); bc_im.load()
+                        bc_im = bc_im.convert("RGB")
+                        bc_h  = int(PX_H * 0.35)
+                        bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
+                        img.paste(bc_im, (0, PX_H - bc_h))
+                    except Exception:
+                        pass
+
+                # Draw into printer DC using SetDIBitsToDevice
+                hdc.StartPage()
+                w, h   = img.size
+                raw    = img.convert("RGB").tobytes("raw", "BGR")
+                bi_hdr = struct.pack("<lllHHLLllLL",
+                    40, w, -h, 1, 24, 0, len(raw), 0, 0, 0, 0)
+                ctypes.windll.gdi32.SetDIBitsToDevice(
+                    hdc.GetSafeHdc(), 0, 0, w, h,
+                    0, 0, 0, h, raw, bi_hdr, 0)
+                hdc.EndPage()
                 printed += 1
-            time.sleep(2)   # give shell time to spool before cleanup
-        finally:
-            win32print.SetDefaultPrinter(old_default)
-            for f in tmp_files:
-                try: os.unlink(f)
-                except: pass
 
+        hdc.EndDoc()
+        hdc.DeleteDC()
         return _json({"ok": True, "printed": printed})
 
     except ImportError as exc:
         return _json({"ok": False, "error": f"Missing: {exc}. Use Download PDF instead."}), 400
     except Exception as exc:
         import logging, traceback
-        logging.getLogger(__name__).error("print_direct failed: %s\n%s", exc, traceback.format_exc())
+        logging.getLogger(__name__).error("print_direct: %s\n%s", exc, traceback.format_exc())
         return _json({"ok": False, "error": str(exc)}), 500
-
-    shop_name = ""
-    try:
-        from ...models.shop_settings import ShopSettings
-        shop_name = ShopSettings.get().shop_name or ""
-    except Exception:
-        pass
-
-    try:
-        import win32print, win32ui, win32con
-        from PIL import Image
-        from reportlab.lib.units import mm
-        from reportlab.pdfgen import canvas as rl_canvas
-        from reportlab.lib.utils import ImageReader
-        import barcode as _bc
-        from barcode.writer import ImageWriter
-
-        DPI   = 203
-        PX_W  = int(w_mm / 25.4 * DPI)
-        PX_H  = int(h_mm / 25.4 * DPI)
-
-        def render_label_png(item):
-            """Render one label as a PNG bytes using reportlab."""
-            name    = str(item.get("name", ""))
-            sku     = str(item.get("sku", ""))
-            bc_val  = str(item.get("barcode") or sku)
-            price   = float(item.get("price", 0))
-            price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
-
-            W = w_mm * mm
-            H = h_mm * mm
-            pad = 2 * mm
-
-            buf = io.BytesIO()
-            c = rl_canvas.Canvas(buf, pagesize=(W, H))
-            c.setFillColorRGB(0, 0, 0)
-
-            # Barcode image
-            bc_img = None
-            bc_h = 0
-            if show_bc:
-                try:
-                    bb = io.BytesIO()
-                    code = _bc.get("code128", bc_val, writer=ImageWriter())
-                    code.write(bb, options={
-                        "write_text": True,
-                        "module_height": 8.0,
-                        "module_width": 0.7,
-                        "quiet_zone": 2.0,
-                        "font_size": 6,
-                        "text_distance": 1.0,
-                    })
-                    bb.seek(0)
-                    bc_img = ImageReader(bb)
-                    bc_h = 13 * mm
-                except Exception:
-                    pass
-
-            # Draw text from top (reportlab y=0 is bottom)
-            y = H - pad
-
-            def txt(text, font, size):
-                nonlocal y
-                c.setFont(font, size)
-                line_h = size * 0.352778 * mm + 0.8 * mm
-                c.drawString(pad, y - size * 0.352778 * mm, text)
-                y -= line_h
-
-            if show_shop and shop_name:
-                txt(shop_name, "Helvetica-Bold", 5)
-
-            # Truncate name
-            c.setFont("Helvetica-Bold", 9)
-            max_w = W - 2 * pad
-            nm = name
-            while nm and c.stringWidth(nm, "Helvetica-Bold", 9) > max_w:
-                nm = nm[:-1]
-            if nm != name:
-                nm = nm[:-1] + "..."
-            txt(nm, "Helvetica-Bold", 9)
-            txt(price_s, "Helvetica-Bold", 13)
-            if show_mrp:
-                txt("MRP incl. all taxes", "Helvetica", 5)
-            if show_sku:
-                txt(sku, "Helvetica", 5)
-
-            # Barcode at bottom, full width
-            if bc_img:
-                c.drawImage(bc_img, 0, 0, width=W, height=bc_h,
-                            preserveAspectRatio=False)
-
-            c.save()
-            buf.seek(0)
-
-            # Convert PDF page → PNG via Pillow/pdf2image
-            # Use reportlab's renderPM to render to PNG directly
-            from reportlab.graphics import renderPM
-            from reportlab.graphics.shapes import Drawing, Image as RLImage
-            # Alternative: use pdf2image if available, else use PIL to
-            # render the PDF page at target DPI
-            try:
-                from pdf2image import convert_from_bytes
-                pages = convert_from_bytes(buf.read(), dpi=DPI, size=(PX_W, PX_H))
-                png_buf = io.BytesIO()
-                pages[0].save(png_buf, format="PNG")
-                png_buf.seek(0)
-                return png_buf
-            except ImportError:
-                # pdf2image not available — use Pillow wand fallback
-                # Render via reportlab renderPM
-                pass
-
-            # Fallback: draw directly with PIL at DPI
-            return None
-
-        # ── Print using Windows GDI (win32ui) ──────────────────────────────
-        # This is the correct Windows print path — creates a printer DC and
-        # draws the image into it. The driver handles scaling/orientation.
-        hprinter = win32print.OpenPrinter(printer_nm)
-        pinfo = win32print.GetPrinter(hprinter, 2)
-        win32print.ClosePrinter(hprinter)
-
-        printed = 0
-        for item in items:
-            copies = max(1, int(item.get("copies", 1)))
-            for _ in range(copies):
-                # Generate label as PNG via reportlab PDF → PIL
-                # Use direct PIL rendering since pdf2image may not be installed
-                name    = str(item.get("name", ""))
-                sku     = str(item.get("sku", ""))
-                bc_val  = str(item.get("barcode") or sku)
-                price   = float(item.get("price", 0))
-                price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
-
-                # Build PIL image in RGB mode (text renders correctly)
-                from PIL import Image, ImageDraw, ImageFont
-                img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
-                draw = ImageDraw.Draw(img)
-
-                _font_path = r"C:\Windows\Fonts\arial.ttf"
-                def _f(mm_size):
-                    px = max(8, int(mm_size / 25.4 * DPI))
-                    try:
-                        return ImageFont.truetype(_font_path, px)
-                    except Exception:
-                        return ImageFont.load_default()
-
-                f_shop = _f(4.5);  f_name = _f(7);  f_price = _f(12)
-                f_small = _f(4);   f_bold_name = _f(7)
-
-                y = int(2 / 25.4 * DPI)  # start 2mm from top
-                PAD = int(2 / 25.4 * DPI)
-                line_gap = int(1 / 25.4 * DPI)
-
-                def put(text, fnt, bold=False):
-                    nonlocal y
-                    bbox = draw.textbbox((PAD, y), text, font=fnt)
-                    draw.text((PAD, y), text, font=fnt, fill=(0, 0, 0))
-                    y += (bbox[3] - bbox[1]) + line_gap
-
-                if show_shop and shop_name:
-                    put(shop_name, f_shop)
-
-                # Wrap/truncate name
-                nm = name
-                while nm:
-                    bbox = draw.textbbox((PAD, y), nm, font=f_name)
-                    if bbox[2] - bbox[0] <= PX_W - 2 * PAD:
-                        break
-                    nm = nm[:-1]
-                if nm != name:
-                    nm = nm[:-1] + "..."
-                put(nm, f_name)
-                put(price_s, f_price)
-                if show_mrp:
-                    put("MRP incl. all taxes", f_small)
-                if show_sku:
-                    put(sku, f_small)
-
-                # Barcode — generate and paste at bottom
-                if show_bc:
-                    try:
-                        bb = io.BytesIO()
-                        code = _bc.get("code128", bc_val, writer=ImageWriter())
-                        code.write(bb, options={
-                            "write_text": True,
-                            "module_height": 8.0,
-                            "module_width":  0.7,
-                            "quiet_zone":    2.0,
-                            "font_size":     6,
-                            "text_distance": 1.0,
-                        })
-                        bb.seek(0)
-                        bc_im = Image.open(bb).convert("RGB")
-                        bc_h  = int(14 / 25.4 * DPI)
-                        bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        img.paste(bc_im, (0, PX_H - bc_h))
-                    except Exception:
-                        pass
-
-                # ── Send to printer via GDI ──
-                hdc = win32ui.CreateDC()
-                hdc.CreatePrinterDC(printer_nm)
-                printer_w = hdc.GetDeviceCaps(win32con.HORZRES)
-                printer_h = hdc.GetDeviceCaps(win32con.VERTRES)
-
-                # Scale image to fill printer page
-                img_scaled = img.resize((printer_w, printer_h), Image.LANCZOS)
-                img_bmp = img_scaled.convert("RGB")
-
-                import win32ui as _w32ui
-                # Create bitmap from PIL image
-                bmp = _w32ui.CreateBitmap()
-                bmp.CreateCompatibleBitmap(hdc, printer_w, printer_h)
-
-                # Use BitBlt approach via memory DC
-                mem_dc = hdc.CreateCompatibleDC()
-                mem_dc.SelectObject(bmp)
-                mem_dc.BitBlt((0, 0), (printer_w, printer_h), hdc, (0, 0), win32con.SRCCOPY)
-
-                hdc.StartDoc(printer_nm)
-                hdc.StartPage()
-
-                # Draw image using DIBits
-                dib = img_bmp.tobytes("raw", "BGRX")
-                hdc.SetStretchBltMode(win32con.COLORONCOLOR)
-                hdc.StretchDIBits(
-                    (0, 0, printer_w, printer_h),
-                    (0, 0, img_bmp.width, img_bmp.height),
-                    dib,
-                    win32con.DIB_RGB_COLORS
-                )
-
-                hdc.EndPage()
-                hdc.EndDoc()
-                hdc.DeleteDC()
-                printed += 1
-
-        return _json({"ok": True, "printed": printed})
-
-    except ImportError as exc:
-        return _json({"ok": False, "error": f"Missing module: {exc}. Use Download PDF instead."}), 400
-    except Exception as exc:
-        import logging, traceback
-        logging.getLogger(__name__).error("labels_print_direct failed: %s\n%s", exc, traceback.format_exc())
-        return _json({"ok": False, "error": str(exc)}), 500
-
-    except ImportError:
-        return _json({"ok": False, "error": "win32print not available — use Download PDF instead"}), 400
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error("labels_print_direct failed: %s", exc, exc_info=True)
-        return _json({"ok": False, "error": str(exc)}), 500
-
 
 def _generate_barcode_b64(value: str) -> str:
     """Generate a Code128 barcode as base64 PNG — scannable by any barcode scanner."""
