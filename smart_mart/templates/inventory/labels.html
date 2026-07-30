@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Print Labels</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
@@ -243,7 +244,11 @@
     btn.disabled=true; btn.textContent='⏳ Generating…';
     try {
       const r = await fetch('/inventory/labels/pdf', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
         body: JSON.stringify(payload)
       });
       if (!r.ok) { alert('PDF failed: ' + await r.text()); return; }
@@ -259,7 +264,11 @@
     payload.printer = 'sticker printer';
     try {
       const r = await fetch('/inventory/labels/print-direct', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
         body: JSON.stringify(payload)
       });
       const d = await r.json();
