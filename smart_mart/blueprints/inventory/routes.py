@@ -1427,15 +1427,28 @@ def labels_print_direct():
                     img  = Image.new("1", (PX_W, PX_H), 1)   # 1-bit: 1=white
                     draw = ImageDraw.Draw(img)
 
-                    # Try to load a font, fall back to default
-                    try:
-                        from PIL import ImageFont
-                        font_sm  = ImageFont.truetype("arial.ttf", int(5  / 25.4 * DPI))
-                        font_med = ImageFont.truetype("arial.ttf", int(8  / 25.4 * DPI))
-                        font_lg  = ImageFont.truetype("arial.ttf", int(11 / 25.4 * DPI))
-                        font_xl  = ImageFont.truetype("arial.ttf", int(14 / 25.4 * DPI))
-                    except Exception:
-                        font_sm = font_med = font_lg = font_xl = ImageFont.load_default()
+                    # Load fonts — try multiple Windows font paths
+                    from PIL import ImageFont
+                    _font_paths = [
+                        r"C:\Windows\Fonts\arial.ttf",
+                        r"C:\Windows\Fonts\Arial.ttf",
+                        r"C:\Windows\Fonts\calibri.ttf",
+                        r"C:\Windows\Fonts\verdana.ttf",
+                    ]
+                    def _load_font(size_mm):
+                        px = int(size_mm / 25.4 * DPI)
+                        for fp in _font_paths:
+                            try:
+                                return ImageFont.truetype(fp, px)
+                            except Exception:
+                                continue
+                        # Last resort: scale default font
+                        return ImageFont.load_default()
+
+                    font_sm  = _load_font(5)
+                    font_med = _load_font(8)
+                    font_lg  = _load_font(11)
+                    font_xl  = _load_font(14)
 
                     y = PAD
 
