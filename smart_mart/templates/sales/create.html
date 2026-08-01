@@ -1044,6 +1044,32 @@
       return;
     }
 
+    // ── Walk-in nudge: soft prompt to capture customer name ──────────────
+    const custNameVal = document.getElementById('customerName')?.value?.trim() || '';
+    const custPhoneVal = document.getElementById('customerPhone')?.value?.trim() || '';
+    if (!custNameVal && !custPhoneVal) {
+      // Only show once per session using sessionStorage flag
+      const nudgeKey = 'walkin_nudge_dismissed';
+      if (!sessionStorage.getItem(nudgeKey)) {
+        const existing = document.getElementById('walkinNudge');
+        if (!existing) {
+          const nudge = document.createElement('div');
+          nudge.id = 'walkinNudge';
+          nudge.className = 'alert alert-info d-flex align-items-center gap-2 py-2';
+          nudge.innerHTML = `
+            <i class="bi bi-person-plus-fill flex-shrink-0"></i>
+            <span class="small flex-grow-1"><strong>Tip:</strong> Add customer name/phone to earn loyalty points and track purchase history.</span>
+            <button type="button" class="btn btn-info btn-sm py-0 px-2" onclick="document.getElementById('customerName').focus(); document.getElementById('walkinNudge').remove();">Add</button>
+            <button type="button" class="btn-close ms-1" onclick="sessionStorage.setItem('walkin_nudge_dismissed','1'); this.closest('#walkinNudge').remove();"></button>
+          `;
+          document.getElementById('saleForm').prepend(nudge);
+          window.scrollTo(0, 0);
+          // Don't block — allow submission after 1s if no action
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+    }
+
     const items = [];
     let idx = 0;
     while (true) {
