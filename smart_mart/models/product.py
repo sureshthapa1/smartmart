@@ -26,6 +26,7 @@ class Product(db.Model):
     inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)
+    pkg_date = db.Column(db.Date, nullable=True)    # Packed / manufactured date
     image_filename = db.Column(db.String(255), nullable=True)
     unit = db.Column(db.String(20), nullable=True, default="pcs")
     description = db.Column(db.Text, nullable=True)

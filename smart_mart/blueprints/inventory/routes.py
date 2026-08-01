@@ -1382,6 +1382,7 @@ def labels_print_direct():
     show_shop  = data.get("show_shop", True)
     show_mrp   = data.get("show_mrp", True)
     show_sku   = data.get("show_sku", False)
+    show_dates = data.get("show_dates", True)
     printer_nm = data.get("printer", "sticker printer")
 
     shop_name = ""
@@ -1452,6 +1453,11 @@ def labels_print_direct():
                 put(name, f_name)
                 put(price_s, f_price)
                 if show_mrp: put("MRP incl. taxes", f_small)
+                if show_dates:
+                    pkg = str(item.get("pkg", ""))
+                    exp = str(item.get("exp", ""))
+                    if pkg: put(f"PKD: {pkg}", f_small)
+                    if exp: put(f"EXP: {exp}", f_small)
                 if show_sku: put(sku, f_small)
 
                 # Barcode at bottom
@@ -1682,6 +1688,7 @@ def _form_to_data(form) -> dict:
         "supplier_id": int(form.get("supplier_id")) if form.get("supplier_id") else None,
         "purchase_date": None,
         "expiry_date": None,
+        "pkg_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
         "reorder_point": int(form.get("reorder_point", 10) or 10),
         "low_stock_threshold": int(form.get("low_stock_threshold", 500) or 500),
@@ -1716,6 +1723,12 @@ def _form_to_data(form) -> dict:
     if expiry_raw:
         try:
             data["expiry_date"] = date.fromisoformat(expiry_raw)
+        except ValueError:
+            pass
+    pkg_raw = form.get("pkg_date", "").strip()
+    if pkg_raw:
+        try:
+            data["pkg_date"] = date.fromisoformat(pkg_raw)
         except ValueError:
             pass
     return data

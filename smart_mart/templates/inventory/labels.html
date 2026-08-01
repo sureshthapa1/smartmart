@@ -142,6 +142,10 @@
             <input class="form-check-input" type="checkbox" id="chkSku" onchange="rebuild()">
             <label class="form-check-label small" for="chkSku">SKU</label>
           </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="chkDates" checked onchange="rebuild()">
+            <label class="form-check-label small" for="chkDates">PKD / EXP dates</label>
+          </div>
         </div>
       </div>
 
@@ -167,7 +171,7 @@
   };
   const PRODS = {
     {% for p in products %}
-    {{ p.id }}: { name:{{ p.name|tojson }}, sku:{{ p.sku|tojson }}, barcode:{{ (p.barcode or p.sku)|tojson }}, price:{{ p.selling_price|float }}, cat:{{ (p.category or '')|tojson }} }{% if not loop.last %},{% endif %}
+    {{ p.id }}: { name:{{ p.name|tojson }}, sku:{{ p.sku|tojson }}, barcode:{{ (p.barcode or p.sku)|tojson }}, price:{{ p.selling_price|float }}, cat:{{ (p.category or '')|tojson }}, pkg:{{ (p.pkg_date.strftime('%Y-%m-%d') if p.pkg_date else '')|tojson }}, exp:{{ (p.expiry_date.strftime('%Y-%m-%d') if p.expiry_date else '')|tojson }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   };
   const BC = { ...PRE_BC };
@@ -202,12 +206,15 @@
     const showShp = document.getElementById('chkShop').checked;
     const showMrp = document.getElementById('chkMrp').checked;
     const showSku = document.getElementById('chkSku').checked;
+    const showDates = document.getElementById('chkDates').checked;
     const price   = 'NPR ' + (p.price % 1 === 0 ? p.price.toFixed(0) : p.price.toFixed(2));
     let txt = '<div class="ltxt">';
     if (showShp) txt += `<div class="lshop">${SHOP}</div>`;
     txt += `<div class="lname">${p.name}</div>`;
     txt += `<div class="lprice">${price}</div>`;
     if (showMrp) txt += `<div class="lmrp">MRP incl. all taxes</div>`;
+    if (showDates && p.pkg) txt += `<div class="lsku">PKD: ${p.pkg}</div>`;
+    if (showDates && p.exp) txt += `<div class="lsku">EXP: ${p.exp}</div>`;
     if (showSku) txt += `<div class="lsku">${p.sku}</div>`;
     txt += '</div>';
     const bcPart = showBc ? `<div class="lbc"><img src="${BC[pid]}" alt="barcode"></div>` : '';
@@ -238,7 +245,7 @@
       const pid = parseInt(cb.value);
       const p   = PRODS[pid]; if (!p) return;
       const n   = Math.max(1, parseInt(document.querySelector(`.qin[data-pid="${pid}"]`)?.value||1));
-      items.push({ pid, name:p.name, sku:p.sku, barcode:p.barcode||p.sku, price:p.price, copies:n });
+      items.push({ pid, name:p.name, sku:p.sku, barcode:p.barcode||p.sku, price:p.price, copies:n, pkg:p.pkg||'', exp:p.exp||'' });
     });
     return { items,
       w_mm: SIZES[cur].w, h_mm: SIZES[cur].h,
@@ -246,6 +253,7 @@
       show_shop:    document.getElementById('chkShop').checked,
       show_mrp:     document.getElementById('chkMrp').checked,
       show_sku:     document.getElementById('chkSku').checked,
+      show_dates:   document.getElementById('chkDates').checked,
     };
   }
 

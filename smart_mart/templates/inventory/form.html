@@ -171,6 +171,13 @@
                      value="{{ product.expiry_date.strftime('%Y-%m-%d') if product and product.expiry_date else '' }}">
             </div>
 
+            <!-- Packed / Manufactured Date -->
+            <div class="col-md-3">
+              <label class="form-label fw-medium">Packed Date (PKD)</label>
+              <input type="date" class="form-control" name="pkg_date"
+                     value="{{ product.pkg_date.strftime('%Y-%m-%d') if product and product.pkg_date else '' }}">
+            </div>
+
             <!-- Reorder Point (MOQ Alert) -->
             <div class="col-md-3">
               <label class="form-label fw-medium">Reorder Point</label>

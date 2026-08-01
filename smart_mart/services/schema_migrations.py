@@ -592,6 +592,11 @@ def _migration_steps() -> list[MigrationStep]:
                 ),
             ),
         ),
+        (
+            "2026_07_30_product_pkg_date",
+            "Add pkg_date (packed/manufactured date) column to products for label printing.",
+            lambda conn: _safe_add_column(conn, "products", "pkg_date", "DATE"),
+        ),
     ]
 
 
