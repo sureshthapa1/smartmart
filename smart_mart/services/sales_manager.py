@@ -326,7 +326,14 @@ def create_sale(items: list[dict], user_id: int,
                 if cust:
                     sale.customer_id = cust.id
                     cust.total_spent = float(cust.total_spent or 0) + float(total_amount)
-                    cust.loyalty_points = int(cust.loyalty_points or 0) + int(total_amount // 10)
+                    # Update loyalty tier based on total_spent (wallet handles actual points)
+                    ts = float(cust.total_spent)
+                    if ts >= 100000:
+                        cust.loyalty_tier = "platinum"
+                    elif ts >= 50000:
+                        cust.loyalty_tier = "gold"
+                    else:
+                        cust.loyalty_tier = "silver"
                     if cust.total_spent >= 100000:
                         cust.loyalty_tier = "platinum"
                     elif cust.total_spent >= 25000:

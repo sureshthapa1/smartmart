@@ -143,9 +143,11 @@
     tr.querySelector('input[name^="name"]').focus();
   }
 
+  const PTS_PER_RUPEE = {{ (shop.loyalty_points_per_rupee | float) if shop else 0.01 }};
+
   function updatePoints(input) {
     const amt = parseFloat(input.value) || 0;
-    const pts = Math.floor(amt / 10);
+    const pts = Math.floor(amt * PTS_PER_RUPEE);
     const span = input.closest('tr').querySelector('.pts-preview');
     span.textContent = pts > 0 ? '+' + pts : '—';
   }

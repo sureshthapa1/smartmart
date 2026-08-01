@@ -173,11 +173,17 @@ def create_sale():
                     db.session.commit()
 
             if sale.customer_id:
-                earned_points = int(float(sale.total_amount or 0) // 10)
+                from ...services.loyalty_wallet_service import _get_loyalty_rates as _gr, get_or_create_wallet
+                from decimal import Decimal as _D, ROUND_DOWN as _RD
+                _ppr, _ = _gr()
+                earned_points = int((_D(str(float(sale.total_amount or 0))) * _ppr).quantize(_D("1"), rounding=_RD))
                 try:
-                    customer_points = sale.customer.loyalty_points if sale.customer else None
-                    if earned_points > 0 and customer_points is not None:
-                        flash(f"+{earned_points} points earned! Customer now has {customer_points} points.", "success")
+                    cname = sale.customer.name if sale.customer else None
+                    cphone = sale.customer.phone if sale.customer else None
+                    _wallet = get_or_create_wallet(cname, cphone)
+                    current_balance = int(_wallet.points_balance) if _wallet else 0
+                    if earned_points > 0:
+                        flash(f"+{earned_points} points earned! Customer now has {current_balance} points.", "success")
                 except Exception as _exc:
                     import logging as _log
                     _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)

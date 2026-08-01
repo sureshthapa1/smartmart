@@ -445,7 +445,11 @@ def missed_sales():
                         ).scalar_one_or_none()
 
                     if cust:
-                        points_earned = int(e["amount"] // 10)
+                        # Use shop settings loyalty rate
+                        from ...services.loyalty_wallet_service import _get_loyalty_rates as _grates
+                        from decimal import Decimal as _Dec, ROUND_DOWN as _RD
+                        _ppr, _ = _grates()
+                        points_earned = int((_Dec(str(e["amount"])) * _ppr).quantize(_Dec("1"), rounding=_RD))
                         cust.total_spent  = float(cust.total_spent  or 0) + e["amount"]
                         cust.loyalty_points = int(cust.loyalty_points or 0) + points_earned
 
