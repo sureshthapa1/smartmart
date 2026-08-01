@@ -276,9 +276,16 @@
 
       {% if current_user.role == 'admin' or current_user.permissions.can_view_customers %}
       <li class="nav-item">
-        <a class="nav-link {% if request.blueprint == 'customers' %}active{% endif %}"
+        <a class="nav-link {% if request.blueprint == 'customers' and request.endpoint != 'customers.missed_sales' %}active{% endif %}"
            href="{{ url_for('customers.list_customers') }}">
           <i class="bi bi-people"></i> Customers
+        </a>
+      </li>
+      {% if current_user.role == 'admin' or current_user.permissions.can_manage_customers %}
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'customers.missed_sales' %}active{% endif %}"
+           href="{{ url_for('customers.missed_sales') }}">
+          <i class="bi bi-clock-history"></i> Missed Sales
         </a>
       </li>
       {% endif %}

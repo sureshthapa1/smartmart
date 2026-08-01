@@ -375,3 +375,112 @@ def birthdays_today():
     upcoming.sort(key=lambda x: x["days_until"])
     from flask import jsonify
     return jsonify(upcoming)
+
+
+@customers_bp.route("/missed-sales", methods=["GET", "POST"])
+@login_required
+def missed_sales():
+    """Record missed customer sales for loyalty tracking.
+    Does NOT affect stock — only updates customer records and awards loyalty points.
+    """
+    _require_perm("can_manage_customers")
+    from datetime import date, datetime, timezone
+
+    results = []
+
+    if request.method == "POST":
+        entries = []
+        # Parse submitted rows: name[N], phone[N], amount[N], sale_date[N]
+        import re
+        keys = request.form.keys()
+        indices = set()
+        for k in keys:
+            m = re.match(r"name\[(\d+)\]", k)
+            if m:
+                indices.add(int(m.group(1)))
+
+        for idx in sorted(indices):
+            name       = request.form.get(f"name[{idx}]", "").strip()
+            phone      = request.form.get(f"phone[{idx}]", "").strip()
+            amount_raw = request.form.get(f"amount[{idx}]", "0").strip()
+            date_raw   = request.form.get(f"sale_date[{idx}]", "").strip()
+
+            if not name:
+                continue
+            try:
+                amount = float(amount_raw or 0)
+            except ValueError:
+                amount = 0.0
+            if amount <= 0:
+                continue
+
+            try:
+                sale_date = date.fromisoformat(date_raw) if date_raw else date.today()
+            except ValueError:
+                sale_date = date.today()
+
+            entries.append({"name": name, "phone": phone, "amount": amount, "sale_date": sale_date})
+
+        if not entries:
+            flash("No valid entries found. Enter at least one row with name and amount.", "danger")
+        else:
+            saved = 0
+            for e in entries:
+                try:
+                    # Upsert customer
+                    Customer.upsert(e["name"], e["phone"])
+                    db.session.flush()
+
+                    # Find the customer record
+                    cust = None
+                    if e["phone"]:
+                        cust = db.session.execute(
+                            db.select(Customer).where(Customer.phone == e["phone"])
+                        ).scalar_one_or_none()
+                    if cust is None:
+                        cust = db.session.execute(
+                            db.select(Customer).where(
+                                db.func.lower(Customer.name) == e["name"].lower()
+                            ).order_by(Customer.id.desc())
+                        ).scalar_one_or_none()
+
+                    if cust:
+                        points_earned = int(e["amount"] // 10)
+                        cust.total_spent  = float(cust.total_spent  or 0) + e["amount"]
+                        cust.loyalty_points = int(cust.loyalty_points or 0) + points_earned
+
+                        # Update tier
+                        ts = float(cust.total_spent)
+                        if ts >= 100000:
+                            cust.loyalty_tier = "platinum"
+                        elif ts >= 50000:
+                            cust.loyalty_tier = "gold"
+                        else:
+                            cust.loyalty_tier = "silver"
+
+                        results.append({
+                            "name": cust.name,
+                            "phone": cust.phone or "—",
+                            "amount": e["amount"],
+                            "points": points_earned,
+                            "total_points": cust.loyalty_points,
+                            "tier": cust.loyalty_tier,
+                            "date": str(e["sale_date"]),
+                            "ok": True,
+                        })
+                        saved += 1
+                    else:
+                        results.append({"name": e["name"], "ok": False,
+                                        "error": "Customer not found after upsert"})
+                except Exception as exc:
+                    db.session.rollback()
+                    results.append({"name": e["name"], "ok": False, "error": str(exc)})
+
+            try:
+                db.session.commit()
+                flash(f"✅ {saved} customer record(s) updated with loyalty points. No stock was affected.", "success")
+            except Exception as exc:
+                db.session.rollback()
+                flash(f"Error saving: {exc}", "danger")
+
+    return render_template("customers/missed_sales.html", results=results, today=date.today().isoformat())

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Missed Customer Sales{% endblock %}
+{% block page_title %}Missed Customer Sales{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('customers.list_customers') }}" class="text-decoration-none">Customers</a></li>
+<li class="breadcrumb-item active">Missed Sales</li>
+{% endblock %}
+{% block content %}
+
+<div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+  <i class="bi bi-info-circle-fill mt-1 flex-shrink-0"></i>
+  <div>
+    <strong>No stock changes.</strong> This form records customer purchases you missed entering.
+    It updates each customer's <strong>total spent</strong> and auto-assigns <strong>loyalty points</strong>
+    (1 point per NPR 10). Existing stock levels are not affected.
+  </div>
+</div>
+
+<form method="post" id="missedForm">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+      <h6 class="fw-bold mb-0"><i class="bi bi-people me-2 text-primary"></i>Enter Missed Customer Sales</h6>
+      <button type="button" class="btn btn-outline-primary btn-sm" onclick="addRow()">
+        <i class="bi bi-plus-lg me-1"></i>Add Row
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle" id="entryTable">
+        <thead>
+          <tr class="table-light">
+            <th style="width:25%">Customer Name <span class="text-danger">*</span></th>
+            <th style="width:18%">Phone</th>
+            <th style="width:18%">Amount Spent (NPR) <span class="text-danger">*</span></th>
+            <th style="width:15%">Sale Date</th>
+            <th style="width:14%">Points (est.)</th>
+            <th style="width:5%"></th>
+          </tr>
+        </thead>
+        <tbody id="entryBody"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white d-flex gap-3 align-items-center px-4 py-3">
+      <button type="submit" class="btn btn-success px-4 fw-semibold">
+        <i class="bi bi-check-circle me-1"></i>Save & Award Points
+      </button>
+      <a href="{{ url_for('customers.list_customers') }}" class="btn btn-outline-secondary">Cancel</a>
+      <span class="ms-auto text-muted small">
+        <i class="bi bi-shield-check me-1 text-success"></i>Stock levels will NOT be changed
+      </span>
+    </div>
+  </div>
+</form>
+
+{% if results %}
+<div class="card shadow-sm">
+  <div class="card-header bg-white border-bottom py-3 px-4">
+    <h6 class="fw-bold mb-0"><i class="bi bi-check2-circle me-2 text-success"></i>Results</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">Points Earned</th>
+          <th class="text-end">Total Points</th>
+          <th>Tier</th>
+          <th>Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr class="{{ 'table-success' if r.ok else 'table-danger' }}">
+          <td class="fw-semibold">{{ r.name }}</td>
+          <td class="text-muted small">{{ r.phone if r.ok else '—' }}</td>
+          <td class="text-end">{% if r.ok %}NPR {{ "%.0f"|format(r.amount) }}{% endif %}</td>
+          <td class="text-end fw-bold text-success">{% if r.ok %}+{{ r.points }}{% endif %}</td>
+          <td class="text-end">{% if r.ok %}{{ r.total_points }} pts{% endif %}</td>
+          <td>
+            {% if r.ok %}
+            <span class="badge {% if r.tier == 'platinum' %}bg-dark{% elif r.tier == 'gold' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+              {{ r.tier | capitalize }}
+            </span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ r.date if r.ok else '—' }}</td>
+          <td>
+            {% if r.ok %}
+            <span class="badge bg-success"><i class="bi bi-check-lg"></i> Saved</span>
+            {% else %}
+            <span class="badge bg-danger" title="{{ r.error }}"><i class="bi bi-x-lg"></i> Failed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  let rowIdx = 0;
+  const TODAY = {{ today | tojson }};
+
+  function addRow(name='', phone='', amount='', saleDate='') {
+    const i = rowIdx++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <input type="text" class="form-control form-control-sm" name="name[${i}]"
+               placeholder="Customer name" value="${name}" autocomplete="off" required>
+      </td>
+      <td>
+        <input type="text" class="form-control form-control-sm" name="phone[${i}]"
+               placeholder="98XXXXXXXX" value="${phone}">
+      </td>
+      <td>
+        <input type="number" class="form-control form-control-sm amt-input"
+               name="amount[${i}]" min="1" step="0.01"
+               placeholder="0.00" value="${amount}" oninput="updatePoints(this)">
+      </td>
+      <td>
+        <input type="date" class="form-control form-control-sm"
+               name="sale_date[${i}]" value="${saleDate || TODAY}">
+      </td>
+      <td class="text-end">
+        <span class="pts-preview text-success fw-bold">—</span>
+        <span class="text-muted small"> pts</span>
+      </td>
+      <td class="text-center">
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    `;
+    document.getElementById('entryBody').appendChild(tr);
+    if (amount) updatePoints(tr.querySelector('.amt-input'));
+    tr.querySelector('input[name^="name"]').focus();
+  }
+
+  function updatePoints(input) {
+    const amt = parseFloat(input.value) || 0;
+    const pts = Math.floor(amt / 10);
+    const span = input.closest('tr').querySelector('.pts-preview');
+    span.textContent = pts > 0 ? '+' + pts : '—';
+  }
+
+  // Start with 3 empty rows
+  addRow(); addRow(); addRow();
+</script>
+{% endblock %}
