@@ -184,7 +184,7 @@
                        style="width:36px;height:36px;object-fit:cover;border-radius:7px;flex-shrink:0;border:1px solid #e2e8f0;">
                   {% else %}{{ product_icon_cell(item.product.name if item.product else '—', item.product.category if item.product else '') }}{% endif %}
                   {%- else -%}{{ product_icon_cell(item.product.name if item.product else '—', item.product.category if item.product else '') }}{%- endif -%}
-                  <span class="fw-semibold" style="font-size:.875rem;">{{ item.product.name if item.product else item.product_name or '—' }}</span>
+                  <span class="fw-semibold" style="font-size:.875rem;">{{ item.product.name if item.product else item.product_name or '—' }}{% if item.variant %} <span class="badge bg-light text-secondary border" style="font-size:.7rem;">{{ item.variant.variant_name }}</span>{% endif %}</span>
                 </div>
               </td>
               <td><code class="text-muted">{{ item.product.sku if item.product else '—' }}</code></td>

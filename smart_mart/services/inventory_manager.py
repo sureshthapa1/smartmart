@@ -37,6 +37,7 @@ def create_product(data: dict) -> Product:
         low_stock_threshold=data.get("low_stock_threshold", 10),
         supplier_id=data.get("supplier_id"),
         expiry_date=data.get("expiry_date"),
+        pkg_date=data.get("pkg_date"),
         image_filename=data.get("image_filename"),
         unit=data.get("unit", "pcs"),
         reorder_point=data.get("reorder_point", 10),
@@ -125,7 +126,8 @@ def update_product(product_id: int, data: dict) -> Product:
     old_values = {f: str(getattr(product, f, "")) for f in price_fields}
 
     updatable = ("name", "category", "sku", "cost_price", "selling_price",
-                 "quantity", "low_stock_threshold", "supplier_id", "expiry_date", "image_filename",
+                 "quantity", "low_stock_threshold", "supplier_id", "expiry_date",
+                 "pkg_date", "image_filename",
                  "unit", "reorder_point", "barcode", "is_active",
                  "max_discount_pct", "tax_category",
                  "description", "benefits", "origin", "storage_tips",
