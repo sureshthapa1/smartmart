@@ -49,11 +49,11 @@ def list_returns():
 
     # SQL-level count and refund total (no full table load)
     from sqlalchemy import func as _f2
-    count_stmt = db.select(_f2.count()).select_from(stmt.subquery())
+    sq = stmt.subquery()
+    count_stmt = db.select(_f2.count()).select_from(sq)
     total = db.session.execute(count_stmt).scalar() or 0
     total_refund_row = db.session.execute(
-        db.select(_f2.coalesce(_f2.sum(stmt.subquery().c.refund_amount), 0))
-        .select_from(stmt.subquery())
+        db.select(_f2.coalesce(_f2.sum(sq.c.refund_amount), 0))
     ).scalar() or 0
     total_refund = float(total_refund_row)
     # SQL-level pagination
