@@ -98,16 +98,18 @@ def create_sale():
 
         products_by_id = {
             p.id: p for p in db.session.execute(
-                db.select(Product).where(Product.id.in_([item["product_id"] for item in items]))
+                db.select(Product).where(Product.id.in_([
+                    item["product_id"] for item in items if item.get("product_id")
+                ]))
             ).scalars().all()
         }
         cart_for_expiry = [
             SimpleNamespace(
                 product_id=item["product_id"],
-                product_name=products_by_id[item["product_id"]].name if item["product_id"] in products_by_id else "Product",
-                expiry_date=products_by_id[item["product_id"]].expiry_date if item["product_id"] in products_by_id else None,
+                product_name=products_by_id[item["product_id"]].name if item.get("product_id") and item["product_id"] in products_by_id else "Product",
+                expiry_date=products_by_id[item["product_id"]].expiry_date if item.get("product_id") and item["product_id"] in products_by_id else None,
             )
-            for item in items
+            for item in items if item.get("product_id")
         ]
         expiry_issues = check_cart_for_expiry(cart_for_expiry)
         if any(issue.severity == "expired" for issue in expiry_issues):

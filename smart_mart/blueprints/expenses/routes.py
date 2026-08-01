@@ -61,7 +61,7 @@ def list_expenses():
     ).scalar() or 0
     total_amount = float(
         db.session.execute(
-            db.select(_f3.coalesce(_f3.sum(Expense.amount), 0))
+            db.select(_f3.coalesce(_f3.sum(sq.c.amount), 0))
             .select_from(sq)
         ).scalar() or 0
     )
