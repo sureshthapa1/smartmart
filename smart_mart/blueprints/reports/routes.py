@@ -668,6 +668,95 @@ def bi_profit_loss():
                            data=data, start_date=start_raw, end_date=end_raw)
 
 
+@reports_bp.route("/ebitda")
+@login_required
+def ebitda_report():
+    """EBITDA report — Earnings Before Interest, Tax, Depreciation & Amortisation."""
+    _require_perm("can_view_profit_report")
+    from ...bi.services.report_service import ReportService
+    from ...models.expense import Expense
+    from ...extensions import db
+    from sqlalchemy import func
+    from decimal import Decimal
+
+    start, end, start_raw, end_raw = _get_date_range()
+    pnl = ReportService.profit_and_loss(start, end)
+    o = pnl["overall"]
+
+    # Fetch depreciation / amortisation expenses (tagged as such)
+    dep_stmt = db.select(func.coalesce(func.sum(Expense.amount), 0)).where(
+        Expense.expense_type.in_(["depreciation", "amortisation", "amortization", "depreciation_amortization"])
+    )
+    if start:
+        dep_stmt = dep_stmt.where(Expense.expense_date >= start)
+    if end:
+        dep_stmt = dep_stmt.where(Expense.expense_date <= end)
+    depreciation = float(db.session.execute(dep_stmt).scalar() or 0)
+
+    # Fetch interest expenses
+    int_stmt = db.select(func.coalesce(func.sum(Expense.amount), 0)).where(
+        Expense.expense_type.in_(["interest", "interest_expense", "loan_interest"])
+    )
+    if start:
+        int_stmt = int_stmt.where(Expense.expense_date >= start)
+    if end:
+        int_stmt = int_stmt.where(Expense.expense_date <= end)
+    interest = float(db.session.execute(int_stmt).scalar() or 0)
+
+    # Tax is currently 0 (VAT is pass-through, not an income tax)
+    tax = 0.0
+
+    net_profit  = float(o["net_profit"])
+    ebitda      = net_profit + depreciation + interest + tax
+    revenue     = float(o["sales"])
+    ebitda_margin = round(ebitda / revenue * 100, 2) if revenue > 0 else 0.0
+
+    # Monthly EBITDA trend (last 12 months)
+    from datetime import date as _date, timedelta
+    from ...models.sale import Sale
+    trend = []
+    for i in range(11, -1, -1):
+        d = _date.today().replace(day=1)
+        # Go back i months
+        month = d.month - i
+        year  = d.year
+        while month <= 0:
+            month += 12
+            year  -= 1
+        m_start = _date(year, month, 1)
+        # last day of month
+        if month == 12:
+            m_end = _date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            m_end = _date(year, month + 1, 1) - timedelta(days=1)
+
+        m_pnl = ReportService.profit_and_loss(m_start, m_end)
+        m_net = float(m_pnl["overall"]["net_profit"])
+        m_ebitda = m_net  # D&A and interest typically 0 month-to-month
+        trend.append({
+            "label": m_start.strftime("%b %Y"),
+            "revenue": float(m_pnl["overall"]["sales"]),
+            "gross_profit": float(m_pnl["overall"]["gross_profit"]),
+            "ebitda": round(m_ebitda, 2),
+        })
+
+    return render_template("reports/ebitda.html",
+        start_date=start_raw, end_date=end_raw,
+        revenue=revenue,
+        cogs=float(o["cogs"]),
+        gross_profit=float(o["gross_profit"]),
+        gross_margin=float(o["gross_margin_pct"]),
+        opex=float(o["opex"]),
+        depreciation=depreciation,
+        interest=interest,
+        tax=tax,
+        net_profit=net_profit,
+        ebitda=ebitda,
+        ebitda_margin=ebitda_margin,
+        trend=trend,
+    )
+
+
 @reports_bp.route("/profit-margin")
 @login_required
 def profit_margin():

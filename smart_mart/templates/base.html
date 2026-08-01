@@ -475,6 +475,8 @@
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-droplet"></i> Profit Leakage</a></li>
             <li><a class="nav-link {% if request.endpoint == 'reports.bi_profit_loss' %}active{% endif %}"
                    href="{{ url_for('reports.bi_profit_loss') }}"><i class="bi bi-file-earmark-bar-graph"></i> P&L Statement</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'reports.ebitda_report' %}active{% endif %}"
+                   href="{{ url_for('reports.ebitda_report') }}"><i class="bi bi-bar-chart-steps"></i> EBITDA</a></li>
             {% endif %}
           </ul>
         </div>

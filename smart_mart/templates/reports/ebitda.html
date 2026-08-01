@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}EBITDA Report — Smart Mart{% endblock %}
+{% block page_title %}EBITDA Report{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('reports.bi_profit_loss') }}" class="text-decoration-none">Reports</a></li>
+<li class="breadcrumb-item active">EBITDA</li>
+{% endblock %}
+{% block content %}
+
+<!-- Date filter -->
+<form method="get" class="card shadow-sm mb-4 p-3">
+  <div class="d-flex gap-3 flex-wrap align-items-end">
+    <div>
+      <label class="form-label small fw-semibold mb-1">From</label>
+      <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+    </div>
+    <div>
+      <label class="form-label small fw-semibold mb-1">To</label>
+      <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Apply</button>
+    <a href="{{ url_for('reports.ebitda_report') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+  </div>
+</form>
+
+<!-- ── EBITDA Waterfall ─────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <!-- Waterfall card -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white border-bottom py-3 px-4">
+        <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-steps me-2 text-primary"></i>EBITDA Waterfall</h6>
+      </div>
+      <div class="card-body p-4">
+
+        {% set rows = [
+          ('Revenue',              revenue,      'text-primary',   'bi-cash-stack'),
+          ('Cost of Goods Sold',   -cogs,        'text-danger',    'bi-cart-dash'),
+          ('Gross Profit',         gross_profit, 'text-success fw-bold', 'bi-graph-up'),
+          ('Operating Expenses',   -opex,        'text-warning',   'bi-receipt'),
+          ('EBIT (Net Profit)',     net_profit,   'text-info fw-bold', 'bi-calculator'),
+          ('Add: Depreciation',    depreciation, 'text-secondary', 'bi-tools'),
+          ('Add: Interest',        interest,     'text-secondary', 'bi-bank'),
+          ('Add: Tax',             tax,          'text-secondary', 'bi-percent'),
+        ] %}
+
+        {% for label, val, cls, icon in rows %}
+        <div class="d-flex align-items-center mb-2 {% if 'fw-bold' in cls %}border-top pt-2 mt-1{% endif %}">
+          <i class="bi {{ icon }} me-2 text-muted" style="width:18px;"></i>
+          <span class="flex-grow-1 small {% if 'fw-bold' in cls %}fw-semibold{% endif %}">{{ label }}</span>
+          <span class="fw-bold {{ cls }}" style="font-size:.95rem; min-width:130px; text-align:right;">
+            {{ '+' if val >= 0 else '' }}NPR {{ "{:,.0f}".format(val|abs) }}
+          </span>
+        </div>
+        {% endfor %}
+
+        <div class="border-top border-2 border-dark mt-3 pt-3 d-flex align-items-center">
+          <i class="bi bi-star-fill me-2 text-warning" style="width:18px;"></i>
+          <span class="flex-grow-1 fw-bold fs-6">EBITDA</span>
+          <span class="fw-bold fs-5 {{ 'text-success' if ebitda >= 0 else 'text-danger' }}">
+            NPR {{ "{:,.0f}".format(ebitda|abs) }}
+          </span>
+        </div>
+        <div class="text-end text-muted small mt-1">
+          EBITDA Margin: <strong>{{ ebitda_margin }}%</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="col-lg-5">
+    <div class="row g-3">
+      {% set kpis = [
+        ('Revenue', revenue,       '#6366f1', 'bi-cash-stack'),
+        ('Gross Profit', gross_profit, '#22c55e', 'bi-graph-up-arrow'),
+        ('Gross Margin', none,     '#0ea5e9', 'bi-percent'),
+        ('EBITDA', ebitda,         '#f59e0b', 'bi-star-fill'),
+        ('EBITDA Margin', none,    '#8b5cf6', 'bi-pie-chart'),
+        ('Net Profit', net_profit, '#14b8a6', 'bi-wallet2'),
+      ] %}
+      {% for name, val, color, icon in kpis %}
+      <div class="col-6">
+        <div class="card border-0 shadow-sm text-center py-3 px-2">
+          <i class="bi {{ icon }} mb-1" style="color:{{ color }};font-size:1.2rem;"></i>
+          <div class="text-muted" style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">{{ name }}</div>
+          {% if name == 'Gross Margin' %}
+          <div class="fw-bold" style="font-size:1rem;color:{{ color }};">{{ gross_margin }}%</div>
+          {% elif name == 'EBITDA Margin' %}
+          <div class="fw-bold" style="font-size:1rem;color:{{ color }};">{{ ebitda_margin }}%</div>
+          {% else %}
+          <div class="fw-bold" style="font-size:.95rem;color:{{ color }};">NPR {{ "{:,.0f}".format(val) }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Monthly Trend ────────────────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom py-3 px-4">
+    <h6 class="fw-bold mb-0"><i class="bi bi-graph-up me-2 text-primary"></i>12-Month EBITDA Trend</h6>
+  </div>
+  <div class="card-body p-4">
+    <canvas id="ebitdaChart" height="90"></canvas>
+  </div>
+</div>
+
+<!-- ── Definition Box ──────────────────────────────────────────────────── -->
+<div class="card shadow-sm border-0 mb-4" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">
+  <div class="card-body p-4">
+    <h6 class="fw-bold text-success mb-2"><i class="bi bi-info-circle me-2"></i>What is EBITDA?</h6>
+    <p class="small text-muted mb-2">
+      <strong>EBITDA = Earnings Before Interest, Taxes, Depreciation & Amortisation</strong><br>
+      It measures operating profitability before non-cash charges (depreciation) and financing costs (interest/tax).
+      For retail businesses it's a cleaner measure of core business performance than net profit.
+    </p>
+    <div class="row g-2 small">
+      <div class="col-md-6"><strong>Formula:</strong> EBITDA = Net Profit + D&amp;A + Interest + Tax</div>
+      <div class="col-md-6"><strong>Healthy EBITDA margin:</strong> &gt;15% for retail</div>
+    </div>
+    <div class="mt-2 small text-muted">
+      <i class="bi bi-lightbulb me-1 text-warning"></i>
+      To record depreciation or interest expenses, go to <a href="{{ url_for('expenses.list_expenses') }}">Expenses</a>
+      and set the type to <strong>depreciation</strong> or <strong>interest</strong>.
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  const trend = {{ trend | tojson }};
+  new Chart(document.getElementById('ebitdaChart'), {
+    type: 'bar',
+    data: {
+      labels: trend.map(t => t.label),
+      datasets: [
+        {
+          label: 'Revenue',
+          data: trend.map(t => t.revenue),
+          backgroundColor: 'rgba(99,102,241,.25)',
+          borderColor: '#6366f1',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Gross Profit',
+          data: trend.map(t => t.gross_profit),
+          backgroundColor: 'rgba(34,197,94,.25)',
+          borderColor: '#22c55e',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'EBITDA',
+          data: trend.map(t => t.ebitda),
+          backgroundColor: 'rgba(245,158,11,.35)',
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          borderRadius: 4,
+          type: 'bar',
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: NPR ${ctx.parsed.y.toLocaleString('en-IN', {maximumFractionDigits:0})}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => 'NPR ' + (v/1000).toFixed(0) + 'k'
+          }
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}
