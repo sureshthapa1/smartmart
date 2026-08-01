@@ -32,6 +32,32 @@
   </div>
 </div>
 
+{# ── Improvement Alerts ────────────────────────────────────────────────── #}
+{% if no_barcode_count > 0 or zero_cost_count > 0 or out_of_stock_count > 0 %}
+<div class="alert alert-warning d-flex flex-wrap gap-2 align-items-center py-2 px-3 mb-3" style="font-size:.82rem;">
+  <i class="bi bi-lightbulb-fill text-warning me-1"></i>
+  <strong>Improvements needed:</strong>
+  {% if no_barcode_count > 0 %}
+  <span class="badge bg-warning text-dark">{{ no_barcode_count }} products missing barcode</span>
+  <form method="post" action="{{ url_for('inventory.autofill_barcodes') }}" class="d-inline"
+        onsubmit="return confirm('Auto-generate barcodes for {{ no_barcode_count }} products using their SKU?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-sm btn-warning py-0 px-2" style="font-size:.72rem;">
+      <i class="bi bi-upc me-1"></i>Auto-fill Barcodes
+    </button>
+  </form>
+  {% endif %}
+  {% if zero_cost_count > 0 %}
+  <span class="badge bg-danger">{{ zero_cost_count }} products with NPR 0 cost — profit reports inaccurate</span>
+  {% endif %}
+  {% if out_of_stock_count > 0 %}
+  <a href="{{ url_for('inventory.list_products', status='low') }}" class="badge bg-secondary text-decoration-none">
+    {{ out_of_stock_count }} out-of-stock products
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ── Stock Valuation Summary ───────────────────────────────────────────── #}
 <div class="row g-3 mb-3">
   <div class="col-6 col-md-3">
@@ -123,7 +149,7 @@
           </td>
           <td><span class="badge rounded-pill" style="background:#f1f5f9;color:#475569;font-size:.7rem">{{ p.category or '—' }}</span></td>
           <td><code class="text-muted" style="font-size:.78rem">{{ p.sku }}</code></td>
-          {% if current_user.role == 'admin' %}<td class="text-end text-muted">{{ "%.2f"|format(p.cost_price|float) }}</td>{% endif %}
+          {% if current_user.role == 'admin' %}<td class="text-end text-muted">{{ "%.2f"|format(p.cost_price|float) }}{% if p.cost_price|float == 0 %} <span class="badge bg-danger" title="Zero cost — fix for accurate profits">!</span>{% endif %}</td>{% endif %}
           <td class="text-end fw-semibold">{{ "%.2f"|format(p.selling_price|float) }}</td>
           <td class="text-center">
             <span class="badge {% if p.quantity == 0 %}bg-danger{% elif p.quantity <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">

@@ -194,6 +194,11 @@ def list_products():
         ).where(Product.is_active == True)
     ).one()
 
+    # ── Improvement counts ────────────────────────────────────────────────
+    no_barcode_count   = db.session.execute(db.select(_func.count(Product.id)).where(Product.is_active == True, Product.barcode == None)).scalar() or 0
+    zero_cost_count    = db.session.execute(db.select(_func.count(Product.id)).where(Product.is_active == True, Product.cost_price == 0)).scalar() or 0
+    out_of_stock_count = db.session.execute(db.select(_func.count(Product.id)).where(Product.is_active == True, Product.quantity == 0)).scalar() or 0
+
     return render_template("inventory/list.html", products=products, search=search or "",
                            page=page, total=total, total_pages=total_pages, per_page=per_page,
                            status_filter=status_filter, today=_date.today(),
@@ -201,7 +206,10 @@ def list_products():
                            stock_cost_value=float(val_row.cost_val),
                            stock_retail_value=float(val_row.retail_val),
                            stock_total_units=int(val_row.total_units),
-                           stock_total_skus=int(val_row.total_skus))
+                           stock_total_skus=int(val_row.total_skus),
+                           no_barcode_count=no_barcode_count,
+                           zero_cost_count=zero_cost_count,
+                           out_of_stock_count=out_of_stock_count)
 
 
 @inventory_bp.route("/create", methods=["GET", "POST"])
@@ -815,6 +823,28 @@ def autofill_all():
         )
     except Exception as exc:
         flash(f"Bulk autofill failed: {exc}", "danger")
+    return redirect(url_for("inventory.list_products"))
+
+
+@inventory_bp.route("/autofill-barcodes", methods=["POST"])
+@admin_required
+def autofill_barcodes():
+    """Auto-generate barcodes for products that don't have one, using their SKU."""
+    products_without_barcode = db.session.execute(
+        db.select(Product)
+        .where(Product.is_active == True, Product.barcode == None)
+    ).scalars().all()
+    updated = 0
+    for p in products_without_barcode:
+        if p.sku:
+            p.barcode = p.sku   # use SKU as the barcode value
+            updated += 1
+    if updated:
+        db.session.commit()
+        flash(f"✅ Barcodes auto-generated for {updated} products using their SKU. "
+              f"Print labels to stick them on products.", "success")
+    else:
+        flash("All active products already have barcodes.", "info")
     return redirect(url_for("inventory.list_products"))
 
 
