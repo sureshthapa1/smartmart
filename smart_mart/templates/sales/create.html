@@ -734,6 +734,12 @@
       tr.querySelector('.subtotal-cell').textContent = (qty * price).toFixed(2);
     }
 
+    // Alias — called from onProductSelected after a dropdown selection
+    function recalcRow(tr) {
+      updateRowSubtotal(tr);
+      recalcTotal();
+    }
+
     // ── Central total recalculation ───────────────────────────────────
     // Discount sources (all independent, can stack):
     //   1. manualDiscount   — typed in the discount field by cashier
