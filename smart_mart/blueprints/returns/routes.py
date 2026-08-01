@@ -52,7 +52,7 @@ def list_returns():
     count_stmt = db.select(_f2.count()).select_from(stmt.subquery())
     total = db.session.execute(count_stmt).scalar() or 0
     total_refund_row = db.session.execute(
-        db.select(_f2.coalesce(_f2.sum(SaleReturn.refund_amount), 0))
+        db.select(_f2.coalesce(_f2.sum(stmt.subquery().c.refund_amount), 0))
         .select_from(stmt.subquery())
     ).scalar() or 0
     total_refund = float(total_refund_row)
