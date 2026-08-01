@@ -214,7 +214,7 @@ with app.app_context():
         conn.commit()
 
         safe_add(conn, "customer_accounts", "notes", "TEXT")
-                safe_add(conn, "shop_settings", "delivery_charge", "NUMERIC(10,2) DEFAULT 0")
+        safe_add(conn, "shop_settings", "delivery_charge", "NUMERIC(10,2) DEFAULT 0")
         safe_add(conn, "shop_settings", "free_delivery_above_npr", "NUMERIC(10,2) DEFAULT 0")
         safe_add(conn, "customer_accounts", "saved_address", "TEXT")
         safe_add(conn, "customer_accounts", "saved_area", "VARCHAR(100)")
