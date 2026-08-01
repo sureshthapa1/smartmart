@@ -182,10 +182,26 @@ def list_products():
         pass
 
     from datetime import date as _date, datetime, timezone
+    from sqlalchemy import func as _func
+
+    # ── Stock Valuation Summary (all active products, not just current page) ─
+    val_row = db.session.execute(
+        db.select(
+            _func.coalesce(_func.sum(Product.cost_price     * Product.quantity), 0).label("cost_val"),
+            _func.coalesce(_func.sum(Product.selling_price  * Product.quantity), 0).label("retail_val"),
+            _func.coalesce(_func.sum(Product.quantity), 0).label("total_units"),
+            _func.count(Product.id).label("total_skus"),
+        ).where(Product.is_active == True)
+    ).one()
+
     return render_template("inventory/list.html", products=products, search=search or "",
                            page=page, total=total, total_pages=total_pages, per_page=per_page,
                            status_filter=status_filter, today=_date.today(),
-                           price_alert_product_ids=price_alert_product_ids)
+                           price_alert_product_ids=price_alert_product_ids,
+                           stock_cost_value=float(val_row.cost_val),
+                           stock_retail_value=float(val_row.retail_val),
+                           stock_total_units=int(val_row.total_units),
+                           stock_total_skus=int(val_row.total_skus))
 
 
 @inventory_bp.route("/create", methods=["GET", "POST"])

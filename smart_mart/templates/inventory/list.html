@@ -32,6 +32,36 @@
   </div>
 </div>
 
+{# ── Stock Valuation Summary ───────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="text-muted" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Total SKUs</div>
+      <div class="fw-bold fs-5" style="color:#0f172a;">{{ stock_total_skus }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="text-muted" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Total Units</div>
+      <div class="fw-bold fs-5" style="color:#0f172a;">{{ "{:,}".format(stock_total_units) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="text-muted" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Cost Value</div>
+      <div class="fw-bold fs-5" style="color:#1e3a5f;">NPR {{ "{:,.0f}".format(stock_cost_value) }}</div>
+      <div class="text-muted" style="font-size:.65rem;">at cost price</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="text-muted" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Retail Value</div>
+      <div class="fw-bold fs-5" style="color:#16a34a;">NPR {{ "{:,.0f}".format(stock_retail_value) }}</div>
+      <div class="text-muted" style="font-size:.65rem;">at selling price</div>
+    </div>
+  </div>
+</div>
+
 <div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" action="{{ url_for('inventory.list_products') }}">
