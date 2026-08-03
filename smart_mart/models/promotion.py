@@ -28,6 +28,9 @@ class Promotion(db.Model):
     min_purchase = db.Column(db.Numeric(10, 2), nullable=True)  # minimum cart value
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
+    usage_limit    = db.Column(db.Integer,  nullable=True)   # None = unlimited
+    usage_count    = db.Column(db.Integer,  default=0)       # total uses so far
+    per_customer_limit = db.Column(db.Integer, default=1)    # max uses per customer (default 1)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
