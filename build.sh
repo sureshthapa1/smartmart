@@ -223,6 +223,7 @@ with app.app_context():
                 safe_add(conn, "promotions", "usage_limit",        "INTEGER")
         safe_add(conn, "promotions", "usage_count",        "INTEGER DEFAULT 0")
         safe_add(conn, "promotions", "per_customer_limit", "INTEGER DEFAULT 1")
+                safe_add(conn, "waste_records", "waste_type", "VARCHAR(20) DEFAULT 'other'")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
