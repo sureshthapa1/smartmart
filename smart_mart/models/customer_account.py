@@ -31,6 +31,10 @@ class CustomerAccount(db.Model):
                            default=lambda: datetime.now(timezone.utc))
     last_login = db.Column(db.DateTime, nullable=True)
     notes       = db.Column(db.Text, nullable=True)  # Staff notes: preferences, allergies, special requests
+    # ── CRM analytics (updated after each order) ──────────────────
+    last_order_date = db.Column(db.DateTime(timezone=True), nullable=True)
+    total_spent     = db.Column(db.Numeric(12, 2), default=0)  # lifetime value in NPR
+    order_count     = db.Column(db.Integer, default=0)         # total confirmed orders
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
