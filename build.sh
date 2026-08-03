@@ -220,6 +220,9 @@ with app.app_context():
         safe_add(conn, "customer_accounts", "saved_area", "VARCHAR(100)")
         safe_add(conn, "customer_accounts", "save_address_pref", "BOOLEAN DEFAULT FALSE")
                 safe_add(conn, "sale_items", "cost_price", "NUMERIC(10,2)")
+                safe_add(conn, "promotions", "usage_limit",        "INTEGER")
+        safe_add(conn, "promotions", "usage_count",        "INTEGER DEFAULT 0")
+        safe_add(conn, "promotions", "per_customer_limit", "INTEGER DEFAULT 1")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
