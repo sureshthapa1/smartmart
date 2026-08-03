@@ -227,6 +227,8 @@ with app.app_context():
                 safe_add(conn, "customer_accounts", "last_order_date", "TIMESTAMPTZ")
         safe_add(conn, "customer_accounts", "total_spent",     "NUMERIC(12,2) DEFAULT 0")
         safe_add(conn, "customer_accounts", "order_count",     "INTEGER DEFAULT 0")
+                safe_add(conn, "online_orders", "shipped_at",    "TIMESTAMPTZ")
+        safe_add(conn, "online_orders", "tracking_code", "VARCHAR(100)")
         print("Column migrations complete.")
     except Exception as e:
         print(f"WARNING: Column migrations failed (non-fatal): {e}")
