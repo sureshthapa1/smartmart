@@ -68,9 +68,10 @@ def create_product(data: dict) -> Product:
         user_id = data.get("user_id", 1)
 
         if supplier_id:
-            # Route through purchase_manager for full expense + stock tracking
+            # Route through purchase_manager for full expense + stock tracking.
+            # Do NOT commit the product separately — let create_purchase commit everything
+            # atomically so a purchase failure leaves no orphan product row.
             try:
-                db.session.commit()  # commit product first so purchase FK works
                 _create_purchase(
                     supplier_id=supplier_id,
                     items=[{
@@ -82,7 +83,8 @@ def create_product(data: dict) -> Product:
                     user_id=user_id,
                 )
             except Exception as exc:
-                raise ValueError(f"Product created but purchase record failed: {exc}")
+                db.session.rollback()
+                raise ValueError(f"Product creation failed (purchase record error): {exc}")
         else:
             # No supplier — still add stock + movement, but no Purchase record
             product.quantity = purchase_qty

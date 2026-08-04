@@ -60,8 +60,7 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
             from . import operations_manager
             operations_manager.create_batches_for_purchase(purchase)
         except Exception:
-            db.session.rollback()
-            raise
+            raise  # outer except handles rollback
 
         db.session.commit()
     except Exception:

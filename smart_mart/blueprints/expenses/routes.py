@@ -93,10 +93,9 @@ def list_expenses():
     by_type_rows = db.session.execute(by_type_stmt).all()
     by_type: dict = {r.expense_type: float(r.total) for r in by_type_rows}
 
-    # Monthly breakdown for stacked bar chart (last 6 months, all data)
-    from sqlalchemy import extract
+    # Monthly breakdown for stacked bar chart (last 6 months, respects active filters)
     from ...services.db_compat import date_format_year_month as _ym
-    monthly_rows = db.session.execute(
+    monthly_stmt = (
         db.select(
             _ym(Expense.expense_date).label("month"),
             Expense.expense_type.label("type"),
@@ -104,7 +103,20 @@ def list_expenses():
         )
         .group_by(_ym(Expense.expense_date), Expense.expense_type)
         .order_by(_ym(Expense.expense_date))
-    ).all()
+    )
+    if start_raw:
+        try:
+            monthly_stmt = monthly_stmt.where(Expense.expense_date >= date.fromisoformat(start_raw))
+        except ValueError:
+            pass
+    if end_raw:
+        try:
+            monthly_stmt = monthly_stmt.where(Expense.expense_date <= date.fromisoformat(end_raw))
+        except ValueError:
+            pass
+    if type_filter:
+        monthly_stmt = monthly_stmt.where(Expense.expense_type == type_filter)
+    monthly_rows = db.session.execute(monthly_stmt).all()
     monthly_chart = [{"month": r.month, "type": r.type, "total": float(r.total)} for r in monthly_rows]
 
     return render_template("expenses/list.html",
