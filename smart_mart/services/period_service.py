@@ -47,7 +47,11 @@ def close_period(year: int, month: int, user_id: int, notes: str | None = None) 
     ).scalar() or 0
 
     total_cogs = db.session.execute(
-        db.select(func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0))
+        db.select(
+            func.coalesce(
+                func.sum(SaleItem.quantity * func.coalesce(SaleItem.cost_price, 0)), 0
+            )
+        )
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start, Sale.sale_date < end)
     ).scalar() or 0

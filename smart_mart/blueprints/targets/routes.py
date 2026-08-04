@@ -106,6 +106,19 @@ def current_target_progress(user_id):
 
 
 def _achieved(user_id, start, end):
+    # Coerce date → datetime for the DateTime sale_date column
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    if not isinstance(start, _dt):
+        start = _dt(start.year, start.month, start.day, tzinfo=_tz.utc)
+    if not isinstance(end, _dt):
+        # end of the given day (inclusive)
+        end = _dt(end.year, end.month, end.day, tzinfo=_tz.utc) + _td(days=1)
+        return float(db.session.execute(
+            db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+            .where(Sale.user_id == user_id)
+            .where(Sale.sale_date >= start)
+            .where(Sale.sale_date < end)
+        ).scalar() or 0)
     return float(db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
         .where(Sale.user_id == user_id)

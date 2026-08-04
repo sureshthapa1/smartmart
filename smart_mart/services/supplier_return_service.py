@@ -10,8 +10,9 @@ from ..models.supplier_return import SupplierReturn, SupplierReturnItem
 
 
 def _next_reference() -> str:
-    count = db.session.execute(db.select(db.func.count(SupplierReturn.id))).scalar() or 0
-    return f"SR-{count + 1:05d}"
+    # Use MAX(id) + 1 so deletions don't produce duplicate reference numbers
+    max_id = db.session.execute(db.select(db.func.max(SupplierReturn.id))).scalar() or 0
+    return f"SR-{max_id + 1:05d}"
 
 
 def create_supplier_return(supplier_id: int, items: list[dict], user_id: int,

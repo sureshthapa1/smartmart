@@ -18,7 +18,13 @@ from ..utils import as_decimal, decimal_to_float, money
 class ReportService:
     @staticmethod
     def profit_and_loss(start: date | None = None, end: date | None = None) -> dict:
-        sale_stmt = db.select(Sale.id, Sale.sale_date).subquery()
+        # Apply date filters on the subquery so the DB doesn't materialise all sales first
+        _sale_base = db.select(Sale.id, Sale.sale_date)
+        if start:
+            _sale_base = _sale_base.where(Sale.sale_date >= start)
+        if end:
+            _sale_base = _sale_base.where(Sale.sale_date <= end)
+        sale_stmt = _sale_base.subquery()
 
         item_stmt = (
             db.select(
@@ -28,17 +34,12 @@ class ReportService:
                 Product.cost_price.label("current_cost"),
                 Product.selling_price.label("current_selling_price"),
                 func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
-                func.coalesce(func.sum(SaleItem.quantity * SaleItem.cost_price), 0).label("cogs"),
+                func.coalesce(func.sum(SaleItem.quantity * func.coalesce(SaleItem.cost_price, 0)), 0).label("cogs"),
                 func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
             )
             .join(sale_stmt, sale_stmt.c.id == SaleItem.sale_id)
             .join(Product, Product.id == SaleItem.product_id)
         )
-
-        if start:
-            item_stmt = item_stmt.where(sale_stmt.c.sale_date >= start)
-        if end:
-            item_stmt = item_stmt.where(sale_stmt.c.sale_date <= end)
 
         item_stmt = item_stmt.group_by(
             SaleItem.product_id, Product.name, Product.sku,

@@ -104,4 +104,7 @@ class SalesService:
         first_user = db.session.execute(db.select(User).order_by(User.id.asc())).scalars().first()
         if first_user is None:
             raise ValueError("No users available. Create a user before recording sale")
-        return first_user.id
+        raise ValueError(
+            f"user_id is required for BI sales. Got None — pass a valid user_id to avoid "
+            f"incorrectly attributing this sale to '{first_user.username}'."
+        )
