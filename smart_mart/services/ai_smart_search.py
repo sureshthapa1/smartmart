@@ -178,7 +178,7 @@ def smart_search(query: str) -> dict:
         rows = db.session.execute(q.limit(10)).scalars().all()
         for e in rows:
             results.append({"type": "expense", "icon": "bi-receipt-cutoff", "color": "#ef4444",
-                            "label": e.description or e.category,
+                            "label": e.note or e.expense_type,
                             "sub": f"NPR {float(e.amount):,.0f} | {str(e.expense_date)[:10]}",
                             "url": "/expenses/"})
 

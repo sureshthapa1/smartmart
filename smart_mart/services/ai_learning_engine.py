@@ -213,7 +213,7 @@ def get_model_version(model_name: str) -> dict | None:
         "accuracy": v.accuracy_score,
         "trained_at": str(v.trained_at),
         "parameters": json.loads(v.parameters) if v.parameters else {},
-        "samples": v.training_samples,
+        "samples": v.data_points_used,
     }
 
 
