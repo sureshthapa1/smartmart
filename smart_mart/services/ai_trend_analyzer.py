@@ -49,6 +49,7 @@ def fast_moving_products(period: str = "weekly", top_n: int = 10) -> dict:
             func.sum(SaleItem.subtotal).label("revenue"),
             func.count(SaleItem.id.distinct()).label("order_count"),
         )
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start)
@@ -89,7 +90,7 @@ def dead_stock_analysis(days: int = 30) -> dict:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= cutoff)
+        .where(Sale.sale_date >= cutoff, SaleItem.product_id.isnot(None))
     ).scalars().all()
 
     products = db.session.execute(

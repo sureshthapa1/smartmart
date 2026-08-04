@@ -413,6 +413,7 @@ def list_categories():
             func.coalesce(func.sum(SaleItem.subtotal), 0).label("revenue"),
             func.coalesce(func.sum(SaleItem.quantity), 0).label("qty_sold"),
         )
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= thirty_days_ago)

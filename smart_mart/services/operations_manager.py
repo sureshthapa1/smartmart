@@ -376,7 +376,7 @@ def get_reorder_suggestions(days: int = 30) -> list[dict]:
     for product_id, qty in db.session.execute(
         db.select(SaleItem.product_id, func.coalesce(func.sum(SaleItem.quantity), 0))
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= cutoff)
+        .where(Sale.sale_date >= cutoff, SaleItem.product_id.isnot(None))
         .group_by(SaleItem.product_id)
     ).all():
         sales_by_product[product_id] = int(qty or 0)

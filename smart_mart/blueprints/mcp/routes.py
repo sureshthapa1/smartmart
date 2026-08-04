@@ -311,6 +311,7 @@ def _tool_sales_summary(args: dict) -> dict:
     top = db.session.execute(
         db.select(Product.name, func.sum(SaleItem.quantity).label("qty"),
                   func.sum(SaleItem.subtotal).label("rev"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
@@ -376,6 +377,7 @@ def _tool_top_products(args: dict) -> dict:
         db.select(Product.id, Product.name, Product.category,
                   func.sum(SaleItem.quantity).label("qty_sold"),
                   func.sum(SaleItem.subtotal).label("revenue"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= since)

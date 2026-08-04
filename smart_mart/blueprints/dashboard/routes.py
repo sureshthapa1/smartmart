@@ -195,6 +195,7 @@ def index():
     # so templates can use p.name, p.total, p.qty_sold directly.
     _top5_rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty_sold"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
@@ -218,7 +219,7 @@ def index():
     sold_ids_30 = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= cutoff_30)
+        .where(Sale.sale_date >= cutoff_30, SaleItem.product_id.isnot(None))
     ).scalars().all()
     dead_stock = db.session.execute(
         db.select(Product)

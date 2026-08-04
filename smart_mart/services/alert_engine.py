@@ -63,6 +63,7 @@ def get_high_demand_alerts(threshold: int | None = None) -> list[dict]:
     cutoff = date.today() - timedelta(days=7)
     rows = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("total_sold"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= cutoff)

@@ -28,6 +28,7 @@ def detect_price_anomalies(days: int = 30) -> list[dict]:
             func.avg(SaleItem.unit_price).label("avg_price"),
             func.count(SaleItem.id).label("txn_count"),
         )
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start)

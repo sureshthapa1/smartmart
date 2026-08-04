@@ -87,7 +87,7 @@ def generate_vat_invoice(sale, shop_settings):
         subtotal += amount
         rows.append([
             idx,
-            item.product.name if item.product else f"Product #{item.product_id}",
+            item.product.name if item.product else (item.custom_label or f"Custom Item"),
             f"{float(item.quantity):,.0f}",
             f"{float(item.unit_price):,.2f}",
             f"{amount:,.2f}",

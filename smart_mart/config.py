@@ -13,6 +13,9 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY") or "dev-secret-key-NOT-for-production"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WTF_CSRF_ENABLED = True
+    # Accept CSRF token from X-CSRFToken header for AJAX/fetch requests
+    # (used by escpos-print and other fetch POSTs that can't send a form body)
+    WTF_CSRF_HEADERS = ["X-CSRFToken", "X-CSRF-Token"]
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024   # 16 MB max upload size — blocks DoS via huge files
     # CSRF tokens expire after 24 hours. None (infinite) would leave leaked
     # tokens valid forever; 86400s is a reasonable balance between UX and security.

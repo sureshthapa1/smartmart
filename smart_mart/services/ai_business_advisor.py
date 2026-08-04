@@ -33,6 +33,7 @@ def _period_revenue(start: date, end: date) -> float:
 def _period_cogs(start: date, end: date) -> float:
     r = db.session.execute(
         db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start, Sale.sale_date <= end)
@@ -313,6 +314,7 @@ def growth_opportunities() -> list[dict]:
     # Top category by revenue
     top_cat = db.session.execute(
         db.select(Product.category, func.sum(SaleItem.subtotal).label("rev"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
@@ -509,7 +511,7 @@ def product_action_recommendations() -> list[dict]:
             func.sum(SaleItem.subtotal).label("revenue_30d"),
         )
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= days_30)
+        .where(Sale.sale_date >= days_30, SaleItem.product_id.isnot(None))
         .group_by(SaleItem.product_id)
     ).all()
     velocity = {r.product_id: {"qty": int(r.qty_sold_30d), "rev": float(r.revenue_30d)} for r in velocity_rows}
@@ -518,7 +520,7 @@ def product_action_recommendations() -> list[dict]:
     sold_90d = set(db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= days_90)
+        .where(Sale.sale_date >= days_90, SaleItem.product_id.isnot(None))
     ).scalars().all())
 
     # All active products

@@ -597,6 +597,79 @@ def _migration_steps() -> list[MigrationStep]:
             "Add pkg_date (packed/manufactured date) column to products for label printing.",
             lambda conn: _safe_add_column(conn, "products", "pkg_date", "DATE"),
         ),
+        (
+            "2026_08_02_sale_return_items_nullable_product",
+            "Make sale_return_items.product_id nullable so returns work on "
+            "custom/loose items that have no product FK.",
+            lambda conn: (
+                _safe_exec(conn, "PRAGMA foreign_keys=OFF"),
+                _safe_exec(conn, """
+                    CREATE TABLE IF NOT EXISTS sale_return_items_new (
+                        id              INTEGER PRIMARY KEY,
+                        sale_return_id  INTEGER NOT NULL REFERENCES sale_returns(id),
+                        sale_item_id    INTEGER NOT NULL REFERENCES sale_items(id),
+                        product_id      INTEGER REFERENCES products(id),
+                        quantity        INTEGER NOT NULL,
+                        unit_price      NUMERIC(10,2) NOT NULL,
+                        subtotal        NUMERIC(10,2) NOT NULL
+                    )
+                """),
+                _safe_exec(conn, """
+                    INSERT OR IGNORE INTO sale_return_items_new
+                        (id, sale_return_id, sale_item_id, product_id,
+                         quantity, unit_price, subtotal)
+                    SELECT id, sale_return_id, sale_item_id,
+                           CASE WHEN product_id = 0 THEN NULL ELSE product_id END,
+                           quantity, unit_price, subtotal
+                    FROM sale_return_items
+                """),
+                _safe_exec(conn, "DROP TABLE sale_return_items"),
+                _safe_exec(conn, "ALTER TABLE sale_return_items_new RENAME TO sale_return_items"),
+                _safe_exec(conn, "PRAGMA foreign_keys=ON"),
+            ),
+        ),
+        (
+            "2026_08_02_sale_items_custom_label",
+            "Add custom_label column to sale_items and make product_id nullable "
+            "so loose/custom billing items (product_id=0) are stored correctly "
+            "instead of being silently dropped. Fixes custom amount rows not "
+            "appearing in final bill total or sales reports.",
+            lambda conn: (
+                _safe_add_column(conn, "sale_items", "custom_label", "VARCHAR(120)"),
+                # SQLite does not support ALTER COLUMN to drop NOT NULL.
+                # Rebuild sale_items with product_id nullable via the standard
+                # SQLite table-rename + recreate + copy + drop pattern.
+                _safe_exec(conn, "PRAGMA foreign_keys=OFF"),
+                _safe_exec(conn, """
+                    CREATE TABLE IF NOT EXISTS sale_items_new (
+                        id          INTEGER PRIMARY KEY,
+                        sale_id     INTEGER NOT NULL REFERENCES sales(id),
+                        product_id  INTEGER REFERENCES products(id),
+                        custom_label VARCHAR(120),
+                        variant_id  INTEGER REFERENCES product_variants(id) ON DELETE SET NULL,
+                        quantity    INTEGER NOT NULL,
+                        unit_price  NUMERIC(10,2) NOT NULL,
+                        cost_price  NUMERIC(10,2),
+                        subtotal    NUMERIC(10,2) NOT NULL
+                    )
+                """),
+                _safe_exec(conn, """
+                    INSERT OR IGNORE INTO sale_items_new
+                        (id, sale_id, product_id, custom_label, variant_id,
+                         quantity, unit_price, cost_price, subtotal)
+                    SELECT id, sale_id,
+                           CASE WHEN product_id = 0 THEN NULL ELSE product_id END,
+                           custom_label, variant_id,
+                           quantity, unit_price, cost_price, subtotal
+                    FROM sale_items
+                """),
+                _safe_exec(conn, "DROP TABLE sale_items"),
+                _safe_exec(conn, "ALTER TABLE sale_items_new RENAME TO sale_items"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_sale_item_sale_id    ON sale_items(sale_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_sale_item_product_id ON sale_items(product_id)"),
+                _safe_exec(conn, "PRAGMA foreign_keys=ON"),
+            ),
+        ),
     ]
 
 
@@ -637,15 +710,28 @@ def run_pending_migrations(app) -> list[str]:
             db.session.commit()
             applied_now.append(migration_key)
             app.logger.info("Applied schema migration %s", migration_key)
-        except Exception:
+        except Exception as _rec_exc:
             db.session.rollback()
-            # Already recorded — happens when the dev reloader runs this twice
-            # in rapid succession. Safe to skip.
-            already = db.session.execute(
-                db.select(SchemaMigrationRecord.migration_key)
-                .where(SchemaMigrationRecord.migration_key == migration_key)
-            ).scalar_one_or_none()
-            if already:
+            # Check if the key is already recorded — this happens when the dev
+            # reloader fires migrations twice in rapid succession.  The UNIQUE
+            # constraint error is the strong signal that the key exists, so we
+            # wrap the confirmation SELECT in its own try/except: if the SELECT
+            # itself fails (e.g. session in error state after rollback) we still
+            # treat it as "already recorded" rather than re-raising, because the
+            # DDL step above already succeeded.
+            _already = False
+            try:
+                _already = db.session.execute(
+                    db.select(SchemaMigrationRecord.migration_key)
+                    .where(SchemaMigrationRecord.migration_key == migration_key)
+                ).scalar_one_or_none() is not None
+            except Exception:
+                db.session.rollback()
+                # If the SELECT also fails we cannot confirm, but the UNIQUE
+                # constraint error is strong evidence the key is present.
+                _str = str(_rec_exc).lower()
+                _already = "unique" in _str or "duplicate" in _str
+            if _already:
                 app.logger.info("Migration %s already recorded (duplicate skipped)", migration_key)
             else:
                 app.logger.exception("Failed to record migration %s", migration_key)

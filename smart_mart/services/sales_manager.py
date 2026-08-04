@@ -157,15 +157,19 @@ def create_sale(items: list[dict], user_id: int,
                         raise ValueError(f"Variant id {vid} not found.")
                     item["product_id"] = v.product_id
 
+        # ── Separate custom/loose items (product_id=None, no stock to lock) ─
+        custom_items = [item for item in items if item.get("product_id") is None and not item.get("variant_id")]
+        regular_items = [item for item in items if item.get("product_id") is not None or item.get("variant_id")]
+
         # ── Lock product rows to prevent concurrent oversell ──────────────
         # SELECT ... FOR UPDATE acquires a row-level lock so two concurrent
         # sales of the same product cannot both pass the stock check.
-        product_ids = list({item["product_id"] for item in items})
+        product_ids = list({item["product_id"] for item in regular_items if item.get("product_id")})
         locked_products = db.session.execute(
             db.select(Product)
             .where(Product.id.in_(product_ids))
             .with_for_update()
-        ).scalars().all()
+        ).scalars().all() if product_ids else []
         products: dict[int, Product] = {p.id: p for p in locked_products}
 
         # Generate invoice number AFTER acquiring row locks so concurrent
@@ -175,7 +179,7 @@ def create_sale(items: list[dict], user_id: int,
         except Exception as exc:
             logger.warning("Invoice number generation failed; using fallback: %s", exc)
 
-        for item in items:
+        for item in regular_items:
             pid = item["product_id"]
             if pid not in products:
                 raise ValueError(f"Product with id {pid} not found.")
@@ -272,10 +276,25 @@ def create_sale(items: list[dict], user_id: int,
         db.session.flush()
 
         for item in items:
-            product = products[item["product_id"]]
+            pid = item.get("product_id")
             qty = item["quantity"]
             unit_price = item["unit_price"]
             vid = item.get("variant_id")
+
+            # ── Custom / loose item — no product FK, no stock deduction ───
+            if pid is None and vid is None:
+                db.session.add(SaleItem(
+                    sale_id=sale.id,
+                    product_id=None,
+                    custom_label=item.get("custom_label") or "Custom Item",
+                    quantity=qty,
+                    unit_price=unit_price,
+                    cost_price=None,
+                    subtotal=unit_price * qty,
+                ))
+                continue
+
+            product = products[pid]
             cost = product.cost_price
             if vid and vid in variant_items:
                 v = variant_items[vid]
@@ -286,6 +305,7 @@ def create_sale(items: list[dict], user_id: int,
             db.session.add(SaleItem(
                 sale_id=sale.id, product_id=product.id,
                 variant_id=vid if vid else None,
+                custom_label=None,
                 quantity=qty, unit_price=unit_price,
                 cost_price=cost,        # snapshot cost at time of sale
                 subtotal=unit_price * qty,
@@ -436,7 +456,10 @@ def _mark_customer_offers_used(
     cart_total = sum(float(item["unit_price"]) * int(item["quantity"]) for item in items)
     product_subtotals: dict[int, float] = {}
     for item in items:
-        product_id = int(item["product_id"])
+        pid = item.get("product_id")
+        if pid is None:
+            continue   # custom/loose items have no product_id — skip for per-product offer calc
+        product_id = int(pid)
         product_subtotals[product_id] = (
             product_subtotals.get(product_id, 0.0)
             + float(item["unit_price"]) * int(item["quantity"])
@@ -543,6 +566,8 @@ def delete_sale(sale_id: int) -> None:
     sale = get_sale(sale_id)
     try:
         for item in sale.items:
+            if item.product_id is None:
+                continue  # custom/loose item — no stock to reverse
             product = db.session.get(Product, item.product_id)
             if product:
                 product.quantity += item.quantity

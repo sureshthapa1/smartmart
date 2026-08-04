@@ -31,6 +31,7 @@ def _get_baseline(days: int = 30) -> dict:
 
     cogs_rows = db.session.execute(
         db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start)

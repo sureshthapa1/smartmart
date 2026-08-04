@@ -33,7 +33,7 @@ class SaleReturnItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sale_return_id = db.Column(db.Integer, db.ForeignKey("sale_returns.id"), nullable=False)
     sale_item_id = db.Column(db.Integer, db.ForeignKey("sale_items.id"), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)   # NULL for custom/loose items
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False)

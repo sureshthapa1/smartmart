@@ -230,6 +230,7 @@ def generate_insights() -> list[dict]:
     # ── Top product this month ────────────────────────────────────────────
     top = db.session.execute(
         db.select(Product, func.sum(SaleItem.quantity).label("qty"))
+        .select_from(Product)
         .join(SaleItem, SaleItem.product_id == Product.id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= month_start)
@@ -273,7 +274,7 @@ def generate_insights() -> list[dict]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= cutoff)
+        .where(Sale.sale_date >= cutoff, SaleItem.product_id.isnot(None))
     ).scalars().all()
     dead_count = db.session.execute(
         db.select(func.count(Product.id))
@@ -317,7 +318,7 @@ def detect_dead_stock(days: int = 30) -> list[dict]:
     sold_ids = db.session.execute(
         db.select(SaleItem.product_id.distinct())
         .join(Sale, Sale.id == SaleItem.sale_id)
-        .where(Sale.sale_date >= cutoff)
+        .where(Sale.sale_date >= cutoff, SaleItem.product_id.isnot(None))
     ).scalars().all()
 
     products = db.session.execute(
@@ -531,6 +532,7 @@ def chatbot_query(message: str) -> str:
         try:
             cogs = db.session.execute(
                 db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
+                .select_from(Product)
                 .join(SaleItem, SaleItem.product_id == Product.id)
                 .join(Sale, Sale.id == SaleItem.sale_id)
                 .where(Sale.sale_date.between(datetime.combine(today, datetime.min.time()), datetime.combine(today, datetime.max.time())))
@@ -586,6 +588,7 @@ def chatbot_query(message: str) -> str:
         rows = db.session.execute(
             db.select(Product, func.sum(SaleItem.quantity).label("qty"),
                       func.sum(SaleItem.subtotal).label("rev"))
+            .select_from(Product)
             .join(SaleItem, SaleItem.product_id == Product.id)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sale_date >= month_start)
@@ -602,6 +605,7 @@ def chatbot_query(message: str) -> str:
     if _has("least selling", "slow moving", "worst product"):
         rows = db.session.execute(
             db.select(Product, func.sum(SaleItem.quantity).label("qty"))
+            .select_from(Product)
             .join(SaleItem, SaleItem.product_id == Product.id)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sale_date >= month_start)

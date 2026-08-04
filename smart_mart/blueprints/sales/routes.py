@@ -550,14 +550,15 @@ def void_sale(sale_id):
 # ---------------------------------------------------------------------------
 
 def _parse_items(form) -> list[dict]:
-    """Parse items[N][product_id/quantity/unit_price] fields from form data.
+    """Parse items[N][product_id/quantity/unit_price/custom_label] fields from form data.
 
     Supports both sequential keys (items[0], items[1]…) and sparse/gapped
     keys that can arise if the JS renumber step is somehow skipped.
 
-    product_id may be a plain integer (regular product) or the string
-    "v:<variant_id>" (a product variant). Variant items carry an extra
-    "variant_id" key so sales_manager can deduct the correct stock.
+    product_id may be:
+    - a plain integer > 0 (regular product)
+    - the string "v:<variant_id>" (a product variant)
+    - "0" or "custom" (a custom/loose item — no product FK, uses custom_label)
     """
     import re
     indices: list[int] = []
@@ -570,8 +571,9 @@ def _parse_items(form) -> list[dict]:
     items: list[dict] = []
     for index in sorted(indices):
         product_id_raw = form.get(f"items[{index}][product_id]")
-        quantity_raw   = form.get(f"items[{index}][quantity]",   "0")
-        unit_price_raw = form.get(f"items[{index}][unit_price]", "0")
+        quantity_raw   = form.get(f"items[{index}][quantity]",     "0")
+        unit_price_raw = form.get(f"items[{index}][unit_price]",   "0")
+        custom_label   = form.get(f"items[{index}][custom_label]", "").strip()
         try:
             qty   = int(quantity_raw)
             price = float(unit_price_raw)
@@ -583,6 +585,15 @@ def _parse_items(form) -> list[dict]:
                 vid = int(str(product_id_raw)[2:])
                 items.append({"product_id": None, "variant_id": vid,
                                "quantity": qty, "unit_price": price})
+
+            # Custom / loose item — product_id submitted as "0"
+            elif str(product_id_raw) == "0":
+                if price <= 0:
+                    continue
+                label = custom_label or "Custom Item"
+                items.append({"product_id": None, "custom_label": label,
+                               "quantity": qty, "unit_price": price})
+
             else:
                 pid = int(product_id_raw)
                 if pid > 0:

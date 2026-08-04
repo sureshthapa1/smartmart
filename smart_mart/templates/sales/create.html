@@ -925,6 +925,7 @@
           <div class="d-flex align-items-center gap-2">
             <span class="badge bg-warning text-dark" style="font-size:.65rem;flex-shrink:0;">Custom</span>
             <input type="text" class="form-control form-control-sm custom-desc-input"
+                   name="items[${idx}][custom_label]"
                    placeholder="Item description (e.g. Cashew 150g)"
                    value="${description}"
                    style="min-width:0;">
@@ -951,10 +952,8 @@
       const descInput = tr.querySelector('.custom-desc-input');
       const removeBtn = tr.querySelector('.remove-btn');
 
-      // Sync description to a hidden product_id=0 with note
-      descInput.addEventListener('input', () => {
-        // Store description so it shows on receipt — append to discount note if needed
-      });
+      // Description has a name attr — submits automatically with the form.
+      // No JS sync needed.
       amtInput.addEventListener('input', () => {
         const v = parseFloat(amtInput.value) || 0;
         tr.querySelector('.subtotal-cell').textContent = v.toFixed(2);
@@ -1134,12 +1133,14 @@
     // items[1] exists) and the server-side parser stops at items[0] → empty.
     const allRows = document.querySelectorAll('tr.sale-item-row');
     allRows.forEach((tr, newIdx) => {
-      const sel   = tr.querySelector('.product-select');
-      const qty   = tr.querySelector('.qty-input');
-      const price = tr.querySelector('.price-input');
+      const sel    = tr.querySelector('.product-select');
+      const qty    = tr.querySelector('.qty-input');
+      const price  = tr.querySelector('.price-input');
+      const label  = tr.querySelector('input[name*="custom_label"]');
       if (sel)   sel.name   = `items[${newIdx}][product_id]`;
       if (qty)   qty.name   = `items[${newIdx}][quantity]`;
       if (price) price.name = `items[${newIdx}][unit_price]`;
+      if (label) label.name = `items[${newIdx}][custom_label]`;
       tr.dataset.idx = newIdx;
     });
 

@@ -106,6 +106,21 @@ def create_return(
 
             product = db.session.get(Product, item.product_id)
             if product is None:
+                if item.product_id is None:
+                    # Custom/loose item — no inventory to restock, still allow refund
+                    subtotal = _to_money(item.unit_price) * requested_qty
+                    refund_amount += subtotal
+                    db.session.add(
+                        SaleReturnItem(
+                            sale_return_id=sale_return.id,
+                            sale_item_id=item.id,
+                            product_id=None,
+                            quantity=requested_qty,
+                            unit_price=item.unit_price,
+                            subtotal=subtotal,
+                        )
+                    )
+                    continue
                 raise ValueError(f"Product for sale item #{item.id} no longer exists.")
 
             subtotal = _to_money(item.unit_price) * requested_qty

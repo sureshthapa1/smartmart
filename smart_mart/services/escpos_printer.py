@@ -124,7 +124,7 @@ def print_receipt(sale, shop=None, loyalty_txns=None, loyalty_balance=None) -> N
     # ── Items ─────────────────────────────────────────────────────────────────
     subtotal = Decimal("0")
     for item in sale.items:
-        name     = item.product.name if item.product else f"Item#{item.product_id}"
+        name     = item.product.name if item.product else (item.custom_label or "Custom Item")
         qty      = item.quantity
         price    = Decimal(str(item.unit_price))
         line_tot = Decimal(str(item.subtotal))
