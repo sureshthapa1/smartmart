@@ -207,7 +207,7 @@ def detect_fraud_signals(days: int = 30) -> dict:
             func.count(SaleReturn.id).label("return_count"),
             func.coalesce(func.sum(SaleReturn.refund_amount), 0).label("refund_total"),
         )
-        .join(User, User.id == SaleReturn.processed_by)
+        .outerjoin(User, User.id == SaleReturn.processed_by)
         .where(SaleReturn.created_at >= start)
         .group_by(SaleReturn.processed_by, User.username)
     ).all()
@@ -233,7 +233,7 @@ def detect_fraud_signals(days: int = 30) -> dict:
             func.count(StockMovement.id).label("adjustment_events"),
             func.coalesce(func.sum(func.abs(StockMovement.change_amount)), 0).label("adjustment_qty"),
         )
-        .join(User, User.id == StockMovement.created_by)
+        .outerjoin(User, User.id == StockMovement.created_by)
         .where(StockMovement.timestamp >= start)
         .where(StockMovement.change_type == "adjustment_out")
         .group_by(StockMovement.created_by, User.username)

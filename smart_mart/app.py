@@ -472,8 +472,8 @@ def create_app(config_name="development"):
     def rate_limit_error(e):
         flash("Too many login attempts. Please wait 1 minute and try again.", "danger")
         if request.endpoint and request.endpoint.startswith("auth."):
-            from datetime import datetime as _dt
-            return render_template("auth/login.html", now=_dt.now()), 429
+            from datetime import datetime as _dt, timezone as _tz
+            return render_template("auth/login.html", now=_dt.now(_tz.utc)), 429
         return render_template("errors/500.html"), 429
 
     return app
