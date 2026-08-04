@@ -522,6 +522,15 @@ def _migration_steps() -> list[MigrationStep]:
             ),
         ),
         (
+            "2026_07_03_promotions_usage_columns",
+            "Add usage_limit, usage_count, and per_customer_limit to promotions table.",
+            lambda conn: (
+                _safe_add_column(conn, "promotions", "usage_limit",         "INTEGER"),
+                _safe_add_column(conn, "promotions", "usage_count",         "INTEGER DEFAULT 0"),
+                _safe_add_column(conn, "promotions", "per_customer_limit",  "INTEGER DEFAULT 1"),
+            ),
+        ),
+        (
             "2026_07_10_shop_settings_social_media",
             "Add social media link columns to shop_settings for store footer display.",
             lambda conn: (
