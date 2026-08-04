@@ -186,7 +186,6 @@ def profitability_analysis(start: date, end: date) -> list[dict]:
 
 def sales_summary(start: date, end: date) -> dict:
     """Return a high-level sales summary for the period."""
-    from ..models.user import User
     total_revenue = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))
         .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
@@ -344,7 +343,7 @@ def hourly_sales(start: date, end: date) -> list[dict]:
 def staff_efficiency_report(start: date, end: date) -> list[dict]:
     """Comprehensive per-staff efficiency metrics."""
     from ..models.user import User
-    from ..models.sale import Sale, SaleItem
+    # Sale and SaleItem are already imported at module level
 
     users = db.session.execute(db.select(User).order_by(User.username)).scalars().all()
     result = []

@@ -109,13 +109,25 @@ def generate_vat_invoice(sale, shop_settings):
     discount = float(sale.discount_amount or 0)
     taxable = max(0.0, subtotal - discount)
     taxable_decimal = Decimal(str(taxable))
-    vat_amount = (taxable_decimal * Decimal('0.13')).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    # Respect shop VAT settings — only apply VAT when explicitly enabled
+    vat_enabled = bool(getattr(shop_settings, "vat_enabled", False))
+    raw_rate = getattr(shop_settings, "vat_rate", None)
+    vat_rate_pct = Decimal(str(raw_rate)) if raw_rate else Decimal("13")  # fall back to 13% if enabled
+
+    if vat_enabled:
+        vat_amount = (taxable_decimal * vat_rate_pct / 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        vat_amount = Decimal("0.00")
+        vat_rate_pct = Decimal("0")
+
     grand_total = taxable_decimal + vat_amount
+    vat_label = f"VAT {vat_rate_pct:.0f}%" if vat_enabled else "VAT (N/A)"
     totals = [
         ["Subtotal", f"NPR {subtotal:,.2f}"],
         ["Discount", f"NPR {discount:,.2f}"],
         ["Taxable Amount", f"NPR {taxable:,.2f}"],
-        ["VAT 13%", f"NPR {vat_amount:,.2f}"],
+        [vat_label, f"NPR {vat_amount:,.2f}"],
         ["GRAND TOTAL", f"NPR {grand_total:,.2f}"],
     ]
     totals_table = Table(totals, colWidths=[width * 0.75, width * 0.25])

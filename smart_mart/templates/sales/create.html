@@ -504,7 +504,7 @@
         is_variant: false
       }{% if not loop.last or variants %},{% endif %}
       {% endfor %}
-      {% for v in variants %}
+      {% for v in variants %}{% if v.product_id in product_map %}
       {
         id: {{ ("v:" ~ v.id) | tojson }},
         name: {{ (product_map[v.product_id].name ~ ' – ' ~ v.variant_name) | tojson }},
@@ -517,7 +517,7 @@
         is_variant: true,
         variant_label: {{ v.variant_name | tojson }}
       }{% if not loop.last %},{% endif %}
-      {% endfor %}
+      {% endif %}{% endfor %}
     ];
 
     // Quick-lookup by id (string key so variant ids like "v:5" work too)

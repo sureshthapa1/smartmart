@@ -99,8 +99,12 @@ def create_return(
             already_returned = returned_quantity_for_sale_item(item.id)
             remaining = item.quantity - already_returned
             if requested_qty > remaining:
+                item_label = (
+                    item.custom_label
+                    or (item.product.name if item.product else f"item #{item.id}")
+                )
                 raise ValueError(
-                    f"Cannot return {requested_qty} of '{item.product.name}'; "
+                    f"Cannot return {requested_qty} of '{item_label}'; "
                     f"only {remaining} remaining from the original sale."
                 )
 

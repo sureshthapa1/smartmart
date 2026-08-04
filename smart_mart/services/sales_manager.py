@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from io import BytesIO
 
 from sqlalchemy import and_
@@ -352,14 +352,10 @@ def create_sale(items: list[dict], user_id: int,
                         cust.loyalty_tier = "platinum"
                     elif ts >= 50000:
                         cust.loyalty_tier = "gold"
-                    else:
+                    elif ts >= 25000:
                         cust.loyalty_tier = "silver"
-                    if cust.total_spent >= 100000:
-                        cust.loyalty_tier = "platinum"
-                    elif cust.total_spent >= 25000:
-                        cust.loyalty_tier = "gold"
                     else:
-                        cust.loyalty_tier = "silver"
+                        cust.loyalty_tier = "bronze"
         except Exception as e:
             logger.warning("Customer upsert failed: %s", e)
 
@@ -729,7 +725,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
         Paragraph(f"<b>No: {invoice_num}</b>",
                   S("inv", fontSize=10, fontName="Helvetica-Bold",
                     textColor=navy, alignment=TA_RIGHT, spaceAfter=3, leading=13)),
-        Paragraph((sale.sale_date + __import__('datetime').timedelta(hours=5, minutes=45)).strftime("%d %B %Y  %I:%M %p") if sale.sale_date else "",
+        Paragraph((sale.sale_date + timedelta(hours=5, minutes=45)).strftime("%d %B %Y  %I:%M %p") if sale.sale_date else "",
                   S("dt", fontSize=8, fontName="Helvetica",
                     textColor=slate, alignment=TA_RIGHT, leading=11)),
     ]
@@ -802,9 +798,9 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     ]]
 
     for i, si in enumerate(sale.items, 1):
-        name = si.product.name if si.product else f"Product #{si.product_id}"
+        name = si.custom_label or (si.product.name if si.product else "Custom Item")
         sku = si.product.sku if si.product else ""
-        unit = (si.product.unit if si.product else "pcs") or "pcs"
+        unit = (getattr(si.product, "unit", None) if si.product else None) or "pcs"
         desc = [
             Paragraph(f"<b>{name}</b>",
                       S(f"pn{i}", fontSize=9, fontName="Helvetica-Bold",

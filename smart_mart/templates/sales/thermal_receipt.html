@@ -72,7 +72,7 @@
       <td class="right" style="font-size:10px;">{{ sale.sale_date | nst('%Y-%m-%d %H:%M') }}</td>
     </tr>
     {% if sale.customer_name %}<tr><td>Customer:</td><td class="right">{{ sale.customer_name }}</td></tr>{% endif %}
-    <tr><td>Payment:</td><td class="right">{{ sale.payment_mode | upper }}</td></tr>
+    <tr><td>Payment:</td><td class="right">{{ (sale.payment_mode or 'cash') | upper }}</td></tr>
   </table>
 
   <div class="divider"></div>

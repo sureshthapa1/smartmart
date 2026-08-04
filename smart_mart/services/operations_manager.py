@@ -442,6 +442,7 @@ def redeem_loyalty_points(customer_name: str, points: int, note: str | None = No
         available = int(wallet.points_balance) if wallet else 0
         raise ValueError(f"Insufficient points. Available: {available}.")
     loyalty_wallet_service.redeem_points_manual(wallet.id, points, note or "manual_redeem")
+    db.session.refresh(wallet)
     return int(wallet.points_balance)
 
 
@@ -548,13 +549,15 @@ def ensure_notifications() -> list[AppNotification]:
 
     # Remove notifications whose source is no longer active
     existing = db.session.execute(db.select(AppNotification)).scalars().all()
+    # Snapshot the keys before any deletions so the add-new loop is correct
+    existing_keys = {(n.source_type, n.source_id) for n in existing}
     for n in existing:
         key = (n.source_type, n.source_id)
         if key not in live_keys:
+            existing_keys.discard(key)
             db.session.delete(n)
 
     # Add new ones that don't exist yet
-    existing_keys = {(n.source_type, n.source_id) for n in existing}
     for title, body, category, source_type, source_id in live:
         if (source_type, source_id) not in existing_keys:
             db.session.add(AppNotification(

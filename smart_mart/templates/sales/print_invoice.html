@@ -131,16 +131,29 @@
         <tr><td>Discount{% if sale.discount_note %} ({{ sale.discount_note }}){% endif %}</td>
             <td class="text-right" style="color:#dc2626;">- NPR {{ "%.2f"|format(sale.discount_amount | float) }}</td></tr>
         {% endif %}
+        {% if shop and shop.vat_enabled %}
+        {% set _vat_rate = shop.vat_rate | default(13) | float %}
+        {% set _vat_amt = sale.total_amount | float * _vat_rate / (100 + _vat_rate) %}
+        <tr><td>VAT ({{ _vat_rate | int }}%)</td><td class="text-right">NPR {{ "%.2f"|format(_vat_amt) }}</td></tr>
+        {% else %}
         <tr><td>Tax (0%)</td><td class="text-right">NPR 0.00</td></tr>
+        {% endif %}
         <tr class="grand"><td>TOTAL</td><td class="text-right">NPR {{ "%.2f"|format(sale.total_amount | float) }}</td></tr>
       </table>
     </div>
 
     <!-- Payment Confirmation -->
+    {% if sale.payment_mode and sale.payment_mode != 'credit' %}
     <div class="payment-confirm">
       <span class="label">✅ Payment Received</span>
       <span class="amount">NPR {{ "%.2f"|format(sale.total_amount | float) }}</span>
     </div>
+    {% else %}
+    <div class="payment-confirm" style="background:#fff7ed;border-color:#f97316;">
+      <span class="label" style="color:#ea580c;">⏳ Credit / Payment Pending</span>
+      <span class="amount" style="color:#ea580c;">NPR {{ "%.2f"|format(sale.total_amount | float) }}</span>
+    </div>
+    {% endif %}
 
     <!-- Footer -->
     <div class="footer">
