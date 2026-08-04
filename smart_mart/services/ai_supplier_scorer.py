@@ -43,17 +43,18 @@ def score_supplier(supplier_id: int) -> dict:
     total_purchases = len(purchases)
     total_value = sum(float(p.total_cost) for p in purchases)
 
-    # ── Price Consistency Score (0–30) ────────────────────────────────────
-    # For each product from this supplier, check unit cost variance
+    # Load all purchase items for this supplier in a single query
+    all_items = db.session.execute(
+        db.select(PurchaseItem)
+        .join(Purchase, Purchase.id == PurchaseItem.purchase_id)
+        .where(Purchase.supplier_id == supplier_id)
+    ).scalars().all()
+
     product_costs = {}
-    for purchase in purchases:
-        items = db.session.execute(
-            db.select(PurchaseItem).filter_by(purchase_id=purchase.id)
-        ).scalars().all()
-        for item in items:
-            if item.product_id not in product_costs:
-                product_costs[item.product_id] = []
-            product_costs[item.product_id].append(float(item.unit_cost))
+    for item in all_items:
+        if item.product_id not in product_costs:
+            product_costs[item.product_id] = []
+        product_costs[item.product_id].append(float(item.unit_cost))
 
     consistency_scores = []
     for pid, costs in product_costs.items():
