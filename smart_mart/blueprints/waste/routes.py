@@ -26,9 +26,9 @@ def index():
     stmt = db.select(WasteRecord).order_by(WasteRecord.created_at.desc())
     try:
         if start_raw:
-            stmt = stmt.where(WasteRecord.created_at >= date.fromisoformat(start_raw))
+            stmt = stmt.where(WasteRecord.created_at >= datetime.combine(date.fromisoformat(start_raw), datetime.min.time()))
         if end_raw:
-            stmt = stmt.where(WasteRecord.created_at <= date.fromisoformat(end_raw))
+            stmt = stmt.where(WasteRecord.created_at < datetime.combine(date.fromisoformat(end_raw) + __import__('datetime').timedelta(days=1), datetime.min.time()))
     except ValueError:
         flash("Invalid date filter.", "warning")
     if reason:

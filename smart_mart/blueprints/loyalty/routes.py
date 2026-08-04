@@ -42,7 +42,7 @@ def card_pdf(customer_id):
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
     tier = (customer.loyalty_tier or "silver").title()
-    shop_name = shop.name or shop.shop_name or "Goldkernel Dryfruits and Treats"
+    shop_name = (shop.name if shop else None) or (shop.shop_name if shop else None) or "Goldkernel Dryfruits and Treats"
     table = Table([
         [Paragraph(f"<b>{shop_name}</b>", styles["Heading1"])],
         [Paragraph(f"Loyalty Card for {customer.name}", styles["Heading2"])],

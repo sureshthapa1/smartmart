@@ -363,6 +363,20 @@ def _migration_steps() -> list[MigrationStep]:
             lambda conn: None,  # db.create_all() handles this
         ),
         (
+            "2026_06_07_customer_accounts_extra_columns",
+            "Add saved_address, saved_area, save_address_pref, notes, last_order_date, "
+            "total_spent, order_count columns to customer_accounts for CRM and checkout.",
+            lambda conn: (
+                _safe_add_column(conn, "customer_accounts", "saved_address",     "TEXT"),
+                _safe_add_column(conn, "customer_accounts", "saved_area",        "VARCHAR(100)"),
+                _safe_add_column(conn, "customer_accounts", "save_address_pref", "BOOLEAN DEFAULT FALSE"),
+                _safe_add_column(conn, "customer_accounts", "notes",             "TEXT"),
+                _safe_add_column(conn, "customer_accounts", "last_order_date",   "TIMESTAMPTZ"),
+                _safe_add_column(conn, "customer_accounts", "total_spent",       "NUMERIC(12,2) DEFAULT 0"),
+                _safe_add_column(conn, "customer_accounts", "order_count",       "INTEGER DEFAULT 0"),
+            ),
+        ),
+        (
             "2026_06_08_product_description",
             "Add description column to products for storefront display.",
             lambda conn: _safe_add_column(conn, "products", "description", "TEXT"),

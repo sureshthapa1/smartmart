@@ -833,9 +833,10 @@ def checkout():
                 pass  # promo system not available
 
         gift_wrap_charge = 50.0 if gift_wrap else 0.0
-        grand_total = max(0.0, subtotal + delivery + gift_wrap_charge - discount_amount)
-        # Ensure discount never produces a negative total
-        discount_amount = min(discount_amount, subtotal + delivery + gift_wrap_charge)
+        # Clamp discount before using it so grand_total and discount_amount are consistent
+        order_value = subtotal + delivery + gift_wrap_charge
+        discount_amount = min(discount_amount, order_value)
+        grand_total = max(0.0, order_value - discount_amount)
 
         payload = {
             "customer": {"name": name, "phone": phone, "email": email,
@@ -1871,9 +1872,18 @@ def apply_promo():
         return jsonify({"ok": False, "message": "Please enter a promo code."})
     today = date.today()
     cart = _cart()
-    subtotal = sum(
-        float(v.get("price", 0)) * int(v.get("qty", 0)) for v in cart.values()
-    )
+    # Cart stores {product_id: qty} — compute subtotal from product prices
+    subtotal = 0.0
+    if cart:
+        try:
+            from ...models.product import Product as _P
+            pids = [int(k) for k in cart.keys() if str(k).isdigit()]
+            if pids:
+                prods = db.session.execute(db.select(_P).where(_P.id.in_(pids))).scalars().all()
+                price_map = {str(p.id): float(p.selling_price) for p in prods}
+                subtotal = sum(price_map.get(str(k), 0.0) * int(v) for k, v in cart.items())
+        except Exception:
+            subtotal = 0.0
     try:
         promo = db.session.execute(
             db.select(Promotion).where(

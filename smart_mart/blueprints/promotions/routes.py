@@ -44,12 +44,15 @@ def create_promotion():
     if request.method == "POST":
         data = _form_to_data(request.form)
         data["created_by"] = current_user.id
-        try:
-            promo = promotion_service.create_promotion(data)
-            flash(f"Promotion '{promo.name}' created.", "success")
-            return redirect(url_for("promotions.list_promotions"))
-        except Exception as e:
-            flash(str(e), "danger")
+        if not data.get("end_date"):
+            flash("Please enter a valid end date for the promotion.", "danger")
+        else:
+            try:
+                promo = promotion_service.create_promotion(data)
+                flash(f"Promotion '{promo.name}' created.", "success")
+                return redirect(url_for("promotions.list_promotions"))
+            except Exception as e:
+                flash(str(e), "danger")
     today = date.today()
     return render_template("promotions/form.html", promo=None, categories=categories,
                            today=today.isoformat(),
@@ -126,5 +129,6 @@ def _form_to_data(form) -> dict:
     try:
         data["end_date"] = date.fromisoformat(form.get("end_date", ""))
     except ValueError:
-        data["end_date"] = date.today()
+        # Leave end_date unset so the caller can flag it as an error
+        data["end_date"] = None
     return data

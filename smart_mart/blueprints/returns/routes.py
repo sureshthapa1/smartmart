@@ -53,7 +53,7 @@ def list_returns():
     count_stmt = db.select(_f2.count()).select_from(sq)
     total = db.session.execute(count_stmt).scalar() or 0
     total_refund_row = db.session.execute(
-        db.select(_f2.coalesce(_f2.sum(sq.c.refund_amount), 0))
+        db.select(_f2.coalesce(_f2.sum(sq.c.refund_amount), 0)).select_from(sq)
     ).scalar() or 0
     total_refund = float(total_refund_row)
     # SQL-level pagination

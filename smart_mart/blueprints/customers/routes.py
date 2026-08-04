@@ -147,16 +147,25 @@ def customer_profile(customer_id):
         db.select(func.count()).select_from(sale_stmt.subquery())
     ).scalar() or 0
 
-    # Show up to 100 most recent; display a note if truncated
-    sales = db.session.execute(sale_stmt.limit(100)).scalars().all()
+    # Financial totals computed from the full dataset, not the 100-row display limit
+    total_spent = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0)).select_from(sale_stmt.subquery())
+    ).scalar() or 0
+    total_spent = float(total_spent)
+    total_discount = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.discount_amount), 0)).select_from(sale_stmt.subquery())
+    ).scalar() or 0
+    total_discount = float(total_discount)
+    credit_outstanding = db.session.execute(
+        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
+        .select_from(sale_stmt.subquery())
+        .where(Sale.payment_mode == "credit", Sale.credit_collected == False)
+    ).scalar() or 0
+    credit_outstanding = float(credit_outstanding)
+    avg_order = round(total_spent / total_sale_count, 2) if total_sale_count else 0
 
-    total_spent = sum(float(s.total_amount) for s in sales)
-    total_discount = sum(float(s.discount_amount or 0) for s in sales)
-    credit_outstanding = sum(
-        float(s.total_amount) for s in sales
-        if s.payment_mode == "credit" and not s.credit_collected
-    )
-    avg_order = round(total_spent / len(sales), 2) if sales else 0
+    # Show up to 100 most recent for the display table
+    sales = db.session.execute(sale_stmt.limit(100)).scalars().all()
 
     # Payment mode breakdown
     pm_counts: dict = {}
