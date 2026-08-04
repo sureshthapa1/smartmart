@@ -29,15 +29,18 @@ def _get_baseline(days: int = 30) -> dict:
         .where(Sale.sale_date >= start)
     ).scalar() or 0
 
-    cogs_rows = db.session.execute(
-        db.select(Product.cost_price, func.sum(SaleItem.quantity).label("qty"))
-        .select_from(Product)
-        .join(SaleItem, SaleItem.product_id == Product.id)
+    # Use historical SaleItem.cost_price so simulation P&L reflects actual
+    # costs at time of sale, not current prices.
+    cogs_row = db.session.execute(
+        db.select(func.coalesce(
+            func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
+        ))
+        .select_from(SaleItem)
+        .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start)
-        .group_by(Product.id)
-    ).all()
-    cogs = sum(float(r.cost_price) * r.qty for r in cogs_rows)
+    ).scalar()
+    cogs = float(cogs_row or 0)
 
     expenses = db.session.execute(
         db.select(func.coalesce(func.sum(Expense.amount), 0))

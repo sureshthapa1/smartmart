@@ -50,6 +50,7 @@ class UserPermissions(db.Model):
 
     # ── Finance / Operations ──────────────────────────────────────────────
     can_manage_credits = db.Column(db.Boolean, default=False)
+    can_collect_credit = db.Column(db.Boolean, default=False)   # mark credit/udharo as collected
     can_manage_cash_session = db.Column(db.Boolean, default=False)
     can_view_expenses = db.Column(db.Boolean, default=False)
     can_manage_expenses = db.Column(db.Boolean, default=False)

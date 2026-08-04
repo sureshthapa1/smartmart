@@ -59,6 +59,9 @@ def diff(old_obj, new_data: dict, fields: list[str]) -> dict:
         new_val = new_data.get(field)
         if new_val is not None and str(old_val) != str(new_val):
             changes[field] = [str(old_val), str(new_val)]
+        elif new_val is None and old_val is not None:
+            # Intentional field-clear — record as change to empty string
+            changes[field] = [str(old_val), ""]
     return changes
 
 

@@ -498,7 +498,7 @@ def credit_udharo():
 @reports_bp.route("/credit-udharo/<int:sale_id>/mark-collected", methods=["POST"])
 @login_required
 def mark_credit_collected(sale_id):
-    _require_perm("can_view_credit_report")
+    _require_perm("can_collect_credit")
     from ...extensions import db
     from ...models.sale import Sale
     sale = db.get_or_404(Sale, sale_id)
@@ -512,7 +512,7 @@ def mark_credit_collected(sale_id):
 @reports_bp.route("/credit-udharo/<int:sale_id>/set-due-date", methods=["POST"])
 @login_required
 def set_credit_due_date(sale_id):
-    _require_perm("can_view_credit_report")
+    _require_perm("can_collect_credit")
     from ...extensions import db
     from ...models.sale import Sale
     from flask import redirect, url_for
@@ -542,7 +542,7 @@ def export_sales_excel():
     xlsx = exporter.export_report_excel(data, f"Sales Report {start} to {end}",
                                         ["Product", "SKU", "Qty Sold", "Revenue (NPR)", "Profit (NPR)"])
     return Response(xlsx, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": f"attachment; filename=sales_{start}_{end}.xlsx"})
+                    headers={"Content-Disposition": f"attachment; filename=sales_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.xlsx"})
 
 
 @reports_bp.route("/inventory-valuation/export-excel")

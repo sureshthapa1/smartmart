@@ -189,9 +189,12 @@ def print_receipt(sale, shop=None, loyalty_txns=None, loyalty_balance=None) -> N
     p.text("\n" + footer + "\n")
     p.text(date_str + "\n")
 
-    # Feed and cut
-    p.ln(3)
-    p.cut()
+    # Feed and cut — always cut even if an earlier line raised
+    try:
+        p.ln(3)
+        p.cut()
+    except Exception:
+        pass
 
     logger.info("ESC/POS receipt printed: invoice=%s printer=%s", inv_no, PRINTER_NAME)
 

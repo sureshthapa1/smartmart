@@ -308,6 +308,11 @@ def _migration_steps() -> list[MigrationStep]:
             lambda conn: _safe_add_column(conn, "user_permissions", "can_void_sale", "BOOLEAN DEFAULT false"),
         ),
         (
+            "2026_08_04_user_permissions_collect_credit",
+            "Add can_collect_credit permission — separate from view-only credit report access.",
+            lambda conn: _safe_add_column(conn, "user_permissions", "can_collect_credit", "BOOLEAN DEFAULT false"),
+        ),
+        (
             "2026_05_16_goldkernel_feature_pack_columns",
             "Add Goldkernel feature pack columns for payments, loyalty, settings, and low stock.",
             lambda conn: (

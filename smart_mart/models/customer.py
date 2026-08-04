@@ -104,5 +104,7 @@ class Customer(db.Model):
                     updated_at=datetime.now(timezone.utc),
                 ))
         except Exception:
-            db.session.rollback()
+            # Do NOT rollback here — the caller (sales_manager) owns the session
+            # and handles rollback in its own except block. Rolling back here
+            # would silently undo the entire sale that is still in progress.
             raise

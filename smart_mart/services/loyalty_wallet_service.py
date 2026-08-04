@@ -188,7 +188,9 @@ def apply_sale_points(
 
 
 def redeem_points_manual(wallet_id: int, points: int, reason: str):
-    wallet = db.get_or_404(LoyaltyWallet, wallet_id)
+    wallet = db.session.get(LoyaltyWallet, wallet_id)
+    if wallet is None:
+        raise ValueError(f"Loyalty wallet #{wallet_id} not found.")
     points = int(points)
     if points <= 0:
         raise ValueError("Points must be greater than zero.")

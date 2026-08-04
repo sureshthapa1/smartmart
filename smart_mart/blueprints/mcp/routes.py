@@ -432,9 +432,10 @@ def _tool_customer_profile(args: dict) -> dict:
             "last_purchase_days_ago": recency,
         },
         "churn_risk": (
-            "churned" if recency and recency > 90 else
-            "at_risk"  if recency and recency > 45 else
-            "active"
+            "churned"  if recency is not None and recency > 90 else
+            "at_risk"  if recency is not None and recency > 45 else
+            "active"   if recency is not None else
+            "unknown"
         ),
     }
 

@@ -31,10 +31,15 @@ def _period_revenue(start: date, end: date) -> float:
 
 
 def _period_cogs(start: date, end: date) -> float:
+    # Use SaleItem.cost_price (snapshot at time of sale) so historical P&L
+    # stays accurate even after product cost changes. Fall back to current
+    # Product.cost_price only when the snapshot is absent.
     r = db.session.execute(
-        db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
-        .select_from(Product)
-        .join(SaleItem, SaleItem.product_id == Product.id)
+        db.select(func.coalesce(
+            func.sum(func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity), 0
+        ))
+        .select_from(SaleItem)
+        .join(Product, Product.id == SaleItem.product_id)
         .join(Sale, Sale.id == SaleItem.sale_id)
         .where(Sale.sale_date >= start, Sale.sale_date <= end)
     ).scalar()

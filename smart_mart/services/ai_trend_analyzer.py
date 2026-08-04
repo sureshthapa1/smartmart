@@ -108,7 +108,9 @@ def dead_stock_analysis(days: int = 30) -> dict:
             .join(SaleItem, SaleItem.sale_id == Sale.id)
             .where(SaleItem.product_id == p.id)
         ).scalar()
-        days_idle = (date.today() - last_sale.date()).days if last_sale else None
+        days_idle = (date.today() - last_sale.date()).days if last_sale and hasattr(last_sale, 'date') else (
+            (date.today() - last_sale).days if last_sale and isinstance(last_sale, date) else None
+        )
         items.append({
             "id": p.id,
             "name": p.name,
@@ -117,7 +119,7 @@ def dead_stock_analysis(days: int = 30) -> dict:
             "quantity": p.quantity,
             "cost_price": float(p.cost_price),
             "stock_value": float(p.cost_price) * p.quantity,
-            "last_sale_date": str(last_sale.date()) if last_sale else None,
+            "last_sale_date": str(last_sale.date() if hasattr(last_sale, 'date') else last_sale) if last_sale else None,
             "days_idle": days_idle,
             "action": "clearance_sale" if float(p.cost_price) * p.quantity > 1000 else "remove",
         })

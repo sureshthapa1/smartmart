@@ -29,7 +29,7 @@ def record_expense(expense_type: str, amount, expense_date: date, user_id: int, 
         created_by=user_id,
     )
     db.session.add(expense)
-    db.session.commit()
+    db.session.flush()  # caller owns the transaction; do not commit here
     return expense
 
 

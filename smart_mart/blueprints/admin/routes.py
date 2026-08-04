@@ -321,6 +321,7 @@ PERMISSION_GROUPS = {
     ],
     "Finance": [
         ("can_manage_credits", "View & Record Credit Payments (Udharo)"),
+        ("can_collect_credit", "Mark Credit / Udharo as Collected"),
         ("can_manage_cash_session", "Open & Close Cash Sessions"),
         ("can_view_expenses", "View Expenses"),
         ("can_manage_expenses", "Add & Edit Expenses"),
