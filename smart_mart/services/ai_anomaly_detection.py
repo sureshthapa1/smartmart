@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from statistics import mean, stdev
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from ..extensions import db
 from ..models.sale import Sale, SaleItem
 from ..models.product import Product
@@ -105,6 +106,7 @@ def detect_suspicious_discounts(days: int = 30) -> list[dict]:
     start = date.today() - timedelta(days=days)
     sales_with_discount = db.session.execute(
         db.select(Sale)
+        .options(joinedload(Sale.user))
         .where(Sale.sale_date >= start)
         .where(Sale.discount_amount > 0)
     ).scalars().all()

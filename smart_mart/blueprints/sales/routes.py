@@ -185,7 +185,7 @@ def create_sale():
                     _wallet = get_or_create_wallet(cname, cphone)
                     current_balance = int(_wallet.points_balance) if _wallet else 0
                     if earned_points > 0:
-                        flash(f"+{earned_points} points earned! Customer now has {current_balance} points.", "success")
+                        flash(f"+{earned_points} points earned! Customer now has {current_balance + earned_points} points.", "success")
                 except Exception as _exc:
                     import logging as _log
                     _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
@@ -523,6 +523,9 @@ def void_sale(sale_id):
             abort(403)
 
     sale = sales_manager.get_sale(sale_id)
+    if sale is None:
+        flash("Sale not found.", "danger")
+        return redirect(url_for("sales.list_sales"))
 
     # Cashiers can only void same-day sales
     if current_user.role != "admin":

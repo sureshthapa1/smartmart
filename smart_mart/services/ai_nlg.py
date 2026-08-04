@@ -60,11 +60,6 @@ def generate_daily_report() -> dict:
         db.select(func.count(Sale.id))
         .where(Sale.sale_date.between(_dt(today), _dt(today).replace(hour=23, minute=59, second=59)))
     ).scalar() or 0
-    week_sales = db.session.execute(
-        db.select(func.coalesce(func.sum(Sale.total_amount), 0))
-        .where(Sale.sale_date >= _dt(week_start))
-    ).scalar() or 0
-
     # Yesterday's data
     yesterday_sales = db.session.execute(
         db.select(func.coalesce(func.sum(Sale.total_amount), 0))

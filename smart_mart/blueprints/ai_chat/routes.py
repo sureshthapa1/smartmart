@@ -164,11 +164,9 @@ def stream():
                 yield f"data: {json.dumps({'token': token})}\n\n"
                 chunk = []
 
-        # Persist to DB
-        from flask import current_app
+        # Persist to DB — already running inside a request/app context; no nesting needed
         try:
-            with current_app.app_context():
-                saved_id = _save_turn(conv_id_in, user_id, user_msg, reply)
+            saved_id = _save_turn(conv_id_in, user_id, user_msg, reply)
         except Exception as exc:
             logger.warning("_save_turn failed in stream: %s", exc)
             saved_id = conv_id_in
@@ -282,8 +280,7 @@ def _save_turn(conv_id, user_id: int, user_msg: str, assistant_msg: str) -> int:
             conv = ChatConversation(user_id=user_id, title=title)
             db.session.add(conv)
             db.session.flush()  # get ID without committing
-        else:
-            conv = db.session.get(ChatConversation, int(conv_id))
+        # else: conv is already assigned above from the initial lookup
 
         db.session.add(ChatMessage(conversation_id=conv.id, role="user",    content=user_msg))
         db.session.add(ChatMessage(conversation_id=conv.id, role="assistant", content=assistant_msg))

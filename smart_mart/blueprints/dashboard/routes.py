@@ -155,7 +155,7 @@ def index():
             "total_sales_count":   int(agg_row.total_count),
             "total_revenue":       total_revenue,
             "today_cogs":          float(today_cogs),
-            "today_profit":        total_revenue - float(today_cogs),  # approximate; not agg_row.today_amount
+            "today_profit":        0,  # placeholder; corrected below using today_sales_amount
             "cash_balance":        total_revenue - float(total_expenses),
             "stock_value":         float(stock_value),
             "monthly_profit":      float(monthly_profit),
@@ -292,7 +292,7 @@ def index():
         ).scalar_one_or_none()
         if open_session:
             cash_session_open = True
-            cash_session_balance = float(open_session.opening_balance or 0) + float(today_sales_amount)
+            cash_session_balance = float(open_session.opening_cash or 0) + float(today_sales_amount)
     except Exception:
         pass
 
