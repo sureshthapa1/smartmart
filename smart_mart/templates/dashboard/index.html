@@ -171,9 +171,9 @@
     <a href="{{ url_for('reports.cash_flow') }}" style="text-decoration:none">
     <div class="kpi">
       <div class="kpi-dot" style="background:#dbeafe"><i class="bi bi-wallet2" style="color:#1d4ed8"></i></div>
-      <div class="kpi-label">Cash Balance</div>
+      <div class="kpi-label">Monthly Profit</div>
       <div class="kpi-value">NPR {{ "%.0f"|format(cash_balance) }}</div>
-      <div class="kpi-sub">Revenue minus expenses</div>
+      <div class="kpi-sub">Net profit this month</div>
     </div>
     </a>
     {% else %}

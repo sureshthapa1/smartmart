@@ -103,9 +103,9 @@ def ensure_admin():
 
     # In development, use a clear default and warn loudly.
     if not admin_password:
-        admin_password = "admin123"
+        admin_password = "Admin@12345"
         print(
-            "WARNING: Using default password admin123. "
+            "WARNING: Using default password Admin@12345. "
             "Set ADMIN_PASSWORD env var before deploying to production."
         )
 

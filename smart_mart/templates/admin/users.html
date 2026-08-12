@@ -51,7 +51,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <div class="modal-header"><h6 class="modal-title fw-bold">Reset Password — {{ u.username }}</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
               <div class="modal-body">
-                <input type="password" class="form-control" name="new_password" required minlength="6" placeholder="New password (min 6 chars)">
+                <input type="password" class="form-control" name="new_password" required minlength="8" placeholder="Min 8 chars, uppercase, digit &amp; special character">
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>

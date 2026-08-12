@@ -63,8 +63,10 @@ def register(name: str, phone: str, password: str,
 
     if not name or not phone or not password:
         raise ValueError("Name, phone and password are required.")
-    if len(password) < 6:
-        raise ValueError("Password must be at least 6 characters.")
+    from .authenticator import validate_password_strength
+    pw_errors = validate_password_strength(password)
+    if pw_errors:
+        raise ValueError("Password too weak: " + " ".join(pw_errors))
 
     existing_phone = db.session.execute(
         db.select(CustomerAccount).where(CustomerAccount.phone == phone)
