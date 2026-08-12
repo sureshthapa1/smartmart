@@ -5,6 +5,10 @@ from smart_mart.app import create_app
 from smart_mart.extensions import db as _db
 from smart_mart.services import user_manager, authenticator
 
+# All test passwords now meet the updated policy:
+# 8+ chars, uppercase, digit, special character
+_PW = "Secret@123"
+
 
 @pytest.fixture(scope="function")
 def app():
@@ -27,22 +31,22 @@ def app_ctx(app):
 # ---------------------------------------------------------------------------
 
 def test_create_user_returns_user():
-    user = user_manager.create_user("alice", "Secret123", "staff")
+    user = user_manager.create_user("alice", _PW, "staff")
     assert user.id is not None
     assert user.username == "alice"
     assert user.role == "staff"
 
 
 def test_create_user_hashes_password():
-    user = user_manager.create_user("bob", "Plaintext1", "admin")
-    assert user.password_hash != "Plaintext1"
-    assert authenticator.check_password("Plaintext1", user.password_hash)
+    user = user_manager.create_user("bob", _PW, "admin")
+    assert user.password_hash != _PW
+    assert authenticator.check_password(_PW, user.password_hash)
 
 
 def test_create_user_duplicate_raises_value_error():
-    user_manager.create_user("charlie", "Password1", "staff")
+    user_manager.create_user("charlie", _PW, "staff")
     with pytest.raises(ValueError, match="already taken"):
-        user_manager.create_user("charlie", "Password2", "admin")
+        user_manager.create_user("charlie", _PW, "admin")
 
 
 # ---------------------------------------------------------------------------
@@ -50,20 +54,20 @@ def test_create_user_duplicate_raises_value_error():
 # ---------------------------------------------------------------------------
 
 def test_update_user_username():
-    user = user_manager.create_user("dave", "Password1", "staff")
+    user = user_manager.create_user("dave", _PW, "staff")
     updated = user_manager.update_user(user.id, {"username": "david"})
     assert updated.username == "david"
 
 
 def test_update_user_role():
-    user = user_manager.create_user("eve", "Password1", "staff")
+    user = user_manager.create_user("eve", _PW, "staff")
     updated = user_manager.update_user(user.id, {"role": "admin"})
     assert updated.role == "admin"
 
 
 def test_update_user_duplicate_username_raises():
-    user_manager.create_user("frank", "Password1", "staff")
-    user2 = user_manager.create_user("grace", "Password1", "staff")
+    user_manager.create_user("frank", _PW, "staff")
+    user2 = user_manager.create_user("grace", _PW, "staff")
     with pytest.raises(ValueError, match="already taken"):
         user_manager.update_user(user2.id, {"username": "frank"})
 
@@ -73,16 +77,17 @@ def test_update_user_duplicate_username_raises():
 # ---------------------------------------------------------------------------
 
 def test_reset_password_stores_new_hash():
-    user = user_manager.create_user("heidi", "Oldpass1", "staff")
-    user_manager.reset_password(user.id, "Newpass1")
-    assert authenticator.check_password("Newpass1", user.password_hash)
-    assert not authenticator.check_password("Oldpass1", user.password_hash)
+    user = user_manager.create_user("heidi", _PW, "staff")
+    new_pw = "NewPass@456"
+    user_manager.reset_password(user.id, new_pw)
+    assert authenticator.check_password(new_pw, user.password_hash)
+    assert not authenticator.check_password(_PW, user.password_hash)
 
 
 def test_reset_password_does_not_store_plaintext():
-    user = user_manager.create_user("ivan", "Mypassword1", "staff")
-    user_manager.reset_password(user.id, "Mypassword1")
-    assert user.password_hash != "Mypassword1"
+    user = user_manager.create_user("ivan", _PW, "staff")
+    user_manager.reset_password(user.id, _PW)
+    assert user.password_hash != _PW
 
 
 # ---------------------------------------------------------------------------
@@ -90,17 +95,16 @@ def test_reset_password_does_not_store_plaintext():
 # ---------------------------------------------------------------------------
 
 def test_delete_user_removes_user():
-    user = user_manager.create_user("judy", "Password1", "staff")
+    user = user_manager.create_user("judy", _PW, "staff")
     uid = user.id
-    # Need a different current_user_id
-    admin = user_manager.create_user("admin_user", "Password1", "admin")
+    admin = user_manager.create_user("admin_user", _PW, "admin")
     user_manager.delete_user(uid, admin.id)
     users = user_manager.list_users()
     assert all(u.id != uid for u in users)
 
 
 def test_delete_user_self_deletion_raises():
-    user = user_manager.create_user("mallory", "Password1", "admin")
+    user = user_manager.create_user("mallory", _PW, "admin")
     with pytest.raises(ValueError, match="cannot delete your own account"):
         user_manager.delete_user(user.id, user.id)
 
@@ -110,16 +114,16 @@ def test_delete_user_self_deletion_raises():
 # ---------------------------------------------------------------------------
 
 def test_list_users_ordered_by_username():
-    user_manager.create_user("zara", "Password1", "staff")
-    user_manager.create_user("anna", "Password1", "staff")
-    user_manager.create_user("mike", "Password1", "staff")
+    user_manager.create_user("zara", _PW, "staff")
+    user_manager.create_user("anna", _PW, "staff")
+    user_manager.create_user("mike", _PW, "staff")
     users = user_manager.list_users()
     usernames = [u.username for u in users]
     assert usernames == sorted(usernames)
 
 
 def test_list_users_returns_all():
-    user_manager.create_user("user1", "Password1", "staff")
-    user_manager.create_user("user2", "Password1", "admin")
+    user_manager.create_user("user1", _PW, "staff")
+    user_manager.create_user("user2", _PW, "admin")
     users = user_manager.list_users()
     assert len(users) >= 2

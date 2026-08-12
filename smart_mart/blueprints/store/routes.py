@@ -754,17 +754,17 @@ def checkout():
         if request.form.get("website", ""):
             return redirect(url_for("store.home"))
 
-        name    = request.form.get("name", "").strip()
+        name    = request.form.get("name", "").strip()[:120]
         phone   = request.form.get("phone", "").strip()
-        email   = request.form.get("email", "").strip()
-        address = request.form.get("address", "").strip()
-        area    = request.form.get("area", "").strip()
+        email   = request.form.get("email", "").strip()[:120]
+        address = request.form.get("address", "").strip()[:500]
+        area    = request.form.get("area", "").strip()[:120]
         method  = request.form.get("payment_mode", "cod")
         if method not in VALID_PAYMENT_METHODS:
             method = "cod"
-        notes        = request.form.get("notes", "").strip()
+        notes        = request.form.get("notes", "").strip()[:500]
         gift_wrap    = request.form.get("gift_wrap") == "1"
-        gift_message = request.form.get("gift_message", "").strip()
+        gift_message = request.form.get("gift_message", "").strip()[:200]
         if gift_wrap:
             gift_note = f"🎁 GIFT WRAP REQUESTED. Message: {gift_message}" if gift_message else "🎁 GIFT WRAP REQUESTED"
             notes = f"{gift_note}. {notes}".strip(". ")

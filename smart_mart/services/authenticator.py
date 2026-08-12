@@ -67,6 +67,9 @@ def login(username: str, password: str) -> User | None:
         return None
 
     clear_attempts(ip)
+    # Regenerate session ID on login to prevent session fixation attacks
+    from flask import session as _s
+    _s.clear()
     login_user(user)
 
     try:
@@ -123,4 +126,6 @@ def validate_password_strength(password: str) -> list[str]:
         errors.append("At least one uppercase letter.")
     if not any(c.isdigit() for c in password):
         errors.append("At least one digit (0–9).")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;':\",./<>?" for c in password):
+        errors.append("At least one special character (!@#$%^&* etc.).")
     return errors

@@ -534,7 +534,12 @@ def count_sales(filters: dict) -> int:
 
 def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
     from sqlalchemy import or_
-    stmt = db.select(Sale).order_by(Sale.sale_date.desc())
+    from sqlalchemy.orm import joinedload
+    stmt = (
+        db.select(Sale)
+        .options(joinedload(Sale.user))   # avoid N+1 on cashier name in the list view
+        .order_by(Sale.sale_date.desc())
+    )
     conditions = []
     if filters.get("start_date"):
         conditions.append(Sale.sale_date >= filters["start_date"])
@@ -555,7 +560,7 @@ def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
     if conditions:
         stmt = stmt.where(and_(*conditions))
     stmt = stmt.limit(per_page).offset((page - 1) * per_page)
-    return db.session.execute(stmt).scalars().all()
+    return db.session.execute(stmt).unique().scalars().all()
 
 
 def delete_sale(sale_id: int) -> None:

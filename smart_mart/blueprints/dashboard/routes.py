@@ -156,7 +156,7 @@ def index():
             "total_revenue":       total_revenue,
             "today_cogs":          float(today_cogs),
             "today_profit":        0,  # placeholder; corrected below using today_sales_amount
-            "cash_balance":        total_revenue - float(total_expenses),
+            "cash_balance":        float(monthly_profit),  # month net profit (meaningful for daily ops)
             "stock_value":         float(stock_value),
             "monthly_profit":      float(monthly_profit),
             "waste_cost_month":    waste_cost_month,

@@ -88,13 +88,13 @@ ADMIN_ONLY_ROUTES = [
 def test_staff_cannot_access_admin_routes(app, client):
     # Feature: smart-mart-inventory, Property 3: Role-based access control is enforced on all restricted routes
     with app.app_context():
-        user_manager.create_user("staff_rbac_test", "Password1", "staff")
+        user_manager.create_user("staff_rbac_test", "Secret@123", "staff")
 
     with client.session_transaction() as sess:
         pass  # ensure clean session
 
     # Login as staff
-    client.post("/auth/login", data={"username": "staff_rbac_test", "password": "Password1"})
+    client.post("/auth/login", data={"username": "staff_rbac_test", "password": "Secret@123"})
 
     for route in ADMIN_ONLY_ROUTES:
         response = client.get(route, follow_redirects=False)
