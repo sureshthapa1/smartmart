@@ -106,7 +106,7 @@
     {% if sale.tax_amount and sale.tax_amount|float > 0 %}
     <tr><td>VAT ({{ sale.tax_rate|int if sale.tax_rate else '' }}%)</td><td class="right">NPR {{ "%.2f"|format(sale.tax_amount|float) }}</td></tr>
     {% elif shop and shop.vat_enabled %}
-    {% set vat_rate = shop.vat_rate|float %}
+    {% set vat_rate = (shop.vat_rate | default(13)) | float %}
     {% set vat_amount = sale.total_amount|float * vat_rate / (100 + vat_rate) %}
     <tr><td>VAT ({{ vat_rate|int }}%)</td><td class="right">NPR {{ "%.2f"|format(vat_amount) }}</td></tr>
     {% endif %}

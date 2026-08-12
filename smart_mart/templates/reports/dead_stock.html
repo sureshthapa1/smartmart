@@ -39,7 +39,9 @@
       <div class="card-body p-3 text-center">
         <div class="text-muted" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Value at Risk</div>
         <div class="fw-bold" style="font-size:1.3rem;color:#881337">
-          NPR {{ "{:,.0f}".format(products|sum(attribute='cost_price')|float * products|sum(attribute='quantity')|float / ([products|length,1]|max)) }}
+          {% set _total_val = namespace(v=0) %}
+          {% for p in products %}{% set _total_val.v = _total_val.v + (p.cost_price|float * p.quantity) %}{% endfor %}
+          NPR {{ "{:,.0f}".format(_total_val.v) }}
         </div>
       </div>
     </div>
