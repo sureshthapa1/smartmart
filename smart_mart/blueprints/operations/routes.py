@@ -105,7 +105,7 @@ def suppliers():
         return redirect(url_for("operations.suppliers"))
     page = request.args.get("page", 1, type=int)
     data = operations_manager.get_supplier_balances(page=page)
-    purchases = db.session.execute(db.select(Purchase).order_by(Purchase.purchase_date.desc())).scalars().all()
+    purchases = db.session.execute(db.select(Purchase).order_by(Purchase.purchase_date.desc()).limit(200)).scalars().all()
     return render_template("operations/suppliers.html", data=data, purchases=purchases)
 
 
@@ -159,7 +159,21 @@ def inventory_tools():
             flash(str(exc), "danger")
         return redirect(url_for("operations.inventory_tools"))
     products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
-    profiles = {p.id: operations_manager._profile_for(p.id) for p in products}
+    # Batch-load all inventory profiles in one query to avoid N+1
+    from ...models.operations import ProductInventoryProfile
+    product_ids = [p.id for p in products]
+    existing_profiles = db.session.execute(
+        db.select(ProductInventoryProfile).where(ProductInventoryProfile.product_id.in_(product_ids))
+    ).scalars().all()
+    profiles = {prof.product_id: prof for prof in existing_profiles}
+    # Create missing profiles for products that don't have one yet
+    for pid in product_ids:
+        if pid not in profiles:
+            prof = ProductInventoryProfile(product_id=pid)
+            db.session.add(prof)
+            profiles[pid] = prof
+    if any(pid not in {prof.product_id for prof in existing_profiles} for pid in product_ids):
+        db.session.flush()
     batches = db.session.execute(db.select(ProductBatch).order_by(ProductBatch.created_at.desc())).scalars().all()
     return render_template("operations/inventory_tools.html", products=products, profiles=profiles, batches=batches)
 
