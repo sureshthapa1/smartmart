@@ -295,7 +295,14 @@ def _save_turn(conv_id, user_id: int, user_msg: str, assistant_msg: str) -> int:
 
 
 def build_business_context() -> str:
-    """Build live business context string for Claude's system prompt."""
+    """Build live business context string for the AI system prompt.
+    Cached for 60 seconds to avoid 6 DB queries per chat message.
+    """
+    from ...services.cache_service import get as _cg, set as _cs
+    _key = f"ai_chat_ctx:{date.today().isoformat()}"
+    _cached = _cg(_key)
+    if _cached is not None:
+        return _cached
     today       = date.today()
     week_start  = today - timedelta(days=today.weekday())
     month_start = today.replace(day=1)
@@ -357,7 +364,7 @@ def build_business_context() -> str:
         for r in customers
     ] or ["- No repeat customer data this month."]
 
-    return "\n".join([
+    result = "\n".join([
         f"Date: {today.isoformat()} AD; BS month: {bs_month_name(today)}",
         f"Today revenue: NPR {float(today_row[0] or 0):,.2f}; sales: {today_row[1] or 0}",
         f"This week revenue: NPR {float(week_revenue):,.2f}",
@@ -370,3 +377,5 @@ def build_business_context() -> str:
         "Frequent customers this month:",
         *cust_lines,
     ])
+    _cs(_key, result, ttl=60)
+    return result

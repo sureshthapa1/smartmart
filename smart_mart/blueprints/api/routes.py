@@ -95,7 +95,7 @@ def profit_trend():
 @login_required
 def customer_search():
     """Search saved customers and historical sale names for billing autofill."""
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:100]  # cap to prevent DoS via huge LIKE
     if len(q) < 1:
         return jsonify([])
     from ...models.customer import Customer
@@ -757,7 +757,7 @@ def global_search():
     """Global search — uses AI smart search (Claude NLP) when key is set,
     falls back to fast keyword search. Used by the topbar search bar.
     """
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:100]  # cap to prevent DoS via huge LIKE
     if len(q) < 2:
         return jsonify({"results": []})
 
