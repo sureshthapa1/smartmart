@@ -54,7 +54,27 @@ def auto_replenishment_plan(
     safety_days: int = 4,
     coverage_days: int = 14,
 ) -> dict:
-    """Create supplier-grouped replenishment recommendations."""
+    """Create supplier-grouped replenishment recommendations.
+
+    Uses a single SQL aggregate for daily demand instead of N+1 per-product queries.
+    """
+    start = date.today() - timedelta(days=max(1, lookback_days - 1))
+
+    # Batch-load all product demand in one query
+    demand_rows = db.session.execute(
+        db.select(
+            SaleItem.product_id,
+            func.coalesce(func.sum(SaleItem.quantity), 0).label("total_qty"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(Sale.sale_date >= start, SaleItem.product_id.isnot(None))
+        .group_by(SaleItem.product_id)
+    ).all()
+    demand_map: dict[int, float] = {
+        r.product_id: float(r.total_qty) / max(1, lookback_days)
+        for r in demand_rows
+    }
+
     products = db.session.execute(
         db.select(Product).order_by(Product.supplier_id, Product.name)
     ).scalars().all()
@@ -62,7 +82,7 @@ def auto_replenishment_plan(
     unassigned = []
 
     for product in products:
-        avg_daily = _avg_daily_demand(product.id, lookback_days)
+        avg_daily = demand_map.get(product.id, 0.0)
         if avg_daily <= 0:
             continue
         lead_time_days = _estimate_supplier_lead_time(product.supplier_id)

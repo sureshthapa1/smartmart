@@ -534,45 +534,50 @@ def generate_combos() -> dict:
 # ── 14. Customer Profitability Analysis ───────────────────────────────────────
 
 def customer_profitability() -> dict:
-    """Identify high-value and low-margin customer segments."""
-    customers = _all_named_customers()
+    """Identify high-value and low-margin customer segments.
+
+    Uses SQL aggregates to avoid N+1 queries.
+    """
+    # Single query: per-customer revenue, discount, cogs
+    agg_rows = db.session.execute(
+        db.select(
+            Sale.customer_name.label("name"),
+            func.count(Sale.id).label("frequency"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total_revenue"),
+            func.coalesce(func.sum(Sale.discount_amount), 0).label("total_discount"),
+            func.coalesce(
+                func.sum(func.coalesce(SaleItem.cost_price, 0) * SaleItem.quantity), 0
+            ).label("cogs"),
+        )
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .where(Sale.customer_name.isnot(None), Sale.customer_name != "")
+        .group_by(Sale.customer_name)
+    ).all()
+
+    cust_map = {c.name.lower(): c for c in _all_named_customers()}
+
     analysis = []
-
-    for c in customers:
-        sales = _get_customer_sales(c.name)
-        if not sales:
-            continue
-
-        total_revenue = sum(float(s.total_amount) for s in sales)
-        total_discount = sum(float(s.discount_amount or 0) for s in sales)
-        frequency = len(sales)
-
-        # Calculate COGS for this customer
-        cogs = 0.0
-        for s in sales:
-            for item in s.items:
-                if item.product:
-                    cogs += float(item.product.cost_price) * item.quantity
-
+    for row in agg_rows:
+        total_revenue = float(row.total_revenue or 0)
+        total_discount = float(row.total_discount or 0)
+        cogs = float(row.cogs or 0)
+        frequency = int(row.frequency or 0)
         gross_profit = total_revenue - cogs
         margin_pct = (gross_profit / total_revenue * 100) if total_revenue > 0 else 0
 
         if total_revenue >= 10000 and margin_pct >= 20:
-            segment = "High Value"
-            color = "success"
+            segment, color = "High Value", "success"
         elif total_revenue >= 5000:
-            segment = "Medium Value"
-            color = "primary"
+            segment, color = "Medium Value", "primary"
         elif margin_pct < 10:
-            segment = "Low Margin"
-            color = "warning"
+            segment, color = "Low Margin", "warning"
         else:
-            segment = "Standard"
-            color = "secondary"
+            segment, color = "Standard", "secondary"
 
+        c_obj = cust_map.get(row.name.lower())
         analysis.append({
-            "name": c.name,
-            "phone": c.phone,
+            "name": row.name,
+            "phone": c_obj.phone if c_obj else None,
             "total_revenue": round(total_revenue, 2),
             "total_discount": round(total_discount, 2),
             "cogs": round(cogs, 2),
