@@ -1200,37 +1200,81 @@ def price_history(product_id):
 def price_alerts():
     _require_perm("can_view_stock_report")
     from datetime import datetime, timedelta
+    from sqlalchemy import alias
     from ...models.supplier_price_record import SupplierPriceRecord
 
     cutoff = datetime.utcnow() - timedelta(days=90)
-    products = db.session.execute(db.select(Product).order_by(Product.name)).scalars().all()
+
+    # Efficient single-pass: get latest and 90d-old cost per product in two queries
+    # then join in Python — avoids 2 queries per product (N+1)
+    latest_rows = db.session.execute(
+        db.select(
+            SupplierPriceRecord.product_id,
+            db.func.max(SupplierPriceRecord.recorded_at).label("latest_at"),
+        ).group_by(SupplierPriceRecord.product_id)
+    ).all()
+    latest_map = {r.product_id: r.latest_at for r in latest_rows}
+
+    if not latest_map:
+        return render_template("inventory/price_alerts.html", alerts=[])
+
+    # Fetch actual latest and old records in two bulk queries
+    latest_records = {
+        r.product_id: r
+        for r in db.session.execute(
+            db.select(SupplierPriceRecord).where(
+                db.tuple_(SupplierPriceRecord.product_id, SupplierPriceRecord.recorded_at)
+                .in_(list(latest_map.items()))
+            )
+        ).scalars().all()
+    }
+
+    old_subq = db.session.execute(
+        db.select(
+            SupplierPriceRecord.product_id,
+            db.func.max(SupplierPriceRecord.recorded_at).label("old_at"),
+        )
+        .where(SupplierPriceRecord.recorded_at <= cutoff)
+        .group_by(SupplierPriceRecord.product_id)
+    ).all()
+    old_at_map = {r.product_id: r.old_at for r in old_subq}
+
+    old_records = {
+        r.product_id: r
+        for r in db.session.execute(
+            db.select(SupplierPriceRecord).where(
+                db.tuple_(SupplierPriceRecord.product_id, SupplierPriceRecord.recorded_at)
+                .in_(list(old_at_map.items()))
+            )
+        ).scalars().all()
+    } if old_at_map else {}
+
+    # Load only the products that have price records
+    products_with_records = db.session.execute(
+        db.select(Product)
+        .where(Product.id.in_(list(latest_map.keys())))
+        .order_by(Product.name)
+    ).scalars().all()
+    product_map = {p.id: p for p in products_with_records}
+
     alerts = []
-    for product in products:
-        latest = db.session.execute(
-            db.select(SupplierPriceRecord)
-            .where(SupplierPriceRecord.product_id == product.id)
-            .order_by(SupplierPriceRecord.recorded_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-        old = db.session.execute(
-            db.select(SupplierPriceRecord)
-            .where(SupplierPriceRecord.product_id == product.id)
-            .where(SupplierPriceRecord.recorded_at <= cutoff)
-            .order_by(SupplierPriceRecord.recorded_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-        if latest and old and float(old.cost_price or 0) > 0:
-            increase_pct = (float(latest.cost_price) - float(old.cost_price)) / float(old.cost_price) * 100
-            if increase_pct >= 10:
-                current_margin = 0.35
-                suggested_price = float(latest.cost_price) / (1 - current_margin)
-                alerts.append({
-                    "product": product,
-                    "increase_pct": increase_pct,
-                    "old_cost": float(old.cost_price),
-                    "new_cost": float(latest.cost_price),
-                    "suggested_price": suggested_price,
-                })
+    for pid, latest in latest_records.items():
+        old = old_records.get(pid)
+        product = product_map.get(pid)
+        if not product or not old or float(old.cost_price or 0) <= 0:
+            continue
+        increase_pct = (float(latest.cost_price) - float(old.cost_price)) / float(old.cost_price) * 100
+        if increase_pct >= 10:
+            current_margin = 0.35
+            suggested_price = float(latest.cost_price) / (1 - current_margin)
+            alerts.append({
+                "product": product,
+                "increase_pct": increase_pct,
+                "old_cost": float(old.cost_price),
+                "new_cost": float(latest.cost_price),
+                "suggested_price": suggested_price,
+            })
+    alerts.sort(key=lambda x: x["increase_pct"], reverse=True)
     return render_template("inventory/price_alerts.html", alerts=alerts)
 
 
