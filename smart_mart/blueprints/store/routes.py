@@ -1196,6 +1196,7 @@ def my_account():
 
 
 @store_bp.route("/account/update", methods=["POST"])
+@limiter.limit("10/minute")
 @customer_login_required
 def account_update():
     cust = g.customer
@@ -1221,6 +1222,7 @@ def account_update():
 
 
 @store_bp.route("/account/change-password", methods=["POST"])
+@limiter.limit("5/minute")
 @customer_login_required
 def account_change_password():
     cust       = g.customer
