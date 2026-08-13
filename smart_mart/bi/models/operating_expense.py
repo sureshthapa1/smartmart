@@ -7,6 +7,11 @@ from ...extensions import db
 
 class OperatingExpense(db.Model):
     __tablename__ = "bi_operating_expenses"
+    __table_args__ = (
+        db.Index("ix_bi_opex_expense_date", "expense_date"),   # P&L date-range queries
+        db.Index("ix_bi_opex_category", "category"),           # category breakdown queries
+        db.Index("ix_bi_opex_product_id", "product_id"),       # direct product cost allocation
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     category = db.Column(db.String(80), nullable=False)

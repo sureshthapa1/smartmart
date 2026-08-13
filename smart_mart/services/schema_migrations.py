@@ -313,6 +313,16 @@ def _migration_steps() -> list[MigrationStep]:
             lambda conn: _safe_add_column(conn, "user_permissions", "can_collect_credit", "BOOLEAN DEFAULT false"),
         ),
         (
+            "2026_08_05_bi_operating_expenses_indexes",
+            "Add indexes on bi_operating_expenses(expense_date, category, product_id) "
+            "to speed up P&L date-range queries, category breakdowns, and direct product cost lookups.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_bi_opex_expense_date ON bi_operating_expenses(expense_date)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_bi_opex_category ON bi_operating_expenses(category)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_bi_opex_product_id ON bi_operating_expenses(product_id)"),
+            ),
+        ),
+        (
             "2026_05_16_goldkernel_feature_pack_columns",
             "Add Goldkernel feature pack columns for payments, loyalty, settings, and low stock.",
             lambda conn: (

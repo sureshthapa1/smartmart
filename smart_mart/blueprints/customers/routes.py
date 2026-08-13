@@ -365,8 +365,22 @@ def export_csv():
 def birthdays_today():
     """Return customers with birthday today or in next 7 days."""
     from datetime import date, timedelta
+    from sqlalchemy import extract
     today = date.today()
-    customers = db.session.execute(db.select(Customer).where(Customer.birthday.isnot(None))).scalars().all()
+    # Filter in SQL using month/day extraction — avoids loading all customers with a birthday
+    upcoming_dates = [(today + timedelta(days=i)) for i in range(8)]
+    month_day_pairs = [(d.month, d.day) for d in upcoming_dates]
+    conditions = [
+        (extract("month", Customer.birthday) == m) & (extract("day", Customer.birthday) == d)
+        for m, d in month_day_pairs
+    ]
+    from sqlalchemy import or_
+    customers = db.session.execute(
+        db.select(Customer)
+        .where(Customer.birthday.isnot(None))
+        .where(or_(*conditions))
+        .order_by(extract("month", Customer.birthday), extract("day", Customer.birthday))
+    ).scalars().all()
     upcoming = []
     for c in customers:
         if c.birthday:
