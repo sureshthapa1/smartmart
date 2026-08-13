@@ -482,7 +482,12 @@ def kpi_scorecard() -> list[dict]:
 # ── Full advisor report ───────────────────────────────────────────────────────
 
 def full_advisor_report() -> dict:
-    return {
+    from .cache_service import get as _cg, set as _cs
+    _key = "advisor:full_report"
+    cached = _cg(_key)
+    if cached is not None:
+        return cached
+    result = {
         "summary": executive_summary(),
         "recommendations": strategic_recommendations(),
         "opportunities": growth_opportunities(),
@@ -491,6 +496,8 @@ def full_advisor_report() -> dict:
         "product_actions": product_action_recommendations(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+    _cs(_key, result, ttl=300)  # cache 5 minutes — expensive multi-query report
+    return result
 
 
 # ── Product Action Advisor ────────────────────────────────────────────────────

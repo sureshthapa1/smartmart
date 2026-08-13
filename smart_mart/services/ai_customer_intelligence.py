@@ -45,23 +45,40 @@ def _all_named_customers() -> list[Customer]:
 # ── 6. Top Regular Customer Detection ────────────────────────────────────────
 
 def tier_customers() -> dict:
-    """Rank and tier all customers: Platinum / Gold / Silver / Bronze."""
-    customers = _all_named_customers()
+    """Rank and tier all customers: Platinum / Gold / Silver / Bronze.
+
+    Uses a single SQL aggregate query instead of N+1 per-customer lookups.
+    """
     today = date.today()
+
+    # Single query: aggregate sales per customer name
+    agg_rows = db.session.execute(
+        db.select(
+            Sale.customer_name.label("name"),
+            func.count(Sale.id).label("frequency"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total_spent"),
+            func.max(Sale.sale_date).label("last_sale"),
+        )
+        .where(Sale.customer_name.isnot(None))
+        .where(Sale.customer_name != "")
+        .group_by(Sale.customer_name)
+    ).all()
+
+    # Build a quick lookup of Customer objects by name for id/phone
+    customers = _all_named_customers()
+    cust_map = {c.name.lower(): c for c in customers}
+
     tiered = []
-
-    for c in customers:
-        sales = _get_customer_sales(c.name)
-        if not sales:
-            continue
-
-        total_spent = sum(float(s.total_amount) for s in sales)
-        frequency = len(sales)
-        last_sale = sales[0].sale_date.date() if sales[0].sale_date else today
+    for row in agg_rows:
+        total_spent = float(row.total_spent or 0)
+        frequency = int(row.frequency or 0)
+        last_sale_dt = row.last_sale
+        last_sale = last_sale_dt.date() if last_sale_dt and hasattr(last_sale_dt, "date") else (
+            last_sale_dt if isinstance(last_sale_dt, date) else today
+        )
         recency_days = (today - last_sale).days
         avg_order = total_spent / frequency if frequency else 0
 
-        # Composite score (weighted)
         monetary_score = min(50, total_spent / 1000 * 10)
         frequency_score = min(30, frequency * 3)
         recency_score = max(0, 20 - recency_days * 0.2)
@@ -76,10 +93,11 @@ def tier_customers() -> dict:
         else:
             tier, color, icon = "Bronze", "danger", "🥉"
 
+        c_obj = cust_map.get(row.name.lower())
         tiered.append({
-            "id": c.id,
-            "name": c.name,
-            "phone": c.phone,
+            "id": c_obj.id if c_obj else None,
+            "name": row.name,
+            "phone": c_obj.phone if c_obj else None,
             "tier": tier,
             "tier_color": color,
             "tier_icon": icon,
