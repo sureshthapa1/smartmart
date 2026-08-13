@@ -258,45 +258,64 @@ def personalized_recommendations(customer_name: str) -> dict:
 # ── 9. Customer Churn Prediction ──────────────────────────────────────────────
 
 def churn_prediction() -> dict:
-    """Detect inactive customers and decreasing purchase frequency."""
-    customers = _all_named_customers()
+    """Detect inactive customers and decreasing purchase frequency.
+
+    Uses SQL aggregates to avoid N+1 queries.
+    """
     today = date.today()
+    three_months_ago = today - timedelta(days=90)
+    six_months_ago = today - timedelta(days=180)
+
+    # Single query: per-customer aggregates
+    agg_rows = db.session.execute(
+        db.select(
+            Sale.customer_name.label("name"),
+            func.count(Sale.id).label("total_freq"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total_spent"),
+            func.max(Sale.sale_date).label("last_sale"),
+            func.coalesce(func.sum(
+                db.case((Sale.sale_date >= three_months_ago, 1), else_=0)
+            ), 0).label("recent_count"),
+            func.coalesce(func.sum(
+                db.case((
+                    (Sale.sale_date >= six_months_ago) & (Sale.sale_date < three_months_ago),
+                    1
+                ), else_=0)
+            ), 0).label("prev_count"),
+        )
+        .where(Sale.customer_name.isnot(None), Sale.customer_name != "")
+        .group_by(Sale.customer_name)
+    ).all()
+
+    cust_map = {c.name.lower(): c for c in _all_named_customers()}
+
     at_risk = []
     churned = []
 
-    for c in customers:
-        sales = _get_customer_sales(c.name)
-        if not sales:
-            continue
-
-        frequency = len(sales)
-        last_sale = sales[0].sale_date.date() if sales[0].sale_date else today
+    for row in agg_rows:
+        c_obj = cust_map.get(row.name.lower())
+        phone = c_obj.phone if c_obj else None
+        last_sale_dt = row.last_sale
+        last_sale = last_sale_dt.date() if last_sale_dt and hasattr(last_sale_dt, "date") else today
         recency = (today - last_sale).days
-
-        # Check frequency trend: compare last 3 months vs previous 3 months
-        three_months_ago = today - timedelta(days=90)
-        six_months_ago = today - timedelta(days=180)
-
-        recent_count = sum(1 for s in sales if s.sale_date and s.sale_date.date() >= three_months_ago)
-        prev_count = sum(1 for s in sales
-                         if s.sale_date and six_months_ago <= s.sale_date.date() < three_months_ago)
-
+        recent_count = int(row.recent_count or 0)
+        prev_count = int(row.prev_count or 0)
         declining = prev_count > 0 and recent_count < prev_count * 0.5
 
         if recency > 90:
             churned.append({
-                "name": c.name, "phone": c.phone,
+                "name": row.name, "phone": phone,
                 "days_inactive": recency,
-                "total_spent": sum(float(s.total_amount) for s in sales),
+                "total_spent": float(row.total_spent or 0),
                 "risk": "churned",
                 "action": "Win-back campaign with 20% discount",
             })
         elif recency > 45 or declining:
             at_risk.append({
-                "name": c.name, "phone": c.phone,
+                "name": row.name, "phone": phone,
                 "days_inactive": recency,
                 "frequency_drop": f"{prev_count} → {recent_count} orders",
-                "total_spent": sum(float(s.total_amount) for s in sales),
+                "total_spent": float(row.total_spent or 0),
                 "risk": "at_risk",
                 "action": "Send retention offer: 10% discount",
             })

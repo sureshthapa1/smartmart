@@ -77,31 +77,40 @@ def _rfm_score(recency_days: int, frequency: int, monetary: float) -> dict:
 
 
 def segment_customers() -> dict:
-    """Segment all known customers using RFM analysis."""
-    customers = db.session.execute(db.select(Customer).order_by(Customer.visit_count.desc())).scalars().all()
+    """Segment all known customers using RFM analysis.
+
+    Uses a single SQL aggregate query instead of N+1 per-customer lookups.
+    """
     today = date.today()
+
+    # Batch query: aggregate sales per customer name in one pass
+    agg_rows = db.session.execute(
+        db.select(
+            Sale.customer_name.label("name"),
+            func.count(Sale.id).label("frequency"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("monetary"),
+            func.max(Sale.sale_date).label("last_sale"),
+        )
+        .where(Sale.customer_name.isnot(None), Sale.customer_name != "")
+        .group_by(Sale.customer_name)
+    ).all()
+
+    # Quick lookup of Customer ORM objects by name for id/phone/address
+    customers = db.session.execute(db.select(Customer)).scalars().all()
+    cust_map = {c.name.lower(): c for c in customers}
+
     segmented = []
-
-    for c in customers:
-        # Get sales linked to this customer name
-        sales = db.session.execute(
-            db.select(Sale)
-            .where(db.func.lower(Sale.customer_name) == c.name.lower())
-            .order_by(Sale.sale_date.desc())
-        ).scalars().all()
-
-        if not sales:
-            continue
-
-        last_sale = sales[0].sale_date.date() if sales[0].sale_date else today
+    for row in agg_rows:
+        c_obj = cust_map.get(row.name.lower())
+        last_sale_dt = row.last_sale
+        last_sale = last_sale_dt.date() if last_sale_dt and hasattr(last_sale_dt, "date") else today
         recency = (today - last_sale).days
-        frequency = len(sales)
-        monetary = sum(float(s.total_amount) for s in sales)
+        frequency = int(row.frequency or 0)
+        monetary = float(row.monetary or 0)
         avg_order = monetary / frequency if frequency else 0
 
         rfm = _rfm_score(recency, frequency, monetary)
 
-        # Discount recommendation
         if rfm["segment"] == "VIP":
             discount_rec = "Offer 5-10% loyalty discount"
         elif rfm["segment"] == "At-Risk":
@@ -112,10 +121,10 @@ def segment_customers() -> dict:
             discount_rec = "No special discount needed"
 
         segmented.append({
-            "id": c.id,
-            "name": c.name,
-            "phone": c.phone,
-            "address": c.address,
+            "id": c_obj.id if c_obj else None,
+            "name": row.name,
+            "phone": c_obj.phone if c_obj else None,
+            "address": c_obj.address if c_obj else None,
             "segment": rfm["segment"],
             "segment_color": rfm["color"],
             "segment_icon": rfm["icon"],
