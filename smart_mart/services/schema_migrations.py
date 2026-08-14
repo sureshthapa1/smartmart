@@ -323,6 +323,14 @@ def _migration_steps() -> list[MigrationStep]:
             ),
         ),
         (
+            "2026_08_06_product_variant_units_per_parent",
+            "Add units_per_parent column to product_variants — enables split-pack billing "
+            "(sell a box AND individual pieces from the same parent product).",
+            lambda conn: _safe_add_column(
+                conn, "product_variants", "units_per_parent", "INTEGER"
+            ),
+        ),
+        (
             "2026_05_16_goldkernel_feature_pack_columns",
             "Add Goldkernel feature pack columns for payments, loyalty, settings, and low stock.",
             lambda conn: (

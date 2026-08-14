@@ -5,7 +5,55 @@
 <li class="breadcrumb-item"><a href="{{ url_for('inventory.list_products') }}" class="text-decoration-none">Inventory</a></li>
 <li class="breadcrumb-item active">{{ product.name }} — Variants</li>
 {% endblock %}
-{% block content %}
+
+{% block scripts %}
+<!-- Split Pack Modal -->
+<div class="modal fade" id="splitModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-box-seam me-2 text-warning"></i>Split Pack</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="splitForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <p class="text-muted small mb-3" id="splitDesc"></p>
+          <label class="form-label fw-semibold">How many packs to open?</label>
+          <input type="number" name="packs_to_open" id="splitQty" class="form-control"
+                 min="1" value="1" required>
+          <div class="form-text mt-1" id="splitPreview"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning btn-sm">
+            <i class="bi bi-box-seam me-1"></i>Open Packs
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function showSplitModal(variantId, variantName, unitsPerParent, parentStock, parentUnit) {
+  const baseUrl = "{{ url_for('inventory.product_variants', product_id=product.id) }}";
+  document.getElementById('splitForm').action = baseUrl + '/' + variantId + '/split-pack';
+  document.getElementById('splitDesc').textContent =
+    'Parent stock: ' + parentStock + ' ' + parentUnit + '(s). Each ' + parentUnit + ' = ' + unitsPerParent + ' \u00d7 ' + variantName + '.';
+  const qtyInput = document.getElementById('splitQty');
+  qtyInput.max = parentStock;
+  qtyInput.value = 1;
+  document.getElementById('splitPreview').textContent =
+    'Opening 1 pack adds ' + unitsPerParent + ' \u00d7 ' + variantName + ' to variant stock.';
+  qtyInput.oninput = function() {
+    const n = parseInt(this.value) || 1;
+    document.getElementById('splitPreview').textContent =
+      'Opening ' + n + ' pack(s) adds ' + (n * unitsPerParent) + ' \u00d7 ' + variantName + ' to variant stock.';
+  };
+  new bootstrap.Modal(document.getElementById('splitModal')).show();
+}
+</script>
+{% endblock %}
 
 <div class="page-header">
   <div>
@@ -52,6 +100,7 @@
             <th>Variant</th>
             <th>SKU</th>
             <th>Barcode</th>
+            <th class="text-center">Units/Pack</th>
             <th class="text-end">Cost</th>
             <th class="text-end">Price</th>
             <th class="text-center">Stock</th>
@@ -65,6 +114,15 @@
             <td class="fw-semibold">{{ v.variant_name }}</td>
             <td><code class="text-muted small">{{ v.sku }}</code></td>
             <td class="text-muted small">{{ v.barcode or '—' }}</td>
+            <td class="text-center">
+              {% if v.units_per_parent %}
+                <span class="badge bg-info text-dark" title="{{ v.units_per_parent }} of this variant per 1 parent unit">
+                  {{ v.units_per_parent }} / pack
+                </span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
             <td class="text-end text-muted">{{ "%.2f"|format(v.cost_price|float) }}</td>
             <td class="text-end fw-semibold">NPR {{ "%.2f"|format(v.selling_price|float) }}</td>
             <td class="text-center">
@@ -78,12 +136,19 @@
               </span>
             </td>
             <td>
-              <div class="d-flex gap-1">
+              <div class="d-flex gap-1 flex-wrap">
                 <a href="{{ url_for('inventory.edit_variant', product_id=product.id, variant_id=v.id) }}"
                    class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                {% if v.units_per_parent and v.units_per_parent > 0 %}
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                        title="Open packs and add {{ v.units_per_parent }} × {{ v.variant_name }} per pack"
+                        onclick="showSplitModal({{ v.id }}, '{{ v.variant_name|e }}', {{ v.units_per_parent }}, {{ product.quantity }}, '{{ product.unit or 'pack' }}')">
+                  <i class="bi bi-box-seam"></i> Split
+                </button>
+                {% endif %}
                 <form method="post" action="{{ url_for('inventory.delete_variant', product_id=product.id, variant_id=v.id) }}"
                       class="d-inline" onsubmit="return confirm('Delete variant {{ v.variant_name }}?')">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                 </form>
               </div>
@@ -91,7 +156,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-5">
+            <td colspan="9" class="text-center text-muted py-5">
               <i class="bi bi-collection fs-1 d-block mb-2 opacity-25"></i>
               No variants yet.
               <a href="{{ url_for('inventory.create_variant', product_id=product.id) }}">Add the first one</a>.

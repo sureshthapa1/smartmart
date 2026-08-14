@@ -1686,6 +1686,8 @@ def create_variant(product_id):
             flash("Variant name and SKU are required.", "danger")
         else:
             try:
+                units_per_parent_raw = request.form.get("units_per_parent", "").strip()
+                units_per_parent = int(units_per_parent_raw) if units_per_parent_raw and int(units_per_parent_raw) > 0 else None
                 v = ProductVariant(
                     product_id=product_id,
                     variant_name=variant_name,
@@ -1695,6 +1697,7 @@ def create_variant(product_id):
                     quantity=quantity,
                     barcode=barcode,
                     is_active=True,
+                    units_per_parent=units_per_parent,
                 )
                 db.session.add(v)
                 db.session.commit()
@@ -1722,6 +1725,8 @@ def edit_variant(product_id, variant_id):
         variant.quantity = int(request.form.get("quantity", 0) or 0)
         variant.barcode = request.form.get("barcode", "").strip() or None
         variant.is_active = request.form.get("is_active") == "on"
+        units_per_parent_raw = request.form.get("units_per_parent", "").strip()
+        variant.units_per_parent = int(units_per_parent_raw) if units_per_parent_raw and int(units_per_parent_raw) > 0 else None
         try:
             db.session.commit()
             flash("Variant updated.", "success")
@@ -1741,6 +1746,80 @@ def delete_variant(product_id, variant_id):
     db.session.delete(v)
     db.session.commit()
     flash("Variant deleted.", "success")
+    return redirect(url_for("inventory.product_variants", product_id=product_id))
+
+
+@inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/split-pack", methods=["POST"])
+@login_required
+def split_pack(product_id, variant_id):
+    """Open N boxes/packets of the parent product and add pieces to the variant.
+
+    Example: 'Chocolate Box' (parent) has 50 boxes.
+    Variant 'Chocolate – 1 Piece' has units_per_parent=24.
+    Opening 2 boxes: parent quantity -2, variant quantity +48.
+
+    Stock movement records are created for full audit trail.
+    """
+    _require_perm("can_manage_variants")
+    from ...models.product_variant import ProductVariant
+    from ...models.stock_movement import StockMovement
+    from datetime import datetime, timezone
+
+    product = db.get_or_404(Product, product_id)
+    variant = db.get_or_404(ProductVariant, variant_id)
+
+    if variant.product_id != product_id:
+        abort(400)
+
+    if not variant.units_per_parent or variant.units_per_parent <= 0:
+        flash("This variant does not have 'units per parent' configured. "
+              "Edit the variant and set how many pieces are in one parent unit.", "danger")
+        return redirect(url_for("inventory.product_variants", product_id=product_id))
+
+    try:
+        packs_to_open = int(request.form.get("packs_to_open", 1) or 1)
+        if packs_to_open <= 0:
+            raise ValueError("Must open at least 1 pack.")
+    except (ValueError, TypeError):
+        flash("Invalid number of packs.", "danger")
+        return redirect(url_for("inventory.product_variants", product_id=product_id))
+
+    if product.quantity < packs_to_open:
+        flash(f"Not enough stock. Only {product.quantity} {product.unit or 'units'} of '{product.name}' available.", "danger")
+        return redirect(url_for("inventory.product_variants", product_id=product_id))
+
+    pieces_added = packs_to_open * variant.units_per_parent
+    product.quantity -= packs_to_open
+    variant.quantity += pieces_added
+
+    note = f"Split {packs_to_open} × {product.name} → {pieces_added} × {variant.variant_name}"
+
+    db.session.add(StockMovement(
+        product_id=product.id,
+        change_amount=-packs_to_open,
+        change_type="adjustment_out",
+        reference_id=None,
+        note=note,
+        created_by=current_user.id,
+        timestamp=datetime.now(timezone.utc),
+    ))
+    db.session.add(StockMovement(
+        product_id=product.id,
+        change_amount=pieces_added,
+        change_type="adjustment_in",
+        reference_id=None,
+        note=f"{note} (piece variant +{pieces_added})",
+        created_by=current_user.id,
+        timestamp=datetime.now(timezone.utc),
+    ))
+
+    db.session.commit()
+    flash(
+        f"✅ Opened {packs_to_open} {product.unit or 'pack(s)'} of '{product.name}'. "
+        f"Added {pieces_added} × '{variant.variant_name}' to stock. "
+        f"'{product.name}' stock: {product.quantity} remaining.",
+        "success"
+    )
     return redirect(url_for("inventory.product_variants", product_id=product_id))
 
 
