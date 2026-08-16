@@ -39,12 +39,17 @@ def list_sales():
     filters: dict = {}
     if start_date:
         try:
-            filters["start_date"] = datetime.fromisoformat(start_date)
+            filters["start_date"] = datetime.fromisoformat(start_date).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
         except ValueError:
             flash("Invalid start date format.", "danger")
     if end_date:
         try:
-            filters["end_date"] = datetime.fromisoformat(end_date)
+            # End of the selected day — include all sales up to 23:59:59
+            filters["end_date"] = datetime.fromisoformat(end_date).replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
         except ValueError:
             flash("Invalid end date format.", "danger")
     if search_q:

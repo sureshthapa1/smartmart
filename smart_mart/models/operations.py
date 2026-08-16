@@ -23,6 +23,10 @@ class CustomerCreditPayment(db.Model):
 
 class SupplierPayment(db.Model):
     __tablename__ = "supplier_payments"
+    __table_args__ = (
+        db.Index("ix_supplier_payments_supplier_id", "supplier_id"),  # supplier balance queries
+        db.Index("ix_supplier_payments_purchase_id", "purchase_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=False)
