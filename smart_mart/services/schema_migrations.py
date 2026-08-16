@@ -331,6 +331,20 @@ def _migration_steps() -> list[MigrationStep]:
             ),
         ),
         (
+            "2026_08_07_operations_indexes",
+            "Add indexes on customer_credit_payments.sale_id and app_notifications "
+            "(source_type+source_id, is_read) — these columns are the primary lookup "
+            "keys in credit-risk and notification queries but were previously unindexed.",
+            lambda conn: (
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_credit_payments_sale_id "
+                                 "ON customer_credit_payments(sale_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_app_notification_source "
+                                 "ON app_notifications(source_type, source_id)"),
+                _safe_exec(conn, "CREATE INDEX IF NOT EXISTS ix_app_notification_is_read "
+                                 "ON app_notifications(is_read)"),
+            ),
+        ),
+        (
             "2026_05_16_goldkernel_feature_pack_columns",
             "Add Goldkernel feature pack columns for payments, loyalty, settings, and low stock.",
             lambda conn: (

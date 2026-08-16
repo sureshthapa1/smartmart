@@ -5,6 +5,9 @@ from ..extensions import db
 
 class CustomerCreditPayment(db.Model):
     __tablename__ = "customer_credit_payments"
+    __table_args__ = (
+        db.Index("ix_credit_payments_sale_id", "sale_id"),  # primary lookup for credit risk
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey("sales.id"), nullable=False)
@@ -82,6 +85,10 @@ class ProductBatch(db.Model):
 
 class AppNotification(db.Model):
     __tablename__ = "app_notifications"
+    __table_args__ = (
+        db.Index("ix_app_notification_source", "source_type", "source_id"),
+        db.Index("ix_app_notification_is_read", "is_read"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(120), nullable=False)
