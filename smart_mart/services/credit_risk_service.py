@@ -86,18 +86,23 @@ def _compute_raw(customer_name: str) -> dict:
         }
 
     total_borrowed = sum(float(s.total_amount) for s in credit_sales)
+    sale_ids = [s.id for s in credit_sales]
 
-    # Outstanding per sale
-    paid_amounts: dict[int, float] = {}
-    for s in credit_sales:
-        paid = db.session.execute(
-            db.select(func.coalesce(func.sum(CustomerCreditPayment.amount), 0))
-            .where(CustomerCreditPayment.sale_id == s.id)
-        ).scalar() or 0
-        paid_amounts[s.id] = float(paid)
+    # Batch-load all payments in one query instead of one per sale (N+1)
+    payment_rows = db.session.execute(
+        db.select(
+            CustomerCreditPayment.sale_id,
+            func.coalesce(func.sum(CustomerCreditPayment.amount), 0).label("paid"),
+            func.max(CustomerCreditPayment.paid_at).label("last_paid_at"),
+        )
+        .where(CustomerCreditPayment.sale_id.in_(sale_ids))
+        .group_by(CustomerCreditPayment.sale_id)
+    ).all()
+    paid_amounts: dict[int, float] = {r.sale_id: float(r.paid) for r in payment_rows}
+    last_paid_map: dict[int, object] = {r.sale_id: r.last_paid_at for r in payment_rows}
 
     total_outstanding = sum(
-        max(0.0, float(s.total_amount) - paid_amounts[s.id]) for s in credit_sales
+        max(0.0, float(s.total_amount) - paid_amounts.get(s.id, 0.0)) for s in credit_sales
     )
 
     # Active overdue (unpaid + past due date)
@@ -120,15 +125,10 @@ def _compute_raw(customer_name: str) -> dict:
         d = _days_to_pay(s)
         if d is not None:
             if s.credit_due_date:
-                # paid before or on due date
-                last_pay = db.session.execute(
-                    db.select(func.max(CustomerCreditPayment.paid_at))
-                    .where(CustomerCreditPayment.sale_id == s.id)
-                ).scalar()
-                if last_pay and last_pay.date() <= s.credit_due_date:
+                last_pay = last_paid_map.get(s.id)
+                if last_pay and (last_pay.date() if hasattr(last_pay, 'date') else last_pay) <= s.credit_due_date:
                     on_time += 1
             else:
-                # no due date — treat as on-time if paid within 30 days
                 if d <= 30:
                     on_time += 1
 
