@@ -193,17 +193,29 @@
     {% endif %}
 
     <a href="{{ url_for('operations.closing') }}" style="text-decoration:none">
-    <div class="kpi">
-      <div class="kpi-dot" style="background:{% if cash_session_open %}#dcfce7{% else %}#f3f4f6{% endif %}">
-        <i class="bi bi-safe2" style="color:{% if cash_session_open %}#16a34a{% else %}#9ca3af{% endif %}"></i>
+    <div class="kpi" style="cursor:default">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <div class="kpi-label" style="margin:0">Today by Payment</div>
+        <a href="{{ url_for('reports.payment_breakdown') }}" style="font-size:.65rem;color:#6366f1;text-decoration:none;font-weight:700">More →</a>
       </div>
-      <div class="kpi-label">Cash Session</div>
-      {% if cash_session_open %}
-      <div class="kpi-value" style="font-size:1.3rem">NPR {{ "%.0f"|format(cash_session_balance) }}</div>
-      <div class="kpi-sub"><span class="session-pill" style="background:#dcfce7;color:#16a34a">● Open</span></div>
+      {% if today_by_payment %}
+        {% for pm in today_by_payment[:4] %}
+        <div class="d-flex align-items-center justify-content-between" style="padding:.18rem 0;border-bottom:1px solid #f3f4f6">
+          <div class="d-flex align-items-center gap-1">
+            <div style="width:7px;height:7px;border-radius:2px;background:{{ pm.color }};flex-shrink:0"></div>
+            <span style="font-size:.7rem;color:#374151;font-weight:600">{{ pm.label }}</span>
+          </div>
+          <div class="text-end">
+            <span style="font-size:.72rem;font-weight:800;color:#111827">NPR {{ "%.0f"|format(pm.total) }}</span>
+            <span style="font-size:.62rem;color:#9ca3af;margin-left:3px">{{ pm.pct }}%</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% if today_by_payment|length == 0 %}
+        <div class="kpi-value" style="font-size:1rem;color:#9ca3af">No sales yet</div>
+        {% endif %}
       {% else %}
-      <div class="kpi-value" style="font-size:1.2rem;color:#9ca3af">Not Started</div>
-      <div class="kpi-sub">Tap to open session →</div>
+        <div class="kpi-value" style="font-size:1rem;color:#9ca3af">No sales yet</div>
       {% endif %}
     </div>
     </a>
@@ -404,6 +416,7 @@
 {% block scripts %}
 <script>
 (function() {
+  // ── Sales trend line chart ────────────────────────────────────────────
   const ctx = document.getElementById('salesChart');
   if (!ctx) return;
 

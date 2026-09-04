@@ -47,6 +47,10 @@ def validate_sale_items(items: list[dict], discount_amount: float = 0) -> dict:
             errors.append({"row": i + 1, "type": "missing_product", "message": f"Row {i+1}: No product selected."})
             continue
 
+        # product_id=0 means a custom/loose amount row — skip product validation
+        if pid == 0:
+            continue
+
         product = db.session.get(Product, pid)
         if not product:
             errors.append({"row": i + 1, "type": "product_not_found", "message": f"Row {i+1}: Product ID {pid} not found."})

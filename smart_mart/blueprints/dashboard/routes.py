@@ -313,6 +313,44 @@ def index():
     except Exception:
         pass
 
+    # ── Today's sales breakdown by payment mode ──────────────────────────
+    today_by_payment = []
+    try:
+        from sqlalchemy import case as _case
+        pm_rows = db.session.execute(
+            db.select(
+                func.coalesce(Sale.payment_method, Sale.payment_mode, "cash").label("method"),
+                func.count(Sale.id).label("txn_count"),
+                func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
+            )
+            .where(Sale.sale_date.between(today, today_end))
+            .group_by(func.coalesce(Sale.payment_method, Sale.payment_mode, "cash"))
+            .order_by(func.sum(Sale.total_amount).desc())
+        ).all()
+        _pm_labels = dict([
+            ("cash", "Cash"), ("fonepay", "Fonepay"), ("esewa", "eSewa"),
+            ("khalti", "Khalti"), ("qr", "QR Code"), ("bank", "Bank Transfer"),
+            ("credit", "Credit/Udharo"),
+        ])
+        _pm_colors = {
+            "cash": "#22c55e", "fonepay": "#6366f1", "esewa": "#10b981",
+            "khalti": "#8b5cf6", "qr": "#0ea5e9", "bank": "#f59e0b",
+            "credit": "#ef4444",
+        }
+        _total_today = today_sales_amount or 1
+        for r in pm_rows:
+            m = r.method or "cash"
+            today_by_payment.append({
+                "method": m,
+                "label":  _pm_labels.get(m, m.title()),
+                "color":  _pm_colors.get(m, "#94a3b8"),
+                "txn_count": int(r.txn_count or 0),
+                "total": float(r.total or 0),
+                "pct":   round(float(r.total or 0) / _total_today * 100, 1),
+            })
+    except Exception:
+        pass
+
     # ── Pending online orders (awaiting fulfillment) ──────────────────────
     pending_orders_count = 0
     try:
@@ -401,4 +439,5 @@ def index():
                            pending_orders_count=pending_orders_count,
                            low_stock_alerts=low_stock_alerts,
                            waste_cost_month=waste_cost_month,
+                           today_by_payment=today_by_payment,
                            )

@@ -186,11 +186,11 @@
               <label class="form-label fw-medium small">Payment Method <span class="text-danger">*</span></label>
               <div class="d-flex gap-2 flex-wrap">
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash" checked>
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash">
                   <label class="form-check-label" for="pm_cash">💵 Cash</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa" checked>
                   <label class="form-check-label" for="pm_esewa"><img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style="height:14px;margin-right:4px">eSewa</label>
                 </div>
                 <div class="form-check form-check-inline">
@@ -351,8 +351,9 @@
         .ppick-price{font-size:.68rem;font-weight:800;color:#6366f1;}
         .ppick-sku{font-size:.58rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}
         .ppick-stock{position:absolute;top:.2rem;right:.2rem;font-size:.52rem;font-weight:800;padding:.1em .38em;border-radius:4px;}
-        .ppick-add{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:.62rem;font-weight:700;padding:.16rem 0;opacity:0;transition:opacity .16s;}
+        .ppick-add{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:.62rem;font-weight:700;padding:.16rem 0;opacity:0;transition:opacity .16s;pointer-events:none;}
         .ppick:hover .ppick-add{opacity:1;}
+        .ppick *{pointer-events:none;}
         .ppick.oos{opacity:.42;cursor:not-allowed;pointer-events:none;}
       </style>
 
@@ -504,7 +505,7 @@
         is_variant: false
       }{% if not loop.last or variants %},{% endif %}
       {% endfor %}
-      {% for v in variants %}{% if v.product_id in product_map %}
+      {% for v in variants %}{% if v.product_id in product_map and v.is_active %}
       {
         id: {{ ("v:" ~ v.id) | tojson }},
         name: {{ (product_map[v.product_id].name ~ ' – ' ~ v.variant_name) | tojson }},
@@ -515,7 +516,8 @@
         category: {{ (product_map[v.product_id].category or '') | tojson }},
         img: {{ (product_image_url(product_map[v.product_id].image_filename, 80) or '') | tojson }},
         is_variant: true,
-        variant_label: {{ v.variant_name | tojson }}
+        variant_label: {{ v.variant_name | tojson }},
+        units_per_parent: {{ (v.units_per_parent or 0) | int }}
       }{% if not loop.last %},{% endif %}
       {% endif %}{% endfor %}
     ];
@@ -543,7 +545,9 @@
 
     function renderGrid() {
       const grid = document.getElementById('prodGrid');
-      const filtered = activeCat ? PRODUCTS.filter(p => p.category === activeCat) : PRODUCTS;
+      // Hide out-of-stock products — they cannot be sold
+      const inStock = PRODUCTS.filter(p => p.stock > 0);
+      const filtered = activeCat ? inStock.filter(p => p.category === activeCat) : inStock;
       grid.innerHTML = filtered.map(p => {
         const oos = p.stock <= 0;
         const low = p.stock > 0 && p.stock <= 5;
@@ -553,7 +557,7 @@
         const imgHtml = p.img
           ? `<img src="${p.img}" class="ppick-img" alt="${p.name.replace(/"/g,'')}" loading="lazy" onerror="this.outerHTML='<div class=\'ppick-ph\'>🥜</div>'">`
           : `<div class="ppick-ph">🥜</div>`;
-        return `<div class="ppick${oos ? ' oos' : ''}" onclick="${oos ? '' : `addRow(${p.id},1,${p.price})`}" title="${p.name} — NPR ${p.price}">
+        return `<div class="ppick${oos ? ' oos' : ''}" ${oos ? '' : `data-pid="${p.id}" data-price="${p.price}"`} title="${p.name} — NPR ${p.price}">
           ${imgHtml}
           ${stockBadge}
           <div class="ppick-name">${p.name}</div>
@@ -582,21 +586,31 @@
     buildCatPills();
     renderGrid();
 
+    // Event delegation for product cards — handles clicks anywhere inside a card reliably.
+    // Inline onclick on child elements (img, text divs) can swallow clicks intermittently;
+    // delegating to the grid container ensures every click on or inside a card is caught.
+    document.getElementById('prodGrid').addEventListener('click', function(e) {
+      const card = e.target.closest('.ppick:not(.oos)');
+      if (!card) return;
+      const pid   = card.dataset.pid;
+      const price = parseFloat(card.dataset.price);
+      if (pid) addRow(pid, 1, price);
+    });
+
     let rowIndex = 0;
 
     function buildOptions(selectedId) {
       let html = '<option value="">— Select product —</option>';
       // Group: regular products first, then variants under a separator
-      const regulars = PRODUCTS.filter(p => !p.is_variant);
-      const variantItems = PRODUCTS.filter(p => p.is_variant);
+      // Exclude out-of-stock items — only show products that can actually be sold
+      const regulars = PRODUCTS.filter(p => !p.is_variant && p.stock > 0);
+      const variantItems = PRODUCTS.filter(p => p.is_variant && p.stock > 0);
       const renderOpt = (p) => {
         const sel = String(p.id) === String(selectedId) ? ' selected' : '';
-        const outOfStock = p.stock <= 0;
         const lowStock = p.stock > 0 && p.stock <= 5;
-        const stockLabel = outOfStock ? ' ⚠ OUT OF STOCK' : (lowStock ? ` (${p.stock} left)` : ` (${p.stock})`);
-        const disabled = outOfStock ? ' disabled' : '';
-        const style = outOfStock ? ' style="color:#ef4444"' : (lowStock ? ' style="color:#f97316"' : '');
-        return `<option value="${p.id}"${sel}${disabled}${style} data-price="${p.price}" data-stock="${p.stock}" data-img="${p.img || ''}" data-category="${p.category || ''}">${p.name}${stockLabel}</option>`;
+        const stockLabel = lowStock ? ` (${p.stock} left)` : ` (${p.stock})`;
+        const style = lowStock ? ' style="color:#f97316"' : '';
+        return `<option value="${p.id}"${sel}${style} data-price="${p.price}" data-stock="${p.stock}" data-img="${p.img || ''}" data-category="${p.category || ''}">${p.name}${stockLabel}</option>`;
       };
       regulars.forEach(p => { html += renderOpt(p); });
       if (variantItems.length > 0) {
@@ -703,16 +717,33 @@
               </div>
               <div class="text-muted" style="font-size:.65rem;">= NPR <span class="loose-price-preview">0</span></div>
             </div>
-            <button type="button" class="btn btn-outline-secondary btn-sm loose-toggle py-0"
-                    style="font-size:.65rem;border-radius:4px;" title="Toggle loose/open quantity by weight">
-              <i class="bi bi-rulers"></i> Loose
-            </button>
+            <!-- Loose pcs mode (for selling individual pieces from a box/pack) -->
+            <div class="pcs-mode" style="display:none;">
+              <div class="input-group input-group-sm">
+                <input type="number" class="form-control form-control-sm pcs-input"
+                       min="1" step="1" placeholder="pcs" title="Number of pieces">
+                <span class="input-group-text" style="font-size:.7rem;padding:2px 5px;">pcs</span>
+              </div>
+              <div class="text-muted" style="font-size:.65rem;">@ NPR <span class="pcs-price-preview">0</span>/pc</div>
+            </div>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-outline-secondary btn-sm loose-toggle py-0 flex-fill"
+                      style="font-size:.63rem;border-radius:4px;" title="Sell by weight (grams)">
+                <i class="bi bi-rulers"></i> g
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm pcs-toggle py-0 flex-fill"
+                      style="font-size:.63rem;border-radius:4px;" title="Sell individual pieces from a box/pack">
+                <i class="bi bi-grid-3x3-gap"></i> pcs
+              </button>
+            </div>
           </div>
         </td>
         <td>
           <input type="number" class="form-control form-control-sm price-input"
                  name="items[${idx}][unit_price]" min="0" step="0.01"
                  value="${unitPrice !== undefined ? unitPrice.toFixed(2) : '0.00'}" required>
+          <!-- Hidden field: populated before submit when pcs mode is active -->
+          <input type="hidden" class="pcs-label-input" name="" value="">
         </td>
         <td class="subtotal-cell text-end fw-medium">0.00</td>
         <td class="text-center">
@@ -736,27 +767,91 @@
       const looseMode   = tr.querySelector('.loose-mode');
       const weightInput = tr.querySelector('.weight-input');
       const loosePrev   = tr.querySelector('.loose-price-preview');
+      const pcsToggle   = tr.querySelector('.pcs-toggle');
+      const pcsMode     = tr.querySelector('.pcs-mode');
+      const pcsInput    = tr.querySelector('.pcs-input');
+      const pcsPrev     = tr.querySelector('.pcs-price-preview');
 
-      // ── Loose mode toggle ──────────────────────────────────────────────
       let isLoose = false;
+      let isPcs   = false;
+
+      // ── Helper: reset both modes ───────────────────────────────────────
+      function resetModes() {
+        isLoose = false; isPcs = false;
+        looseMode.style.display = 'none';
+        pcsMode.style.display   = 'none';
+        looseToggle.classList.remove('btn-warning');
+        looseToggle.classList.add('btn-outline-secondary');
+        pcsToggle.classList.remove('btn-info');
+        pcsToggle.classList.add('btn-outline-secondary');
+        qty.readOnly = false;
+        price.dataset.manuallyEdited = '';
+      }
+
+      // ── Loose (weight) mode toggle ─────────────────────────────────────
       looseToggle.addEventListener('click', () => {
-        isLoose = !isLoose;
-        looseMode.style.display = isLoose ? '' : 'none';
-        looseToggle.classList.toggle('btn-warning', isLoose);
-        looseToggle.classList.toggle('btn-outline-secondary', !isLoose);
-        if (isLoose) {
-          qty.value = 1;              // lock qty to 1 for loose items
-          qty.readOnly = true;
-          weightInput.focus();
-        } else {
-          qty.readOnly = false;
-          price.dataset.manuallyEdited = '';  // allow price to reset
+        if (isLoose) { resetModes(); updateRowSubtotal(tr); recalcTotal(); return; }
+        resetModes();
+        isLoose = true;
+        looseMode.style.display = '';
+        looseToggle.classList.remove('btn-outline-secondary');
+        looseToggle.classList.add('btn-warning');
+        qty.value = 1;
+        qty.readOnly = true;
+        weightInput.focus();
+        updateRowSubtotal(tr); recalcTotal();
+      });
+
+      // ── Pcs mode toggle ────────────────────────────────────────────────
+      pcsToggle.addEventListener('click', () => {
+        if (isPcs) { resetModes(); tr.dataset.pcsMode = ''; updateRowSubtotal(tr); recalcTotal(); return; }
+        resetModes();
+        isPcs = true;
+        tr.dataset.pcsMode = '1';
+        pcsMode.style.display = '';
+        pcsToggle.classList.remove('btn-outline-secondary');
+        pcsToggle.classList.add('btn-info');
+        qty.value = 1;
+        qty.readOnly = true;
+        // Pre-fill per-piece price if variant has units_per_parent
+        _recalcPcsPrice();
+        pcsInput.focus();
+        updateRowSubtotal(tr); recalcTotal();
+      });
+
+      // ── Per-piece price calculation ────────────────────────────────────
+      function _recalcPcsPrice() {
+        const opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value) return;
+        const prod = PRODUCT_MAP[String(opt.value)];
+        const pcs  = parseInt(pcsInput.value) || 0;
+        let perPcPrice = 0;
+
+        if (prod && prod.units_per_parent > 0) {
+          // Variant already knows its per-piece price as selling_price
+          perPcPrice = prod.price;
+        } else if (prod) {
+          // Regular product — no configured per-piece rate; keep whatever is in price field
+          perPcPrice = parseFloat(price.value) || prod.price;
         }
+
+        if (perPcPrice > 0) {
+          pcsPrev.textContent = perPcPrice.toFixed(2);
+          if (pcs > 0) {
+            const total = Math.round(perPcPrice * pcs * 100) / 100;
+            price.value = total.toFixed(2);
+            price.dataset.manuallyEdited = '1';
+          }
+        }
+      }
+
+      pcsInput.addEventListener('input', () => {
+        _recalcPcsPrice();
         updateRowSubtotal(tr); recalcTotal();
       });
 
       // ── Weight input: auto-calculate price from per-kg rate ────────────
-      weightInput && weightInput.addEventListener('input', () => {
+      weightInput.addEventListener('input', () => {
         const grams = parseFloat(weightInput.value) || 0;
         const perKgPrice = parseFloat(
           sel.options[sel.selectedIndex]?.dataset?.price || 0
@@ -775,6 +870,7 @@
         if (opt && opt.dataset.price && !price.dataset.manuallyEdited) {
           price.value = parseFloat(opt.dataset.price).toFixed(2);
         }
+        if (isPcs) _recalcPcsPrice();
         onProductSelected(sel);
         updateRowSubtotal(tr); recalcTotal();
       });
@@ -1137,10 +1233,36 @@
       const qty    = tr.querySelector('.qty-input');
       const price  = tr.querySelector('.price-input');
       const label  = tr.querySelector('input[name*="custom_label"]');
-      if (sel)   sel.name   = `items[${newIdx}][product_id]`;
-      if (qty)   qty.name   = `items[${newIdx}][quantity]`;
-      if (price) price.name = `items[${newIdx}][unit_price]`;
-      if (label) label.name = `items[${newIdx}][custom_label]`;
+      const pcsLbl = tr.querySelector('.pcs-label-input');
+
+      // ── Pcs mode: convert to custom item before submit ─────────────────
+      // When pcs mode is active we submit as product_id=0 with a descriptive
+      // label so the backend records it as a custom/loose item. The price
+      // field already holds (pcs × per-piece-price) set by _recalcPcsPrice.
+      if (tr.dataset.pcsMode === '1' && sel) {
+        const pcsInput = tr.querySelector('.pcs-input');
+        const pcs = parseInt(pcsInput?.value) || 0;
+        const opt = sel.options[sel.selectedIndex];
+        const prodName = opt ? opt.text.replace(/\s*\([\d]+ left\)\s*|\s*\(\d+\)\s*/g, '').trim() : 'Item';
+        const customLabel = pcs > 0 ? `${prodName} × ${pcs} pcs` : prodName;
+
+        // Activate the pcs-label-input hidden field as custom_label
+        if (pcsLbl) {
+          pcsLbl.name  = `items[${newIdx}][custom_label]`;
+          pcsLbl.value = customLabel;
+        }
+        // Submit as custom item (product_id = 0)
+        sel.value = '0';
+        sel.name  = `items[${newIdx}][product_id]`;
+        if (qty)   { qty.value = '1'; qty.name = `items[${newIdx}][quantity]`; }
+        if (price) price.name = `items[${newIdx}][unit_price]`;
+      } else {
+        if (sel)   sel.name   = `items[${newIdx}][product_id]`;
+        if (qty)   qty.name   = `items[${newIdx}][quantity]`;
+        if (price) price.name = `items[${newIdx}][unit_price]`;
+        if (label) label.name = `items[${newIdx}][custom_label]`;
+        if (pcsLbl) pcsLbl.name = '';  // disable so it doesn't get submitted
+      }
       tr.dataset.idx = newIdx;
     });
 
@@ -1188,7 +1310,8 @@
       if (!pid) break;
       const qty = document.querySelector(`[name="items[${idx}][quantity]"]`);
       const price = document.querySelector(`[name="items[${idx}][unit_price]"]`);
-      if (pid.value) {
+      // Only validate real product rows — skip empty rows and custom/pcs rows (product_id=0)
+      if (pid.value && pid.value !== '0') {
         items.push({
           product_id: parseInt(pid.value),
           quantity: parseInt(qty?.value || 0),

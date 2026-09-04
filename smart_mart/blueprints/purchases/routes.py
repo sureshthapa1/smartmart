@@ -228,6 +228,19 @@ def supplier_performance(supplier_id):
     )
 
 
+@purchases_bp.route("/<int:purchase_id>/delete", methods=["POST"])
+@admin_required
+def delete_purchase(purchase_id):
+    try:
+        purchase_manager.delete_purchase(purchase_id, current_user.id)
+        flash(f"Purchase #{purchase_id} deleted and stock reversed.", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+    except Exception as e:
+        flash(f"Error deleting purchase: {e}", "danger")
+    return redirect(url_for("purchases.list_purchases"))
+
+
 @purchases_bp.route("/suppliers/<int:supplier_id>/delete", methods=["POST"])
 @admin_required
 def delete_supplier(supplier_id):

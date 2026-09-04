@@ -1,13 +1,18 @@
 """Product variants — size/unit/colour variants under a parent product."""
 from datetime import datetime, timezone
+from sqlalchemy import CheckConstraint
 from ..extensions import db
 
 
 class ProductVariant(db.Model):
     __tablename__ = "product_variants"
+    __table_args__ = (
+        CheckConstraint("quantity >= 0", name="ck_variant_quantity_non_negative"),
+        CheckConstraint("units_per_parent IS NULL OR units_per_parent > 0", name="ck_variant_units_per_parent_positive"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     variant_name = db.Column(db.String(80), nullable=False)   # e.g. "1kg", "Red", "Large", "1 Piece"
     sku = db.Column(db.String(80), unique=True, nullable=False)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
@@ -23,7 +28,10 @@ class ProductVariant(db.Model):
     units_per_parent = db.Column(db.Integer, nullable=True, default=None)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
-    product = db.relationship("Product", backref=db.backref("variants", lazy="dynamic"))
+    product = db.relationship(
+        "Product",
+        backref=db.backref("variants", lazy="dynamic", cascade="all, delete-orphan", passive_deletes=True),
+    )
 
     def __repr__(self):
         return f"<ProductVariant {self.sku} - {self.variant_name}>"

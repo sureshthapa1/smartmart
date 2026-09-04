@@ -55,6 +55,7 @@ function showSplitModal(variantId, variantName, unitsPerParent, parentStock, par
 </script>
 {% endblock %}
 
+{% block content %}
 <div class="page-header">
   <div>
     <div class="page-header-title">{{ product.name }}</div>
@@ -142,12 +143,12 @@ function showSplitModal(variantId, variantName, unitsPerParent, parentStock, par
                 {% if v.units_per_parent and v.units_per_parent > 0 %}
                 <button type="button" class="btn btn-sm btn-outline-warning"
                         title="Open packs and add {{ v.units_per_parent }} × {{ v.variant_name }} per pack"
-                        onclick="showSplitModal({{ v.id }}, '{{ v.variant_name|e }}', {{ v.units_per_parent }}, {{ product.quantity }}, '{{ product.unit or 'pack' }}')">
+                        onclick="showSplitModal({{ v.id }}, {{ v.variant_name|tojson }}, {{ v.units_per_parent }}, {{ product.quantity }}, {{ (product.unit or 'pack')|tojson }})">
                   <i class="bi bi-box-seam"></i> Split
                 </button>
                 {% endif %}
                 <form method="post" action="{{ url_for('inventory.delete_variant', product_id=product.id, variant_id=v.id) }}"
-                      class="d-inline" onsubmit="return confirm('Delete variant {{ v.variant_name }}?')">
+                      class="d-inline" onsubmit="return confirm('Delete variant ' + {{ v.variant_name|tojson }} + '?')">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                 </form>

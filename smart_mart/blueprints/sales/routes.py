@@ -81,7 +81,9 @@ def create_sale():
         if not p.can_create_sale:
             abort(403)
     products = db.session.execute(
-        db.select(Product).where(Product.is_active == True).order_by(Product.name)
+        db.select(Product)
+        .where(Product.is_active == True, Product.quantity > 0)
+        .order_by(Product.name)
     ).scalars().all()
     # Load active variants so they can be billed alongside parent products
     from ...models.product_variant import ProductVariant

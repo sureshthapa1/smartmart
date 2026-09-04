@@ -1675,19 +1675,44 @@ def create_variant(product_id):
     product = db.get_or_404(Product, product_id)
     from ...models.product_variant import ProductVariant
     from sqlalchemy.exc import IntegrityError
+    form_data = {}
     if request.method == "POST":
         variant_name = request.form.get("variant_name", "").strip()
         sku = request.form.get("sku", "").strip()
-        cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
-        selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
+        cost_price_raw = request.form.get("cost_price", "").strip()
+        selling_price_raw = request.form.get("selling_price", "").strip()
+        cost_price = Decimal(str(cost_price_raw or 0))
+        selling_price = Decimal(str(selling_price_raw or 0))
         quantity = int(request.form.get("quantity", 0) or 0)
         barcode = request.form.get("barcode", "").strip() or None
+        units_per_parent_raw = request.form.get("units_per_parent", "").strip()
+
+        # Capture submitted values so we can repopulate on error
+        form_data = {
+            "variant_name": variant_name,
+            "sku": sku,
+            "cost_price": cost_price_raw,
+            "selling_price": selling_price_raw,
+            "quantity": request.form.get("quantity", "0"),
+            "barcode": request.form.get("barcode", ""),
+            "units_per_parent": units_per_parent_raw,
+        }
+
         if not variant_name or not sku:
             flash("Variant name and SKU are required.", "danger")
+        elif not selling_price_raw or Decimal(str(selling_price_raw or 0)) <= 0:
+            flash("Selling price must be greater than 0.", "danger")
         else:
             try:
-                units_per_parent_raw = request.form.get("units_per_parent", "").strip()
-                units_per_parent = int(units_per_parent_raw) if units_per_parent_raw and int(units_per_parent_raw) > 0 else None
+                units_per_parent = None
+                if units_per_parent_raw:
+                    try:
+                        uval = int(units_per_parent_raw)
+                        if uval > 0:
+                            units_per_parent = uval
+                    except ValueError:
+                        flash("Units per parent pack must be a whole number.", "danger")
+                        return render_template("inventory/variant_form.html", product=product, variant=None, action="Add", form_data=form_data)
                 v = ProductVariant(
                     product_id=product_id,
                     variant_name=variant_name,
@@ -1706,7 +1731,7 @@ def create_variant(product_id):
             except IntegrityError:
                 db.session.rollback()
                 flash(f"SKU '{sku}' already exists.", "danger")
-    return render_template("inventory/variant_form.html", product=product, variant=None, action="Add")
+    return render_template("inventory/variant_form.html", product=product, variant=None, action="Add", form_data=form_data)
 
 
 @inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/edit", methods=["GET", "POST"])
@@ -1717,24 +1742,45 @@ def edit_variant(product_id, variant_id):
     from ...models.product_variant import ProductVariant
     from sqlalchemy.exc import IntegrityError
     variant = db.get_or_404(ProductVariant, variant_id)
+    if variant.product_id != product_id:
+        abort(404)
     if request.method == "POST":
-        variant.variant_name = request.form.get("variant_name", "").strip()
-        variant.sku = request.form.get("sku", "").strip()
-        variant.cost_price = Decimal(str(request.form.get("cost_price", 0) or 0 or 0))
-        variant.selling_price = Decimal(str(request.form.get("selling_price", 0) or 0 or 0))
-        variant.quantity = int(request.form.get("quantity", 0) or 0)
-        variant.barcode = request.form.get("barcode", "").strip() or None
-        variant.is_active = request.form.get("is_active") == "on"
+        variant_name = request.form.get("variant_name", "").strip()
+        sku = request.form.get("sku", "").strip()
+        cost_price_raw = request.form.get("cost_price", "").strip()
+        selling_price_raw = request.form.get("selling_price", "").strip()
         units_per_parent_raw = request.form.get("units_per_parent", "").strip()
-        variant.units_per_parent = int(units_per_parent_raw) if units_per_parent_raw and int(units_per_parent_raw) > 0 else None
-        try:
-            db.session.commit()
-            flash("Variant updated.", "success")
-            return redirect(url_for("inventory.product_variants", product_id=product_id))
-        except IntegrityError:
-            db.session.rollback()
-            flash("SKU already exists.", "danger")
-    return render_template("inventory/variant_form.html", product=product, variant=variant, action="Edit")
+
+        if not variant_name or not sku:
+            flash("Variant name and SKU are required.", "danger")
+        elif not selling_price_raw or Decimal(str(selling_price_raw or 0)) <= 0:
+            flash("Selling price must be greater than 0.", "danger")
+        else:
+            units_per_parent = None
+            if units_per_parent_raw:
+                try:
+                    uval = int(units_per_parent_raw)
+                    if uval > 0:
+                        units_per_parent = uval
+                except ValueError:
+                    flash("Units per parent pack must be a whole number.", "danger")
+                    return render_template("inventory/variant_form.html", product=product, variant=variant, action="Edit", form_data={})
+            variant.variant_name = variant_name
+            variant.sku = sku
+            variant.cost_price = Decimal(str(cost_price_raw or 0))
+            variant.selling_price = Decimal(str(selling_price_raw or 0))
+            variant.quantity = int(request.form.get("quantity", 0) or 0)
+            variant.barcode = request.form.get("barcode", "").strip() or None
+            variant.is_active = request.form.get("is_active") == "on"
+            variant.units_per_parent = units_per_parent
+            try:
+                db.session.commit()
+                flash("Variant updated.", "success")
+                return redirect(url_for("inventory.product_variants", product_id=product_id))
+            except IntegrityError:
+                db.session.rollback()
+                flash(f"SKU '{sku}' already exists.", "danger")
+    return render_template("inventory/variant_form.html", product=product, variant=variant, action="Edit", form_data={})
 
 
 @inventory_bp.route("/<int:product_id>/variants/<int:variant_id>/delete", methods=["POST"])
@@ -1743,6 +1789,8 @@ def delete_variant(product_id, variant_id):
     _require_perm("can_manage_variants")
     from ...models.product_variant import ProductVariant
     v = db.get_or_404(ProductVariant, variant_id)
+    if v.product_id != product_id:
+        abort(404)
     db.session.delete(v)
     db.session.commit()
     flash("Variant deleted.", "success")
@@ -1765,11 +1813,13 @@ def split_pack(product_id, variant_id):
     from ...models.stock_movement import StockMovement
     from datetime import datetime, timezone
 
-    product = db.get_or_404(Product, product_id)
+    product = db.session.execute(
+        db.select(Product).where(Product.id == product_id).with_for_update()
+    ).scalar_one_or_404()
     variant = db.get_or_404(ProductVariant, variant_id)
 
     if variant.product_id != product_id:
-        abort(400)
+        abort(404)
 
     if not variant.units_per_parent or variant.units_per_parent <= 0:
         flash("This variant does not have 'units per parent' configured. "
@@ -1800,15 +1850,6 @@ def split_pack(product_id, variant_id):
         change_type="adjustment_out",
         reference_id=None,
         note=note,
-        created_by=current_user.id,
-        timestamp=datetime.now(timezone.utc),
-    ))
-    db.session.add(StockMovement(
-        product_id=product.id,
-        change_amount=pieces_added,
-        change_type="adjustment_in",
-        reference_id=None,
-        note=f"{note} (piece variant +{pieces_added})",
         created_by=current_user.id,
         timestamp=datetime.now(timezone.utc),
     ))

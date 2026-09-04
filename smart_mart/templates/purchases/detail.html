@@ -16,6 +16,15 @@
     <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-printer me-1"></i>Print GRN
     </button>
+    {% if current_user.role == 'admin' %}
+    <form method="post" action="{{ url_for('purchases.delete_purchase', purchase_id=purchase.id) }}"
+          onsubmit="return confirm('Delete Purchase #{{ purchase.id }} ({{ purchase.supplier.name if purchase.supplier else '' }}, NPR {{ '%.0f'|format(purchase.total_cost|float) }})?\n\nThis will reverse the stock that was added. This cannot be undone.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
+    {% endif %}
     <a href="{{ url_for('purchases.list_purchases') }}" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-arrow-left me-1"></i>Back
     </a>

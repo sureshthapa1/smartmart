@@ -145,7 +145,7 @@ def ensure_shop_settings():
     settings.owner_name = settings.owner_name or ""
     settings.vat_enabled = True
     settings.vat_rate = Decimal("13.00")
-    settings.footer_note = "Thank you for shopping at Goldkernel!"
+    settings.footer_note = "Thank you for shopping with GoldKernel! Keep shopping with us, increase your loyalty point balance and win exciting prizes."
     settings.loyalty_points_per_rupee = Decimal("0.10")
     settings.loyalty_rupee_per_point = Decimal("0.10")
     db.session.commit()

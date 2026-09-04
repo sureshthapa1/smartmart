@@ -413,6 +413,8 @@
             {% if current_user.role == 'admin' or current_user.permissions.can_view_sales_report %}
             <li><a class="nav-link {% if request.endpoint == 'reports.sales_report' %}active{% endif %}"
                    href="{{ url_for('reports.sales_report') }}"><i class="bi bi-graph-up"></i> Sales</a></li>
+            <li><a class="nav-link {% if request.endpoint == 'reports.payment_breakdown' %}active{% endif %}"
+                   href="{{ url_for('reports.payment_breakdown') }}"><i class="bi bi-credit-card-2-front"></i> Payment Modes</a></li>
             {% endif %}
             {% if current_user.role == 'admin' or current_user.permissions.can_view_profit_report %}
             <li><a class="nav-link {% if request.endpoint in ['reports.profitability','reports.bi_profit_loss','reports.profit_margin'] %}active{% endif %}"

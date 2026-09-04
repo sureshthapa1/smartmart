@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Payment Mode Breakdown — Reports{% endblock %}
+{% block page_title %}Payment Mode Breakdown{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('reports.sales_report') }}" class="text-decoration-none">Reports</a></li>
+<li class="breadcrumb-item active">Payment Breakdown</li>
+{% endblock %}
+
+{% block content %}
+
+{# ── Date filter ─────────────────────────────────────────────────────── #}
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+      <div>
+        <label class="form-label small fw-semibold mb-1">From</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ start_date }}">
+      </div>
+      <div>
+        <label class="form-label small fw-semibold mb-1">To</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ end_date }}">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm align-self-end"><i class="bi bi-funnel me-1"></i>Filter</button>
+      <a href="{{ url_for('reports.payment_breakdown') }}" class="btn btn-outline-secondary btn-sm align-self-end">Reset</a>
+      <a href="{{ request.url }}&export=csv" class="btn btn-outline-success btn-sm align-self-end ms-auto">
+        <i class="bi bi-download me-1"></i>Export CSV
+      </a>
+    </form>
+  </div>
+</div>
+
+{# ── Summary cards ───────────────────────────────────────────────────── #}
+<div class="row g-3 mb-3">
+  {% for pm in summary %}
+  <div class="col-sm-6 col-md-4 col-xl-3">
+    <div class="card h-100 border-0 shadow-sm" style="border-left:4px solid {{ pm.color }}!important;border-radius:10px">
+      <div class="card-body py-3 px-3">
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <div style="width:10px;height:10px;border-radius:3px;background:{{ pm.color }}"></div>
+          <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b">{{ pm.label }}</span>
+        </div>
+        <div style="font-size:1.5rem;font-weight:800;color:#0f172a;line-height:1.1">NPR {{ "%.2f"|format(pm.total) }}</div>
+        <div class="d-flex gap-2 mt-1" style="font-size:.75rem;color:#64748b">
+          <span>{{ pm.txn_count }} sale{{ 's' if pm.txn_count != 1 }}</span>
+          <span class="fw-bold" style="color:{{ pm.color }}">{{ pm.pct }}%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12 text-center text-muted py-4">No sales data for this period.</div>
+  {% endfor %}
+</div>
+
+{# ── Trend chart ─────────────────────────────────────────────────────── #}
+{% if chart_days %}
+<div class="card border-0 shadow-sm mb-3" style="border-radius:12px">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-bar-chart-line me-2 text-primary"></i>Daily Sales by Payment Mode
+  </div>
+  <div class="card-body">
+    <div style="position:relative;height:280px">
+      <canvas id="paymentTrendChart"></canvas>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Daily breakdown table ───────────────────────────────────────────── #}
+<div class="card border-0 shadow-sm" style="border-radius:12px">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between">
+    <span class="fw-semibold"><i class="bi bi-table me-2 text-primary"></i>Daily Breakdown</span>
+    <span class="text-muted small">Grand Total: <strong>NPR {{ "%.2f"|format(grand_total) }}</strong></span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle" style="font-size:.845rem">
+      <thead>
+        <tr>
+          <th>Date</th>
+          {% for m in all_methods %}
+          <th class="text-end" style="color:{{ pm_colors.get(m,'#64748b') }}">
+            {{ pm_labels.get(m, m.title()) }}
+          </th>
+          {% endfor %}
+          <th class="text-end fw-bold">Day Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in daily %}
+        <tr>
+          <td class="fw-semibold">
+            {{ row.day }}
+            <div class="text-muted" style="font-size:.68rem">
+              {% set d_obj = row.day %}
+              {# Day of week label via loop index - just show the date #}
+            </div>
+          </td>
+          {% for m in all_methods %}
+          {% set cell = row.by_method[m] %}
+          <td class="text-end">
+            {% if cell.total > 0 %}
+            <div class="fw-semibold">NPR {{ "%.2f"|format(cell.total) }}</div>
+            <div class="text-muted" style="font-size:.68rem">{{ cell.txn_count }} txn{{ 's' if cell.txn_count != 1 }}</div>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td class="text-end fw-bold" style="color:#0f172a">NPR {{ "%.2f"|format(row.day_total) }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="{{ all_methods|length + 2 }}" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+            No sales found for the selected period.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% if daily %}
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>Total</td>
+          {% for m in all_methods %}
+          {% set m_total = summary | selectattr('method','eq',m) | map(attribute='total') | first | default(0) %}
+          <td class="text-end">NPR {{ "%.2f"|format(m_total) }}</td>
+          {% endfor %}
+          <td class="text-end text-primary">NPR {{ "%.2f"|format(grand_total) }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if chart_days %}
+<script>
+(function() {
+  const ctx = document.getElementById('paymentTrendChart');
+  if (!ctx) return;
+  const days   = {{ chart_days | tojson }};
+  const ds     = {{ chart_datasets | tojson }};
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: ds.map(d => ({
+        label: d.label,
+        data: d.data,
+        backgroundColor: d.color + 'cc',
+        borderColor: d.color,
+        borderWidth: 1,
+        borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12, padding: 14 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: NPR ${ctx.parsed.y.toLocaleString('en-NP')}`
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+        y: {
+          stacked: true,
+          grid: { color: '#f1f5f9' },
+          ticks: {
+            font: { size: 10 }, color: '#94a3b8',
+            callback: v => 'NPR ' + v.toLocaleString('en-NP')
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

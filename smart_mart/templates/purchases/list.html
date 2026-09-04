@@ -65,6 +65,16 @@
           <td>
             <a href="{{ url_for('purchases.purchase_detail', purchase_id=p.id) }}"
                class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+            {% if current_user.role == 'admin' %}
+            <form method="post" action="{{ url_for('purchases.delete_purchase', purchase_id=p.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Delete Purchase #{{ p.id }} ({{ p.supplier.name }}, NPR {{ '%.0f'|format(p.total_cost|float) }})?\n\nThis will reverse the stock that was added. This cannot be undone.')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete purchase & reverse stock">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}

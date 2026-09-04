@@ -177,6 +177,139 @@ def sales_report():
                            period=period, start_date=start_raw, end_date=end_raw)
 
 
+@reports_bp.route("/payment-breakdown")
+@login_required
+def payment_breakdown():
+    """Daily sales breakdown by payment mode — date range with daily trend."""
+    _require_perm("can_view_reports")
+    from sqlalchemy import func, and_, case
+    from ...extensions import db
+    from ...models.sale import Sale, PAYMENT_METHODS
+    from datetime import date as _date, timedelta, datetime, timezone
+    import csv, io as _io
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    _pm_labels = dict(PAYMENT_METHODS)
+    _pm_colors = {
+        "cash": "#22c55e", "fonepay": "#6366f1", "esewa": "#10b981",
+        "khalti": "#8b5cf6", "qr": "#0ea5e9", "bank": "#f59e0b",
+        "credit": "#ef4444",
+    }
+
+    # ── Summary totals by payment mode ───────────────────────────────────
+    summary_rows = db.session.execute(
+        db.select(
+            func.coalesce(Sale.payment_method, Sale.payment_mode, "cash").label("method"),
+            func.count(Sale.id).label("txn_count"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
+        )
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+        .group_by(func.coalesce(Sale.payment_method, Sale.payment_mode, "cash"))
+        .order_by(func.sum(Sale.total_amount).desc())
+    ).all()
+
+    grand_total = sum(float(r.total or 0) for r in summary_rows) or 1
+    summary = []
+    for r in summary_rows:
+        m = r.method or "cash"
+        total = float(r.total or 0)
+        summary.append({
+            "method": m,
+            "label": _pm_labels.get(m, m.title()),
+            "color": _pm_colors.get(m, "#94a3b8"),
+            "txn_count": int(r.txn_count or 0),
+            "total": total,
+            "pct": round(total / grand_total * 100, 1),
+        })
+
+    # ── Daily breakdown table ─────────────────────────────────────────────
+    # One query: group by date + method
+    daily_rows = db.session.execute(
+        db.select(
+            func.date(Sale.sale_date).label("day"),
+            func.coalesce(Sale.payment_method, Sale.payment_mode, "cash").label("method"),
+            func.count(Sale.id).label("txn_count"),
+            func.coalesce(func.sum(Sale.total_amount), 0).label("total"),
+        )
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+        .group_by(func.date(Sale.sale_date),
+                  func.coalesce(Sale.payment_method, Sale.payment_mode, "cash"))
+        .order_by(func.date(Sale.sale_date).desc(),
+                  func.sum(Sale.total_amount).desc())
+    ).all()
+
+    # Pivot: day → {method: {txn_count, total}}
+    from collections import defaultdict
+    day_map = defaultdict(lambda: defaultdict(lambda: {"txn_count": 0, "total": 0.0}))
+    day_totals = defaultdict(float)
+    for r in daily_rows:
+        day_str = str(r.day)
+        m = r.method or "cash"
+        day_map[day_str][m]["txn_count"] += int(r.txn_count or 0)
+        day_map[day_str][m]["total"] += float(r.total or 0)
+        day_totals[day_str] += float(r.total or 0)
+
+    # Sorted days descending
+    days = sorted(day_map.keys(), reverse=True)
+    # All methods that appear
+    all_methods = [s["method"] for s in summary]
+
+    daily = []
+    for day in days:
+        row = {
+            "day": day,
+            "day_total": round(day_totals[day], 2),
+            "by_method": {
+                m: day_map[day].get(m, {"txn_count": 0, "total": 0.0})
+                for m in all_methods
+            }
+        }
+        daily.append(row)
+
+    # ── CSV export ────────────────────────────────────────────────────────
+    if request.args.get("export") == "csv":
+        output = _io.StringIO()
+        writer = csv.writer(output)
+        header = ["Date", "Day Total (NPR)"] + [
+            f"{_pm_labels.get(m, m.title())} (NPR)" for m in all_methods
+        ] + [f"{_pm_labels.get(m, m.title())} Txns" for m in all_methods]
+        writer.writerow(header)
+        for row in daily:
+            line = [row["day"], row["day_total"]]
+            line += [round(row["by_method"][m]["total"], 2) for m in all_methods]
+            line += [row["by_method"][m]["txn_count"] for m in all_methods]
+            writer.writerow(line)
+        return Response(
+            output.getvalue(), mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=payment_breakdown_{start_raw}_{end_raw}.csv"}
+        )
+
+    # ── Chart data (daily totals per method) ─────────────────────────────
+    chart_days = sorted(day_map.keys())  # ascending for chart
+    chart_datasets = []
+    for s in summary:
+        m = s["method"]
+        chart_datasets.append({
+            "label": s["label"],
+            "color": s["color"],
+            "data": [round(day_map[d].get(m, {}).get("total", 0.0), 2) for d in chart_days],
+        })
+
+    return render_template(
+        "reports/payment_breakdown.html",
+        summary=summary,
+        daily=daily,
+        all_methods=all_methods,
+        pm_labels=_pm_labels,
+        pm_colors=_pm_colors,
+        grand_total=round(grand_total, 2),
+        chart_days=chart_days,
+        chart_datasets=chart_datasets,
+        start_date=start_raw, end_date=end_raw,
+    )
+
+
 @reports_bp.route("/payment-reconciliation")
 @login_required
 def payment_reconciliation():
