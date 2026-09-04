@@ -43,12 +43,19 @@ def validate_sale_items(items: list[dict], discount_amount: float = 0) -> dict:
         qty = item.get("quantity", 0)
         unit_price = float(item.get("unit_price", 0))
 
-        if not pid:
-            errors.append({"row": i + 1, "type": "missing_product", "message": f"Row {i+1}: No product selected."})
+        # Skip rows with no product: None (missing), 0 (custom/loose), or
+        # non-integer values (e.g. NaN from parseInt on variant "v:N" ids)
+        if pid is None or pid == 0:
+            if pid is None:
+                errors.append({"row": i + 1, "type": "missing_product", "message": f"Row {i+1}: No product selected."})
             continue
 
-        # product_id=0 means a custom/loose amount row — skip product validation
-        if pid == 0:
+        # Guard: pid must be a positive integer — discard anything else silently
+        try:
+            pid = int(pid)
+            if pid <= 0:
+                continue
+        except (TypeError, ValueError):
             continue
 
         product = db.session.get(Product, pid)
