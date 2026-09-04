@@ -1310,8 +1310,9 @@
       if (!pid) break;
       const qty = document.querySelector(`[name="items[${idx}][quantity]"]`);
       const price = document.querySelector(`[name="items[${idx}][unit_price]"]`);
-      // Only validate real product rows — skip empty rows and custom/pcs rows (product_id=0)
-      if (pid.value && pid.value !== '0') {
+      // Only validate real product rows — skip empty rows, custom/pcs rows (product_id=0),
+      // and variant rows (product_id like "v:5") — variants pass server-side validation separately
+      if (pid.value && pid.value !== '0' && !pid.value.startsWith('v:')) {
         items.push({
           product_id: parseInt(pid.value),
           quantity: parseInt(qty?.value || 0),
