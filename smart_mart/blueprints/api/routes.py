@@ -918,7 +918,7 @@ def alert_count():
     if cached is not None:
         return jsonify(cached)
     try:
-        from ...services.alert_engine import get_low_stock_alerts, get_expiry_alerts
+        from ...services.alert_engine import get_low_stock_alerts, get_expiry_alerts, get_high_demand_alerts
         from ...models.dismissed_alert import DismissedAlert
         from ...models.online_order import OnlineOrder
         dismissed = set(
@@ -927,9 +927,10 @@ def alert_count():
                 .where(DismissedAlert.user_id == current_user.id)
             ).scalars().all()
         )
-        low_stock = [p for p in get_low_stock_alerts() if f"low_stock:{p.id}" not in dismissed]
-        expiry    = [p for p in get_expiry_alerts()   if f"expiry:{p.id}"    not in dismissed]
-        count     = len(low_stock) + len(expiry)
+        low_stock    = [p for p in get_low_stock_alerts()    if f"low_stock:{p.id}"           not in dismissed]
+        expiry       = [p for p in get_expiry_alerts()       if f"expiry:{p.id}"              not in dismissed]
+        high_demand  = [i for i in get_high_demand_alerts()  if f"high_demand:{i['product'].id}" not in dismissed]
+        count = len(low_stock) + len(expiry) + len(high_demand)
         pending_orders = 0
         if current_user.role == "admin":
             pending_orders = db.session.execute(

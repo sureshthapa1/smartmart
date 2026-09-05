@@ -6,8 +6,9 @@
 {% block content %}
 {% from 'macros/product_icon.html' import product_icon_cell %}
 
-{% set total_active = (alerts.low_stock | selectattr('id') | list | length)
-   + (alerts.expiry | selectattr('id') | list | length) %}
+{% set total_active = (alerts.low_stock | list | length)
+   + (alerts.expiry | list | length)
+   + (alerts.high_demand | list | length) %}
 
 <div class="d-flex justify-content-end mb-3">
   {% if total_active > 0 %}

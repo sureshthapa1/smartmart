@@ -41,6 +41,9 @@ def dismiss():
         if key not in existing:
             db.session.add(DismissedAlert(user_id=current_user.id, alert_key=key))
     db.session.commit()
+    # Invalidate the cached alert count so the navbar badge clears immediately
+    from ...services.cache_service import delete as _cache_delete
+    _cache_delete(f"alert_count:u{current_user.id}")
     return redirect(url_for("alerts.index"))
 
 
