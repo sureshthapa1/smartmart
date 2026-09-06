@@ -1257,7 +1257,13 @@
         if (qty)   { qty.value = '1'; qty.name = `items[${newIdx}][quantity]`; }
         if (price) price.name = `items[${newIdx}][unit_price]`;
       } else {
-        if (sel)   sel.name   = `items[${newIdx}][product_id]`;
+        // For regular rows sel is the <select>; for custom rows the product_id
+        // is a hidden <input> — handle both so the index always stays in sync.
+        if (sel)        sel.name = `items[${newIdx}][product_id]`;
+        else {
+          const hiddenPid = tr.querySelector('input[type="hidden"][name*="product_id"]');
+          if (hiddenPid) hiddenPid.name = `items[${newIdx}][product_id]`;
+        }
         if (qty)   qty.name   = `items[${newIdx}][quantity]`;
         if (price) price.name = `items[${newIdx}][unit_price]`;
         if (label) label.name = `items[${newIdx}][custom_label]`;
