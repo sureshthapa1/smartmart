@@ -20,7 +20,7 @@ echo  Open in browser:
 echo    This PC:        http://localhost:5000
 echo    Other devices:  http://%IP%:5000
 echo.
-echo  Login with: admin / GoldKernel@2026!
+echo  Login with the ADMIN_USERNAME / ADMIN_PASSWORD set in your .env file.
 echo.
 echo  Press Ctrl+C to stop the server.
 echo  ==========================================

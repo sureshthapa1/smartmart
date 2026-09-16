@@ -730,6 +730,33 @@ def _migration_steps() -> list[MigrationStep]:
                 _safe_exec(conn, "PRAGMA foreign_keys=ON"),
             ),
         ),
+        (
+            "2026_09_05_sales_invoice_number_unique",
+            "Unique index on sales.invoice_number so two sales can never share one.",
+            lambda conn: (
+                # Backstop for the shop_settings row lock that serializes
+                # _generate_invoice_number(): if that lock is ever bypassed, the
+                # second INSERT fails here instead of quietly minting a duplicate
+                # invoice number — a tax-compliance problem, and it breaks using
+                # the invoice number as a lookup key.
+                #
+                # Partial (WHERE NOT NULL) because the generator falls back to a
+                # NULL invoice_number when numbering fails, and NULLs must stay
+                # non-conflicting. Same pattern as ix_promotions_code above.
+                #
+                # _safe_exec swallows failure deliberately: on a database that
+                # already contains duplicates the CREATE cannot succeed, and
+                # run_pending_migrations re-raises DDL errors — which would brick
+                # POS startup over a historical data blemish. _generate_invoice_number
+                # also re-checks uniqueness in Python, so numbering stays correct
+                # whether or not this index exists.
+                _safe_exec(
+                    conn,
+                    'CREATE UNIQUE INDEX IF NOT EXISTS "ix_sales_invoice_number" '
+                    'ON "sales" ("invoice_number") WHERE "invoice_number" IS NOT NULL',
+                ),
+            ),
+        ),
     ]
 
 

@@ -16,12 +16,46 @@ from ..models.stock_movement import StockMovement
 logger = logging.getLogger(__name__)
 
 
+def _lock_invoice_counter() -> None:
+    """Serialize invoice-number generation across concurrent sales.
+
+    Takes a row-level lock on the single shop_settings row, so two sales that
+    reach _generate_invoice_number() must queue — their MAX() read and matching
+    INSERT cannot interleave. The lock is released when the sale transaction
+    commits or rolls back.
+
+    Product row locks are NOT sufficient for this: two carts with no products
+    in common lock disjoint rows, and an all-custom cart locks nothing at all.
+    Both would read the same MAX() and mint the same invoice number.
+
+    with_for_update() is a no-op on SQLite, which serializes writers with a
+    database-level write lock instead; on PostgreSQL (production) it is a real
+    row lock. Settings updates are rare admin actions, so the contention cost
+    of borrowing that row as the sequence lock is negligible.
+    """
+    from ..models.shop_settings import ShopSettings
+    settings_id = db.session.execute(db.select(db.func.min(ShopSettings.id))).scalar()
+    if settings_id is None:
+        # First ever sale on a fresh DB — creating the row is itself serialized
+        # by the insert, and there is no prior invoice number to collide with.
+        ShopSettings.get()
+        return
+    db.session.execute(
+        db.select(ShopSettings.id)
+        .where(ShopSettings.id == settings_id)
+        .with_for_update()
+    ).scalar()
+
+
 def _generate_invoice_number() -> str:
     """Generate invoice number in format INV-YYYYMMDD-XXXX.
 
-    Uses MAX() on existing committed invoice numbers for the day.
-    Must be called AFTER product row locks are held (inside the transaction)
-    so concurrent sales are serialized and can't both read the same MAX value.
+    Uses MAX() on existing committed invoice numbers for the day. Callers must
+    hold the invoice counter lock (_lock_invoice_counter) so concurrent sales
+    cannot both read the same MAX value. sales.invoice_number also carries a
+    unique index as a backstop, so a collision fails loudly instead of silently
+    storing a duplicate.
+
     Falls back gracefully on any DB error — the sale is more important than
     the invoice number format.
     """
@@ -40,14 +74,133 @@ def _generate_invoice_number() -> str:
             last_seq = 0
     else:
         last_seq = 0
-    return f"{prefix}{last_seq + 1:04d}"
+
+    # Skip past any number already taken. The shop_settings lock and the unique
+    # index on sales.invoice_number both make a collision unlikely, but neither
+    # covers the case where MAX() misreads a hand-edited or imported number that
+    # does not sort last, and a duplicate here fails the whole sale at INSERT.
+    for _ in range(50):
+        last_seq += 1
+        candidate = f"{prefix}{last_seq:04d}"
+        taken = db.session.execute(
+            db.select(Sale.id).where(Sale.invoice_number == candidate).limit(1)
+        ).scalar()
+        if not taken:
+            return candidate
+    raise RuntimeError(f"Could not allocate an invoice number for {prefix}")
 
 
 class InsufficientStockError(ValueError):
     """Raised when a sale item quantity exceeds available product stock."""
 
 
+def invoice_payment_status(sale: Sale) -> dict:
+    """How much of this sale has actually been collected.
+
+    Returns ``{"status", "paid", "due", "is_credit"}`` where status is one of
+    Paid / Partially Paid / Unpaid.
+
+    Both the PDF invoice and the print-friendly HTML invoice used to decide this
+    for themselves — the PDF hardcoded "Paid" and a green "Payment Received"
+    banner, so every Udharo customer walked out holding a tax invoice stating
+    the shop had already been paid in full; the HTML version keyed off
+    payment_mode alone and so kept saying "Payment Pending" long after the
+    credit had been collected. Deriving it in one place keeps the two documents
+    from disagreeing about the same sale.
+    """
+    is_credit = "credit" in {
+        (sale.payment_mode or "").strip().lower(),
+        (sale.payment_method or "").strip().lower(),
+    }
+    total = float(sale.total_amount or 0)
+    paid = total
+    if is_credit and not sale.credit_collected:
+        collected = 0.0
+        try:
+            from ..models.operations import CustomerCreditPayment
+            collected = float(db.session.execute(
+                db.select(db.func.coalesce(db.func.sum(CustomerCreditPayment.amount), 0))
+                .where(CustomerCreditPayment.sale_id == sale.id)
+            ).scalar() or 0)
+        except Exception as exc:
+            logger.warning("Credit payment lookup failed for sale %s: %s", sale.id, exc)
+        paid = min(collected, total)
+    due = round(max(0.0, total - paid), 2)
+    if due <= 0:
+        status = "Paid"
+    elif paid > 0:
+        status = "Partially Paid"
+    else:
+        status = "Unpaid"
+    return {"status": status, "paid": round(paid, 2), "due": due, "is_credit": is_credit}
+
+
+def invoice_vat_breakdown(sale: Sale) -> dict:
+    """VAT split for an invoice, taken from the snapshot stored on the sale.
+
+    Returns ``{"enabled", "rate", "vat", "taxable"}``.
+
+    create_sale records tax_rate/tax_amount on the Sale. Recomputing them from
+    ShopSettings at print time meant every historical tax invoice silently
+    changed whenever the VAT rate was edited or VAT was toggled off, so a
+    reprint no longer matched the copy the customer was originally handed.
+
+    Sales predating the tax columns and sales rung up while VAT was off both
+    carry a zero snapshot and cannot be told apart in the data, so a zero
+    snapshot is taken at face value and those invoices show Tax (0%). The total
+    is unaffected either way — VAT here is extracted from a tax-inclusive
+    total, so this only changes how that total is broken down.
+    """
+    total = float(sale.total_amount or 0)
+    rate = float(sale.tax_rate or 0)
+    vat = float(sale.tax_amount or 0)
+    enabled = rate > 0
+    return {
+        "enabled": enabled,
+        "rate": rate,
+        "vat": vat,
+        "taxable": round(total - vat, 2) if enabled else total,
+    }
+
+
+def _customer_outstanding_credit(phone: str) -> float:
+    """Unpaid credit balance for a customer.
+
+    Sums uncollected credit sales and subtracts the partial payments recorded
+    in customer_credit_payments — the same basis operations_manager
+    .list_credit_records uses for the credit dashboard.
+
+    The subtraction matters because record_credit_payment only flips
+    Sale.credit_collected once the balance reaches zero, so a partly-paid sale
+    still counts as uncollected. Without it a customer who has paid down most
+    of a large credit sale is charged against their limit at the full original
+    invoice value and gets wrongly blocked.
+    """
+    from ..models.operations import CustomerCreditPayment
+
+    billed = db.session.execute(
+        db.select(db.func.coalesce(db.func.sum(Sale.total_amount), 0))
+        .where(Sale.customer_phone == phone)
+        .where(Sale.payment_mode == "credit")
+        .where(Sale.credit_collected == False)
+    ).scalar() or 0
+    paid = db.session.execute(
+        db.select(db.func.coalesce(db.func.sum(CustomerCreditPayment.amount), 0))
+        .join(Sale, Sale.id == CustomerCreditPayment.sale_id)
+        .where(Sale.customer_phone == phone)
+        .where(Sale.payment_mode == "credit")
+        .where(Sale.credit_collected == False)
+    ).scalar() or 0
+    return max(0.0, float(billed) - float(paid))
+
+
 def _enforce_credit_limit(customer_phone: str, sale_total: float) -> None:
+    """Raise ValueError if this credit sale would push the customer over limit.
+
+    Call this once, after sale_total is final (post discount and post loyalty
+    redemption) — an earlier check would compare the limit against a total the
+    customer is not actually being billed.
+    """
     from ..models.customer import Customer
 
     phone = str(customer_phone).strip()
@@ -57,17 +210,12 @@ def _enforce_credit_limit(customer_phone: str, sale_total: float) -> None:
     if not customer or not customer.credit_limit or float(customer.credit_limit) <= 0:
         return
 
-    outstanding = db.session.execute(
-        db.select(db.func.sum(Sale.total_amount))
-        .where(Sale.customer_phone == phone)
-        .where(Sale.payment_mode == "credit")
-        .where(Sale.credit_collected == False)
-    ).scalar() or 0
-    if float(outstanding) + float(sale_total) > float(customer.credit_limit):
+    outstanding = _customer_outstanding_credit(phone)
+    if outstanding + float(sale_total) > float(customer.credit_limit):
         raise ValueError(
             f"Credit limit exceeded for {customer.name}. "
             f"Limit: NPR {float(customer.credit_limit):,.0f}, "
-            f"Outstanding: NPR {float(outstanding):,.0f}, "
+            f"Outstanding: NPR {outstanding:,.0f}, "
             f"This sale: NPR {float(sale_total):,.0f}."
         )
 
@@ -100,38 +248,11 @@ def create_sale(items: list[dict], user_id: int,
             pass  # Don't block sales if period check fails
 
         # ── Credit limit enforcement ───────────────────────────────────────
-        if payment_mode == "credit" and customer_phone:
-            try:
-                from ..models.customer import Customer
-                cust = db.session.execute(
-                    db.select(Customer).where(Customer.phone == str(customer_phone).strip())
-                ).scalar_one_or_none()
-                if cust and cust.credit_limit and float(cust.credit_limit) > 0:
-                    outstanding = db.session.execute(
-                        db.select(db.func.sum(Sale.total_amount))
-                        .where(Sale.customer_phone == str(customer_phone).strip())
-                        .where(Sale.payment_mode == "credit")
-                        .where(Sale.credit_collected == False)
-                    ).scalar() or 0
-                    # Prospective total for this sale — the authoritative
-                    # total_amount isn't computed until later in this
-                    # function (after stock locking), so estimate it here
-                    # from the same items/discount inputs for this check.
-                    _prospective_gross = sum(
-                        item["unit_price"] * item["quantity"] for item in items
-                    )
-                    _prospective_total = max(0, _prospective_gross - float(discount_amount or 0))
-                    if float(outstanding) + float(_prospective_total) > float(cust.credit_limit):
-                        raise ValueError(
-                            f"Credit limit exceeded for {cust.name}. "
-                            f"Limit: NPR {float(cust.credit_limit):,.0f}, "
-                            f"Outstanding: NPR {float(outstanding):,.0f}, "
-                            f"This sale: NPR {float(_prospective_total):,.0f}."
-                        )
-            except ValueError:
-                raise
-            except Exception:
-                pass  # Non-blocking — don't fail sale if credit check errors
+        # Enforced once, further down, by _enforce_credit_limit() — after
+        # total_amount is final. A second pre-check used to run here on an
+        # estimated total that ignored loyalty redemption and keyed off the raw
+        # payment_mode instead of the normalized payment method, so the two
+        # checks could disagree about the same sale.
 
         invoice_number = None
 
@@ -172,9 +293,11 @@ def create_sale(items: list[dict], user_id: int,
         ).scalars().all() if product_ids else []
         products: dict[int, Product] = {p.id: p for p in locked_products}
 
-        # Generate invoice number AFTER acquiring row locks so concurrent
-        # transactions are serialized — both cannot read the same MAX value.
+        # Generate the invoice number under the counter lock so two concurrent
+        # sales cannot read the same MAX value. Acquired after the variant and
+        # product locks so every caller takes locks in the same order.
         try:
+            _lock_invoice_counter()
             invoice_number = _generate_invoice_number()
         except Exception as exc:
             logger.warning("Invoice number generation failed; using fallback: %s", exc)
@@ -202,7 +325,24 @@ def create_sale(items: list[dict], user_id: int,
                     )
 
         gross_total_amount = sum(item["unit_price"] * item["quantity"] for item in items)
-        total_amount = max(0, gross_total_amount - float(discount_amount or 0))
+
+        # ── Discount sanity ───────────────────────────────────────────────
+        # discount_amount comes straight off the POS form. Clamping the result
+        # with max(0, ...) silently accepted a discount larger than the cart,
+        # which zeroed the sale while leaving Sale.discount_amount inconsistent
+        # with Sale.total_amount in every profit and discount-leak report.
+        # Reject it instead — the route surfaces ValueError to the cashier.
+        # The 0.01 tolerance matches _mark_customer_offers_used and exists only
+        # so a legitimate discount-to-zero isn't rejected on float rounding.
+        discount_value = float(discount_amount or 0)
+        if discount_value < 0:
+            raise ValueError("Discount cannot be negative.")
+        if discount_value > gross_total_amount + 0.01:
+            raise ValueError(
+                f"Discount NPR {discount_value:,.2f} exceeds the cart total of "
+                f"NPR {gross_total_amount:,.2f}."
+            )
+        total_amount = max(0, gross_total_amount - discount_value)
         normalized_payment = (payment_method or payment_mode or "cash").strip().lower()
 
         redeemed_points = 0
@@ -222,15 +362,24 @@ def create_sale(items: list[dict], user_id: int,
                     discount_note = f"{discount_note}; Loyalty points redeemed"
                 else:
                     discount_note = "Loyalty points redeemed"
-        # ── Fetch VAT settings for tax snapshot ──────────────────────────
+        # ── Credit limit ──────────────────────────────────────────────────
+        # Checked here, where total_amount is final (post discount, post
+        # loyalty redemption). Infrastructure errors stay non-blocking — a
+        # failed query should not cost the shop a sale — but they are logged
+        # loudly rather than swallowed, because a silently skipped check is
+        # otherwise indistinguishable from a passed one.
         if normalized_payment == "credit" and customer_phone:
             try:
                 _enforce_credit_limit(customer_phone, total_amount)
             except ValueError:
                 raise
             except Exception as exc:
-                logger.debug("Credit limit check skipped after error: %s", exc)
+                logger.warning(
+                    "Credit limit check could not be completed for %s — sale allowed: %s",
+                    customer_phone, exc,
+                )
 
+        # ── Fetch VAT settings for tax snapshot ──────────────────────────
         _tax_rate = 0.0
         _tax_amount = 0.0
         try:
@@ -264,7 +413,7 @@ def create_sale(items: list[dict], user_id: int,
             payment_mode=normalized_payment,
             payment_method=normalized_payment,
             sale_type=sale_type or "regular",
-            discount_amount=float(discount_amount or 0) + loyalty_discount_amount,
+            discount_amount=discount_value + loyalty_discount_amount,
             commission_amount=commission_amount,
             discount_note=discount_note,
             promotion_id=promotion_id,
@@ -296,10 +445,15 @@ def create_sale(items: list[dict], user_id: int,
 
             product = products[pid]
             cost = product.cost_price
+            movement_note = None
             if vid and vid in variant_items:
                 v = variant_items[vid]
                 cost = v.cost_price
                 v.quantity -= qty   # deduct variant stock
+                # stock_movements is keyed by product_id only, so a variant sale
+                # is logged against the parent product. Name the variant in the
+                # note so the ledger row can still be traced to what moved.
+                movement_note = f"Variant: {v.variant_name} ({v.sku})"
             else:
                 product.quantity -= qty  # deduct parent product stock
             db.session.add(SaleItem(
@@ -313,6 +467,7 @@ def create_sale(items: list[dict], user_id: int,
             db.session.add(StockMovement(
                 product_id=product.id, change_amount=-qty, change_type="sale",
                 reference_id=sale.id, created_by=user_id,
+                note=movement_note,
                 timestamp=datetime.now(timezone.utc),
             ))
 
@@ -362,7 +517,7 @@ def create_sale(items: list[dict], user_id: int,
         applied_offer_discount = _mark_customer_offers_used(
             sale=sale,
             items=items,
-            posted_discount=float(discount_amount or 0),
+            posted_discount=discount_value,
             customer_offer_ids=applied_customer_offer_ids or [],
         )
         if applied_offer_discount > 0:
@@ -564,17 +719,65 @@ def list_sales(filters: dict, page: int = 1, per_page: int = 20) -> list[Sale]:
 
 
 def delete_sale(sale_id: int) -> None:
+    """Delete a sale and return its stock to the bucket it came out of.
+
+    Variant lines are credited back to the ProductVariant, not the parent
+    Product. create_sale deducts variant stock for those lines, so crediting
+    the parent here invented parent units that never existed while the sold
+    variant units stayed lost — every void of a variant sale drifted inventory
+    in both directions at once.
+
+    Units already restored by a sale return are netted off. Deleting the sale
+    cascades its SaleReturn rows away, so this is the last point at which they
+    can be accounted for.
+    """
+    from ..models.product_variant import ProductVariant
+    from ..models.sale_return import SaleReturnItem
+
     sale = get_sale(sale_id)
     try:
         for item in sale.items:
-            if item.product_id is None:
+            if item.product_id is None and item.variant_id is None:
                 continue  # custom/loose item — no stock to reverse
+
+            already_returned = db.session.execute(
+                db.select(db.func.coalesce(db.func.sum(SaleReturnItem.quantity), 0))
+                .where(SaleReturnItem.sale_item_id == item.id)
+            ).scalar() or 0
+            restore_qty = int(item.quantity) - int(already_returned)
+            if restore_qty <= 0:
+                continue  # fully returned already — stock is back on the shelf
+
+            if item.variant_id:
+                variant = db.session.get(ProductVariant, item.variant_id)
+                if variant is None:
+                    # The FK is ON DELETE SET NULL, so a live variant_id pointing
+                    # at a missing row should not happen. Skip rather than guess —
+                    # crediting the parent would corrupt its count.
+                    logger.warning(
+                        "Sale #%s item %s references missing variant %s — "
+                        "stock not reversed.", sale.id, item.id, item.variant_id,
+                    )
+                    continue
+                variant.quantity += restore_qty
+                db.session.add(StockMovement(
+                    product_id=variant.product_id,
+                    change_amount=restore_qty,
+                    change_type="adjustment_in",
+                    reference_id=sale.id,
+                    note=(f"Sale #{sale.id} deleted/reversed — variant: "
+                          f"{variant.variant_name} ({variant.sku})"),
+                    created_by=sale.user_id,
+                    timestamp=datetime.now(timezone.utc),
+                ))
+                continue
+
             product = db.session.get(Product, item.product_id)
             if product:
-                product.quantity += item.quantity
+                product.quantity += restore_qty
                 db.session.add(StockMovement(
                     product_id=product.id,
-                    change_amount=item.quantity,
+                    change_amount=restore_qty,
                     change_type="adjustment_in",
                     reference_id=sale.id,
                     note=f"Sale #{sale.id} deleted/reversed",
@@ -651,6 +854,12 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
                  "CARD": "Card", "CREDIT": "Credit / Udharo", "OTHER": "Other"}
     payment_label = pm_labels.get(pm, pm)
 
+    # ── Payment status — never assume the invoice is paid ──────────────────
+    _pay = invoice_payment_status(sale)
+    payment_status = _pay["status"]
+    amount_paid = _pay["paid"]
+    amount_due = _pay["due"]
+
     # ── Document setup ────────────────────────────────────────────────────
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -667,6 +876,8 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     border = colors.HexColor("#cbd5e1")
     green = colors.HexColor("#16a34a")
     light_green = colors.HexColor("#f0fdf4")
+    red = colors.HexColor("#dc2626")
+    light_red = colors.HexColor("#fef2f2")
     row_alt = colors.HexColor("#f8fafc")
 
     def S(name, **kw):
@@ -768,9 +979,12 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     pay_items = [
         Paragraph("PAYMENT DETAILS", lbl_s),
         Paragraph(f"Mode:  <b>{payment_label}</b>", val_s),
-        Paragraph("Status:  <b>Paid</b>", val_s),
+        Paragraph(f"Status:  <b>{payment_status}</b>", val_s),
         Paragraph(f"Served by:  <b>{sale.user.username if sale.user else '—'}</b>", val_s),
     ]
+    if amount_due > 0 and sale.credit_due_date:
+        pay_items.append(Paragraph(
+            f"Due by:  <b>{sale.credit_due_date.strftime('%d %b %Y')}</b>", val_s))
 
     meta = Table([[bill_items, pay_items]], colWidths=[W * 0.52, W * 0.48])
     meta.setStyle(TableStyle([
@@ -860,29 +1074,16 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     discount = float(sale.discount_amount or 0)
     final_total = float(sale.total_amount)
 
-    # VAT calculation
-    vat_enabled = False
-    vat_rate = 0.0
-    vat_number = ""
-    try:
-        from ..models.shop_settings import ShopSettings
-        _s = ShopSettings.get()
-        vat_enabled = bool(_s.vat_enabled)
-        vat_rate = float(_s.vat_rate or 0)
-        vat_number = _s.vat_number or ""
-    except Exception:
-        pass
-
-    taxable_amount = final_total
-    vat_amount = 0.0
-    if vat_enabled and vat_rate > 0:
-        # VAT is inclusive in the total (extract it)
-        vat_amount = round(taxable_amount * vat_rate / (100 + vat_rate), 2)
-        taxable_amount = round(final_total - vat_amount, 2)
+    # ── VAT — from the snapshot on the sale, not from current settings ────
+    _vat = invoice_vat_breakdown(sale)
+    vat_enabled = _vat["enabled"]
+    vat_rate = _vat["rate"]
+    vat_amount = _vat["vat"]
+    taxable_amount = _vat["taxable"]
 
     tot_s = S("ts", fontSize=9, fontName="Helvetica", textColor=slate)
     tot_v = S("tv", fontSize=9, fontName="Helvetica", textColor=navy, alignment=TA_RIGHT)
-    tot_red = S("tr", fontSize=9, fontName="Helvetica", textColor=colors.HexColor("#dc2626"), alignment=TA_RIGHT)
+    tot_red = S("tr", fontSize=9, fontName="Helvetica", textColor=red, alignment=TA_RIGHT)
 
     totals_rows = [
         [Paragraph("Sub Total:", tot_s), Paragraph(f"NPR {gross_total:,.2f}", tot_v)],
@@ -890,7 +1091,7 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     if discount > 0:
         disc_label = f"Discount ({sale.discount_note}):" if sale.discount_note else "Discount:"
         totals_rows.append([Paragraph(disc_label, tot_s), Paragraph(f"- NPR {discount:,.2f}", tot_red)])
-    if vat_enabled and vat_rate > 0:
+    if vat_enabled:
         totals_rows.append([Paragraph("Taxable Amount:", tot_s), Paragraph(f"NPR {taxable_amount:,.2f}", tot_v)])
         totals_rows.append([Paragraph(f"VAT ({vat_rate:.0f}%):", tot_s), Paragraph(f"NPR {vat_amount:,.2f}", tot_v)])
     else:
@@ -924,17 +1125,31 @@ def generate_invoice_pdf(sale_id: int) -> bytes:
     story.append(grand)
     story.append(Spacer(1, 0.4 * cm))
 
-    # ── PAYMENT CONFIRMATION ──────────────────────────────────────────────
+    # ── PAYMENT CONFIRMATION / AMOUNT DUE ─────────────────────────────────
+    # Green "Payment Received" only when the money is actually in. An open
+    # credit sale gets a red amount-due panel instead, so the invoice doubles
+    # as the collection record the cashier hands over.
+    if amount_due > 0:
+        conf_label = "Balance Due" if amount_paid > 0 else "Amount Due"
+        conf_extra = f"  (Paid: NPR {amount_paid:,.2f})" if amount_paid > 0 else ""
+        conf_amount = amount_due
+        conf_fg, conf_bg = red, light_red
+    else:
+        conf_label = "Payment Received"
+        conf_extra = ""
+        conf_amount = amount_paid
+        conf_fg, conf_bg = green, light_green
+
     pay_conf = Table([[
-        Paragraph(f"Payment Received  —  <b>{payment_label}</b>",
-                  S("pc", fontSize=9, fontName="Helvetica-Bold", textColor=green)),
-        Paragraph(f"NPR {final_total:,.2f}",
+        Paragraph(f"{conf_label}  —  <b>{payment_label}</b>{conf_extra}",
+                  S("pc", fontSize=9, fontName="Helvetica-Bold", textColor=conf_fg)),
+        Paragraph(f"NPR {conf_amount:,.2f}",
                   S("pv", fontSize=11, fontName="Helvetica-Bold",
-                    textColor=green, alignment=TA_RIGHT)),
+                    textColor=conf_fg, alignment=TA_RIGHT)),
     ]], colWidths=[W * 0.72, W * 0.28])
     pay_conf.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), light_green),
-        ("BOX", (0, 0), (-1, -1), 1, green),
+        ("BACKGROUND", (0, 0), (-1, -1), conf_bg),
+        ("BOX", (0, 0), (-1, -1), 1, conf_fg),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
         ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ("TOPPADDING", (0, 0), (-1, -1), 7),

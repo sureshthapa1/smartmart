@@ -90,6 +90,9 @@ class ExpenseService:
             "purchase":       "purchase_in",
             "adjustment_in":  "adjustment_in",
             "adjustment_out": "adjustment_out",
+            # returns_manager writes "sale_return"; the map said "return", so the
+            # ledger's "Return In" filter matched nothing at all.
+            "sale_return":    "return_in",
             "return":         "return_in",
             "transfer_in":    "transfer_in",
             "transfer_out":   "transfer_out",
@@ -103,10 +106,11 @@ class ExpenseService:
         if product_id:
             stmt = stmt.where(StockMovement.product_id == product_id)
         if movement_type:
-            # reverse-map the ledger label back to StockMovement.change_type
-            _REV = {v: k for k, v in _TYPE_MAP.items()}
-            raw_type = _REV.get(movement_type, movement_type)
-            stmt = stmt.where(StockMovement.change_type == raw_type)
+            # reverse-map the ledger label back to StockMovement.change_type.
+            # Several raw types can share one label (sale_return/return → return_in),
+            # so match on the whole set rather than a single reversed key.
+            raw_types = [k for k, v in _TYPE_MAP.items() if v == movement_type] or [movement_type]
+            stmt = stmt.where(StockMovement.change_type.in_(raw_types))
 
         total = db.session.execute(
             db.select(db.func.count()).select_from(stmt.subquery())

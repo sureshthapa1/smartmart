@@ -127,9 +127,21 @@ def list_suppliers() -> list[Supplier]:
 def delete_purchase(purchase_id: int, user_id: int) -> None:
     """Delete a purchase record and reverse its stock movements.
 
-    Raises ValueError if the purchase has associated supplier returns,
-    to preserve audit integrity.
+    Refuses rather than half-reversing. A purchase is only safely erasable while
+    the goods it brought in are all still on the shelf and nothing else has been
+    booked against it, so this raises ValueError if:
+
+    * a supplier return references it (pre-existing guard — audit integrity);
+    * a supplier payment references it (money was paid against this purchase);
+    * a batch it created has been drawn down (units already went out);
+    * reversing a line would drive stock negative.
+
+    The last check replaced ``max(0, quantity - item.quantity)``. That clamp made
+    the failure invisible: delete a 100-unit purchase after 60 units were sold and
+    stock went 40 → 0, destroying the 40 units still physically in the shop, while
+    the StockMovement row logged the full -100 the clamp had not actually applied.
     """
+    from ..models.operations import ProductBatch, SupplierPayment
     from ..models.supplier_return import SupplierReturn
     purchase = db.get_or_404(Purchase, purchase_id)
 
@@ -144,19 +156,61 @@ def delete_purchase(purchase_id: int, user_id: int) -> None:
             "it has associated supplier return records. Void the returns first."
         )
 
-    # Reverse stock for each item
+    # Guard: supplier payments carry no cascade, so deleting the purchase would
+    # leave them pointing at a row that no longer exists.
+    has_payments = db.session.execute(
+        db.select(db.func.count(SupplierPayment.id))
+        .where(SupplierPayment.purchase_id == purchase_id)
+    ).scalar() or 0
+    if has_payments:
+        raise ValueError(
+            f"Cannot delete Purchase #{purchase_id}: "
+            "supplier payments are recorded against it. Void the payments first."
+        )
+
+    # Batches created by this purchase. There is no Purchase→ProductBatch
+    # relationship, so nothing cascaded: the batch rows survived the delete with a
+    # dangling purchase_id and their original quantity_remaining, and FIFO/expiry
+    # logic kept counting stock the purchase no longer accounted for.
+    batches = db.session.execute(
+        db.select(ProductBatch).where(ProductBatch.purchase_id == purchase_id)
+    ).scalars().all()
+    drawn_down = [b for b in batches if b.quantity_remaining != b.quantity_received]
+    if drawn_down:
+        raise ValueError(
+            f"Cannot delete Purchase #{purchase_id}: stock from batch "
+            f"{drawn_down[0].batch_code} has already been used. "
+            "Record a stock adjustment instead of deleting the purchase."
+        )
+
+    # Reverse stock for each item — all-or-nothing, checked before any mutation.
+    reversals = []
     for item in purchase.items:
         product = db.session.get(Product, item.product_id)
-        if product:
-            product.quantity = max(0, product.quantity - item.quantity)
-            db.session.add(StockMovement(
-                product_id=product.id,
-                change_amount=-item.quantity,
-                change_type="purchase_reversal",
-                reference_id=purchase.id,
-                created_by=user_id,
-                timestamp=datetime.now(timezone.utc),
-            ))
+        if product is None:
+            continue
+        if product.quantity < item.quantity:
+            raise ValueError(
+                f"Cannot delete Purchase #{purchase_id}: reversing "
+                f"{item.quantity} of '{product.name}' would leave negative stock "
+                f"(only {product.quantity} on hand). Those units have already "
+                "moved out; record a stock adjustment instead."
+            )
+        reversals.append((product, item.quantity))
+
+    for product, qty in reversals:
+        product.quantity -= qty
+        db.session.add(StockMovement(
+            product_id=product.id,
+            change_amount=-qty,
+            change_type="purchase_reversal",
+            reference_id=purchase.id,
+            created_by=user_id,
+            timestamp=datetime.now(timezone.utc),
+        ))
+
+    for batch in batches:
+        db.session.delete(batch)
 
     try:
         from . import audit_service

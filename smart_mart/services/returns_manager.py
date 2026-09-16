@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from ..extensions import db
 from ..models.product import Product
+from ..models.product_variant import ProductVariant
 from ..models.sale import Sale, SaleItem
 from ..models.sale_return import SaleReturn, SaleReturnItem
 from ..models.stock_movement import StockMovement
+
+logger = logging.getLogger(__name__)
 
 
 def _to_money(value) -> Decimal:
@@ -141,14 +145,43 @@ def create_return(
                 )
             )
 
-            product.quantity += requested_qty
+            # ── Restock the bucket the units came out of ───────────────────
+            # create_sale deducts variant stock for a variant line, so crediting
+            # the parent product here invented parent units the shop never had
+            # while the returned variant units stayed missing — one return drifted
+            # inventory in both directions at once. stock_movements has no
+            # variant_id column, so the ledger row stays keyed to the parent
+            # product and names the variant in the note.
+            restock_note = f"Return for sale #{sale.id}"
+            if item.variant_id:
+                variant = db.session.get(ProductVariant, item.variant_id)
+                if variant is None:
+                    # variant_id is ON DELETE SET NULL, so a live id pointing at a
+                    # missing row should not be reachable. Skip the restock rather
+                    # than credit the parent and corrupt its count — but still
+                    # refund, because blocking a customer at the counter over an
+                    # internal inconsistency is the worse failure. The refund row
+                    # is already recorded above; no ledger entry, since no stock
+                    # actually moved.
+                    logger.warning(
+                        "Sale #%s item %s references missing variant %s — "
+                        "refunded but stock not restocked.",
+                        sale.id, item.id, item.variant_id,
+                    )
+                    continue
+                variant.quantity += requested_qty
+                restock_note = (f"Return for sale #{sale.id} — variant: "
+                                f"{variant.variant_name} ({variant.sku})")
+            else:
+                product.quantity += requested_qty
+
             db.session.add(
                 StockMovement(
                     product_id=product.id,
                     change_amount=requested_qty,
                     change_type="sale_return",
                     reference_id=sale_return.id,
-                    note=f"Return for sale #{sale.id}",
+                    note=restock_note,
                     created_by=user_id,
                     timestamp=datetime.now(timezone.utc),
                 )

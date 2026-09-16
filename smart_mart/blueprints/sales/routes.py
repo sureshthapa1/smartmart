@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from types import SimpleNamespace
 
 from flask import Blueprint, Response, abort, flash, redirect, render_template, request, url_for
@@ -75,11 +75,13 @@ def list_sales():
 @sales_bp.route("/create", methods=["GET", "POST"])
 @login_required
 def create_sale():
+    can_discount = True
     if current_user.role != "admin":
         from ...models.user_permissions import UserPermissions
         p = UserPermissions.get_or_create(current_user.id)
         if not p.can_create_sale:
             abort(403)
+        can_discount = bool(p.can_give_discount)
     products = db.session.execute(
         db.select(Product)
         .where(Product.is_active == True, Product.quantity > 0)
@@ -100,6 +102,24 @@ def create_sale():
         items = _parse_items(request.form)
         if not items:
             flash("Please add at least one item to the sale.", "danger")
+            return render_template("sales/create.html", products=products, variants=variants,
+                                   product_map=product_map, target_progress=target_progress)
+
+        # ── Discount permission ────────────────────────────────────────────
+        # can_give_discount is a real UserPermissions column, editable in the
+        # admin UI, but nothing ever enforced it: the discount field ships in the
+        # POS form, so any cashier who could ring up a sale could also discount
+        # it to zero. Reject the sale rather than silently dropping the discount,
+        # so the cashier sees why it did not go through.
+        try:
+            posted_discount = Decimal(str(request.form.get("discount_amount", 0) or 0))
+        except (InvalidOperation, ValueError):
+            flash("Discount must be a number.", "danger")
+            return render_template("sales/create.html", products=products, variants=variants,
+                                   product_map=product_map, target_progress=target_progress)
+        if posted_discount and not can_discount:
+            flash("You do not have permission to apply a discount on a sale. "
+                  "Ask an administrator to apply it.", "danger")
             return render_template("sales/create.html", products=products, variants=variants,
                                    product_map=product_map, target_progress=target_progress)
 
@@ -165,7 +185,7 @@ def create_sale():
                 customer_phone=request.form.get("customer_phone", "").strip() or None,
                 payment_mode=request.form.get("payment_mode") or request.form.get("payment_method", "cash"),
                 payment_method=request.form.get("payment_method") or request.form.get("payment_mode", "cash"),
-                discount_amount=Decimal(str(request.form.get("discount_amount", 0) or 0 or 0)),
+                discount_amount=posted_discount,
                 discount_note=request.form.get("discount_note", "").strip() or None,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
                 applied_customer_offer_ids=_parse_customer_offer_ids(request.form),
@@ -269,7 +289,15 @@ def print_invoice(sale_id):
         shop = ShopSettings.get()
     except Exception:
         shop = None
-    return render_template("sales/print_invoice.html", sale=sale, shop=shop)
+    # Payment status and VAT come from the same helpers the PDF invoice uses, so
+    # the printed and downloaded copies of one sale cannot disagree.
+    return render_template(
+        "sales/print_invoice.html",
+        sale=sale,
+        shop=shop,
+        pay=sales_manager.invoice_payment_status(sale),
+        vat=sales_manager.invoice_vat_breakdown(sale),
+    )
 
 
 @sales_bp.route("/<int:sale_id>/receipt")

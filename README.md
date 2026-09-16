@@ -141,7 +141,17 @@ flask db upgrade
 python run.py
 ```
 
-Open **http://127.0.0.1:5000** — default login: `admin` / (set during seed)
+On Windows, use the Waitress launcher instead — gunicorn has no Windows support:
+
+```bash
+python serve.py
+```
+
+or double-click `start_server.bat`, which does the same and prints the LAN address
+so phones and tablets on the same network can reach the POS.
+
+Both entry points load `.env`. Open **http://127.0.0.1:5000** — log in with the
+`ADMIN_USERNAME` / `ADMIN_PASSWORD` you set in `.env` before running `seed.py`.
 
 ### Production
 

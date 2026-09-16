@@ -15,6 +15,7 @@ from ...extensions import db
 from ...models.online_order import OnlineOrder, OnlineOrderItem
 from ...models.product import Product
 from ...models.shop_settings import ShopSettings
+from ...models.stock_movement import StockMovement
 from ...services.decorators import login_required, admin_required
 from ...services.ecommerce_sync import EcommerceSyncError, apply_order_status
 
@@ -166,7 +167,13 @@ def create_order():
         db.session.flush()
 
         for item in items_data:
-            product = db.session.get(Product, item["product_id"])
+            # Lock the row before the check-then-deduct below. The POS sale path
+            # locks; this one did not, so a concurrent sale could read the same
+            # quantity and both writes would pass their own stock check — an
+            # oversell, and a lost update on whichever committed first.
+            product = db.session.execute(
+                db.select(Product).where(Product.id == item["product_id"]).with_for_update()
+            ).scalar_one_or_none()
             if product is None:
                 db.session.rollback()
                 flash(f"Product ID {item['product_id']} not found.", "danger")
@@ -182,6 +189,18 @@ def create_order():
             # Deduct stock — only if sufficient quantity available
             if product.quantity >= item["quantity"]:
                 product.quantity -= item["quantity"]
+                # Ledger row, so these units are not unexplained shrinkage. The
+                # deduction happened here with no StockMovement at all, leaving
+                # products.quantity and the stock ledger permanently out of step.
+                db.session.add(StockMovement(
+                    product_id=product.id,
+                    change_amount=-item["quantity"],
+                    change_type="online_order",
+                    reference_id=order.id,
+                    note=f"Online order {order.order_number}",
+                    created_by=current_user.id,
+                    timestamp=datetime.now(timezone.utc),
+                ))
             else:
                 db.session.rollback()
                 flash(f"Insufficient stock for '{product.name}': requested {item['quantity']}, available {product.quantity}.", "danger")

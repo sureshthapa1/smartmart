@@ -530,8 +530,15 @@ def chatbot_query(message: str) -> str:
         count = _cnt(today)
         profit_today = 0
         try:
+            # coalesce to the SaleItem cost snapshot first: create_purchase
+            # overwrites Product.cost_price on every delivery, so reading the live
+            # column made this answer disagree with the dashboard and the P&L
+            # report — which both already use the snapshot — as soon as a purchase
+            # landed on a product sold earlier the same day.
             cogs = db.session.execute(
-                db.select(func.coalesce(func.sum(Product.cost_price * SaleItem.quantity), 0))
+                db.select(func.coalesce(func.sum(
+                    func.coalesce(SaleItem.cost_price, Product.cost_price) * SaleItem.quantity
+                ), 0))
                 .select_from(Product)
                 .join(SaleItem, SaleItem.product_id == Product.id)
                 .join(Sale, Sale.id == SaleItem.sale_id)

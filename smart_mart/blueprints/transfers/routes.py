@@ -79,7 +79,7 @@ def transfer_detail(transfer_id):
 def complete_transfer(transfer_id):
     _require_perm("can_manage_transfers")
     try:
-        t = transfer_manager.complete_transfer(transfer_id)
+        t = transfer_manager.complete_transfer(transfer_id, current_user.id)
         flash(f"Transfer #{t.id} completed. Stock deducted.", "success")
     except ValueError as e:
         flash(str(e), "danger")
