@@ -17,7 +17,7 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     category = db.Column(db.String(80), index=True)
-    sku = db.Column(db.String(80), unique=True, nullable=False)
+    sku = db.Column(db.String(80), nullable=False, index=True)
     barcode = db.Column(db.String(80), nullable=True)  # EAN-13/UPC manufacturer barcode
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)

@@ -58,7 +58,7 @@ def create_product(data: dict) -> Product:
         db.session.flush()  # get product.id without committing yet
     except IntegrityError:
         db.session.rollback()
-        raise ValueError(f"A product with SKU '{data['sku']}' already exists.")
+        raise ValueError(f"Failed to save product '{data['sku']}'. Please try again.")
 
     # ── Create opening purchase record if quantity > 0 ────────────────────
     if purchase_qty > 0:
@@ -142,7 +142,7 @@ def update_product(product_id: int, data: dict) -> Product:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
-        raise ValueError(f"A product with SKU '{data.get('sku')}' already exists.")
+        raise ValueError(f"Failed to update product. Please try again.")
 
     # Audit log with field-level diff
     try:

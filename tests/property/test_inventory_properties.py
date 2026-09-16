@@ -72,14 +72,14 @@ def _make_product(sku, quantity=10, supplier_id=None):
     return p
 
 
-# ── Property 5: Unique constraint violations are rejected ────────────────────
+# ── Property 5: Duplicate SKUs are now allowed for products ─────────────────
 
-def test_duplicate_sku_rejected(app):
-    # Feature: smart-mart-inventory, Property 5: Unique constraint violations are rejected
+def test_duplicate_sku_allowed(app):
+    # Feature: smart-mart-inventory, Property 5: Products can share a SKU (e.g. same product in different sizes)
     with app.app_context():
-        _make_product("UNIQUE-SKU-001")
-        with pytest.raises((ValueError, Exception)):
-            _make_product("UNIQUE-SKU-001")
+        p1 = _make_product("SHARED-SKU-001")
+        p2 = _make_product("SHARED-SKU-001")
+        assert p1.id != p2.id  # both saved successfully with the same SKU
 
 
 # ── Property 6: Stock adjustment arithmetic is correct ───────────────────────
