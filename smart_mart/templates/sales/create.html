@@ -334,8 +334,25 @@
           <i class="bi bi-chevron-down ms-auto" id="pickerChevron" style="transition:transform .2s;"></i>
         </div>
         <div class="card-body p-2" id="pickerBody">
+          <div class="mb-2 px-1">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-white border-end-0" style="border-color:#e2e8f0;">
+                <i class="bi bi-search text-muted" style="font-size:.75rem;"></i>
+              </span>
+              <input type="text" id="pickerSearch" class="form-control border-start-0"
+                     placeholder="Search by name, SKU or barcode…"
+                     autocomplete="off"
+                     style="border-color:#e2e8f0;font-size:.8rem;"
+                     oninput="onPickerSearch(this.value)">
+              <button type="button" class="btn btn-outline-secondary border-start-0"
+                      id="pickerSearchClear" style="display:none;border-color:#e2e8f0;padding:0 .5rem;"
+                      onclick="clearPickerSearch()" title="Clear search">
+                <i class="bi bi-x" style="font-size:.9rem;"></i>
+              </button>
+            </div>
+          </div>
           <div id="catPills" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.55rem;padding:.1rem .1rem;">
-            <button type="button" class="cat-pill active" onclick="filterCat(this,'')">All</button>
+            <button type="button" class="cat-pill active" data-cat="" onclick="filterCat(this,'')">All</button>
           </div>
           <div id="prodGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.4rem;max-height:300px;overflow-y:auto;padding:.1rem;"></div>
         </div>
@@ -529,11 +546,13 @@
     // ── Quick Product Picker ──────────────────────────────────────────────
     let pickerOpen = true;
     let activeCat = '';
+    let searchQuery = '';
 
     function togglePicker() {
       pickerOpen = !pickerOpen;
       document.getElementById('pickerBody').style.display = pickerOpen ? '' : 'none';
       document.getElementById('pickerChevron').style.transform = pickerOpen ? '' : 'rotate(-90deg)';
+      if (pickerOpen) setTimeout(() => document.getElementById('pickerSearch')?.focus(), 50);
     }
 
     function filterCat(btn, cat) {
@@ -543,11 +562,40 @@
       renderGrid();
     }
 
+    function onPickerSearch(val) {
+      searchQuery = val.trim().toLowerCase();
+      // Visually deactivate category pills when searching across all categories
+      if (searchQuery) {
+        document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      } else {
+        // Restore the active pill for the current activeCat
+        document.querySelectorAll('.cat-pill').forEach(p => {
+          if ((p.dataset.cat || '') === activeCat) p.classList.add('active');
+        });
+      }
+      document.getElementById('pickerSearchClear').style.display = searchQuery ? '' : 'none';
+      renderGrid();
+    }
+
+    function clearPickerSearch() {
+      document.getElementById('pickerSearch').value = '';
+      onPickerSearch('');
+      document.getElementById('pickerSearch').focus();
+    }
+
     function renderGrid() {
       const grid = document.getElementById('prodGrid');
-      // Hide out-of-stock products — they cannot be sold
       const inStock = PRODUCTS.filter(p => p.stock > 0);
-      const filtered = activeCat ? inStock.filter(p => p.category === activeCat) : inStock;
+      // Apply category filter (ignored while search is active)
+      let filtered = (activeCat && !searchQuery) ? inStock.filter(p => p.category === activeCat) : inStock;
+      // Apply search filter — matches name, SKU, or barcode
+      if (searchQuery) {
+        filtered = filtered.filter(p =>
+          p.name.toLowerCase().includes(searchQuery) ||
+          (p.sku  && p.sku.toLowerCase().includes(searchQuery)) ||
+          (p.barcode && p.barcode.toLowerCase().includes(searchQuery))
+        );
+      }
       grid.innerHTML = filtered.map(p => {
         const oos = p.stock <= 0;
         const low = p.stock > 0 && p.stock <= 5;
@@ -565,7 +613,10 @@
           <div class="ppick-sku">${p.sku}</div>
           ${oos ? '' : '<div class="ppick-add"><i class="bi bi-plus-lg"></i> Add</div>'}
         </div>`;
-      }).join('');
+      }).join('') || (searchQuery
+        ? `<div style="grid-column:1/-1;text-align:center;padding:1.5rem 0;color:#94a3b8;font-size:.8rem;"><i class="bi bi-search me-1"></i>No products match <strong>${searchQuery.replace(/</g,'&lt;')}</strong></div>`
+        : '<div style="grid-column:1/-1;text-align:center;padding:1.5rem 0;color:#94a3b8;font-size:.8rem;">No products available</div>'
+      );
     }
 
     function buildCatPills() {
