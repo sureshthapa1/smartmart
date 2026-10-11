@@ -1,0 +1,9 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    "Voucher threshold vs. report threshold mismatch — The voucher prints for total_amount >= 500 but the lucky draw eligibility boundary in the report is 2000. Customers spending 500–1999 receive a physical 'Lucky Draw Voucher' but appear in the ineligible below-2000 segment. Change the voucher threshold to >= 2000 to match.",
+    "Export URL string concatenation — url_for('reports.dashain_offer_export_above') + '?start_date=...' is non-idiomatic and inconsistent with every other export link in the codebase. Pass date params as url_for arguments to let Flask handle encoding.",
+    "Unbounded memory load in main report route — dashain_offer_report fetches all sales in the date range with no LIMIT and splits in Python. Add a row cap (e.g. .limit(2000)) consistent with the credit_udharo route."
+  ],
+  "reviewDoc": "d:\\.agents\\tasks\\dashain-review.md"
+}

@@ -6,6 +6,7 @@ class Product(db.Model):
     __tablename__ = "products"
     __table_args__ = (
         db.Index("ix_product_sku", "sku"),
+        db.Index("ix_product_barcode", "barcode"),
         db.Index("ix_product_quantity", "quantity"),
         db.Index("ix_product_category", "category"),
         db.Index("ix_product_name", "name"),           # search / ORDER BY name

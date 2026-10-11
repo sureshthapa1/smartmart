@@ -113,10 +113,15 @@
       <i class="bi bi-arrow-up-circle-fill me-2"></i>Above Rs. 2000 — Lucky Draw Eligible
       <span class="badge bg-light text-success ms-2">{{summary.above_count}} customers</span>
     </div>
-    <a href="{{url_for('reports.dashain_offer_export_above')}}?start_date={{start_date}}&end_date={{end_date}}"
+    <div class="d-flex align-items-center gap-2">
+      {% if above_2000|length >= 1000 %}
+      <span class="badge bg-warning text-dark no-print" title="Page shows first 1000 rows. Export CSV for the full list.">⚠ First 1000 shown — use CSV for full list</span>
+      {% endif %}
+      <a href="{{url_for('reports.dashain_offer_export_above', start_date=start_date_param, end_date=end_date_param)}}"
        class="btn btn-sm btn-light no-print">
       <i class="bi bi-filetype-csv me-1"></i>Export CSV
     </a>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle table-above">
@@ -166,10 +171,15 @@
       <i class="bi bi-arrow-down-circle-fill me-2"></i>Below Rs. 2000 — All Customers
       <span class="badge bg-light text-warning ms-2" style="color:#e67e00!important;">{{summary.below_count}} customers</span>
     </div>
-    <a href="{{url_for('reports.dashain_offer_export_below')}}?start_date={{start_date}}&end_date={{end_date}}"
+    <div class="d-flex align-items-center gap-2">
+      {% if below_2000|length >= 1000 %}
+      <span class="badge bg-warning text-dark no-print" title="Page shows first 1000 rows. Export CSV for the full list.">⚠ First 1000 shown — use CSV for full list</span>
+      {% endif %}
+      <a href="{{url_for('reports.dashain_offer_export_below', start_date=start_date_param, end_date=end_date_param)}}"
        class="btn btn-sm btn-light no-print">
       <i class="bi bi-filetype-csv me-1"></i>Export CSV
     </a>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle table-below">

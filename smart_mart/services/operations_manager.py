@@ -52,12 +52,13 @@ def update_inventory_profile(product_id: int, barcode: str | None, reorder_level
 
 
 def search_product_by_barcode(barcode: str) -> Product | None:
-    profile = db.session.execute(
-        db.select(ProductInventoryProfile).where(ProductInventoryProfile.barcode == barcode.strip())
+    """Look up a product by its barcode field (EAN-13/UPC).
+    Queries products.barcode directly — NOT product_inventory_profiles.barcode
+    which is a separate field and may not match what staff entered in the product form.
+    """
+    return db.session.execute(
+        db.select(Product).where(Product.barcode == barcode.strip())
     ).scalar_one_or_none()
-    if profile:
-        return db.session.get(Product, profile.product_id)
-    return None
 
 
 def create_batches_for_purchase(purchase: Purchase) -> None:

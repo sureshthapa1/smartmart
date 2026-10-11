@@ -757,6 +757,14 @@ def _migration_steps() -> list[MigrationStep]:
                 ),
             ),
         ),
+        (
+            "2026_10_11_product_barcode_index",
+            "Add index on products.barcode for fast barcode lookup.",
+            lambda conn: _safe_exec(
+                conn,
+                "CREATE INDEX IF NOT EXISTS ix_product_barcode ON products(barcode)"
+            ),
+        ),
     ]
 
 

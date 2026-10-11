@@ -1100,22 +1100,44 @@ def dashain_offer_report():
 
     start, end, start_raw, end_raw = _get_date_range()
 
-    all_sales = db.session.execute(
-        db.select(Sale)
-        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+    # Query each tier separately at the DB level so a limit on one doesn't
+    # corrupt the counts/totals of the other. Cap each at 1000 rows for the
+    # page display; CSV exports (no limit) are available for full audit.
+    _base = db.select(Sale).where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+
+    above_2000 = db.session.execute(
+        _base.where(Sale.total_amount >= 2000)
         .order_by(Sale.sale_date.desc())
+        .limit(1000)
     ).scalars().all()
 
-    above_2000 = [s for s in all_sales if float(s.total_amount or 0) >= 2000]
-    below_2000 = [s for s in all_sales if float(s.total_amount or 0) < 2000]
+    below_2000 = db.session.execute(
+        _base.where(Sale.total_amount < 2000)
+        .order_by(Sale.sale_date.desc())
+        .limit(1000)
+    ).scalars().all()
+
+    # Aggregate totals via a dedicated COUNT/SUM query so the summary is always
+    # accurate even when the display list is capped at 1000 rows.
+    from sqlalchemy import func as _func
+    agg = db.session.execute(
+        db.select(
+            _func.count(Sale.id).label("total_sales"),
+            _func.coalesce(_func.sum(Sale.total_amount), 0).label("grand_total"),
+            _func.count(db.case((Sale.total_amount >= 2000, 1))).label("above_count"),
+            _func.coalesce(_func.sum(db.case((Sale.total_amount >= 2000, Sale.total_amount), else_=0)), 0).label("above_total"),
+            _func.count(db.case((Sale.total_amount < 2000, 1))).label("below_count"),
+            _func.coalesce(_func.sum(db.case((Sale.total_amount < 2000, Sale.total_amount), else_=0)), 0).label("below_total"),
+        ).where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+    ).one()
 
     summary = {
-        "above_count": len(above_2000),
-        "below_count": len(below_2000),
-        "total_sales": len(all_sales),
-        "grand_total": sum(float(s.total_amount or 0) for s in all_sales),
-        "above_total": sum(float(s.total_amount or 0) for s in above_2000),
-        "below_total": sum(float(s.total_amount or 0) for s in below_2000),
+        "above_count": agg.above_count,
+        "below_count": agg.below_count,
+        "total_sales": agg.total_sales,
+        "grand_total": float(agg.grand_total),
+        "above_total": float(agg.above_total),
+        "below_total": float(agg.below_total),
     }
 
     return render_template(
@@ -1123,8 +1145,11 @@ def dashain_offer_report():
         above_2000=above_2000,
         below_2000=below_2000,
         summary=summary,
-        start_date=start_raw,
-        end_date=end_raw,
+        start_date=start_raw or "",
+        end_date=end_raw or "",
+        # Pass None when empty so url_for omits the param entirely
+        start_date_param=start_raw or None,
+        end_date_param=end_raw or None,
     )
 
 

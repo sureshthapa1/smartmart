@@ -1292,7 +1292,7 @@ def print_labels():
         # Generate QR/barcode images as base64 for selected products
         for p in products:
             if p.id in selected_ids:
-                barcode_b64 = _generate_barcode_b64(p.sku)
+                barcode_b64 = _generate_barcode_b64(p.barcode or p.sku)
                 label_data.append({
                     "id": p.id,
                     "name": p.name,

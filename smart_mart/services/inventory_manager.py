@@ -262,13 +262,15 @@ def get_products(search: str | None = None, page: int = 1, per_page: int = 100,
     stmt = db.select(Product).options(joinedload(Product.supplier)).order_by(Product.name)
     if search:
         term = search.strip().lower()
-        stmt = stmt.where(
-            or_(
-                func.lower(Product.name).contains(term),
-                func.lower(Product.category).contains(term),
-                func.lower(Product.sku) == term,
-            )
-        )
+        _conditions = [
+            func.lower(Product.name).contains(term),
+            func.lower(Product.category).contains(term),
+            func.lower(Product.sku) == term,
+            func.lower(Product.barcode) == term,
+        ]
+        if len(term) >= 4:
+            _conditions.append(Product.barcode.ilike(f'%{term}%'))
+        stmt = stmt.where(or_(*_conditions))
     if active_only is True:
         stmt = stmt.where(Product.is_active == True)
     elif active_only is False:
