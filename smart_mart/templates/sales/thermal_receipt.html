@@ -42,6 +42,10 @@
       body { width: 80mm }
       .no-print { display: none }
     }
+    /* Dashain voucher: ensure border and background print correctly */
+    @media print {
+      .dashain-voucher { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
   </style>
 </head>
 <body>
@@ -142,6 +146,41 @@
     <span class="miti" style="font-size:10px;">{{ sale.sale_date | bs_date }}</span>
     <span style="font-size:9px;"> ({{ sale.sale_date | nst('%Y-%m-%d %H:%M') }})</span>
   </div>
+
+  {# ================================================================
+     DASHAIN LUCKY DRAW VOUCHER
+     Only shown for purchases >= NPR 500.
+     Change the threshold below (500) as needed.
+     ================================================================ #}
+  {% if sale.total_amount|float >= 500 %}
+  <div style="margin-top:8px">
+    <!-- Tear-here scissors line -->
+    <div style="display:flex;align-items:center;gap:4px;margin:6px 0;">
+      <span style="font-size:14px;">✂</span>
+      <div style="flex:1;border-top:1px dashed #555;"></div>
+      <span style="font-size:10px;color:#555;">Tear Here</span>
+      <div style="flex:1;border-top:1px dashed #555;"></div>
+    </div>
+    <!-- Voucher Box -->
+    <div style="border:2px solid #e67e00;border-radius:4px;padding:5px 7px;background:#fff9f0;">
+      <div style="text-align:center;font-weight:900;font-size:14px;color:#e67e00;letter-spacing:0.5px;margin-bottom:3px;">
+        🪔 Dashain Lucky Draw Voucher 🪔
+      </div>
+      <div style="border-top:1px dashed #e67e00;margin-bottom:4px;"></div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse;">
+        <tr><td style="padding:1px 0;"><strong>Shop:</strong></td><td style="text-align:right;padding:1px 0;">{{shop.shop_name if shop else 'Goldkernel'}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Customer:</strong></td><td style="text-align:right;padding:1px 0;">{{sale.customer_name or 'Walk-in'}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Phone:</strong></td><td style="text-align:right;padding:1px 0;">{{sale.customer_phone or '—'}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Invoice:</strong></td><td style="text-align:right;padding:1px 0;">{{sale.invoice_number or '#' ~ sale.id}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Date (BS):</strong></td><td style="text-align:right;padding:1px 0;" class="miti">{{sale.sale_date | bs_date}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Date (AD):</strong></td><td style="text-align:right;padding:1px 0;">{{sale.sale_date | nst('%Y-%m-%d')}}</td></tr>
+        <tr><td style="padding:1px 0;"><strong>Amount:</strong></td><td style="text-align:right;padding:1px 0;font-weight:900;">NPR {{"%.2f"|format(sale.total_amount|float)}}</td></tr>
+      </table>
+      <div style="border-top:1px dashed #e67e00;margin-top:4px;margin-bottom:3px;"></div>
+      <div style="text-align:center;font-size:10px;color:#a05000;font-style:italic;">Keep this voucher for the Dashain Lucky Draw!</div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="no-print" style="margin-top:12px;text-align:center">
     <button onclick="window.print()" style="padding:8px 20px;background:#6366f1;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">

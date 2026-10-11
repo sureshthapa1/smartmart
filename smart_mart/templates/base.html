@@ -438,6 +438,10 @@
             <li><a class="nav-link {% if request.endpoint == 'reports.credit_udharo' %}active{% endif %}"
                    href="{{ url_for('reports.credit_udharo') }}"><i class="bi bi-credit-card"></i> Udharo Report</a></li>
             {% endif %}
+            {% if current_user.role == 'admin' or current_user.permissions.can_view_reports %}
+            <li><a class="nav-link {% if request.endpoint == 'reports.dashain_offer_report' %}active{% endif %}"
+                   href="{{ url_for('reports.dashain_offer_report') }}"><i class="bi bi-gift"></i> 🪔 Dashain Offer</a></li>
+            {% endif %}
           </ul>
         </div>
       </li>

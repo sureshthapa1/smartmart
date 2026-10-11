@@ -1085,3 +1085,124 @@ def vat_report():
                            total_discount=float(result.total_discount or 0),
                            daily_rows=daily_rows,
                            start_date=start_raw, end_date=end_raw)
+
+
+# ── Dashain Offer Report ──────────────────────────────────────────────────────
+
+@reports_bp.route("/dashain-offer")
+@login_required
+def dashain_offer_report():
+    """Dashain offer report: sales split by above/below NPR 2000."""
+    _require_perm("can_view_reports")
+    from sqlalchemy import and_
+    from ...extensions import db
+    from ...models.sale import Sale
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    all_sales = db.session.execute(
+        db.select(Sale)
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end))
+        .order_by(Sale.sale_date.desc())
+    ).scalars().all()
+
+    above_2000 = [s for s in all_sales if float(s.total_amount or 0) >= 2000]
+    below_2000 = [s for s in all_sales if float(s.total_amount or 0) < 2000]
+
+    summary = {
+        "above_count": len(above_2000),
+        "below_count": len(below_2000),
+        "total_sales": len(all_sales),
+        "grand_total": sum(float(s.total_amount or 0) for s in all_sales),
+        "above_total": sum(float(s.total_amount or 0) for s in above_2000),
+        "below_total": sum(float(s.total_amount or 0) for s in below_2000),
+    }
+
+    return render_template(
+        "reports/dashain_offer.html",
+        above_2000=above_2000,
+        below_2000=below_2000,
+        summary=summary,
+        start_date=start_raw,
+        end_date=end_raw,
+    )
+
+
+@reports_bp.route("/dashain-offer/export-above")
+@login_required
+def dashain_offer_export_above():
+    """CSV export: Dashain offer — above NPR 2000 customers."""
+    _require_perm("can_view_reports")
+    import csv, io
+    from sqlalchemy import and_
+    from ...extensions import db
+    from ...models.sale import Sale
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    sales = db.session.execute(
+        db.select(Sale)
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end,
+                    Sale.total_amount >= 2000))
+        .order_by(Sale.sale_date.desc())
+    ).scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["S.N.", "Invoice No", "Customer Name", "Customer Phone",
+                     "Billing Date", "Total Amount (NPR)", "Payment Mode"])
+    for i, s in enumerate(sales, 1):
+        writer.writerow([
+            i,
+            s.invoice_number or f"INV-{s.id:05d}",
+            s.customer_name or "Walk-in",
+            s.customer_phone or "",
+            s.sale_date.strftime("%Y-%m-%d %H:%M") if s.sale_date else "",
+            float(s.total_amount or 0),
+            (s.payment_mode or "cash").upper(),
+        ])
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition":
+                 f"attachment; filename=dashain_above2000_{start_raw}_{end_raw}.csv"}
+    )
+
+
+@reports_bp.route("/dashain-offer/export-below")
+@login_required
+def dashain_offer_export_below():
+    """CSV export: Dashain offer — below NPR 2000 customers."""
+    _require_perm("can_view_reports")
+    import csv, io
+    from sqlalchemy import and_
+    from ...extensions import db
+    from ...models.sale import Sale
+
+    start, end, start_raw, end_raw = _get_date_range()
+
+    sales = db.session.execute(
+        db.select(Sale)
+        .where(and_(Sale.sale_date >= start, Sale.sale_date <= end,
+                    Sale.total_amount < 2000))
+        .order_by(Sale.sale_date.desc())
+    ).scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["S.N.", "Invoice No", "Customer Name", "Customer Phone",
+                     "Billing Date", "Total Amount (NPR)", "Payment Mode"])
+    for i, s in enumerate(sales, 1):
+        writer.writerow([
+            i,
+            s.invoice_number or f"INV-{s.id:05d}",
+            s.customer_name or "Walk-in",
+            s.customer_phone or "",
+            s.sale_date.strftime("%Y-%m-%d %H:%M") if s.sale_date else "",
+            float(s.total_amount or 0),
+            (s.payment_mode or "cash").upper(),
+        ])
+    return Response(
+        output.getvalue(), mimetype="text/csv",
+        headers={"Content-Disposition":
+                 f"attachment; filename=dashain_below2000_{start_raw}_{end_raw}.csv"}
+    )
