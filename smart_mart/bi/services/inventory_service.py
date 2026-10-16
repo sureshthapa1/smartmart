@@ -41,8 +41,9 @@ class InventoryService:
         product.inventory_value = money(as_decimal(product.quantity) * as_decimal(product.cost_price))
 
     @staticmethod
-    def reduce_stock_for_sale(product: Product, qty: int) -> None:
-        product.quantity = int(product.quantity or 0) - int(qty)
+    def reduce_stock_for_sale(product: Product, qty) -> None:
+        from decimal import Decimal
+        product.quantity = as_decimal(product.quantity or 0) - as_decimal(qty)
         product.inventory_value = money(as_decimal(product.quantity) * as_decimal(product.cost_price or 0))
 
     @staticmethod

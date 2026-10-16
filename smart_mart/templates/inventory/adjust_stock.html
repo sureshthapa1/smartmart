@@ -29,7 +29,7 @@
           <div class="d-flex gap-2 align-items-center mt-1">
             <code class="text-muted" style="font-size:.78rem">{{ product.sku }}</code>
             <span class="badge {% if product.quantity == 0 %}bg-danger{% elif product.quantity <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
-              {{ product.quantity }} {{ product.unit or 'pcs' }} in stock
+              {{ product.quantity | qty }} {{ product.unit or 'pcs' }} in stock
             </span>
           </div>
         </div>

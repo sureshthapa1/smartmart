@@ -115,7 +115,7 @@
           <td class="text-center">{{ loop.index }}</td>
           <td><strong>{{ item.custom_label if item.custom_label else (item.product.name if item.product else '—') }}</strong></td>
           <td style="color:#94a3b8;font-size:11px;">{{ item.product.sku if item.product else '—' }}</td>
-          <td class="text-center">{{ item.quantity }}</td>
+          <td class="text-center">{{ item.quantity | qty }}</td>
           <td class="text-right">{{ "%.2f"|format(item.unit_price | float) }}</td>
           <td class="text-right"><strong>{{ "%.2f"|format(item.subtotal | float) }}</strong></td>
         </tr>

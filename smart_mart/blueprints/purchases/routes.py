@@ -459,7 +459,7 @@ def _parse_items(form) -> list[dict]:
             break
         try:
             pid = int(product_id)
-            qty = int(form.get(f"items[{index}][quantity]", "0"))
+            qty = round(float(form.get(f"items[{index}][quantity]", "0")), 3)
             cost = float(form.get(f"items[{index}][unit_cost]", "0"))
             if pid > 0 and qty > 0 and cost >= 0:
                 items.append({"product_id": pid, "quantity": qty, "unit_cost": cost})

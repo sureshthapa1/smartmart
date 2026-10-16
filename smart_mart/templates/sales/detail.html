@@ -191,7 +191,7 @@
                 </div>
               </td>
               <td><code class="text-muted">{{ item.product.sku if item.product else '—' }}</code></td>
-              <td class="text-end">{{ item.quantity }}</td>
+              <td class="text-end">{{ item.quantity | qty }}</td>
               <td class="text-end">{{ "%.2f"|format(item.unit_price) }}</td>
               <td class="text-end fw-medium">{{ "%.2f"|format(item.subtotal) }}</td>
             </tr>

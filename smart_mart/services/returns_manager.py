@@ -33,13 +33,13 @@ def get_return(return_id: int) -> SaleReturn:
     return db.get_or_404(SaleReturn, return_id)
 
 
-def returned_quantity_for_sale_item(sale_item_id: int) -> int:
+def returned_quantity_for_sale_item(sale_item_id: int):
     qty = db.session.execute(
         db.select(db.func.coalesce(db.func.sum(SaleReturnItem.quantity), 0)).where(
             SaleReturnItem.sale_item_id == sale_item_id
         )
     ).scalar()
-    return int(qty or 0)
+    return float(qty or 0)
 
 
 def returnable_items_for_sale(sale_id: int) -> list[dict]:
@@ -73,7 +73,7 @@ def create_return(
     requested_by_item_id = {}
     for row in item_quantities:
         sale_item_id = int(row["sale_item_id"])
-        quantity = int(row["quantity"])
+        quantity = round(float(row["quantity"]), 3)
         if quantity <= 0:
             continue
         requested_by_item_id[sale_item_id] = quantity

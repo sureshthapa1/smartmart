@@ -114,7 +114,7 @@ with app.app_context():
 
         # Update stock
         prod_obj = db.session.get(Product, prod_id)
-        prod_obj.quantity = int(prod_obj.quantity) + 10
+        prod_obj.quantity = float(prod_obj.quantity) + 10
 
         # Stock movement
         db.session.add(StockMovement(

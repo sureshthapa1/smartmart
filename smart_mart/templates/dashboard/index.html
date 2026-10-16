@@ -370,7 +370,7 @@
           <div class="ls-row">
             <span class="ls-name text-truncate" style="max-width:160px">{{ p.name }}</span>
             <a href="{{ url_for('inventory.edit_product', product_id=p.id) }}"
-               class="ls-qty">{{ p.quantity }} left</a>
+               class="ls-qty">{{ p.quantity | qty }} left</a>
           </div>
           {% endfor %}
           {% else %}

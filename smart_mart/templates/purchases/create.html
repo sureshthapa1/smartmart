@@ -128,7 +128,7 @@ function addRow(){
       </select>
       <div class="text-muted price-history" style="font-size:.68rem;margin-top:3px;padding-left:2px"></div>
     </td>
-    <td><input type="number" class="form-control form-control-sm qty-in" name="items[${idx}][quantity]" min="1" value="1" required></td>
+    <td><input type="number" class="form-control form-control-sm qty-in" name="items[${idx}][quantity]" min="0.001" step="0.001" value="1" required></td>
     <td>
       <input type="number" class="form-control form-control-sm cost-in" name="items[${idx}][unit_cost]" min="0" step="0.01" value="0.00" required>
     </td>

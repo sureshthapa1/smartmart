@@ -104,7 +104,7 @@
     {% set subtotal.val = subtotal.val + item.subtotal|float %}
     <tr>
       <td class="item-name">{{ item.custom_label if item.custom_label else (item.product.name | truncate(22, True, '…') if item.product else 'Item') }}{% if item.variant %} ({{ item.variant.variant_name | truncate(8, True, '…') }}){% endif %}</td>
-      <td class="item-qty">{{ item.quantity }}</td>
+      <td class="item-qty">{{ item.quantity | qty }}</td>
       <td class="item-price">{{ "%.0f"|format(item.unit_price|float) }}</td>
       <td class="item-total">{{ "%.0f"|format(item.subtotal|float) }}</td>
     </tr>

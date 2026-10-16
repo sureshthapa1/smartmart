@@ -48,8 +48,8 @@ class StockTakeItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     stock_take_id = db.Column(db.Integer, db.ForeignKey("stock_takes.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
-    system_qty = db.Column(db.Integer, nullable=False)   # qty at time of count
-    counted_qty = db.Column(db.Integer, nullable=True)   # actual physical count
+    system_qty = db.Column(db.Numeric(10, 3), nullable=False)   # qty at time of count
+    counted_qty = db.Column(db.Numeric(10, 3), nullable=True)   # actual physical count
     note = db.Column(db.String(255), nullable=True)
 
     stock_take = db.relationship("StockTake", back_populates="items")

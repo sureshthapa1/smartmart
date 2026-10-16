@@ -12,7 +12,7 @@ class StockMovement(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
-    change_amount = db.Column(db.Integer, nullable=False)  # positive = in, negative = out
+    change_amount = db.Column(db.Numeric(10, 3), nullable=False)  # positive = in, negative = out
     change_type = db.Column(db.String(20), nullable=False)  # 'sale'|'purchase'|'adjustment_in'|'adjustment_out'
     reference_id = db.Column(db.Integer, nullable=True)
     note = db.Column(db.Text, nullable=True)

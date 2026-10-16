@@ -22,7 +22,7 @@ class Product(db.Model):
     barcode = db.Column(db.String(80), nullable=True)  # EAN-13/UPC manufacturer barcode
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False, default=0)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False, default=0)
     low_stock_threshold = db.Column(db.Integer, nullable=True, default=10)
     inventory_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
     supplier_id = db.Column(db.Integer, db.ForeignKey("suppliers.id"), nullable=True)
@@ -63,7 +63,8 @@ class Product(db.Model):
 
     @stock_quantity.setter
     def stock_quantity(self, value):
-        self.quantity = int(value or 0)
+        from decimal import Decimal
+        self.quantity = Decimal(str(value or 0))
 
     def __repr__(self):
         return f"<Product {self.sku} - {self.name}>"

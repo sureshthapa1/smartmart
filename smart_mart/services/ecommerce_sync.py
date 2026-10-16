@@ -534,7 +534,7 @@ def _consume_reservations(order: OnlineOrder) -> None:
             )
     for row in active_rows:
         product = db.session.get(Product, row.product_id)
-        product.quantity = int(product.quantity or 0) - int(row.quantity or 0)
+        product.quantity = float(product.quantity or 0) - float(row.quantity or 0)
         row.status = "consumed"
         row.updated_at = utcnow()
 
@@ -550,7 +550,7 @@ def _release_or_restore_stock(order: OnlineOrder) -> None:
             if row.status in {"released", "expired"}:
                 continue
             if row.status == "consumed" and product:
-                product.quantity = int(product.quantity or 0) + int(row.quantity or 0)
+                product.quantity = float(product.quantity or 0) + float(row.quantity or 0)
             if row.status in {"active", "consumed"}:
                 row.status = "released"
                 row.updated_at = utcnow()
@@ -560,7 +560,7 @@ def _release_or_restore_stock(order: OnlineOrder) -> None:
     for item in order.items:
         product = db.session.get(Product, item.product_id)
         if product:
-            product.quantity = int(product.quantity or 0) + int(item.quantity or 0)
+            product.quantity = float(product.quantity or 0) + float(item.quantity or 0)
 
 
 def apply_order_status(
@@ -671,7 +671,7 @@ def sync_inventory(payload: dict[str, Any]) -> dict[str, Any]:
         for item in items:
             product = _product_for_item(item)
             if "quantity" in item:
-                product.quantity = int(item["quantity"])
+                product.quantity = round(float(item["quantity"]), 3)
             if "selling_price" in item:
                 product.selling_price = money(item["selling_price"])
             if "is_active" in item:

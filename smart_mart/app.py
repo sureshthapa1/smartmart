@@ -283,6 +283,20 @@ def create_app(config_name="development"):
             return _md_fallback
     app.jinja_env.filters["markdown"] = _make_md_filter()
 
+    @app.template_filter("qty")
+    def qty_filter(value):
+        """Display a quantity cleanly: integers as whole numbers, fractions to 3 d.p.
+        e.g. Decimal('1.000') → '1',  Decimal('0.100') → '0.1',  Decimal('0.333') → '0.333'
+        """
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            return value
+        if f == int(f):
+            return str(int(f))
+        # Strip trailing zeros (e.g. 0.100 → 0.1)
+        return f"{f:.3f}".rstrip("0").rstrip(".")
+
     @app.template_filter("nst")
     def nst_filter(dt, fmt="%Y-%m-%d %H:%M"):
         """Convert a naive UTC datetime to Nepal Standard Time (UTC+5:45)."""

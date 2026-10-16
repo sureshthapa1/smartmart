@@ -18,7 +18,7 @@ class ProductService:
                 sku=sku,
                 name=data.get("name") or sku,
                 category=data.get("category"),
-                quantity=int(data.get("quantity") or 0),
+                quantity=round(float(data.get("quantity") or 0), 3),
                 cost_price=quantize_unit_cost(data.get("cost_price") or 0),
                 selling_price=money(data.get("selling_price") or 0),
                 unit=data.get("unit") or "pcs",

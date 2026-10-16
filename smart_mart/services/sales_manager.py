@@ -744,7 +744,7 @@ def delete_sale(sale_id: int) -> None:
                 db.select(db.func.coalesce(db.func.sum(SaleReturnItem.quantity), 0))
                 .where(SaleReturnItem.sale_item_id == item.id)
             ).scalar() or 0
-            restore_qty = int(item.quantity) - int(already_returned)
+            restore_qty = float(item.quantity) - float(already_returned)
             if restore_qty <= 0:
                 continue  # fully returned already — stock is back on the shelf
 

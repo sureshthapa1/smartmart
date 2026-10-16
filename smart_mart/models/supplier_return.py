@@ -55,7 +55,7 @@ class SupplierReturnItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     supplier_return_id = db.Column(db.Integer, db.ForeignKey("supplier_returns.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)
     unit_cost = db.Column(db.Numeric(10, 2), nullable=False)
     reason = db.Column(db.String(120), nullable=True)
 

@@ -613,7 +613,7 @@ def _parse_items(form) -> list[dict]:
         unit_price_raw = form.get(f"items[{index}][unit_price]",   "0")
         custom_label   = form.get(f"items[{index}][custom_label]", "").strip()
         try:
-            qty   = int(quantity_raw)
+            qty   = round(float(quantity_raw), 3)
             price = float(unit_price_raw)
             if qty <= 0 or price < 0:
                 continue

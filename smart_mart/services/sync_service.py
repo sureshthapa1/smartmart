@@ -94,7 +94,7 @@ def _upsert_product(payload: dict, client_ts: datetime | None = None, force_appl
     product.name = payload.get("name") or product.name
     product.category = payload.get("category") or product.category
     if "quantity" in payload:
-        product.quantity = int(payload["quantity"])
+        product.quantity = round(float(payload["quantity"]), 3)
     if "selling_price" in payload:
         product.selling_price = payload["selling_price"]
     if "cost_price" in payload:

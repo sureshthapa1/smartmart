@@ -67,13 +67,10 @@ def record_waste():
         if quantity > stock_quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")
         cost_value = quantity * Decimal(str(product.cost_price or 0))
-        # products.quantity is an Integer column, so fractional waste has to land
-        # on a whole unit. Derive the deduction once and log exactly that: the
-        # ledger used -int(quantity), which for 0.5g logged 0 while the stock
-        # write took a whole unit off — one unit of silent drift per part-unit
-        # waste record, on a form whose own labels are in grams.
-        new_quantity = int(stock_quantity - quantity)
-        deducted = int(stock_quantity) - new_quantity
+        # Now that products.quantity is Numeric(10,3), fractional deductions are
+        # stored exactly. Compute the new quantity directly without int() truncation.
+        new_quantity = stock_quantity - quantity
+        deducted = quantity
         product.quantity = new_quantity
         record = WasteRecord(
             product_id=product.id,
