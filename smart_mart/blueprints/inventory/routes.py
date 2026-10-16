@@ -835,17 +835,40 @@ def autofill_barcodes():
         db.select(Product)
         .where(Product.is_active == True, Product.barcode == None)
     ).scalars().all()
+
+    # Build a set of barcodes already in use (both existing and newly assigned this run)
+    # to prevent two products getting the same barcode value.
+    existing_barcodes = set(
+        row[0] for row in db.session.execute(
+            db.select(Product.barcode).where(Product.barcode != None)
+        ).all()
+    )
+
     updated = 0
+    skipped = 0
     for p in products_without_barcode:
-        if p.sku:
-            p.barcode = p.sku   # use SKU as the barcode value
-            updated += 1
+        if not p.sku:
+            skipped += 1
+            continue
+        if p.sku in existing_barcodes:
+            # Another product already uses this SKU as its barcode — skip to avoid collision
+            skipped += 1
+            continue
+        p.barcode = p.sku
+        existing_barcodes.add(p.sku)  # reserve it for subsequent iterations
+        updated += 1
+
     if updated:
         db.session.commit()
-        flash(f"✅ Barcodes auto-generated for {updated} products using their SKU. "
-              f"Print labels to stick them on products.", "success")
+        msg = f"✅ Barcodes auto-generated for {updated} products using their SKU. Print labels to stick them on products."
+        if skipped:
+            msg += f" ({skipped} skipped — no SKU or barcode already in use.)"
+        flash(msg, "success")
     else:
-        flash("All active products already have barcodes.", "info")
+        if skipped:
+            flash(f"No barcodes generated — {skipped} products skipped (no SKU or barcode collision).", "warning")
+        else:
+            flash("All active products already have barcodes.", "info")
     return redirect(url_for("inventory.list_products"))
 
 
@@ -1348,6 +1371,7 @@ def labels_pdf():
     show_shop   = data.get("show_shop", True)
     show_mrp    = data.get("show_mrp", True)
     show_sku    = data.get("show_sku", False)
+    show_dates  = data.get("show_dates", True)
 
     shop_name = ""
     try:
@@ -1360,98 +1384,145 @@ def labels_pdf():
         from reportlab.lib.units import mm
         from reportlab.pdfgen import canvas
         from reportlab.lib.utils import ImageReader
+        from reportlab.pdfbase.pdfmetrics import stringWidth
 
-        W = w_mm * mm
-        H = h_mm * mm
-        pad = 2 * mm
+        W = w_mm * mm   # 75mm → 212.6pt
+        H = h_mm * mm   # 50mm → 141.7pt
+
+        # ── Layout constants (all in points) ──────────────────────────────
+        PAD_X   = 2.5 * mm   # left/right margin
+        PAD_TOP = 2.0 * mm   # gap from top edge to first text baseline
+        PAD_BOT = 2.0 * mm   # gap from bottom edge to barcode bottom
+        BC_H    = 15.0 * mm  # barcode zone height (bars + quiet zone)
+        LINE_GAP = 1.0 * mm  # minimum gap between text lines
 
         buf = io.BytesIO()
         c = canvas.Canvas(buf, pagesize=(W, H))
 
         for item in items:
-            copies  = max(1, int(item.get("copies", 1)))
-            name    = str(item.get("name", ""))
-            sku     = str(item.get("sku", ""))
-            bc_val  = str(item.get("barcode") or sku)
-            price   = float(item.get("price", 0))
+            copies    = max(1, int(item.get("copies", 1)))
+            name      = str(item.get("name", ""))
+            sku       = str(item.get("sku", ""))
+            bc_val    = str(item.get("barcode") or sku)
+            price     = float(item.get("price", 0))
             price_str = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
+            pkg_date  = str(item.get("pkg", ""))
+            exp_date  = str(item.get("exp", ""))
 
-            # Generate barcode image
-            bc_img = None
+            # ── Generate barcode PNG bytes once per item ──────────────────
+            # Store raw bytes so each copy can wrap a fresh stream — an
+            # exhausted ImageReader stream causes blank/barcode-only copies.
+            # write_text=False avoids printing barcode digits *inside* the PNG
+            # which would double-up with the text we draw above it.
+            bc_bytes = None
             if show_bc:
                 try:
                     import barcode as _bc
                     from barcode.writer import ImageWriter
                     bb = io.BytesIO()
-                    code = _bc.get("code128", bc_val, writer=ImageWriter())
-                    code.write(bb, options={
-                        "write_text": True,
-                        "module_height": 8.0,
-                        "module_width": 0.7,
-                        "quiet_zone": 2.0,
-                        "font_size": 6,
-                        "text_distance": 1.0,
+                    _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
+                        "write_text":   False,
+                        "module_height": 12.0,
+                        "module_width":  0.7,
+                        "quiet_zone":    2.0,
+                        "font_size":     0,
+                        "text_distance": 0,
                     })
-                    bb.seek(0)
-                    bc_img = ImageReader(bb)
+                    bc_bytes = bb.getvalue()
                 except Exception:
-                    bc_img = None
+                    bc_bytes = None
 
             for _ in range(copies):
                 c.setPageSize((W, H))
                 c.setFillColorRGB(0, 0, 0)
 
-                # barcode at bottom
-                bc_h = 12 * mm if bc_img else 0
+                # Fresh reader per copy (stream is exhausted after first drawImage)
+                bc_img = ImageReader(io.BytesIO(bc_bytes)) if bc_bytes else None
 
-                # ── Text layout (top down) ──
-                # reportlab y=0 is bottom, so convert: y_from_top → H - y_from_top
-                y_top = H - pad   # start from top minus padding
+                # ── Zone boundaries (ReportLab y=0 at BOTTOM) ─────────────
+                # Barcode zone sits just above the bottom margin.
+                bc_zone_bottom = PAD_BOT                          # barcode bottom edge
+                bc_zone_top    = PAD_BOT + BC_H if bc_img else PAD_BOT
 
-                def draw_text(text, font, size, y_ft):
-                    """Draw text at y measured from top."""
-                    c.setFont(font, size)
-                    c.drawString(pad, y_ft - size * 0.352778, text)  # 1pt = 0.352778mm
-                    return y_ft - (size * 0.352778 + 1.2 * mm)
+                # Text zone sits between PAD_TOP below top edge and bc_zone_top
+                text_bottom    = bc_zone_top + LINE_GAP           # lowest point text may reach
+                text_top       = H - PAD_TOP                      # highest point (just below top edge)
+                text_zone_h    = text_top - text_bottom
 
-                y = y_top
+                # ── Build line list ───────────────────────────────────────
+                # (text, font_name, base_pt, droppable)
+                # droppable lines are removed first when label is overcrowded.
+                lines = []
                 if show_shop and shop_name:
-                    y = draw_text(shop_name, "Helvetica-Bold", 5, y)
-
-                # Product name — truncate to fit width
-                max_w_mm = w_mm - 2 * 2  # subtract padding both sides
-                font_size_name = 8
-                c.setFont("Helvetica-Bold", font_size_name)
-                char_w_mm = font_size_name * 0.352778 * 0.55
-                max_chars = int(max_w_mm / char_w_mm)
-                disp = name if len(name) <= max_chars else name[:max_chars - 1] + "…"
-                y = draw_text(disp, "Helvetica-Bold", font_size_name, y)
-
-                y = draw_text(price_str, "Helvetica-Bold", 12, y)
-
+                    lines.append((shop_name,             "Helvetica",      6.5, True))
+                lines.append(    (name,                  "Helvetica-Bold", 9.0, False))
+                lines.append(    (price_str,             "Helvetica-Bold", 16.0, False))
                 if show_mrp:
-                    y = draw_text("MRP incl. all taxes", "Helvetica", 4.5, y)
-
+                    lines.append(("MRP incl. all taxes", "Helvetica",      6.0, True))
+                if show_dates and pkg_date:
+                    lines.append((f"PKD: {pkg_date}",   "Helvetica",      6.5, False))
+                if show_dates and exp_date:
+                    lines.append((f"EXP: {exp_date}",   "Helvetica",      6.5, False))
                 if show_sku:
-                    draw_text(sku, "Helvetica", 4.5, y)
+                    lines.append((sku,                   "Helvetica",      6.5, True))
 
-                # Barcode spans full width at bottom
+                # Total height = sum of font sizes + gaps between lines
+                def _block_h(ln, s=1.0):
+                    if not ln: return 0
+                    return sum(pt * s for _, _, pt, _ in ln) + LINE_GAP * (len(ln) - 1)
+
+                # Step 1 — drop droppable lines if overcrowded
+                cur = list(lines)
+                if _block_h(cur) > text_zone_h:
+                    for i in reversed([i for i, l in enumerate(cur) if l[3]]):
+                        cur.pop(i)
+                        if _block_h(cur) <= text_zone_h:
+                            break
+
+                # Step 2 — proportional font scale if still overcrowded
+                scale = 1.0
+                if _block_h(cur) > text_zone_h and cur:
+                    scale = max(0.70, text_zone_h / _block_h(cur))
+
+                # Step 3 — distribute leftover space evenly between lines
+                used_h = _block_h(cur, scale)
+                extra  = 0.0
+                if len(cur) > 1 and used_h < text_zone_h:
+                    extra = min((text_zone_h - used_h) / (len(cur) - 1), 2.0 * mm)
+
+                # ── Draw text top-down ────────────────────────────────────
+                # Start at text_top and step downward by font size + gap.
+                y = text_top
+                for text, font, pt, _ in cur:
+                    sz  = pt * scale
+                    y  -= sz          # descend by one line height
+                    if y < text_bottom:
+                        break         # safety clamp — never enter barcode zone
+                    # Accurate truncation using ReportLab's own string width
+                    avail = W - 2 * PAD_X
+                    disp  = text
+                    while len(disp) > 1 and stringWidth(disp, font, sz) > avail:
+                        disp = disp[:-1]
+                    if disp != text:
+                        disp = disp[:-1] + "…"
+                    c.setFont(font, sz)
+                    c.drawString(PAD_X, y, disp)
+                    y -= LINE_GAP + extra
+
+                # ── Draw barcode ──────────────────────────────────────────
+                # Fills the full label width, sits directly above the bottom margin.
                 if bc_img:
-                    c.drawImage(bc_img, 0, 0, width=W, height=bc_h,
+                    c.drawImage(bc_img,
+                                0, bc_zone_bottom,
+                                width=W, height=BC_H,
                                 preserveAspectRatio=False)
 
                 c.showPage()
 
         c.save()
         buf.seek(0)
-
-        return _Resp(
-            buf.read(),
-            mimetype="application/pdf",
-            headers={
-                "Content-Disposition": "inline; filename=labels.pdf",
-            }
-        )
+        return _Resp(buf.read(), mimetype="application/pdf",
+                     headers={"Content-Disposition": "inline; filename=labels.pdf"})
 
     except Exception as exc:
         import logging
@@ -1523,6 +1594,22 @@ def labels_print_direct():
             price   = float(item.get("price", 0))
             price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
 
+            # Generate barcode bytes ONCE per item, reuse for each copy.
+            # write_text=False to avoid the double-barcode-text bug.
+            bc_bytes = None
+            if show_bc:
+                try:
+                    bb = io.BytesIO()
+                    code = _bc.get("code128", bc_val, writer=ImageWriter())
+                    code.write(bb, options={
+                        "write_text": False, "module_height": 10.0,
+                        "module_width": 0.4, "quiet_zone": 1.0,
+                        "font_size": 0, "text_distance": 0, "dpi": 203,
+                    })
+                    bc_bytes = bb.getvalue()
+                except Exception:
+                    bc_bytes = None
+
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
                 draw = ImageDraw.Draw(img)
@@ -1551,23 +1638,15 @@ def labels_print_direct():
                     if exp: put(f"EXP: {exp}", f_small)
                 if show_sku: put(sku, f_small)
 
-                # Barcode at bottom
-                if show_bc:
+                # Barcode at bottom — fresh Image from bytes each copy
+                if bc_bytes:
                     try:
-                        bb = io.BytesIO()
-                        code = _bc.get("code128", bc_val, writer=ImageWriter())
-                        code.write(bb, options={
-                            "write_text": True, "module_height": 10.0,
-                            "module_width": 0.4, "quiet_zone": 1.0,
-                            "font_size": 5, "text_distance": 1.0, "dpi": 203,
-                        })
-                        bb.seek(0)
-                        bc_im = Image.open(bb); bc_im.load()
+                        bc_im = Image.open(io.BytesIO(bc_bytes))
+                        bc_im.load()
                         bc_im = bc_im.convert("RGB")
-                        bc_h  = int(PX_H * 0.38)   # ~9mm barcode on 25mm sticker
+                        bc_h  = int(PX_H * 0.38)   # ~38% of label height for barcode
                         bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        # Place barcode right after text with small gap, not at absolute bottom
-                        bc_y = min(y + 4, PX_H - bc_h)
+                        bc_y  = min(y + 4, PX_H - bc_h)
                         img.paste(bc_im, (0, bc_y))
                     except Exception:
                         pass

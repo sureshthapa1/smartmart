@@ -37,8 +37,11 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
                 quantity=qty, unit_cost=unit_cost, subtotal=unit_cost * qty,
             ))
             product.quantity += qty
-            # Update cost price to latest purchase price
-            product.cost_price = unit_cost
+            # Update cost price only when unset (first purchase) — never overwrite
+            # an established cost price with a one-off delivery price, as that would
+            # corrupt historical profitability calculations for all prior sales.
+            if not product.cost_price or product.cost_price == 0:
+                product.cost_price = unit_cost
             # Auto-link supplier to product if not already set
             if not product.supplier_id:
                 product.supplier_id = supplier_id

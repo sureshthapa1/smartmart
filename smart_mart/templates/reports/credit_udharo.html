@@ -119,7 +119,17 @@
           </td>
           <td class="text-muted small">{{ s.customer_phone or '—' }}</td>
           <td class="text-muted small">{{ s.sale_date | nst('%Y-%m-%d') if s.sale_date else '—' }}<br>{% if s.sale_date %}<span style="font-size:.7rem;color:#94a3b8;">{{ s.sale_date | bs_date }}</span>{% endif %}</td>
-          <td class="text-end fw-semibold">NPR {{ "%.2f"|format(s.total_amount|float) }}</td>
+          <td class="text-end fw-semibold">
+            NPR {{ "%.2f"|format(s.total_amount|float) }}
+            {% if r.paid_so_far > 0 and not r.sale.credit_collected %}
+            <div class="text-success small">
+              <i class="bi bi-check-circle"></i> Paid: NPR {{ "%.2f"|format(r.paid_so_far) }}
+            </div>
+            <div class="text-danger small fw-bold">
+              Outstanding: NPR {{ "%.2f"|format(r.outstanding) }}
+            </div>
+            {% endif %}
+          </td>
           <td>
             {% if r.status == 'collected' %}
               <span class="text-muted small">—</span>

@@ -186,11 +186,11 @@
               <label class="form-label fw-medium small">Payment Method <span class="text-danger">*</span></label>
               <div class="d-flex gap-2 flex-wrap">
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash" checked>
                   <label class="form-check-label" for="pm_cash">💵 Cash</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa" checked>
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa">
                   <label class="form-check-label" for="pm_esewa"><img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style="height:14px;margin-right:4px">eSewa</label>
                 </div>
                 <div class="form-check form-check-inline">
@@ -1408,8 +1408,8 @@
   function findProductBySku(query) {
     const q = query.trim();
     if (!q) return null;
-    // 1. Exact barcode match (manufacturer EAN/UPC)
-    let found = PRODUCTS.find(p => p.barcode && p.barcode === q);
+    // 1. Exact barcode match (case-insensitive — scanners may output different case)
+    let found = PRODUCTS.find(p => p.barcode && p.barcode.toLowerCase() === q.toLowerCase());
     // 2. Exact SKU match (case-insensitive)
     if (!found) found = PRODUCTS.find(p => p.sku && p.sku.toLowerCase() === q.toLowerCase());
     // 3. Exact name match
@@ -1423,6 +1423,30 @@
     if (!sku) return;
     const product = findProductBySku(sku);
     if (product) {
+      // Out-of-stock guard — show warning toast instead of silently adding to cart
+      if (product.stock <= 0) {
+        barcodeInput.style.borderColor = '#f59e0b';
+        barcodeInput.style.background = 'rgba(245,158,11,.08)';
+        barcodeInput.value = '';
+        let toast = document.getElementById('barcodeErrorToast');
+        if (!toast) {
+          toast = document.createElement('div');
+          toast.id = 'barcodeErrorToast';
+          toast.style.cssText = 'position:absolute;top:100%;left:0;background:#f59e0b;color:#fff;padding:.3rem .7rem;border-radius:6px;font-size:.75rem;font-weight:600;z-index:1000;white-space:nowrap;margin-top:2px;';
+          barcodeInput.parentElement.style.position = 'relative';
+          barcodeInput.parentElement.appendChild(toast);
+        }
+        toast.style.background = '#f59e0b';
+        toast.textContent = `⚠️ Out of stock: ${product.name}`;
+        toast.style.display = '';
+        setTimeout(() => {
+          barcodeInput.style.borderColor = '';
+          barcodeInput.style.background = '';
+          if (toast) toast.style.display = 'none';
+        }, 2500);
+        barcodeInput.focus();
+        return;
+      }
       // Check if product already in cart — increment qty instead of adding new row
       let found = false;
       document.querySelectorAll('tr.sale-item-row').forEach(row => {
@@ -1457,6 +1481,7 @@
         barcodeInput.parentElement.style.position = 'relative';
         barcodeInput.parentElement.appendChild(toast);
       }
+      toast.style.background = '#ef4444';
       toast.textContent = `❌ SKU/Barcode not found: ${sku}`;
       toast.style.display = '';
       setTimeout(() => {

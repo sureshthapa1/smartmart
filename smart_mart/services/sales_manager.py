@@ -799,6 +799,25 @@ def delete_sale(sale_id: int) -> None:
         except Exception as e:
             logger.warning("Offer rollback failed for sale %s: %s", sale.id, e)
 
+        # Reverse the customer's total_spent so loyalty tiers don't drift upward
+        # from voided/deleted sales.
+        if sale.customer_id:
+            from ..models.customer import Customer
+            cust = db.session.get(Customer, sale.customer_id)
+            if cust:
+                sale_total = float(sale.total_amount or 0)
+                cust.total_spent = max(0.0, float(cust.total_spent or 0) - sale_total)
+                # Recalculate loyalty tier after reversal
+                ts = cust.total_spent
+                if ts >= 100000:
+                    cust.loyalty_tier = "platinum"
+                elif ts >= 50000:
+                    cust.loyalty_tier = "gold"
+                elif ts >= 20000:
+                    cust.loyalty_tier = "silver"
+                else:
+                    cust.loyalty_tier = "bronze"
+
         db.session.delete(sale)
         db.session.commit()
     except Exception:

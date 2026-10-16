@@ -113,6 +113,15 @@ def create_purchase():
             return render_template("purchases/create.html", suppliers=suppliers, products=products,
                                    today=date.today().isoformat())
         try:
+            # Idempotency: prevent double-post on network retry or double-click
+            idem_key = request.form.get("idempotency_key", "").strip()
+            if idem_key:
+                from ...models.idempotency_key import IdempotencyKey
+                existing = IdempotencyKey.consume(idem_key, current_user.id, "purchases.create_purchase")
+                if existing is not None:
+                    flash("This purchase was already submitted. Redirecting to the purchase list.", "info")
+                    return redirect(url_for("purchases.list_purchases"))
+
             purchase = purchase_manager.create_purchase(
                 supplier_id=int(supplier_id_raw), items=items,
                 purchase_date=purchase_date, user_id=current_user.id,
@@ -312,6 +321,7 @@ def bulk_upload():
         filename = file.filename.lower()
         rows = []
         parse_errors = []
+        auto_created_products = []  # products created with is_active=False that need price review
 
         try:
             if filename.endswith(".csv"):
@@ -376,7 +386,8 @@ def bulk_upload():
                     )
                 ).scalar_one_or_none()
             if not product:
-                # Auto-create the product with cost as both cost and selling price
+                # Auto-create the product as INACTIVE — it has zero margin (selling = cost).
+                # Staff must review and set a proper selling price before it goes live on POS.
                 import uuid
                 auto_sku = sku_raw or f"AUTO-{product_name[:6].upper().replace(' ','-')}-{str(uuid.uuid4())[:4].upper()}"
                 try:
@@ -386,10 +397,12 @@ def bulk_upload():
                         "category": category_raw or None,
                         "sku": auto_sku,
                         "cost_price": cost,
-                        "selling_price": cost,
+                        "selling_price": cost,  # placeholder — staff must update before selling
                         "quantity": 0,
                         "supplier_id": int(supplier_id_raw),  # link supplier immediately
+                        "is_active": False,     # keep off POS until selling price is reviewed
                     })
+                    auto_created_products.append(product_name)
                 except Exception as e:
                     parse_errors.append(f"Row {row_num}: could not create product '{product_name}': {e}")
                     continue
@@ -417,6 +430,15 @@ def bulk_upload():
             )
             flash(f"✅ Bulk purchase #{purchase.id} created — {len(items)} products, "
                   f"NPR {float(purchase.total_cost):,.2f} total.", "success")
+            if auto_created_products:
+                names = ", ".join(auto_created_products[:5])
+                extra = f" (+{len(auto_created_products)-5} more)" if len(auto_created_products) > 5 else ""
+                flash(
+                    f"⚠️ {len(auto_created_products)} new product(s) were auto-created as INACTIVE "
+                    f"(selling price = cost price — no margin set): {names}{extra}. "
+                    f"Go to Inventory to set selling prices and activate them before selling.",
+                    "warning"
+                )
             if parse_errors:
                 for e in parse_errors[:5]:
                     flash(e, "warning")

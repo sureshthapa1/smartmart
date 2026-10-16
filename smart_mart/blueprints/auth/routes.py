@@ -98,11 +98,14 @@ def request_password_reset():
         if user:
             token = generate_reset_token(user.id)
             reset_url = url_for("auth.reset_password_confirm", token=token, _external=True)
-            # Always log as a security audit trail
+            # Log audit trail with token hash only — never log the full URL/token
+            # as it is a bearer credential and the log file may be readable by others.
+            import hashlib as _hashlib
+            token_hash = _hashlib.sha256(token.encode()).hexdigest()[:16]
             current_app.logger.warning(
                 "PASSWORD RESET requested for user '%s' (id=%s). "
-                "Reset URL (valid 30 min): %s",
-                user.username, user.id, reset_url,
+                "Token fingerprint (sha256[:16]): %s",
+                user.username, user.id, token_hash,
             )
             # Try to send password reset email if user has an email on file
             email_sent = False

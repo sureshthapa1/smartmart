@@ -191,6 +191,48 @@ def create_return(
             raise ValueError("Select at least one item quantity to return.")
 
         sale_return.refund_amount = refund_amount
+
+        # ── Reduce customer total_spent by the refund amount ──────────────
+        # Without this, voided/returned items permanently inflate the customer's
+        # spending total, causing incorrect loyalty tier upgrades.
+        if sale.customer_id:
+            from ..models.customer import Customer
+            cust = db.session.get(Customer, sale.customer_id)
+            if cust:
+                cust.total_spent = max(0.0, float(cust.total_spent or 0) - float(refund_amount))
+                ts = cust.total_spent
+                if ts >= 100000:
+                    cust.loyalty_tier = "platinum"
+                elif ts >= 50000:
+                    cust.loyalty_tier = "gold"
+                elif ts >= 20000:
+                    cust.loyalty_tier = "silver"
+                else:
+                    cust.loyalty_tier = "bronze"
+
+        # ── Credit sale: reduce the outstanding balance by the refund amount ──
+        # Without this, a customer who returns goods on a credit sale still owes
+        # the full original amount on the Udharo ledger.
+        if sale.payment_mode == "credit" and not sale.credit_collected:
+            from ..models.operations import CustomerCreditPayment
+            # Compute current outstanding balance so we don't over-credit
+            already_paid = db.session.execute(
+                db.select(db.func.coalesce(db.func.sum(CustomerCreditPayment.amount), 0))
+                .where(CustomerCreditPayment.sale_id == sale.id)
+            ).scalar() or Decimal("0.00")
+            outstanding = max(Decimal("0.00"), Decimal(str(sale.total_amount)) - Decimal(str(already_paid)))
+            credit_reduction = min(refund_amount, outstanding)
+            if credit_reduction > 0:
+                db.session.add(CustomerCreditPayment(
+                    sale_id=sale.id,
+                    user_id=user_id,
+                    amount=credit_reduction,
+                    payment_mode="return",
+                    note=f"Return #{sale_return.id} — goods returned",
+                ))
+                new_balance = outstanding - credit_reduction
+                sale.credit_collected = new_balance <= Decimal("0.00")
+
         db.session.commit()
     except Exception:
         db.session.rollback()

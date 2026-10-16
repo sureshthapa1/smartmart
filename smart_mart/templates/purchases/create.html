@@ -30,6 +30,8 @@
 
 <form method="post" action="{{ url_for('purchases.create_purchase') }}" style="max-width:960px">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="idempotency_key" id="purchaseIdempotencyKey">
+  <script>(function(){ document.getElementById('purchaseIdempotencyKey').value = 'purchase-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); })();</script>
 
   <div class="card shadow-sm mb-3">
     <div class="card-header fw-semibold d-flex align-items-center gap-2 py-3">

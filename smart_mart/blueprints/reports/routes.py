@@ -583,9 +583,27 @@ def credit_udharo():
          .limit(500))  # cap at 500 — prevents memory spike on large shops
     all_credit = db.session.execute(q).scalars().all()
 
+    # Build a map of total partial payments per sale in a single query
+    from ...models.operations import CustomerCreditPayment
+    sale_ids = [s.id for s in all_credit]
+    paid_map: dict[int, float] = {}
+    if sale_ids:
+        rows = db.session.execute(
+            db.select(
+                CustomerCreditPayment.sale_id,
+                db.func.coalesce(db.func.sum(CustomerCreditPayment.amount), 0).label("paid"),
+            )
+            .where(CustomerCreditPayment.sale_id.in_(sale_ids))
+            .group_by(CustomerCreditPayment.sale_id)
+        ).all()
+        paid_map = {r.sale_id: float(r.paid) for r in rows}
+
     # Annotate each sale
     records = []
     for s in all_credit:
+        paid_so_far = paid_map.get(s.id, 0.0)
+        outstanding = max(0.0, float(s.total_amount) - paid_so_far)
+
         if s.credit_collected:
             status = "collected"
             status_color = "success"
@@ -603,6 +621,8 @@ def credit_udharo():
             "sale": s,
             "status": status,
             "status_color": status_color,
+            "outstanding": outstanding,
+            "paid_so_far": paid_so_far,
             "days_overdue": (today - s.credit_due_date).days if (s.credit_due_date and s.credit_due_date < today and not s.credit_collected) else 0,
         })
 
@@ -610,11 +630,14 @@ def credit_udharo():
     if status_filter != "all":
         records = [r for r in records if r["status"] == status_filter]
 
-    # Summary stats (always from full list)
+    # Summary stats — pending_amount uses actual outstanding (after partial payments)
     summary = {
         "total_count": len(all_credit),
         "total_amount": sum(float(s.total_amount) for s in all_credit),
-        "pending_amount": sum(float(s.total_amount) for s in all_credit if not s.credit_collected),
+        "pending_amount": sum(
+            max(0.0, float(s.total_amount) - paid_map.get(s.id, 0.0))
+            for s in all_credit if not s.credit_collected
+        ),
         "overdue_count": sum(1 for s in all_credit
                              if not s.credit_collected and s.credit_due_date and s.credit_due_date < today),
         "collected_amount": sum(float(s.total_amount) for s in all_credit if s.credit_collected),

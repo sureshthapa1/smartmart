@@ -163,9 +163,9 @@
     {% if current_user.role == 'admin' %}
     <div class="kpi">
       <div class="kpi-dot" style="background:#ede9fe"><i class="bi bi-graph-up-arrow" style="color:#7c3aed"></i></div>
-      <div class="kpi-label">Today's Profit</div>
+      <div class="kpi-label">Today's Gross Profit</div>
       <div class="kpi-value">NPR {{ "%.0f"|format(today_profit) }}</div>
-      <div class="kpi-sub">After cost of goods</div>
+      <div class="kpi-sub">Revenue minus cost of goods</div>
     </div>
 
     <a href="{{ url_for('reports.cash_flow') }}" style="text-decoration:none">
