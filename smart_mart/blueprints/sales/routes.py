@@ -185,6 +185,8 @@ def create_sale():
                     _split_esewa = float(request.form.get("split_esewa_amount", 0) or 0)
                     _split_note = f"Split: Cash NPR {_split_cash:.2f} + eSewa NPR {_split_esewa:.2f}"
                     _discount_note = (_discount_note + "; " + _split_note) if _discount_note else _split_note
+                    # Guard against exceeding String(120) column limit
+                    _discount_note = _discount_note[:120]
                 except (ValueError, TypeError):
                     pass
 
@@ -268,6 +270,19 @@ def sale_detail(sale_id):
 @login_required
 def update_payment_mode(sale_id):
     sale = sales_manager.get_sale(sale_id)
+
+    # Restrict: admins can update any sale; cashiers can only update their own same-day sales.
+    if current_user.role != "admin":
+        from ...models.user_permissions import UserPermissions
+        from datetime import date as _date
+        p = UserPermissions.get_or_create(current_user.id)
+        if sale.user_id != current_user.id:
+            flash("You can only change the payment mode on your own sales.", "danger")
+            return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+        if sale.sale_date.date() != _date.today():
+            flash("You can only change the payment mode on today's sales. Contact an admin for older sales.", "danger")
+            return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+
     new_mode = request.form.get("new_payment_mode", "").strip()
     valid_modes = ["cash", "esewa", "khalti", "fonepay", "qr", "card", "bank", "credit", "split", "other"]
     if new_mode not in valid_modes:

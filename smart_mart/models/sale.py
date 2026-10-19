@@ -9,8 +9,10 @@ PAYMENT_METHODS = [
     ("split", "Split: Cash + eSewa"),
     ("khalti", "Khalti"),
     ("qr", "QR Code"),
+    ("card", "Card"),
     ("bank", "Bank Transfer"),
     ("credit", "Credit / Udharo"),
+    ("other", "Other"),
 ]
 
 

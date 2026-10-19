@@ -1074,6 +1074,12 @@
 
       // Check active promotions
       checkPromotions(subtotal);
+
+      // Re-validate split amounts if split mode is active so a cart change
+      // (item removed, qty reduced) immediately shows a stale-total warning.
+      if (document.querySelector('input[name="payment_mode"]:checked')?.value === 'split') {
+        if (typeof validateSplitAmounts === 'function') validateSplitAmounts();
+      }
     }
 
     function renderDiscountBreakdown(subtotal, totalDiscount, net) {
