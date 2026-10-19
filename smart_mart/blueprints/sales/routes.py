@@ -184,9 +184,21 @@ def create_sale():
                     _split_cash = float(request.form.get("split_cash_amount", 0) or 0)
                     _split_esewa = float(request.form.get("split_esewa_amount", 0) or 0)
                     _split_note = f"Split: Cash NPR {_split_cash:.2f} + eSewa NPR {_split_esewa:.2f}"
-                    _discount_note = (_discount_note + "; " + _split_note) if _discount_note else _split_note
-                    # Guard against exceeding String(120) column limit
-                    _discount_note = _discount_note[:120]
+                    _combined = (_discount_note + "; " + _split_note) if _discount_note else _split_note
+                    if len(_combined) > 120:
+                        flash(
+                            "The discount note is too long to record the split payment breakdown. "
+                            "Please shorten the discount note and try again.",
+                            "danger",
+                        )
+                        return render_template(
+                            "sales/create.html",
+                            products=products,
+                            variants=variants,
+                            product_map=product_map,
+                            target_progress=target_progress,
+                        )
+                    _discount_note = _combined
                 except (ValueError, TypeError):
                     pass
 
@@ -273,9 +285,7 @@ def update_payment_mode(sale_id):
 
     # Restrict: admins can update any sale; cashiers can only update their own same-day sales.
     if current_user.role != "admin":
-        from ...models.user_permissions import UserPermissions
         from datetime import date as _date
-        p = UserPermissions.get_or_create(current_user.id)
         if sale.user_id != current_user.id:
             flash("You can only change the payment mode on your own sales.", "danger")
             return redirect(url_for("sales.sale_detail", sale_id=sale_id))

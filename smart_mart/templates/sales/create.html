@@ -2035,6 +2035,17 @@
     });
   });
 
+  // ── Initialise panel visibility on page load (handles browser form restore) ──
+  (function initPaymentPanels() {
+    const mode = document.querySelector('input[name="payment_mode"]:checked')?.value;
+    const changePanel = document.getElementById('changeDuePanel');
+    if (changePanel) changePanel.style.display = (mode === 'cash') ? '' : 'none';
+    const splitPanel = document.getElementById('splitPanel');
+    if (splitPanel) splitPanel.style.display = (mode === 'split') ? '' : 'none';
+    const dueDateBox = document.getElementById('creditDueDateBox');
+    if (dueDateBox) dueDateBox.style.display = (mode === 'credit') ? '' : 'none';
+  })();
+
   // Change due calculator
   document.getElementById('cashReceivedInput')?.addEventListener('input', function() {
     const received = parseFloat(this.value) || 0;
