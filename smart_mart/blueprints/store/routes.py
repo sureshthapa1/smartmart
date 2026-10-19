@@ -634,7 +634,7 @@ def cart():
 def cart_add():
     try:
         product_id = int(request.form.get("product_id", 0))
-        qty        = max(1, min(int(request.form.get("qty", 1)), MAX_QTY_PER_ITEM))
+        qty        = max(1, min(int(float(request.form.get("qty", 1))), MAX_QTY_PER_ITEM))
     except (ValueError, TypeError):
         return jsonify({"ok": False, "error": "Invalid input"}), 400
 
@@ -670,7 +670,7 @@ def cart_add():
 def cart_update():
     product_id = str(request.form.get("product_id", ""))
     try:
-        qty = int(request.form.get("qty", 0))
+        qty = int(float(request.form.get("qty", 0)))
     except (ValueError, TypeError):
         qty = 0
 

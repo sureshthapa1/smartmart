@@ -12,24 +12,27 @@ Tool invocation:   POST /mcp/tools/<tool_name>
 
 Available tools
 ---------------
-- get_inventory_status       Check current stock levels
-- get_sales_summary          Today / week / month revenue
-- search_products            Semantic product search (RAG)
-- get_low_stock_products     Products needing reorder
-- get_top_products           Best-selling products
-- get_customer_profile       Customer purchase history
+- get_inventory_status        Check current stock levels
+- get_sales_summary           Today / week / month revenue
+- search_products             Semantic product search (RAG)
+- get_low_stock_products      Products needing reorder
+- get_top_products            Best-selling products
+- get_customer_profile        Customer purchase history
 - create_purchase_order_draft Draft a PO for low-stock items
-- get_business_kpis          KPI scorecard
-- get_cashflow_forecast      30-day cashflow forecast
-- ask_business_advisor       Natural language business Q&A via Claude
-- rag_search                 Semantic search over product catalogue
+- get_business_kpis           KPI scorecard
+- get_cashflow_forecast       30-day cashflow forecast
+- ask_business_advisor        Natural language business Q&A via Gemini
+- get_recommendations         Co-purchase / collaborative-filtering recs
+- get_anomaly_report          Detect unusual sales / stock / pricing patterns
 """
 
 from __future__ import annotations
 
+import hmac
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
+from typing import Callable, Any
 
 from flask import Blueprint, jsonify, request, current_app
 from flask_login import current_user
@@ -61,7 +64,8 @@ def _is_authorized() -> bool:
         bearer = request.headers.get("Authorization", "")
         if bearer.lower().startswith("bearer "):
             bearer = bearer[7:].strip()
-        if bearer == secret:
+        # hmac.compare_digest prevents timing-based token enumeration attacks.
+        if hmac.compare_digest(bearer, secret):
             return True
 
     try:
@@ -106,7 +110,7 @@ TOOLS = [
     {
         "name": "get_sales_summary",
         "description": "Get revenue and sales count for today, this week, and this month. Includes top products.",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "search_products",
@@ -162,13 +166,14 @@ TOOLS = [
             "properties": {
                 "lookback_days": {"type": "integer", "description": "Days of sales history to use (default 30)"},
                 "coverage_days": {"type": "integer", "description": "Days of stock to cover (default 14)"},
+                "user_id":       {"type": "integer", "description": "User ID to attribute the PO to (default 1 = system)"},
             },
         },
     },
     {
         "name": "get_business_kpis",
         "description": "Get key performance indicators: revenue, gross margin, net profit, avg order value, customer retention, expense ratio.",
-        "inputSchema": {"type": "object", "properties": {}},
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "get_cashflow_forecast",
@@ -187,7 +192,8 @@ TOOLS = [
             "type": "object",
             "required": ["question"],
             "properties": {
-                "question": {"type": "string", "description": "Business question in plain English or Nepali"},
+                "question":   {"type": "string",  "description": "Business question in plain English or Nepali"},
+                "max_tokens": {"type": "integer", "description": "Max response length in tokens (default 800, max 2000)"},
             },
         },
     },
@@ -224,6 +230,31 @@ def list_tools():
     return jsonify({"tools": TOOLS})
 
 
+# Module-level dispatch table — built once at import time, not per-request.
+_TOOL_HANDLERS: dict[str, Callable[[dict], dict]] = {}
+
+
+def _get_tool_handlers() -> dict[str, Callable[[dict], dict]]:
+    """Populate the handler map lazily (avoids circular-import issues at module load)."""
+    global _TOOL_HANDLERS
+    if not _TOOL_HANDLERS:
+        _TOOL_HANDLERS = {
+            "get_inventory_status":        _tool_inventory,
+            "get_sales_summary":           _tool_sales_summary,
+            "search_products":             _tool_search_products,
+            "get_low_stock_products":      _tool_low_stock,
+            "get_top_products":            _tool_top_products,
+            "get_customer_profile":        _tool_customer_profile,
+            "create_purchase_order_draft": _tool_create_po_draft,
+            "get_business_kpis":           _tool_kpis,
+            "get_cashflow_forecast":       _tool_cashflow,
+            "ask_business_advisor":        _tool_ask_advisor,
+            "get_recommendations":         _tool_recommendations,
+            "get_anomaly_report":          _tool_anomalies,
+        }
+    return _TOOL_HANDLERS
+
+
 @mcp_bp.route("/tools/<tool_name>", methods=["POST"])
 @mcp_auth
 @limiter.limit("60/minute")
@@ -231,21 +262,7 @@ def invoke_tool(tool_name: str):
     """MCP tool invocation endpoint."""
     args = request.get_json(silent=True) or {}
 
-    handlers = {
-        "get_inventory_status":       _tool_inventory,
-        "get_sales_summary":          _tool_sales_summary,
-        "search_products":            _tool_search_products,
-        "get_low_stock_products":     _tool_low_stock,
-        "get_top_products":           _tool_top_products,
-        "get_customer_profile":       _tool_customer_profile,
-        "create_purchase_order_draft": _tool_create_po_draft,
-        "get_business_kpis":          _tool_kpis,
-        "get_cashflow_forecast":      _tool_cashflow,
-        "ask_business_advisor":       _tool_ask_advisor,
-        "get_recommendations":        _tool_recommendations,
-        "get_anomaly_report":         _tool_anomalies,
-    }
-
+    handlers = _get_tool_handlers()
     handler = handlers.get(tool_name)
     if not handler:
         return _err(f"Unknown tool: {tool_name}", 404)
@@ -344,6 +361,7 @@ def _tool_search_products(args: dict) -> dict:
 
 def _tool_low_stock(args: dict) -> dict:
     from ...models.product import Product
+    from ...models.sale import Sale, SaleItem
     threshold = int(args.get("threshold", 10))
     include_oos = args.get("include_out_of_stock", True)
     q = db.select(Product).where(Product.is_active.isnot(False))
@@ -352,19 +370,38 @@ def _tool_low_stock(args: dict) -> dict:
     else:
         q = q.where(Product.quantity > 0, Product.quantity <= threshold)
     products = db.session.execute(q.order_by(Product.quantity)).scalars().all()
-    return {
-        "threshold": threshold,
-        "count": len(products),
-        "products": [
-            {
-                "id": p.id, "name": p.name, "category": p.category,
-                "quantity": p.quantity,
-                "reorder_point": p.reorder_point or threshold,
-                "suggested_order_qty": max(50, (p.reorder_point or 50) * 3),
-            }
-            for p in products
-        ],
-    }
+
+    # Build a demand map: avg daily units sold over the last 30 days per product.
+    since = date.today() - timedelta(days=30)
+    product_ids = [p.id for p in products]
+    demand_rows = db.session.execute(
+        db.select(SaleItem.product_id, func.sum(SaleItem.quantity).label("total_qty"))
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(SaleItem.product_id.in_(product_ids))
+        .where(Sale.sale_date >= since)
+        .group_by(SaleItem.product_id)
+    ).all() if product_ids else []
+    avg_daily: dict[int, float] = {r.product_id: float(r.total_qty or 0) / 30 for r in demand_rows}
+
+    result = []
+    for p in products:
+        daily = avg_daily.get(p.id, 0.0)
+        reorder_pt = int(p.reorder_point or threshold)
+        # Cover 14 days of demand above current stock; floor at reorder_point as MOQ.
+        if daily > 0:
+            suggested = max(reorder_pt, round(daily * 14 - int(p.quantity or 0)))
+        else:
+            # No sales history — fall back to 3× reorder_point.
+            suggested = max(reorder_pt, reorder_pt * 3)
+        result.append({
+            "id": p.id, "name": p.name, "category": p.category,
+            "quantity": p.quantity,
+            "reorder_point": reorder_pt,
+            "avg_daily_demand": round(daily, 2),
+            "suggested_order_qty": int(suggested),
+        })
+
+    return {"threshold": threshold, "count": len(result), "products": result}
 
 
 def _tool_top_products(args: dict) -> dict:
@@ -406,33 +443,47 @@ def _tool_customer_profile(args: dict) -> dict:
         db.select(Customer).where(func.lower(Customer.name) == name.lower())
     ).scalar_one_or_none()
 
+    # If the Customer record has a phone, also match sales by phone so that
+    # slight name-spelling differences in Sale.customer_name don't drop history.
+    sale_filter = func.lower(Sale.customer_name) == name.lower()
+    if c and c.phone:
+        from sqlalchemy import or_
+        sale_filter = or_(sale_filter, Sale.customer_phone == c.phone)
+
     sales = db.session.execute(
         db.select(Sale)
-        .where(func.lower(Sale.customer_name) == name.lower())
+        .where(sale_filter)
         .order_by(Sale.sale_date.desc())
         .limit(50)
     ).scalars().all()
 
     total_spent = sum(float(s.total_amount) for s in sales)
     avg_order   = total_spent / len(sales) if sales else 0
-    last_sale   = sales[0].sale_date if sales else None
-    recency     = (date.today() - last_sale.date()).days if last_sale else None
+
+    # sale_date is a DateTime column — extract just the date part safely.
+    def _to_date(val):
+        if val is None:
+            return None
+        return val.date() if isinstance(val, datetime) else val
+
+    last_sale_date = _to_date(sales[0].sale_date) if sales else None
+    recency = (date.today() - last_sale_date).days if last_sale_date else None
 
     return {
         "customer": {
-            "name":         c.name if c else name,
-            "phone":        c.phone if c else None,
-            "loyalty_tier": c.loyalty_tier if c else "unknown",
+            "name":           c.name if c else name,
+            "phone":          c.phone if c else None,
+            "loyalty_tier":   c.loyalty_tier if c else "unknown",
             "loyalty_points": c.loyalty_points if c else 0,
         } if c else {"name": name},
         "purchase_history": {
-            "total_orders": len(sales),
-            "total_spent":  round(total_spent, 2),
-            "avg_order":    round(avg_order, 2),
+            "total_orders":           len(sales),
+            "total_spent":            round(total_spent, 2),
+            "avg_order":              round(avg_order, 2),
             "last_purchase_days_ago": recency,
         },
         "churn_risk": (
-            "churned"  if recency is not None and recency > 90 else
+            "churned" if recency is not None and recency > 90 else
             "at_risk"  if recency is not None and recency > 45 else
             "active"   if recency is not None else
             "unknown"
@@ -443,10 +494,14 @@ def _tool_customer_profile(args: dict) -> dict:
 def _tool_create_po_draft(args: dict) -> dict:
     lookback = int(args.get("lookback_days", 30))
     coverage = int(args.get("coverage_days", 14))
+    # user_id defaults to 1 (system user) when called via MCP, since MCP stdio
+    # has no per-user session.  Pass "user_id" in args to attribute the PO to a
+    # specific user when called from a context where the user id is known.
+    user_id = int(args.get("user_id", 1))
     try:
         from ...services.ai_growth_ops import create_auto_draft_purchase_orders
         result = create_auto_draft_purchase_orders(
-            user_id=1,  # system user
+            user_id=user_id,
             lookback_days=lookback,
             coverage_days=coverage,
         )
@@ -477,28 +532,69 @@ def _tool_ask_advisor(args: dict) -> dict:
     if not question:
         return {"error": "question required"}
 
+    # max_tokens is caller-configurable; cap at 2000 to stay within model limits.
+    max_tokens = min(int(args.get("max_tokens", 800)), 2000)
+
     from ...services.gemini_client import gemini_generate, gemini_available
     if not gemini_available():
         return {"answer": "GEMINI_API_KEY not configured."}
 
     try:
-        from ...blueprints.ai_chat.routes import build_business_context
-        context = build_business_context()
+        # Build business context entirely from the service layer to avoid a
+        # cross-blueprint import (previously imported build_business_context
+        # from blueprints.ai_chat.routes, which couples two blueprints).
+        context_parts: list[str] = []
 
-        # Also add RAG context
+        # Sales summary via the same tool we already have
+        try:
+            sales = _tool_sales_summary({})
+            today_rev  = sales.get("today", {}).get("revenue", 0)
+            month_rev  = sales.get("this_month", {}).get("revenue", 0)
+            top_prods  = sales.get("top_products", [])
+            top_lines  = "\n".join(f"  - {p['name']}: {p['qty_sold']} sold, NPR {p['revenue']:,.2f}" for p in top_prods[:5])
+            context_parts.append(
+                f"Today revenue: NPR {today_rev:,.2f}\n"
+                f"This month revenue: NPR {month_rev:,.2f}\n"
+                f"Top products this month:\n{top_lines}"
+            )
+        except Exception:
+            pass
+
+        # KPIs
+        try:
+            from ...services.ai_business_advisor import kpi_scorecard
+            kpis = kpi_scorecard()
+            kpi_lines = "\n".join(f"  - {k['label']}: {k['value']}" for k in (kpis or [])[:8])
+            context_parts.append(f"KPIs:\n{kpi_lines}")
+        except Exception:
+            pass
+
+        # Low stock alerts
+        try:
+            low = _tool_low_stock({"threshold": 10})
+            low_lines = "\n".join(f"  - {p['name']}: {p['quantity']} left" for p in low.get("products", [])[:5])
+            if low_lines:
+                context_parts.append(f"Low stock:\n{low_lines}")
+        except Exception:
+            pass
+
+        # RAG context for the specific question
         try:
             from ...services.rag_service import rag_context_for_query
             rag_ctx = rag_context_for_query(question, top_k=5)
-            context += f"\n\n{rag_ctx}"
+            if rag_ctx:
+                context_parts.append(rag_ctx)
         except Exception:
             pass
+
+        context = "\n\n".join(context_parts) or "No live data available."
 
         system = (
             "You are the Goldkernel Business AI, answering questions about a premium dry fruits "
             "retail shop in Nepal. Use the live data provided. Currency is NPR.\n\n"
             f"[LIVE DATA]\n{context}\n[/LIVE DATA]"
         )
-        answer = gemini_generate(question, system=system, max_tokens=800) or "No answer generated."
+        answer = gemini_generate(question, system=system, max_tokens=max_tokens) or "No answer generated."
         return {"question": question, "answer": answer}
     except Exception as exc:
         return {"error": str(exc)}

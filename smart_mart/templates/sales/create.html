@@ -406,6 +406,7 @@
         <div class="card-header d-flex align-items-center gap-2 py-3">
           <i class="bi bi-cart3 text-primary"></i>
           <span class="fw-semibold">Sale Items</span>
+          <span id="itemCountBadge" class="badge ms-1" style="background:#94a3b8;color:#fff;font-size:.72rem;">0 items</span>
           <!-- Barcode scanner input -->
           <div class="ms-auto d-flex align-items-center gap-2">
             <i class="bi bi-upc-scan text-muted"></i>
@@ -519,6 +520,7 @@
             <span class="text-white-50 small">
               Subtotal: <span class="text-white fw-semibold" id="subtotalDisplay">NPR 0.00</span>
             </span>
+            <span class="text-white-50" style="font-size:.72rem;" id="totalBarItemCount"></span>
             <button type="button" class="btn btn-sm" id="addOfferForNextVisitBtn"
                     style="background:rgba(99,102,241,.25);color:#a5b4fc;border:1px solid rgba(99,102,241,.4);font-size:.75rem;display:none;">
               <i class="bi bi-gift me-1"></i>Add Offer for Next Visit
@@ -1080,6 +1082,8 @@
       if (document.querySelector('input[name="payment_mode"]:checked')?.value === 'split') {
         if (typeof validateSplitAmounts === 'function') validateSplitAmounts();
       }
+
+      updateItemCountBadge();
     }
 
     function renderDiscountBreakdown(subtotal, totalDiscount, net) {
@@ -1198,6 +1202,24 @@
 
       if (amount) recalcTotal();
       amtInput.focus();
+    }
+
+    function updateItemCountBadge() {
+      let totalQty = 0;
+      let lineCount = 0;
+      document.querySelectorAll('tr.sale-item-row').forEach(function(row) {
+        var qty = parseFloat(row.querySelector('.qty-input') && row.querySelector('.qty-input').value) || 0;
+        if (qty > 0) { totalQty += qty; lineCount++; }
+      });
+      var qtyRounded = Math.round(totalQty * 100) / 100;
+      var text = lineCount === 0 ? '0 items'
+        : (lineCount === qtyRounded
+          ? (lineCount === 1 ? '1 item' : lineCount + ' items')
+          : lineCount + ' line' + (lineCount !== 1 ? 's' : '') + ' \u00b7 ' + qtyRounded + ' qty');
+      var badge = document.getElementById('itemCountBadge');
+      if (badge) { badge.textContent = text; badge.style.background = lineCount === 0 ? '#94a3b8' : '#6366f1'; }
+      var bar = document.getElementById('totalBarItemCount');
+      if (bar) { bar.textContent = lineCount > 0 ? text : ''; }
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

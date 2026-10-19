@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from ..extensions import db
 from ..models.ai_enhancements import DeviceSyncState, SyncEvent
@@ -94,7 +95,7 @@ def _upsert_product(payload: dict, client_ts: datetime | None = None, force_appl
     product.name = payload.get("name") or product.name
     product.category = payload.get("category") or product.category
     if "quantity" in payload:
-        product.quantity = round(float(payload["quantity"]), 3)
+        product.quantity = Decimal(str(payload["quantity"]))
     if "selling_price" in payload:
         product.selling_price = payload["selling_price"]
     if "cost_price" in payload:

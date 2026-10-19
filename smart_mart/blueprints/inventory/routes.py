@@ -364,7 +364,7 @@ def adjust_stock(product_id):
         note = request.form.get("note", "").strip()
         adjustment_type = request.form.get("adjustment_type", "").strip() or None
         try:
-            qty = int(request.form.get("quantity", 0))
+            qty = int(float(request.form.get("quantity", 0) or 0))
             if qty <= 0:
                 raise ValueError("Quantity must be a positive integer.")
             inventory_manager.adjust_stock(product_id, qty, direction, note, current_user.id,
@@ -1762,7 +1762,7 @@ def create_variant(product_id):
         selling_price_raw = request.form.get("selling_price", "").strip()
         cost_price = Decimal(str(cost_price_raw or 0))
         selling_price = Decimal(str(selling_price_raw or 0))
-        quantity = int(request.form.get("quantity", 0) or 0)
+        quantity = int(float(request.form.get("quantity", 0) or 0))
         barcode = request.form.get("barcode", "").strip() or None
         units_per_parent_raw = request.form.get("units_per_parent", "").strip()
 
@@ -1848,7 +1848,7 @@ def edit_variant(product_id, variant_id):
             variant.sku = sku
             variant.cost_price = Decimal(str(cost_price_raw or 0))
             variant.selling_price = Decimal(str(selling_price_raw or 0))
-            variant.quantity = int(request.form.get("quantity", 0) or 0)
+            variant.quantity = int(float(request.form.get("quantity", 0) or 0))
             variant.barcode = request.form.get("barcode", "").strip() or None
             variant.is_active = request.form.get("is_active") == "on"
             variant.units_per_parent = units_per_parent
@@ -1906,7 +1906,7 @@ def split_pack(product_id, variant_id):
         return redirect(url_for("inventory.product_variants", product_id=product_id))
 
     try:
-        packs_to_open = int(request.form.get("packs_to_open", 1) or 1)
+        packs_to_open = int(float(request.form.get("packs_to_open", 1) or 1))
         if packs_to_open <= 0:
             raise ValueError("Must open at least 1 pack.")
     except (ValueError, TypeError):
@@ -1974,14 +1974,14 @@ def _form_to_data(form) -> dict:
         "sku": form.get("sku", "").strip(),
         "cost_price": form.get("cost_price", "0") or "0",
         "selling_price": form.get("selling_price", "0") or "0",
-        "quantity": int(form.get("quantity", 0) or 0),
+        "quantity": int(float(form.get("quantity", 0) or 0)),
         "supplier_id": int(form.get("supplier_id")) if form.get("supplier_id") else None,
         "purchase_date": None,
         "expiry_date": None,
         "pkg_date": None,
         "unit": form.get("unit", "pcs").strip() or "pcs",
-        "reorder_point": int(form.get("reorder_point", 10) or 10),
-        "low_stock_threshold": int(form.get("low_stock_threshold", 500) or 500),
+        "reorder_point": int(float(form.get("reorder_point", 10) or 10)),
+        "low_stock_threshold": int(float(form.get("low_stock_threshold", 500) or 500)),
         "barcode": form.get("barcode", "").strip() or None,
         "is_active": form.get("is_active") == "on",
         "tax_category": form.get("tax_category", "standard").strip() or "standard",

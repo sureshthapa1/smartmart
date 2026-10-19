@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from io import BytesIO
 
 from sqlalchemy import and_
@@ -426,8 +427,8 @@ def create_sale(items: list[dict], user_id: int,
 
         for item in items:
             pid = item.get("product_id")
-            qty = item["quantity"]
-            unit_price = item["unit_price"]
+            qty = Decimal(str(item["quantity"]))
+            unit_price = Decimal(str(item["unit_price"]))
             vid = item.get("variant_id")
 
             # ── Custom / loose item — no product FK, no stock deduction ───
@@ -500,9 +501,9 @@ def create_sale(items: list[dict], user_id: int,
                     cust = db.session.execute(q).scalar_one_or_none()
                 if cust:
                     sale.customer_id = cust.id
-                    cust.total_spent = float(cust.total_spent or 0) + float(total_amount)
+                    cust.total_spent = (cust.total_spent or Decimal("0")) + Decimal(str(total_amount))
                     # Update loyalty tier based on total_spent (wallet handles actual points)
-                    ts = float(cust.total_spent)
+                    ts = cust.total_spent
                     if ts >= 100000:
                         cust.loyalty_tier = "platinum"
                     elif ts >= 50000:

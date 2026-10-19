@@ -199,7 +199,7 @@ def create_return(
             from ..models.customer import Customer
             cust = db.session.get(Customer, sale.customer_id)
             if cust:
-                cust.total_spent = max(0.0, float(cust.total_spent or 0) - float(refund_amount))
+                cust.total_spent = max(Decimal("0"), (cust.total_spent or Decimal("0")) - Decimal(str(refund_amount)))
                 ts = cust.total_spent
                 if ts >= 100000:
                     cust.loyalty_tier = "platinum"

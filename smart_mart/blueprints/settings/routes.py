@@ -65,7 +65,7 @@ def index():
             return render_template("settings/index.html", s=s)
         s.vat_number = request.form.get("vat_number", "").strip() or None
         s.currency_symbol = request.form.get("currency_symbol", "NPR").strip() or "NPR"
-        s.low_stock_threshold = int(request.form.get("low_stock_threshold", "10") or 10)
+        s.low_stock_threshold = int(float(request.form.get("low_stock_threshold", "10") or 10))
         # ── Delivery settings ─────────────────────────────────────────
         try:
             s.delivery_charge         = Decimal(str(request.form.get("delivery_charge") or 0))
