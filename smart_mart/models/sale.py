@@ -6,6 +6,7 @@ PAYMENT_METHODS = [
     ("cash", "Cash"),
     ("fonepay", "Fonepay"),
     ("esewa", "eSewa"),
+    ("split", "Split: Cash + eSewa"),
     ("khalti", "Khalti"),
     ("qr", "QR Code"),
     ("bank", "Bank Transfer"),

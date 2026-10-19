@@ -177,6 +177,17 @@ def create_sale():
                     from datetime import date as _date, timedelta as _td
                     _credit_due_date = _date.today() + _td(days=30)
 
+            # Parse split payment note
+            _discount_note = request.form.get("discount_note", "").strip() or None
+            if request.form.get("payment_mode") == "split":
+                try:
+                    _split_cash = float(request.form.get("split_cash_amount", 0) or 0)
+                    _split_esewa = float(request.form.get("split_esewa_amount", 0) or 0)
+                    _split_note = f"Split: Cash NPR {_split_cash:.2f} + eSewa NPR {_split_esewa:.2f}"
+                    _discount_note = (_discount_note + "; " + _split_note) if _discount_note else _split_note
+                except (ValueError, TypeError):
+                    pass
+
             sale = sales_manager.create_sale(
                 items,
                 user_id=current_user.id,
@@ -186,7 +197,7 @@ def create_sale():
                 payment_mode=request.form.get("payment_mode") or request.form.get("payment_method", "cash"),
                 payment_method=request.form.get("payment_method") or request.form.get("payment_mode", "cash"),
                 discount_amount=posted_discount,
-                discount_note=request.form.get("discount_note", "").strip() or None,
+                discount_note=_discount_note,
                 wallet_redeem_points=int(request.form.get("wallet_redeem_points", 0) or 0),
                 applied_customer_offer_ids=_parse_customer_offer_ids(request.form),
                 credit_due_date=_credit_due_date,
@@ -251,6 +262,22 @@ def sale_detail(sale_id):
         _log.getLogger(__name__).warning("Suppressed exception: %s", _exc)
     return render_template("sales/detail.html", sale=sale,
                            loyalty_txns=loyalty_txns, loyalty_balance=loyalty_balance)
+
+
+@sales_bp.route("/<int:sale_id>/payment-mode", methods=["POST"])
+@login_required
+def update_payment_mode(sale_id):
+    sale = sales_manager.get_sale(sale_id)
+    new_mode = request.form.get("new_payment_mode", "").strip()
+    valid_modes = ["cash", "esewa", "khalti", "fonepay", "qr", "card", "bank", "credit", "split", "other"]
+    if new_mode not in valid_modes:
+        flash("Invalid payment mode.", "danger")
+        return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+    sale.payment_mode = new_mode
+    sale.payment_method = new_mode
+    db.session.commit()
+    flash(f"Payment mode updated to {new_mode}.", "success")
+    return redirect(url_for("sales.sale_detail", sale_id=sale_id))
 
 
 @sales_bp.route("/<int:sale_id>/invoice")

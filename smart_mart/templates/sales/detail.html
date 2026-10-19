@@ -93,9 +93,19 @@
           <div class="text-white-50 small" style="font-size:.7rem;">{{ sale.sale_date | bs_date }}</div>
           {% set pm = sale.payment_method or sale.payment_mode or 'cash' %}
           <div class="mt-1">
-            <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
-              {% if pm == 'cash' %}💵{% elif pm == 'qr' %}📱{% elif pm == 'card' %}💳{% elif pm == 'credit' %}📋{% else %}🔄{% endif %}
-              {{ pm | capitalize }}
+            <span class="badge {% if pm == 'cash' %}bg-success{% elif pm == 'credit' %}bg-warning text-dark{% elif pm == 'qr' %}bg-info text-dark{% elif pm == 'esewa' %}bg-success{% elif pm == 'khalti' %}text-white{% elif pm == 'fonepay' %}bg-info text-dark{% elif pm == 'card' %}bg-primary{% elif pm == 'bank' %}bg-secondary{% elif pm == 'split' %}text-white{% else %}bg-secondary{% endif %}"
+              {% if pm == 'khalti' %}style="background-color:#5c2d91"{% elif pm == 'split' %}style="background-color:#20c997"{% endif %}>
+              {% if pm == 'cash' %}💵 Cash
+              {% elif pm == 'esewa' %}📱 eSewa
+              {% elif pm == 'khalti' %}💜 Khalti
+              {% elif pm == 'fonepay' %}📲 Fonepay
+              {% elif pm == 'qr' %}📱 QR
+              {% elif pm == 'card' %}💳 Card
+              {% elif pm == 'bank' %}🏦 Bank Transfer
+              {% elif pm == 'credit' %}📋 Credit/Udharo
+              {% elif pm == 'split' %}💰 Split: Cash+eSewa
+              {% elif pm == 'other' %}🔄 Other
+              {% else %}🔄 {{ pm | capitalize }}{% endif %}
             </span>
           </div>
         </div>
@@ -123,10 +133,42 @@
             <dd>
               {% set pm = sale.payment_method or sale.payment_mode or 'cash' %}
               {% if pm == 'cash' %}💵 Cash
+              {% elif pm == 'esewa' %}📱 eSewa
+              {% elif pm == 'khalti' %}💜 Khalti
+              {% elif pm == 'fonepay' %}📲 Fonepay
               {% elif pm == 'qr' %}📱 QR / Digital
               {% elif pm == 'card' %}💳 Card
+              {% elif pm == 'bank' %}🏦 Bank Transfer
               {% elif pm == 'credit' %}📋 Credit / Udharo
-              {% else %}🔄 Other{% endif %}
+              {% elif pm == 'split' %}💰 Split: Cash + eSewa
+              {% elif pm == 'other' %}🔄 Other
+              {% else %}🔄 {{ pm | capitalize }}{% endif %}
+              <div class="mt-1">
+                <button type="button" id="changePaymentModeBtn" class="btn btn-sm btn-outline-secondary">
+                  ✏️ Change Payment Mode
+                </button>
+              </div>
+              <div id="changePaymentModeForm" style="display:none;" class="mt-2">
+                <form method="POST" action="/sales/{{ sale.id }}/payment-mode">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select name="new_payment_mode" class="form-select form-select-sm" style="width:auto;">
+                      <option value="cash" {% if pm == 'cash' %}selected{% endif %}>💵 Cash</option>
+                      <option value="esewa" {% if pm == 'esewa' %}selected{% endif %}>📱 eSewa</option>
+                      <option value="khalti" {% if pm == 'khalti' %}selected{% endif %}>💜 Khalti</option>
+                      <option value="fonepay" {% if pm == 'fonepay' %}selected{% endif %}>📲 Fonepay</option>
+                      <option value="qr" {% if pm == 'qr' %}selected{% endif %}>📱 QR</option>
+                      <option value="card" {% if pm == 'card' %}selected{% endif %}>💳 Card</option>
+                      <option value="bank" {% if pm == 'bank' %}selected{% endif %}>🏦 Bank Transfer</option>
+                      <option value="credit" {% if pm == 'credit' %}selected{% endif %}>📋 Credit/Udharo</option>
+                      <option value="split" {% if pm == 'split' %}selected{% endif %}>💰 Split: Cash+eSewa</option>
+                      <option value="other" {% if pm == 'other' %}selected{% endif %}>🔄 Other</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-success">💾 Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentModeBtn">Cancel</button>
+                  </div>
+                </form>
+              </div>
             </dd>
           </div>
           <div class="col-sm-4 mb-2">
@@ -348,6 +390,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    // Toggle change-payment-mode form
+    document.getElementById('changePaymentModeBtn')?.addEventListener('click', function() {
+      const form = document.getElementById('changePaymentModeForm');
+      form.style.display = form.style.display === 'none' ? '' : 'none';
+    });
+    document.getElementById('cancelPaymentModeBtn')?.addEventListener('click', function() {
+      document.getElementById('changePaymentModeForm').style.display = 'none';
+    });
+
     async function escposPrint(saleId) {
       const btn = document.getElementById('escposPrintBtn');
       btn.disabled = true;

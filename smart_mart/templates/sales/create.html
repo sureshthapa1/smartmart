@@ -186,11 +186,11 @@
               <label class="form-label fw-medium small">Payment Method <span class="text-danger">*</span></label>
               <div class="d-flex gap-2 flex-wrap">
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash" checked>
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_cash" value="cash">
                   <label class="form-check-label" for="pm_cash">💵 Cash</label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_esewa" value="esewa" checked>
                   <label class="form-check-label" for="pm_esewa"><img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style="height:14px;margin-right:4px">eSewa</label>
                 </div>
                 <div class="form-check form-check-inline">
@@ -221,6 +221,10 @@
                   <input class="form-check-input" type="radio" name="payment_mode" id="pm_other" value="other">
                   <label class="form-check-label" for="pm_other">🔄 Other</label>
                 </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="payment_mode" id="pm_split" value="split">
+                  <label class="form-check-label" for="pm_split">💰 Split: Cash + eSewa</label>
+                </div>
               </div>
             </div>
             <!-- Credit Risk Warning (shown when Credit payment mode + named customer) -->
@@ -232,6 +236,30 @@
               <input type="date" name="credit_due_date" id="creditDueDateInput"
                      class="form-control form-control-sm">
               <div class="form-text">When should this credit be collected?</div>
+            </div>
+
+            <!-- Split Payment Panel (shown only when Split: Cash + eSewa is selected) -->
+            <div id="splitPanel" class="col-12" style="display:none;">
+              <div class="border rounded-3 p-3" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#86efac!important;">
+                <div class="fw-semibold small mb-2"><i class="bi bi-cash-coin me-1 text-success"></i>Split Payment: Cash + eSewa</div>
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label fw-medium small">Cash Amount (NPR)</label>
+                    <input type="number" name="split_cash_amount" id="splitCash"
+                           class="form-control form-control-sm" min="0" step="0.01"
+                           placeholder="0.00">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label fw-medium small">eSewa Amount (NPR)</label>
+                    <input type="number" name="split_esewa_amount" id="splitEsewa"
+                           class="form-control form-control-sm" min="0" step="0.01"
+                           placeholder="0.00">
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <div id="splitValidationMsg" class="small fw-semibold" style="display:none;color:#dc2626;"></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Loyalty Points Redemption (shown when named customer has points) -->
@@ -1060,14 +1088,18 @@
           <span>Manual Discount</span><span>− NPR ${window.manualDiscount.toFixed(2)}</span></div>`);
       }
 
-      // Offer discounts (one row per applied offer)
+      // Offer discounts (one row per applied offer, with individual remove button)
       window.offerDiscounts.forEach(d => {
         const scopeTag = d.scope === 'product'
           ? `<span class="badge bg-info text-dark ms-1" style="font-size:.6rem;">on ${d.productName || 'product'}</span>`
           : `<span class="badge bg-success ms-1" style="font-size:.6rem;">on bill</span>`;
-        rows.push(`<div class="d-flex justify-content-between align-items-center small">
-          <span class="text-success fw-semibold">🎁 ${d.label}${scopeTag}</span>
+        rows.push(`<div class="d-flex justify-content-between align-items-center small gap-1">
+          <span class="text-success fw-semibold flex-grow-1">🎁 ${d.label}${scopeTag}</span>
           <span class="text-success fw-semibold">− NPR ${d.amount.toFixed(2)}</span>
+          <button type="button" class="btn btn-sm p-0 ms-1 text-danger remove-offer-btn"
+                  data-co-id="${d.coId}"
+                  style="line-height:1;font-size:.78rem;background:none;border:none;"
+                  title="Remove this offer">✕</button>
         </div>`);
       });
 
@@ -1096,6 +1128,14 @@
             <span class="text-success">− NPR ${totalDiscount.toFixed(2)}</span>
           </div>
         </div>`;
+
+      // Wire up per-offer remove buttons
+      panel.querySelectorAll('.remove-offer-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const coId = this.dataset.coId;
+          removeOneOffer(coId);
+        });
+      });
     }
 
     document.getElementById('addItemBtn').addEventListener('click', () => addRow());
@@ -1388,6 +1428,19 @@
       document.getElementById('saleForm').prepend(div);
       window.scrollTo(0, 0);
       return;
+    }
+
+    // ── Split payment validation ──────────────────────────────────────────
+    if (document.querySelector('input[name="payment_mode"]:checked')?.value === 'split') {
+      if (!validateSplitAmounts()) {
+        const div = document.createElement('div');
+        div.className = 'alert alert-danger ai-validation-alert';
+        div.innerHTML = '<strong>❌ Split payment error:</strong> Cash + eSewa amounts must equal the grand total.';
+        document.querySelectorAll('.ai-validation-alert').forEach(el => el.remove());
+        document.getElementById('saleForm').prepend(div);
+        window.scrollTo(0, 0);
+        return;
+      }
     }
 
     // ── Walk-in nudge: soft prompt to capture customer name ──────────────
@@ -1952,8 +2005,9 @@
     radio.addEventListener('change', () => {
       clearTimeout(riskCheckTimer);
       riskCheckTimer = setTimeout(checkCreditRisk, 300);
+      const mode = document.querySelector('input[name="payment_mode"]:checked')?.value;
       // Show/hide credit due date field
-      const isCredit = document.querySelector('input[name="payment_mode"]:checked')?.value === 'credit';
+      const isCredit = mode === 'credit';
       const dueDateBox = document.getElementById('creditDueDateBox');
       if (dueDateBox) {
         dueDateBox.style.display = isCredit ? '' : 'none';
@@ -1964,10 +2018,14 @@
           dueDateInput.value = d.toISOString().split('T')[0];
         }
       }
-      // Show/hide change calculator for cash payments
-      const isCash = document.querySelector('input[name="payment_mode"]:checked')?.value === 'cash';
+      // Show/hide change calculator: cash only
+      const isCash = mode === 'cash';
       const changePanel = document.getElementById('changeDuePanel');
       if (changePanel) changePanel.style.display = isCash ? '' : 'none';
+      // Show/hide split panel
+      const isSplit = mode === 'split';
+      const splitPanel = document.getElementById('splitPanel');
+      if (splitPanel) splitPanel.style.display = isSplit ? '' : 'none';
     });
   });
 
@@ -1987,6 +2045,31 @@
     clearTimeout(riskCheckTimer);
     riskCheckTimer = setTimeout(checkCreditRisk, 500);
   });
+
+  // ── Split payment validation ──────────────────────────────────────────
+  function validateSplitAmounts() {
+    const mode = document.querySelector('input[name="payment_mode"]:checked')?.value;
+    if (mode !== 'split') return true;
+    const grandTotal = parseFloat(document.getElementById('grandTotal')?.textContent || 0);
+    const cash = parseFloat(document.getElementById('splitCash')?.value || 0);
+    const esewa = parseFloat(document.getElementById('splitEsewa')?.value || 0);
+    const sum = Math.round((cash + esewa) * 100) / 100;
+    const total = Math.round(grandTotal * 100) / 100;
+    const msgEl = document.getElementById('splitValidationMsg');
+    if (msgEl) {
+      if (Math.abs(sum - total) > 0.01) {
+        msgEl.textContent = `⚠️ Cash + eSewa (${sum.toFixed(2)}) must equal Grand Total (${total.toFixed(2)})`;
+        msgEl.style.display = '';
+        return false;
+      } else {
+        msgEl.style.display = 'none';
+        return true;
+      }
+    }
+    return Math.abs(sum - total) <= 0.01;
+  }
+  document.getElementById('splitCash')?.addEventListener('input', validateSplitAmounts);
+  document.getElementById('splitEsewa')?.addEventListener('input', validateSplitAmounts);
 
   // ── Loyalty Points Redemption ─────────────────────────────────────────
   const loyaltyBox = document.getElementById('loyaltyBox');
@@ -2177,13 +2260,18 @@
 
     if (unapplied.length === 0) {
       // All offers applied — hide the "apply" section but keep the banner visible
-      // if there are applied offers (so user can clear them)
+      // so user can still clear individual offers via the breakdown panel ✕ buttons.
       if (window.offerDiscounts.length > 0) {
         document.getElementById('offerBannerText').textContent = '🎁 Offers applied';
         document.getElementById('offerBannerSub').textContent =
           window.offerDiscounts.map(d => d.label).join(' + ');
-        document.getElementById('applyOfferBtn').style.display = 'none';
+        const applyBtn = document.getElementById('applyOfferBtn');
+        applyBtn.style.display = 'none';
+        applyBtn.disabled = false; // always reset so it's ready if an offer is removed
         document.getElementById('viewAllOffersBtn').style.display = 'none';
+        // Show Skip as "Clear All" when there are applied offers
+        const skipBtn = document.getElementById('skipOfferBtn');
+        if (skipBtn) skipBtn.textContent = 'Clear All Offers';
         banner.style.display = '';
       } else {
         banner.style.display = 'none';
@@ -2204,6 +2292,7 @@
 
     const applyBtn = document.getElementById('applyOfferBtn');
     applyBtn.style.display = '';
+    applyBtn.disabled = false;
     applyBtn.textContent = unapplied.length === 1 ? 'Apply' : 'Choose Offer ▾';
 
     document.getElementById('viewAllOffersBtn').style.display =
@@ -2373,12 +2462,12 @@
       return;
     }
 
-    // Already applied?
+    // Guard against duplicate — already applied, do nothing
     if (window.offerDiscounts.find(d => d.coId === offer.customer_offer_id)) {
-      return; // silently skip — already applied, no alert needed
+      return;
     }
 
-    // Disable Apply button during processing to prevent double-click
+    // Disable Apply button to prevent rapid double-clicks
     const applyBtn = document.getElementById('applyOfferBtn');
     if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = 'Applying...'; }
 
@@ -2389,8 +2478,9 @@
     if (offer.scope === 'product') {
       const productSubtotal = getProductSubtotal(offer.product_id);
       if (productSubtotal <= 0) {
-        if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = 'Apply'; }
+        if (applyBtn) { applyBtn.disabled = false; }
         alert(`This offer is for "${offer.product_name || 'a specific product'}" — please add that product to the cart first.`);
+        renderOfferBanner(); // re-renders with correct button text
         return;
       }
       discount = Math.round(productSubtotal * Math.min(offer.discount_value, 100) / 100 * 100) / 100;
@@ -2411,15 +2501,11 @@
     });
 
     // Store applied offer IDs in hidden field (comma-separated)
-    const hiddenField = document.getElementById('appliedCustomerOfferId');
-    if (hiddenField) {
-      const existing = hiddenField.value ? hiddenField.value.split(',').filter(Boolean) : [];
-      existing.push(String(offer.customer_offer_id));
-      hiddenField.value = existing.join(',');
-    }
+    _syncAppliedOfferField();
 
     recalcTotal();
-    renderOfferBanner();
+    renderOfferBanner(); // re-renders the banner + restores the Apply button state
+
     // Show applied confirmation
     const appliedMsg = document.getElementById('offerAppliedMsg');
     const appliedText = document.getElementById('offerAppliedText');
@@ -2431,17 +2517,43 @@
       appliedMsg.style.display = '';
     }
 
-    // Update skip button
+    // Update skip/clear button label
     const skipBtn = document.getElementById('skipOfferBtn');
     if (skipBtn) skipBtn.textContent = 'Clear All Offers';
+  }
+
+  // ── Remove a single offer by its coId ────────────────────────────────
+  function removeOneOffer(coId) {
+    window.offerDiscounts = window.offerDiscounts.filter(d => d.coId !== coId);
+    _syncAppliedOfferField();
+    recalcTotal();
+    renderOfferBanner();
+
+    // If no offers left, hide the applied message and reset Skip button
+    if (window.offerDiscounts.length === 0) {
+      const appliedMsg = document.getElementById('offerAppliedMsg');
+      if (appliedMsg) appliedMsg.style.display = 'none';
+      const skipBtn = document.getElementById('skipOfferBtn');
+      if (skipBtn) skipBtn.textContent = 'Skip';
+    }
+  }
+
+  // ── Sync the hidden applied_customer_offer_id field ──────────────────
+  function _syncAppliedOfferField() {
+    const hiddenField = document.getElementById('appliedCustomerOfferId');
+    if (!hiddenField) return;
+    // Only include real customer offer IDs (not promo_ or ai_ prefixed ones)
+    const ids = window.offerDiscounts
+      .map(d => d.coId)
+      .filter(id => typeof id === 'number' || (typeof id === 'string' && !isNaN(Number(id))));
+    hiddenField.value = ids.join(',');
   }
 
   // ── Skip / Clear all offers ───────────────────────────────────────────
   document.getElementById('skipOfferBtn')?.addEventListener('click', function() {
     if (window.offerDiscounts.length > 0) {
       window.offerDiscounts = [];
-      const hiddenField = document.getElementById('appliedCustomerOfferId');
-      if (hiddenField) hiddenField.value = '';
+      _syncAppliedOfferField();
       recalcTotal();
       renderOfferBanner();
       const appliedMsg = document.getElementById('offerAppliedMsg');
