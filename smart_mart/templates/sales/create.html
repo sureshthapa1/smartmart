@@ -93,7 +93,7 @@
       </a>
     </div>
 
-    <form method="post" action="{{ url_for('sales.create_sale') }}" id="saleForm">
+    <form method="post" action="{{ url_for('sales.create_sale') }}" id="saleForm" autocomplete="off">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {# Idempotency key — prevents double-post on network retry #}
       <input type="hidden" name="idempotency_key" id="idempotencyKey">
@@ -407,12 +407,17 @@
           <i class="bi bi-cart3 text-primary"></i>
           <span class="fw-semibold">Sale Items</span>
           <span id="itemCountBadge" class="badge ms-1" style="background:#94a3b8;color:#fff;font-size:.72rem;">0 items</span>
-          <!-- Barcode scanner input -->
+          <!-- Barcode scanner input — uses div[contenteditable] so Chrome password manager never attaches -->
           <div class="ms-auto d-flex align-items-center gap-2">
             <i class="bi bi-upc-scan text-muted"></i>
-            <input type="text" id="barcodeInput" class="form-control form-control-sm"
-                   style="width:200px;" placeholder="Scan barcode / type SKU…"
-                   autocomplete="off" title="Scan product barcode or type SKU and press Enter">
+            <div id="barcodeInput"
+                 contenteditable="true"
+                 role="textbox"
+                 aria-label="Scan barcode or type SKU"
+                 spellcheck="false"
+                 data-placeholder="Scan barcode / type SKU…"
+                 class="form-control form-control-sm"
+                 style="width:200px; cursor:text; overflow:hidden; white-space:nowrap;"></div>
           </div>
         </div>
         <div class="card-body p-0">
@@ -1353,7 +1358,8 @@
     // F2 to focus barcode input
     if (e.key === 'F2') {
       e.preventDefault();
-      document.getElementById('barcodeInput')?.focus();
+      const bi = document.getElementById('barcodeInput');
+      if (bi) { bi.removeAttribute('readonly'); bi.focus(); }
     }
   });
 
@@ -1542,6 +1548,35 @@
   });
   const barcodeInput = document.getElementById('barcodeInput');
 
+  // ── Contenteditable placeholder behaviour ────────────────────────────
+  function barcodeGetValue() { return barcodeInput.textContent.trim(); }
+  function barcodeClear()    { barcodeInput.textContent = ''; }
+  function barcodeSetPlaceholder(text) { barcodeInput.dataset.placeholder = text; }
+  // Refocus without triggering Windows Credential / Chrome password UI.
+  // blur() dismisses any open credential popup, then focus() restores input.
+  function barcodeRefocus() {
+    barcodeInput.blur();
+    requestAnimationFrame(() => barcodeInput.focus({ preventScroll: true }));
+  }
+
+  // CSS-driven placeholder (set via data-placeholder attribute + ::before pseudo)
+  // Injected once here so it lives with the logic, not scattered in a stylesheet.
+  (function injectBarcodePlaceholderCSS() {
+    const s = document.createElement('style');
+    s.textContent = `
+      #barcodeInput:empty::before {
+        content: attr(data-placeholder);
+        color: #9ca3af;
+        pointer-events: none;
+      }
+    `;
+    document.head.appendChild(s);
+  })();
+
+  // Chrome Password Manager lock icon fix:
+  // contenteditable divs are completely invisible to Chrome's credential scanner.
+  // No extra attributes needed — this is the definitive fix.
+
   function findProductBySku(query) {
     const q = query.trim();
     if (!q) return null;
@@ -1549,10 +1584,9 @@
     let found = PRODUCTS.find(p => p.barcode && p.barcode.toLowerCase() === q.toLowerCase());
     // 2. Exact SKU match (case-insensitive)
     if (!found) found = PRODUCTS.find(p => p.sku && p.sku.toLowerCase() === q.toLowerCase());
-    // 3. Exact name match
-    if (!found) found = PRODUCTS.find(p => p.name.toLowerCase() === q.toLowerCase());
-    // 4. Partial name match
-    if (!found) found = PRODUCTS.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
+    // NOTE: Name matching is intentionally excluded from barcode scan — a scanned
+    // barcode should only resolve to an exact barcode or SKU, never a partial name,
+    // to prevent wrong products from appearing (e.g. scanning Cashew shows Bansilam).
     return found;
   }
 
@@ -1564,7 +1598,7 @@
       if (product.stock <= 0) {
         barcodeInput.style.borderColor = '#f59e0b';
         barcodeInput.style.background = 'rgba(245,158,11,.08)';
-        barcodeInput.value = '';
+        barcodeClear();
         let toast = document.getElementById('barcodeErrorToast');
         if (!toast) {
           toast = document.createElement('div');
@@ -1581,7 +1615,6 @@
           barcodeInput.style.background = '';
           if (toast) toast.style.display = 'none';
         }, 2500);
-        barcodeInput.focus();
         return;
       }
       // Check if product already in cart — increment qty instead of adding new row
@@ -1598,17 +1631,17 @@
         }
       });
       if (!found) addRow(product.id, 1, product.price);
-      barcodeInput.value = '';
+      barcodeClear();
       barcodeInput.style.borderColor = '#22c55e';
       barcodeInput.style.background = 'rgba(34,197,94,.08)';
       setTimeout(() => { barcodeInput.style.borderColor = ''; barcodeInput.style.background = ''; }, 600);
-      barcodeInput.focus();
+      barcodeRefocus();
     } else {
       // Clear the input and show visible error — silent failures are unacceptable at POS
       barcodeInput.style.borderColor = '#ef4444';
       barcodeInput.style.background = 'rgba(239,68,68,.08)';
-      barcodeInput.placeholder = `Not found: ${sku}`;
-      barcodeInput.value = '';
+      barcodeSetPlaceholder(`Not found: ${sku}`);
+      barcodeClear();
       // Show a toast-style error near the barcode input
       let toast = document.getElementById('barcodeErrorToast');
       if (!toast) {
@@ -1624,10 +1657,10 @@
       setTimeout(() => {
         barcodeInput.style.borderColor = '';
         barcodeInput.style.background = '';
-        barcodeInput.placeholder = 'Scan barcode / type SKU…';
+        barcodeSetPlaceholder('Scan barcode / type SKU…');
         if (toast) toast.style.display = 'none';
       }, 2500);
-      barcodeInput.focus();
+      barcodeRefocus();
     }
   }
 
@@ -1639,15 +1672,22 @@
     if (e.key === 'Enter') {
       e.preventDefault();
       clearTimeout(barcodeTimer);
-      handleBarcodeScan(this.value.trim());
+      handleBarcodeScan(barcodeGetValue());
     }
+  });
+
+  // Strip rich text on paste — contenteditable would otherwise paste HTML
+  barcodeInput.addEventListener('paste', function(e) {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, text);
   });
 
   // Also handle rapid input (some scanners don't send Enter)
   barcodeInput.addEventListener('input', function() {
     clearTimeout(barcodeTimer);
     barcodeTimer = setTimeout(() => {
-      const val = this.value.trim();
+      const val = barcodeGetValue();
       if (val.length >= 3) handleBarcodeScan(val);
     }, 300);
   });
