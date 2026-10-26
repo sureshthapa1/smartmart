@@ -1,0 +1,10 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    "Credit mode via update_payment_mode leaves credit_due_date null — switching a sale to 'credit' via the post-billing form sets payment_mode/payment_method but never populates credit_due_date, producing a partial credit record that collection-reminder queries will miss. Fix: default to today+30d when new_mode=='credit', or exclude 'credit' from valid_modes in update_payment_mode.",
+    "Hardcoded URL in detail.html payment-mode form — action=\"/sales/{{ sale.id }}/payment-mode\" bypasses url_for; breaks silently if blueprint prefix or app mount point changes. Fix: use url_for('sales.update_payment_mode', sale_id=sale.id).",
+    "Cart loss on split-note truncation error — the 120-char overflow guard re-renders create.html without the posted cart, discarding all line items. Redirecting (POST-redirect-GET) or round-tripping the cart through the template context would prevent silent loss.",
+    "Split amounts not validated server-side — the server trusts the JS sum check. A crafted POST can commit split amounts that don't equal the sale total. Low-risk for an internal POS but worth hardening."
+  ],
+  "reviewDoc": "d:\\Mart Project\\.agents\\tasks\\payment-review.md"
+}

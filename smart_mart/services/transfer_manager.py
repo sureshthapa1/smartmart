@@ -72,7 +72,8 @@ def complete_transfer(transfer_id: int, user_id: int | None = None) -> StockTran
             raise ValueError(f"Product {item.product_id} no longer exists.")
         if product.quantity < item.quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")
-        product.quantity -= item.quantity
+        from ..utils.qty import qty_sub as _qty_sub
+        _qty_sub(product, item.quantity)
         db.session.add(StockMovement(
             product_id=product.id,
             change_amount=-item.quantity,

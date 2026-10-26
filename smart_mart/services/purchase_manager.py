@@ -36,7 +36,8 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
                 purchase_id=purchase.id, product_id=product.id,
                 quantity=qty, unit_cost=unit_cost, subtotal=unit_cost * qty,
             ))
-            product.quantity += qty
+            from ..utils.qty import qty_add
+            qty_add(product, qty)
             # Update cost price only when unset (first purchase) — never overwrite
             # an established cost price with a one-off delivery price, as that would
             # corrupt historical profitability calculations for all prior sales.
@@ -201,8 +202,9 @@ def delete_purchase(purchase_id: int, user_id: int) -> None:
             )
         reversals.append((product, item.quantity))
 
+    from ..utils.qty import qty_sub as _qty_sub
     for product, qty in reversals:
-        product.quantity -= qty
+        _qty_sub(product, qty)
         db.session.add(StockMovement(
             product_id=product.id,
             change_amount=-qty,

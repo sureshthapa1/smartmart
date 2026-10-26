@@ -52,7 +52,8 @@ def create_supplier_return(supplier_id: int, items: list[dict], user_id: int,
             reason=item.get("reason"),
         ))
         # Deduct stock
-        product.quantity -= qty
+        from ..utils.qty import qty_sub as _qty_sub
+        _qty_sub(product, qty)
         db.session.add(StockMovement(
             product_id=product.id,
             change_amount=-qty,
@@ -83,7 +84,8 @@ def update_status(return_id: int, status: str) -> SupplierReturn:
         for item in sr.items:
             product = db.session.get(Product, item.product_id)
             if product:
-                product.quantity += item.quantity
+                from ..utils.qty import qty_add as _qty_add
+                _qty_add(product, item.quantity)
                 db.session.add(StockMovement(
                     product_id=product.id,
                     change_amount=item.quantity,

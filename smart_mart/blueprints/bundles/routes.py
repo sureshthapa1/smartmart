@@ -89,7 +89,8 @@ def sell(bundle_id):
         summaries = []
         for item in bundle.items:
             deduct_qty = int(float(item.quantity) * units)
-            item.component.quantity -= deduct_qty
+            from ...utils.qty import qty_sub as _qty_sub
+            _qty_sub(item.component, deduct_qty)
             summaries.append(f"{item.component.name}: -{deduct_qty}g")
             db.session.add(StockMovement(
                 product_id=item.component.id,

@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "MCP client configuration for SmartMart.",
+    "",
+    "Copy the relevant block into your client's config file:",
+    "  Claude Desktop  → %APPDATA%\\Claude\\claude_desktop_config.json  (Windows)",
+    "                  → ~/Library/Application Support/Claude/claude_desktop_config.json  (macOS)",
+    "  Kiro            → .kiro/settings/mcp.json  (workspace)",
+    "                  → ~/.kiro/settings/mcp.json  (user-level)",
+    "",
+    "Replace <PROJECT_ROOT> with the absolute path to this repo,",
+    "and <MCP_SECRET> with the value you set in your .env file.",
+    "",
+    "The stdio transport (mcp_stdio) is recommended for local development.",
+    "The HTTP transport (mcp_http) is recommended for production deployments."
+  ],
+
+  "mcpServers": {
+
+    "smartmart-stdio": {
+      "_comment": "Stdio transport — spawns the bridge as a subprocess. Best for local dev.",
+      "command": "python",
+      "args": ["-m", "smart_mart.mcp_stdio"],
+      "cwd": "<PROJECT_ROOT>",
+      "env": {
+        "FLASK_ENV": "development",
+        "MCP_SECRET": "<MCP_SECRET>"
+      },
+      "disabled": false
+    },
+
+    "smartmart-http": {
+      "_comment": "HTTP transport — connects to a running SmartMart server. Best for production.",
+      "url": "https://<your-render-app>.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer <MCP_SECRET>"
+      },
+      "disabled": true
+    }
+
+  }
+}

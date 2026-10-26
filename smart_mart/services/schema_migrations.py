@@ -765,7 +765,79 @@ def _migration_steps() -> list[MigrationStep]:
                 "CREATE INDEX IF NOT EXISTS ix_product_barcode ON products(barcode)"
             ),
         ),
+        (
+            "2026_10_26_product_variant_quantity_numeric",
+            "Change product_variants.quantity from INTEGER to NUMERIC(10,3) so that "
+            "Decimal values from qty_sub/qty_add can be stored without a SQLite type error. "
+            "SQLite allows ALTER TABLE … RECREATE via CREATE TABLE + INSERT + DROP + RENAME. "
+            "Existing integer values are preserved as-is.",
+            lambda conn: _migrate_variant_quantity_to_numeric(conn),
+        ),
     ]
+
+
+def _migrate_variant_quantity_to_numeric(conn) -> None:
+    """Recreate product_variants with quantity as NUMERIC(10,3).
+
+    SQLite does not support ALTER COLUMN TYPE, so we:
+    1. Create a temporary table with the new schema.
+    2. Copy all rows.
+    3. Drop the original.
+    4. Rename the temp table.
+    Foreign keys / indexes are recreated afterwards.
+    """
+    from sqlalchemy import inspect as _inspect, text as _text
+
+    inspector = _inspect(conn)
+    # Guard: if quantity is already NUMERIC-compatible, skip.
+    try:
+        cols = {c["name"]: c for c in inspector.get_columns("product_variants")}
+        qty_type = str(cols.get("quantity", {}).get("type", "")).upper()
+        # SQLite stores the column type string literally; after the migration it
+        # will be "NUMERIC" (or "NUMERIC(10, 3)"). Skip if already done.
+        if "NUMERIC" in qty_type or "DECIMAL" in qty_type or "REAL" in qty_type:
+            return
+    except Exception:
+        pass  # If introspection fails, proceed with the migration anyway.
+
+    conn.execute(_text("PRAGMA foreign_keys = OFF"))
+    try:
+        conn.execute(_text("""
+            CREATE TABLE _product_variants_new (
+                id           INTEGER PRIMARY KEY,
+                product_id   INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                variant_name VARCHAR(80) NOT NULL,
+                sku          VARCHAR(80) NOT NULL UNIQUE,
+                cost_price   NUMERIC(10,2) NOT NULL,
+                selling_price NUMERIC(10,2) NOT NULL,
+                quantity     NUMERIC(10,3) NOT NULL DEFAULT 0,
+                barcode      VARCHAR(80) UNIQUE,
+                is_active    BOOLEAN NOT NULL DEFAULT 1,
+                units_per_parent INTEGER,
+                created_at   DATETIME NOT NULL
+            )
+        """))
+        conn.execute(_text("""
+            INSERT INTO _product_variants_new
+                (id, product_id, variant_name, sku, cost_price, selling_price,
+                 quantity, barcode, is_active, units_per_parent, created_at)
+            SELECT id, product_id, variant_name, sku, cost_price, selling_price,
+                 CAST(quantity AS REAL), barcode, is_active, units_per_parent, created_at
+            FROM product_variants
+        """))
+        conn.execute(_text("DROP TABLE product_variants"))
+        conn.execute(_text("ALTER TABLE _product_variants_new RENAME TO product_variants"))
+        # Recreate the indexes that existed on the original table.
+        conn.execute(_text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_product_variants_sku "
+            "ON product_variants(sku)"
+        ))
+        conn.execute(_text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_product_variants_barcode "
+            "ON product_variants(barcode)"
+        ))
+    finally:
+        conn.execute(_text("PRAGMA foreign_keys = ON"))
 
 
 def run_pending_migrations(app) -> list[str]:
@@ -845,5 +917,35 @@ def run_pending_migrations(app) -> list[str]:
                 )
         except Exception as exc:
             app.logger.warning("AI autofill on startup failed (non-fatal): %s", exc)
+
+    # ── Verify critical columns exist after migrations ────────────────────
+    # If a column that the ORM model declares is missing from the real table,
+    # it returns None for every row and causes silent data corruption (e.g.
+    # barcode scan always failing, wrong product shown). Catch this at startup
+    # so it surfaces as a loud ERROR rather than a mystery bug in production.
+    _REQUIRED_COLUMNS = [
+        ("products", "barcode"),
+        ("products", "is_active"),
+        ("products", "low_stock_threshold"),
+        ("products", "tax_category"),
+        ("products", "max_discount_pct"),
+        ("product_variants", "barcode"),
+    ]
+    try:
+        with db.engine.connect() as _chk_conn:
+            for _tbl, _col in _REQUIRED_COLUMNS:
+                from sqlalchemy import text as _text
+                result = _chk_conn.execute(_text(f"PRAGMA table_info({_tbl})"))
+                existing_cols = {row[1] for row in result.fetchall()}
+                if _col not in existing_cols:
+                    app.logger.error(
+                        "SCHEMA MISMATCH: column '%s.%s' is missing from the database. "
+                        "The ORM model expects it but it was not created. "
+                        "This causes silent NULL returns (e.g. barcode scan always fails, "
+                        "wrong products shown). Run pending migrations to fix.",
+                        _tbl, _col,
+                    )
+    except Exception as _verify_exc:
+        app.logger.warning("Post-migration column verification failed (non-fatal): %s", _verify_exc)
 
     return applied_now

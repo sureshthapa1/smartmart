@@ -169,11 +169,13 @@ def create_return(
                         sale.id, item.id, item.variant_id,
                     )
                     continue
-                variant.quantity += requested_qty
+                from ..utils.qty import qty_add as _qty_add
+                _qty_add(variant, requested_qty)
                 restock_note = (f"Return for sale #{sale.id} — variant: "
                                 f"{variant.variant_name} ({variant.sku})")
             else:
-                product.quantity += requested_qty
+                from ..utils.qty import qty_add as _qty_add
+                _qty_add(product, requested_qty)
 
             db.session.add(
                 StockMovement(

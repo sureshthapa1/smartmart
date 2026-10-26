@@ -188,7 +188,8 @@ def create_order():
             ))
             # Deduct stock — only if sufficient quantity available
             if product.quantity >= item["quantity"]:
-                product.quantity -= item["quantity"]
+                from ...utils.qty import qty_sub as _qty_sub
+                _qty_sub(product, item["quantity"])
                 # Ledger row, so these units are not unexplained shrinkage. The
                 # deduction happened here with no StockMovement at all, leaving
                 # products.quantity and the stock ledger permanently out of step.

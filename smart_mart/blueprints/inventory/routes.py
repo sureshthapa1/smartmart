@@ -1918,8 +1918,9 @@ def split_pack(product_id, variant_id):
         return redirect(url_for("inventory.product_variants", product_id=product_id))
 
     pieces_added = packs_to_open * variant.units_per_parent
-    product.quantity -= packs_to_open
-    variant.quantity += pieces_added
+    from ...utils.qty import qty_sub as _qty_sub, qty_add as _qty_add
+    _qty_sub(product, packs_to_open)
+    _qty_add(variant, pieces_added)
 
     note = f"Split {packs_to_open} × {product.name} → {pieces_added} × {variant.variant_name}"
 

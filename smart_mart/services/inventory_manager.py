@@ -301,10 +301,12 @@ def adjust_stock(product_id: int, qty: int, direction: str, note: str, user_id: 
                 raise ValueError(
                     f"Insufficient stock: requested {qty}, available {product.quantity}."
                 )
-            product.quantity -= qty
+            from ..utils.qty import qty_sub as _qty_sub
+            _qty_sub(product, qty)
             change_amount = -qty
         else:
-            product.quantity += qty
+            from ..utils.qty import qty_add as _qty_add
+            _qty_add(product, qty)
             change_amount = qty
         product.updated_at = datetime.now(timezone.utc)
         movement = StockMovement(

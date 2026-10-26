@@ -569,6 +569,15 @@ def _register_blueprints(app):
     except Exception:
         pass
 
+    # MCP tools are called by external AI clients (Claude Desktop, Kiro) that
+    # send bearer tokens, not CSRF cookies. Exempt the whole blueprint so POST
+    # requests to /mcp/tools/<tool_name> are not rejected by Flask-WTF.
+    try:
+        from .blueprints.mcp import mcp_bp as _mcp_bp
+        csrf.exempt(_mcp_bp)
+    except Exception:
+        pass
+
     # csrf.exempt(login) was previously here but is unnecessary — the login
     # template already renders {{ csrf_token() }} so CSRF protection works
     # naturally. Removing it restores defense-in-depth against login CSRF

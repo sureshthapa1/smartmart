@@ -17,7 +17,7 @@ class ProductVariant(db.Model):
     sku = db.Column(db.String(80), unique=True, nullable=False)
     cost_price = db.Column(db.Numeric(10, 2), nullable=False)
     selling_price = db.Column(db.Numeric(10, 2), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False, default=0)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False, default=0)
     barcode = db.Column(db.String(80), nullable=True, unique=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     # ── Pack splitting support ────────────────────────────────────────────

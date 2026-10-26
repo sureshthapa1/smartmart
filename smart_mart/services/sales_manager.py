@@ -450,13 +450,15 @@ def create_sale(items: list[dict], user_id: int,
             if vid and vid in variant_items:
                 v = variant_items[vid]
                 cost = v.cost_price
-                v.quantity -= qty   # deduct variant stock
+                from ..utils.qty import qty_sub as _qty_sub
+                _qty_sub(v, qty)   # deduct variant stock
                 # stock_movements is keyed by product_id only, so a variant sale
                 # is logged against the parent product. Name the variant in the
                 # note so the ledger row can still be traced to what moved.
                 movement_note = f"Variant: {v.variant_name} ({v.sku})"
             else:
-                product.quantity -= qty  # deduct parent product stock
+                from ..utils.qty import qty_sub as _qty_sub
+                _qty_sub(product, qty)  # deduct parent product stock
             db.session.add(SaleItem(
                 sale_id=sale.id, product_id=product.id,
                 variant_id=vid if vid else None,
@@ -745,7 +747,8 @@ def delete_sale(sale_id: int) -> None:
                 db.select(db.func.coalesce(db.func.sum(SaleReturnItem.quantity), 0))
                 .where(SaleReturnItem.sale_item_id == item.id)
             ).scalar() or 0
-            restore_qty = float(item.quantity) - float(already_returned)
+            from decimal import Decimal as _D
+            restore_qty = _D(str(item.quantity)) - _D(str(already_returned))
             if restore_qty <= 0:
                 continue  # fully returned already — stock is back on the shelf
 
@@ -760,10 +763,10 @@ def delete_sale(sale_id: int) -> None:
                         "stock not reversed.", sale.id, item.id, item.variant_id,
                     )
                     continue
-                variant.quantity += restore_qty
+                variant.quantity = _D(str(variant.quantity or 0)) + restore_qty
                 db.session.add(StockMovement(
                     product_id=variant.product_id,
-                    change_amount=restore_qty,
+                    change_amount=float(restore_qty),
                     change_type="adjustment_in",
                     reference_id=sale.id,
                     note=(f"Sale #{sale.id} deleted/reversed — variant: "
@@ -775,10 +778,10 @@ def delete_sale(sale_id: int) -> None:
 
             product = db.session.get(Product, item.product_id)
             if product:
-                product.quantity += restore_qty
+                product.quantity = _D(str(product.quantity or 0)) + restore_qty
                 db.session.add(StockMovement(
                     product_id=product.id,
-                    change_amount=restore_qty,
+                    change_amount=float(restore_qty),
                     change_type="adjustment_in",
                     reference_id=sale.id,
                     note=f"Sale #{sale.id} deleted/reversed",

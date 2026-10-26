@@ -308,9 +308,13 @@ def _tool_inventory(args: dict) -> dict:
 
 def _tool_sales_summary(args: dict) -> dict:
     from ...models.sale import Sale, SaleItem
-    today = date.today()
-    week_start  = today - timedelta(days=today.weekday())
-    month_start = today.replace(day=1)
+    # Use datetime boundaries (not bare date) so PostgreSQL's DateTime column
+    # comparison is correct on any timezone.  Midnight local time is used as
+    # the start of "today"; without this, PG interprets a date as midnight UTC
+    # and may miss sales made in the gap between UTC midnight and NST midnight.
+    today_dt    = datetime.combine(date.today(), datetime.min.time())
+    week_start  = today_dt - timedelta(days=date.today().weekday())
+    month_start = today_dt.replace(day=1)
 
     def _rev(start):
         return float(db.session.execute(
@@ -338,7 +342,7 @@ def _tool_sales_summary(args: dict) -> dict:
     ).all()
 
     return {
-        "today":        {"revenue": _rev(today), "orders": _cnt(today)},
+        "today":        {"revenue": _rev(today_dt), "orders": _cnt(today_dt)},
         "this_week":    {"revenue": _rev(week_start), "orders": _cnt(week_start)},
         "this_month":   {"revenue": _rev(month_start), "orders": _cnt(month_start)},
         "top_products": [{"name": r.name, "qty_sold": int(r.qty or 0), "revenue": float(r.rev or 0)} for r in top],
@@ -372,7 +376,7 @@ def _tool_low_stock(args: dict) -> dict:
     products = db.session.execute(q.order_by(Product.quantity)).scalars().all()
 
     # Build a demand map: avg daily units sold over the last 30 days per product.
-    since = date.today() - timedelta(days=30)
+    since = datetime.combine(date.today() - timedelta(days=30), datetime.min.time())
     product_ids = [p.id for p in products]
     demand_rows = db.session.execute(
         db.select(SaleItem.product_id, func.sum(SaleItem.quantity).label("total_qty"))
@@ -409,7 +413,7 @@ def _tool_top_products(args: dict) -> dict:
     from ...models.sale import Sale, SaleItem
     days  = int(args.get("days", 30))
     limit = min(int(args.get("limit", 10)), 50)
-    since = date.today() - timedelta(days=days)
+    since = datetime.combine(date.today() - timedelta(days=days), datetime.min.time())
     rows = db.session.execute(
         db.select(Product.id, Product.name, Product.category,
                   func.sum(SaleItem.quantity).label("qty_sold"),
