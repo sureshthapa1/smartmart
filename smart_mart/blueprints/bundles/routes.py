@@ -88,7 +88,7 @@ def sell(bundle_id):
         db.session.flush()
         summaries = []
         for item in bundle.items:
-            deduct_qty = int(float(item.quantity) * units)
+            deduct_qty = Decimal(str(item.quantity)) * Decimal(str(units))
             from ...utils.qty import qty_sub as _qty_sub
             _qty_sub(item.component, deduct_qty)
             summaries.append(f"{item.component.name}: -{deduct_qty}g")

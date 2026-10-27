@@ -1,0 +1,7 @@
+{
+  "task_id": "task-health-audit-fixes",
+  "task_description": "Fix all 22 findings (C-1 through L-4) from the health audit report, plus the ecommerce_api dev-mode auth bypass, for the Smart Mart POS Flask application.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

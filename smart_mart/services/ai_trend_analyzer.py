@@ -101,13 +101,22 @@ def dead_stock_analysis(days: int = 30) -> dict:
     ).scalars().all()
 
     total_dead_value = sum(float(p.cost_price) * p.quantity for p in products)
+
+    # Batch query: get MAX(sale_date) grouped by product_id — single DB round-trip
+    last_sale_rows = db.session.execute(
+        db.select(
+            SaleItem.product_id,
+            func.max(Sale.sale_date).label("last_sale"),
+        )
+        .join(Sale, Sale.id == SaleItem.sale_id)
+        .where(SaleItem.product_id.in_([p.id for p in products]))
+        .group_by(SaleItem.product_id)
+    ).all()
+    last_sale_map = {row.product_id: row.last_sale for row in last_sale_rows}
+
     items = []
     for p in products:
-        last_sale = db.session.execute(
-            db.select(func.max(Sale.sale_date))
-            .join(SaleItem, SaleItem.sale_id == Sale.id)
-            .where(SaleItem.product_id == p.id)
-        ).scalar()
+        last_sale = last_sale_map.get(p.id)
         days_idle = (date.today() - last_sale.date()).days if last_sale and hasattr(last_sale, 'date') else (
             (date.today() - last_sale).days if last_sale and isinstance(last_sale, date) else None
         )

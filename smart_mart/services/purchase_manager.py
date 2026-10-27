@@ -76,7 +76,12 @@ def create_purchase(supplier_id: int, items: list[dict], purchase_date: date, us
 
 def list_purchases(filters: dict, page: int = 1, per_page: int = 20) -> list[Purchase]:
     """Return purchases ordered by date descending, optionally filtered by date range."""
-    stmt = db.select(Purchase).order_by(Purchase.purchase_date.desc())
+    from sqlalchemy.orm import joinedload
+    stmt = (
+        db.select(Purchase)
+        .options(joinedload(Purchase.supplier), joinedload(Purchase.creator))
+        .order_by(Purchase.purchase_date.desc())
+    )
     conditions = []
     if filters.get("start_date"):
         conditions.append(Purchase.purchase_date >= filters["start_date"])

@@ -1575,7 +1575,7 @@ def labels_print_direct():
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(6, px))
-            except: return ImageFont.load_default()
+            except Exception: return ImageFont.load_default()
 
         # Font sizes scaled to 240px wide landscape canvas
         f_shop  = _f(16)
@@ -1848,7 +1848,7 @@ def edit_variant(product_id, variant_id):
             variant.sku = sku
             variant.cost_price = Decimal(str(cost_price_raw or 0))
             variant.selling_price = Decimal(str(selling_price_raw or 0))
-            variant.quantity = int(float(request.form.get("quantity", 0) or 0))
+            variant.quantity = Decimal(str(request.form.get("quantity", 0) or 0))
             variant.barcode = request.form.get("barcode", "").strip() or None
             variant.is_active = request.form.get("is_active") == "on"
             variant.units_per_parent = units_per_parent

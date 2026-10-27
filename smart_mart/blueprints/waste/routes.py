@@ -62,7 +62,11 @@ def record_waste():
         if reason not in REASONS:
             raise ValueError("Choose a valid waste reason.")
 
-        product = db.get_or_404(Product, product_id)
+        product = db.session.execute(
+            db.select(Product).where(Product.id == product_id).with_for_update()
+        ).scalar_one_or_none()
+        if product is None:
+            raise ValueError(f"Product #{product_id} not found.")
         stock_quantity = Decimal(str(product.quantity or 0))
         if quantity > stock_quantity:
             raise ValueError(f"Insufficient stock for {product.name}.")

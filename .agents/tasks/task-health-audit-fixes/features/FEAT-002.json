@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix all blueprint-level CRITICAL and HIGH decimal-truncation bugs: C-4 (inventory variant quantity), C-5 (bundles Decimal), H-3 (stock-take counts), H-4 (returns qty), H-5 (online orders missing try/except). Independent of FEAT-001 — different files, no shared state.",
+  "status": "completed",
+  "steps": [
+    "1. READ D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\context.json and D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\features\\FEAT-002.json FIRST.",
+    "2. READ D:\\Mart Project\\.agents\\tasks\\health-audit-fix-plan.md for the exact before/after code for every item below.",
+    "3. Edit D:\\Mart Project\\smart_mart\\blueprints\\inventory\\routes.py — plan item 14: Find line variant.quantity = int(float(request.form.get('quantity', 0) or 0)) (around line 1851). Confirm Decimal is already imported in the file (search for 'from decimal import Decimal'). Change to variant.quantity = Decimal(str(request.form.get('quantity', 0) or 0)). Add 'from decimal import Decimal' if absent.",
+    "4. Edit D:\\Mart Project\\smart_mart\\blueprints\\bundles\\routes.py — plan item 15: Add 'from decimal import Decimal' to imports if absent. Change deduct_qty = int(float(item.quantity) * units) to deduct_qty = Decimal(str(item.quantity)) * Decimal(str(units)).",
+    "5. Edit D:\\Mart Project\\smart_mart\\blueprints\\stock_take\\routes.py — plan item 16: Add 'from decimal import Decimal' to imports. Change counts[item.product_id] = int(raw) to counts[item.product_id] = Decimal(str(raw)). Change the AJAX endpoint line stock_take_service.update_counts(take_id, {int(product_id): int(counted_qty)}) to stock_take_service.update_counts(take_id, {int(product_id): Decimal(str(counted_qty))}).",
+    "6. Edit D:\\Mart Project\\smart_mart\\blueprints\\returns\\routes.py — plan item 17: Add 'from decimal import Decimal' to imports. Replace the try: parsed_qty = int(qty) / except ValueError: parsed_qty = 0 block with try: parsed_qty = Decimal(str(qty)) / except Exception: parsed_qty = Decimal('0').",
+    "7. Edit D:\\Mart Project\\smart_mart\\blueprints\\online_orders\\routes.py — plan item 18: Read the current POST handler body from lines 170-215. Wrap the entire POST block body (from the product-lock SELECT FOR UPDATE through db.session.commit() and the flash/redirect) in try: ... except Exception as exc: db.session.rollback(); flash(f'Could not create order: {exc}', 'danger'); return render_template('online_orders/create.html', products=products). The existing db.session.rollback() + flash in the else-branch (insufficient stock) stays inside the try block.",
+    "8. Run python -m py_compile on every file edited in this FEAT. All must exit 0.",
+    "9. Set FEAT-002.status to 'completed' and record any deviations in findings."
+  ],
+  "acceptance_criteria": [
+    "python -m py_compile smart_mart/blueprints/inventory/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/bundles/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/stock_take/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/returns/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/online_orders/routes.py exits 0",
+    "inventory/routes.py line uses Decimal(str(...)) not int(float(...))",
+    "bundles/routes.py uses Decimal arithmetic for deduct_qty",
+    "stock_take/routes.py both count sites use Decimal",
+    "returns/routes.py uses Decimal for parsed_qty",
+    "online_orders/routes.py POST body wrapped in try/except/rollback"
+  ],
+  "verification": [
+    "cd 'D:\\Mart Project' && python -m py_compile smart_mart/blueprints/inventory/routes.py smart_mart/blueprints/bundles/routes.py smart_mart/blueprints/stock_take/routes.py smart_mart/blueprints/returns/routes.py smart_mart/blueprints/online_orders/routes.py"
+  ],
+  "blocked_reason": null,
+  "findings": "No deviations. inventory/routes.py already imported Decimal at line 3. bundles/routes.py already imported Decimal at line 1. Added Decimal import to stock_take/routes.py and returns/routes.py. Wrapped online_orders create_order POST body in try/except/rollback."
+}

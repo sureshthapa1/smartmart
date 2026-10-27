@@ -52,12 +52,13 @@ def _is_authorized() -> bool:
     if _is_admin_session():
         return True
     configured = _candidate_keys()
-    # Never allow unauthenticated access in production
+    # No API keys are configured at all.
+    # Only allow fallback-open in an *explicit* testing context; never
+    # when DEBUG is simply False or FLASK_ENV is absent/unset.
+    # This prevents staging misconfiguration (DEBUG=False, FLASK_ENV unset)
+    # from defaulting to open.
     if not configured:
-        import os
-        if os.environ.get("FLASK_ENV") == "production" or not (current_app.testing or current_app.debug):
-            return False
-        return True  # dev/test only
+        return bool(current_app.testing)
     return bool(configured.intersection(_provided_keys()))
 
 

@@ -773,6 +773,24 @@ def _migration_steps() -> list[MigrationStep]:
             "Existing integer values are preserved as-is.",
             lambda conn: _migrate_variant_quantity_to_numeric(conn),
         ),
+        (
+            "2026_10_26_stock_transfer_items_quantity_numeric",
+            "Change stock_transfer_items.quantity from INTEGER to NUMERIC(10,3) "
+            "so fractional stock transfers are stored exactly. "
+            "Uses same SQLite table-recreate pattern as 2026_10_26_product_variant_quantity_numeric.",
+            lambda conn: _migrate_transfer_item_quantity_to_numeric(conn),
+        ),
+        (
+            "2026_10_26_sale_cname_lower_index",
+            "Add functional index on sales(lower(customer_name)) so customer_intelligence "
+            "queries using func.lower(Sale.customer_name) can use the index on SQLite and "
+            "PostgreSQL instead of doing a full table scan.",
+            lambda conn: _safe_exec(
+                conn,
+                "CREATE INDEX IF NOT EXISTS ix_sale_cname_lower "
+                "ON sales (lower(customer_name))"
+            ),
+        ),
     ]
 
 
@@ -835,6 +853,55 @@ def _migrate_variant_quantity_to_numeric(conn) -> None:
         conn.execute(_text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_product_variants_barcode "
             "ON product_variants(barcode)"
+        ))
+    finally:
+        conn.execute(_text("PRAGMA foreign_keys = ON"))
+
+
+def _migrate_transfer_item_quantity_to_numeric(conn) -> None:
+    """Recreate stock_transfer_items with quantity as NUMERIC(10,3).
+
+    SQLite does not support ALTER COLUMN TYPE, so we use the standard
+    CREATE TABLE + INSERT + DROP + RENAME pattern, identical to
+    _migrate_variant_quantity_to_numeric above.
+    """
+    from sqlalchemy import inspect as _inspect, text as _text
+
+    inspector = _inspect(conn)
+    try:
+        cols = {c["name"]: c for c in inspector.get_columns("stock_transfer_items")}
+        qty_type = str(cols.get("quantity", {}).get("type", "")).upper()
+        if "NUMERIC" in qty_type or "DECIMAL" in qty_type or "REAL" in qty_type:
+            return
+    except Exception:
+        pass
+
+    conn.execute(_text("PRAGMA foreign_keys = OFF"))
+    try:
+        conn.execute(_text("""
+            CREATE TABLE _stock_transfer_items_new (
+                id          INTEGER PRIMARY KEY,
+                transfer_id INTEGER NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+                product_id  INTEGER NOT NULL REFERENCES products(id),
+                quantity    NUMERIC(10,3) NOT NULL DEFAULT 0
+            )
+        """))
+        conn.execute(_text("""
+            INSERT INTO _stock_transfer_items_new (id, transfer_id, product_id, quantity)
+            SELECT id, transfer_id, product_id, CAST(quantity AS REAL)
+            FROM stock_transfer_items
+        """))
+        conn.execute(_text("DROP TABLE stock_transfer_items"))
+        conn.execute(_text(
+            "ALTER TABLE _stock_transfer_items_new RENAME TO stock_transfer_items"
+        ))
+        conn.execute(_text(
+            "CREATE INDEX IF NOT EXISTS ix_sti_transfer_id "
+            "ON stock_transfer_items(transfer_id)"
+        ))
+        conn.execute(_text(
+            "CREATE INDEX IF NOT EXISTS ix_sti_product_id "
+            "ON stock_transfer_items(product_id)"
         ))
     finally:
         conn.execute(_text("PRAGMA foreign_keys = ON"))

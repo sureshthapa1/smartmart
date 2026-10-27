@@ -105,7 +105,9 @@ class AnalyticsService:
         fast_cutoff = today - timedelta(days=fast_sell_days)
         slow_cutoff = today - timedelta(days=slow_sell_days)
 
-        products = db.session.execute(db.select(Product)).scalars().all()
+        products = db.session.execute(
+            db.select(Product).where(Product.is_active == True)  # noqa: E712
+        ).scalars().all()
 
         # Recent sales velocity
         fast_rows = db.session.execute(
@@ -353,12 +355,14 @@ class AnalyticsService:
         )
         cogs_data = db.session.execute(cogs_stmt).all()
 
-        # Current inventory value per product
-        inv_rows = db.session.execute(db.select(Product)).scalars().all()
-        inv_map = {
-            p.id: as_decimal(p.quantity or 0) * as_decimal(p.cost_price or 0)
-            for p in inv_rows
-        }
+        # Current inventory value per product (projection — avoids full-row load)
+        inv_rows = db.session.execute(
+            db.select(
+                Product.id,
+                (Product.quantity * Product.cost_price).label("inv_value"),
+            ).where(Product.cost_price > 0)
+        ).all()
+        inv_map = {row.id: as_decimal(row.inv_value or 0) for row in inv_rows}
 
         products = []
         total_cogs = Decimal("0")
@@ -414,7 +418,7 @@ class AnalyticsService:
         Alert when stock <= reorder_point (or custom_threshold if provided).
         Returns products needing restock, sorted by urgency.
         """
-        stmt = db.select(Product).where(Product.quantity >= 0)
+        stmt = db.select(Product).where(Product.is_active == True)  # noqa: E712
         products = db.session.execute(stmt).scalars().all()
 
         alerts = []
@@ -636,7 +640,9 @@ class AnalyticsService:
                 })
 
         # Dead stock and overstock from inventory
-        all_products = db.session.execute(db.select(Product)).scalars().all()
+        all_products = db.session.execute(
+            db.select(Product).where(Product.quantity > 0)
+        ).scalars().all()
         for product in all_products:
             qty = int(product.quantity or 0)
             last_sale = last_sale_map.get(product.id)

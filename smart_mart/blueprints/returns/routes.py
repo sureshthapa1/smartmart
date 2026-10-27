@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for, abort
 from flask_login import current_user
 
@@ -85,9 +87,9 @@ def create_return(sale_id):
             sale_item = row["sale_item"]
             qty = request.form.get(f"return_qty_{sale_item.id}", "0").strip() or "0"
             try:
-                parsed_qty = int(qty)
-            except ValueError:
-                parsed_qty = 0
+                parsed_qty = Decimal(str(qty))
+            except Exception:
+                parsed_qty = Decimal("0")
             item_quantities.append({"sale_item_id": sale_item.id, "quantity": parsed_qty})
 
         try:

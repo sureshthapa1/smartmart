@@ -201,11 +201,18 @@ def personalized_recommendations(customer_name: str) -> dict:
         return behavior
 
     bought_ids = {p["product_id"] for p in behavior["top_products"]}
-    top_categories = set()
 
-    for pid in bought_ids:
-        p = db.session.get(Product, pid)
-        if p and p.category:
+    # Batch-load all bought products in one query (fixes M-8 N+1)
+    bought_products = {
+        p.id: p
+        for p in db.session.execute(
+            db.select(Product).where(Product.id.in_(bought_ids))
+        ).scalars().all()
+    } if bought_ids else {}
+
+    top_categories = set()
+    for pid, p in bought_products.items():
+        if p.category:
             top_categories.add(p.category)
 
     # Products in same categories not yet bought
@@ -218,10 +225,10 @@ def personalized_recommendations(customer_name: str) -> dict:
         .limit(5)
     ).scalars().all()
 
-    # Upsell: premium products in same category
+    # Upsell: premium products in same category (uses bought_products dict — no extra queries)
     upsell = []
     for pid in list(bought_ids)[:3]:
-        p = db.session.get(Product, pid)
+        p = bought_products.get(pid)
         if p:
             premium = db.session.execute(
                 db.select(Product)

@@ -691,9 +691,11 @@ document.addEventListener('click',function(e){
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('{{ url_for("store.service_worker") }}')
-            .then(reg => console.log('SW registered:', reg.scope))
-            .catch(err => console.log('SW registration failed:', err));
+          try {
+            navigator.serviceWorker.register('{{ url_for("store.service_worker") }}')
+              .then(reg => console.debug('SW registered:', reg.scope))
+              .catch(() => { /* SW registration failed — silent in production */ });
+          } catch (_e) { /* SW not supported — ignore */ }
         });
       }
     </script>

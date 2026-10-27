@@ -52,6 +52,7 @@ def create_promotion():
                 flash(f"Promotion '{promo.name}' created.", "success")
                 return redirect(url_for("promotions.list_promotions"))
             except Exception as e:
+                db.session.rollback()
                 flash(str(e), "danger")
     today = date.today()
     return render_template("promotions/form.html", promo=None, categories=categories,
@@ -75,6 +76,7 @@ def edit_promotion(promo_id):
             flash("Promotion updated.", "success")
             return redirect(url_for("promotions.list_promotions"))
         except Exception as e:
+            db.session.rollback()
             flash(str(e), "danger")
     today = date.today()
     return render_template("promotions/form.html", promo=promo, categories=categories,

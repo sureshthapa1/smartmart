@@ -516,6 +516,8 @@ def create_sale(items: list[dict], user_id: int,
                         cust.loyalty_tier = "bronze"
         except Exception as e:
             logger.warning("Customer upsert failed: %s", e)
+            db.session.rollback()
+            db.session.begin()
 
         applied_offer_discount = _mark_customer_offers_used(
             sale=sale,
@@ -551,6 +553,7 @@ def create_sale(items: list[dict], user_id: int,
         db.session.commit()
     except Exception as exc:
         logger.warning("Sale audit logging failed for sale %s: %s", sale.id, exc)
+        db.session.rollback()
 
     # Invalidate BI dashboard cache so next load reflects the new sale
     try:

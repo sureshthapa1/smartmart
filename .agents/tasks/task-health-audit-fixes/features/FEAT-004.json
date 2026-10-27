@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-004",
+  "type": "perf",
+  "description": "Fix M-3 (unbounded Product loads in analytics_service.py — 4 sites) and M-4 (N+1 customer_intelligence query in api/routes.py — functional index added via migration in FEAT-003; this FEAT handles the api/routes.py query comment update if needed). analytics_service.py is the primary focus. Independent of FEAT-001, FEAT-002, FEAT-003.",
+  "status": "completed",
+  "steps": [
+    "1. READ D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\context.json and D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\features\\FEAT-004.json FIRST.",
+    "2. READ D:\\Mart Project\\.agents\\tasks\\health-audit-fix-plan.md plan item 21 for the exact before/after changes.",
+    "3. Edit D:\\Mart Project\\smart_mart\\bi\\services\\analytics_service.py — plan item 21, four sites: (a) Line 108 (margin_recommendations): add .where(Product.is_active == True) filter to the Product select so inactive products are excluded. (b) Lines 357-362 (inventory_turnover): replace the full-product-load with a projection query returning only Product.id and (Product.quantity * Product.cost_price).label('inv_value') and build inv_map from those rows. (c) Lines 417-419 (safety_stock_alerts): add .where(Product.is_active == True) filter. (d) Line 639 (inventory_warnings): add .where(Product.quantity > 0) filter to skip zero-stock products early.",
+    "4. Note on M-4 (api/routes.py): The functional index ix_sale_cname_lower was already added in FEAT-003 via schema_migrations.py. No code change is needed in api/routes.py itself — the existing query uses func.lower(Sale.customer_name) which will now use the index. Confirm by reading lines 248-260 of api/routes.py; if there is a comment or code that can be improved without changing behavior, update it. Otherwise, no edit needed.",
+    "5. Run python -m py_compile on every file edited in this FEAT. All must exit 0.",
+    "6. Set FEAT-004.status to 'completed' and record any deviations in findings."
+  ],
+  "acceptance_criteria": [
+    "python -m py_compile smart_mart/bi/services/analytics_service.py exits 0",
+    "analytics_service.py margin_recommendations query has .where(Product.is_active == True) filter",
+    "analytics_service.py inventory_turnover no longer loads all Product rows — uses projection query",
+    "analytics_service.py safety_stock_alerts query has is_active filter",
+    "analytics_service.py inventory_warnings query has .where(Product.quantity > 0) filter"
+  ],
+  "verification": [
+    "cd 'D:\\Mart Project' && python -m py_compile smart_mart/bi/services/analytics_service.py"
+  ],
+  "blocked_reason": null,
+  "findings": "M-4 (api/routes.py): No code change needed — existing query already uses func.lower(Sale.customer_name) which will benefit from the ix_sale_cname_lower index added in FEAT-003. All four analytics_service.py sites updated as planned."
+}

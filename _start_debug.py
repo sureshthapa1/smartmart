@@ -1,5 +1,13 @@
 import sys, os, traceback, time
 
+# Safety guard — prevent accidental use in production
+if os.environ.get("FLASK_ENV") == "production":
+    raise RuntimeError(
+        "_start_debug.py must NOT be used in production! "
+        "It enables Flask debug mode (Werkzeug interactive debugger) on 0.0.0.0:5000. "
+        "Use serve.py (Waitress) for production."
+    )
+
 log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "startup_debug.txt")
 os.makedirs(os.path.dirname(log_path), exist_ok=True)
 

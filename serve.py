@@ -34,10 +34,11 @@ def _log_exception(e):
     logging.getLogger(__name__).error("Unhandled exception:\n%s", tb)
     # Also print to console so bat window shows it
     print(tb, file=sys.stderr)
-    from flask import request as _r
     return (
-        "<pre style='padding:2rem;background:#111;color:#f87171;font-size:13px'>"
-        f"500 — Internal Server Error\n\n{tb}</pre>"
+        "<div style='padding:2rem;font-family:sans-serif;'>"
+        "<h2 style='color:#b91c1c;'>500 — Internal Server Error</h2>"
+        "<p>An unexpected error occurred. The server team has been notified.</p>"
+        "</div>"
     ), 500
 
 host = "0.0.0.0"

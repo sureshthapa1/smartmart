@@ -121,7 +121,12 @@ def request_password_reset():
             # show the reset link directly on screen so they can relay it
             # without needing server-log access.
             if _cu.is_authenticated and getattr(_cu, "role", "") == "admin":
-                msg = f"Reset link for '{user.username}' (valid 30 min): {reset_url}"
+                token_preview = token[:8] + "…"
+                msg = (
+                    f"Reset link for '{user.username}' (valid 30 min) — "
+                    f"token starts with: {token_preview}. "
+                    "Copy the full link from the browser address bar after visiting the URL."
+                )
                 if email_sent:
                     msg += " (also emailed to user)"
                 flash(msg, "info")

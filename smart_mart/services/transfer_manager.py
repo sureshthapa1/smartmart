@@ -1,6 +1,7 @@
 """Stock Transfer between branches."""
 from __future__ import annotations
 from datetime import datetime, timezone
+from decimal import Decimal
 from ..extensions import db
 from ..models.stock_movement import StockMovement
 from ..models.stock_transfer import StockTransfer, StockTransferItem
@@ -24,8 +25,10 @@ def create_transfer(from_branch_id: int, to_branch_id: int, user_id: int,
     db.session.flush()
 
     for item in items:
-        product = db.session.get(Product, int(item["product_id"]))
-        qty = int(item["quantity"])
+        product = db.session.execute(
+            db.select(Product).where(Product.id == int(item["product_id"])).with_for_update()
+        ).scalar_one_or_none()
+        qty = Decimal(str(item["quantity"]))
         if not product:
             raise ValueError(f"Product {item['product_id']} not found.")
         if product.quantity < qty:

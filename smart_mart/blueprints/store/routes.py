@@ -1782,6 +1782,7 @@ def about():
 
 
 @store_bp.route("/contact", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
 def contact():
     settings = _settings()
     if request.method == "POST":

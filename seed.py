@@ -101,12 +101,14 @@ def ensure_admin():
             "Run: export ADMIN_PASSWORD=<your-secure-password>"
         )
 
-    # In development, use a clear default and warn loudly.
+    # In development, generate a random password if none is set.
     if not admin_password:
-        admin_password = "Admin@12345"
+        import secrets as _secrets
+        admin_password = _secrets.token_urlsafe(16)
         print(
-            "WARNING: Using default password Admin@12345. "
-            "Set ADMIN_PASSWORD env var before deploying to production."
+            f"WARNING: ADMIN_PASSWORD not set. Generated random admin password: {admin_password}\n"
+            "         SAVE THIS — it will not be shown again. "
+            "Set ADMIN_PASSWORD env var to use a fixed password."
         )
 
     admin_username = _os.environ.get("ADMIN_USERNAME", "admin")

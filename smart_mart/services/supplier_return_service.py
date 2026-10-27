@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from ..extensions import db
 from ..models.product import Product
@@ -9,65 +10,66 @@ from ..models.stock_movement import StockMovement
 from ..models.supplier_return import SupplierReturn, SupplierReturnItem
 
 
-def _next_reference() -> str:
-    # Use MAX(id) + 1 so deletions don't produce duplicate reference numbers
-    max_id = db.session.execute(db.select(db.func.max(SupplierReturn.id))).scalar() or 0
-    return f"SR-{max_id + 1:05d}"
-
-
 def create_supplier_return(supplier_id: int, items: list[dict], user_id: int,
                            purchase_id: int | None = None,
                            reason: str | None = None,
                            notes: str | None = None) -> SupplierReturn:
     """Create a supplier return and deduct stock immediately."""
-    sr = SupplierReturn(
-        reference=_next_reference(),
-        supplier_id=supplier_id,
-        purchase_id=purchase_id,
-        reason=reason,
-        notes=notes,
-        status="pending",
-        created_by=user_id,
-    )
-    db.session.add(sr)
-    db.session.flush()
-
-    total_credit = 0.0
-    for item in items:
-        product = db.session.get(Product, item["product_id"])
-        if not product:
-            raise ValueError(f"Product #{item['product_id']} not found.")
-        qty = int(item["quantity"])
-        unit_cost = float(item["unit_cost"])
-        if qty > product.quantity:
-            raise ValueError(
-                f"Insufficient stock for '{product.name}': "
-                f"requested {qty}, available {product.quantity}."
-            )
-        db.session.add(SupplierReturnItem(
-            supplier_return_id=sr.id,
-            product_id=product.id,
-            quantity=qty,
-            unit_cost=unit_cost,
-            reason=item.get("reason"),
-        ))
-        # Deduct stock
-        from ..utils.qty import qty_sub as _qty_sub
-        _qty_sub(product, qty)
-        db.session.add(StockMovement(
-            product_id=product.id,
-            change_amount=-qty,
-            change_type="supplier_return",
-            reference_id=sr.id,
-            note=f"Supplier return {sr.reference}",
+    try:
+        sr = SupplierReturn(
+            reference="",   # placeholder; assigned after flush gives us the real id
+            supplier_id=supplier_id,
+            purchase_id=purchase_id,
+            reason=reason,
+            notes=notes,
+            status="pending",
             created_by=user_id,
-            timestamp=datetime.now(timezone.utc),
-        ))
-        total_credit += qty * unit_cost
+        )
+        db.session.add(sr)
+        db.session.flush()
+        sr.reference = f"SR-{sr.id:05d}"   # use the assigned PK — race-free
 
-    sr.credit_amount = total_credit
-    db.session.commit()
-    return sr
+        total_credit = 0.0
+        for item in items:
+            product = db.session.execute(
+                db.select(Product).where(Product.id == item["product_id"]).with_for_update()
+            ).scalar_one_or_none()
+            if not product:
+                raise ValueError(f"Product #{item['product_id']} not found.")
+            qty = Decimal(str(item["quantity"]))
+            unit_cost = float(item["unit_cost"])
+            if qty > product.quantity:
+                raise ValueError(
+                    f"Insufficient stock for '{product.name}': "
+                    f"requested {qty}, available {product.quantity}."
+                )
+            db.session.add(SupplierReturnItem(
+                supplier_return_id=sr.id,
+                product_id=product.id,
+                quantity=qty,
+                unit_cost=unit_cost,
+                reason=item.get("reason"),
+            ))
+            # Deduct stock
+            from ..utils.qty import qty_sub as _qty_sub
+            _qty_sub(product, qty)
+            db.session.add(StockMovement(
+                product_id=product.id,
+                change_amount=-qty,
+                change_type="supplier_return",
+                reference_id=sr.id,
+                note=f"Supplier return {sr.reference}",
+                created_by=user_id,
+                timestamp=datetime.now(timezone.utc),
+            ))
+            total_credit += qty * unit_cost
+
+        sr.credit_amount = total_credit
+        db.session.commit()
+        return sr
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 def update_status(return_id: int, status: str) -> SupplierReturn:

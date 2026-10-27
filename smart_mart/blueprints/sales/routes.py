@@ -298,9 +298,22 @@ def update_payment_mode(sale_id):
     if new_mode not in valid_modes:
         flash("Invalid payment mode.", "danger")
         return redirect(url_for("sales.sale_detail", sale_id=sale_id))
+
+    # Guard: refuse to change payment mode if credit has already been collected
+    if getattr(sale, 'credit_collected', False):
+        return (
+            {"error": "Cannot change payment mode: credit has already been collected."},
+            400,
+        )
+
     sale.payment_mode = new_mode
     sale.payment_method = new_mode
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error updating payment mode: {e}", "danger")
+        return redirect(url_for("sales.sale_detail", sale_id=sale_id))
     flash(f"Payment mode updated to {new_mode}.", "success")
     return redirect(url_for("sales.sale_detail", sale_id=sale_id))
 
@@ -594,6 +607,7 @@ def delete_sale(sale_id):
         sales_manager.delete_sale(sale_id)
         flash(f"Sale #{sale_id} has been deleted and stock reversed.", "success")
     except Exception as e:
+        db.session.rollback()
         flash(f"Error deleting sale: {e}", "danger")
     return redirect(url_for("sales.list_sales"))
 
@@ -631,6 +645,7 @@ def void_sale(sale_id):
         flash(f"Sale #{sale_id} voided — stock has been restored.", "success")
         return redirect(url_for("sales.list_sales"))
     except Exception as e:
+        db.session.rollback()
         flash(f"Error voiding sale: {e}", "danger")
         return redirect(url_for("sales.sale_detail", sale_id=sale_id))
 

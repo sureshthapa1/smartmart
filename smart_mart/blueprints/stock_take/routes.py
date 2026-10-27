@@ -1,6 +1,8 @@
 """Stock Take blueprint — physical inventory count (Feature #3)."""
 from __future__ import annotations
 
+from decimal import Decimal
+
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 
@@ -75,7 +77,7 @@ def count(take_id):
             raw = request.form.get(f"count_{item.product_id}", "").strip()
             if raw != "":
                 try:
-                    counts[item.product_id] = int(raw)
+                    counts[item.product_id] = Decimal(str(raw))
                 except ValueError:
                     pass
         stock_take_service.update_counts(take_id, counts)
@@ -133,7 +135,7 @@ def api_save_count(take_id):
     if product_id is None or counted_qty is None:
         return jsonify({"ok": False, "error": "Missing fields"}), 400
     try:
-        stock_take_service.update_counts(take_id, {int(product_id): int(counted_qty)})
+        stock_take_service.update_counts(take_id, {int(product_id): Decimal(str(counted_qty))})
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400

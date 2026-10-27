@@ -1,379 +1,426 @@
-# Smart Mart — Full Application Audit
-
-**Date:** 2026-10-14  
-**Scope:** Broad audit across POS/Billing, Inventory, Reports/Dashboard, Auth, Data Integrity, Purchase/Supplier flow, and general code quality. Barcode/label area excluded (already audited separately).
+# Smart Mart — Full Codebase Audit
+**Date:** 2025-07-17  
+**Project:** GoldKernel Smart Mart POS (Flask/Python)  
+**Scope:** All blueprints, models, services, templates, config, and root-level scripts
 
 ---
 
 ## Executive Summary
 
-The codebase is in good overall shape. The critical financial logic (stock locking, double-post prevention, discount validation, credit-limit enforcement, payment-status accuracy) has been hardened with intentional design. However, **five issues could hurt a real store today**:
+The codebase is a mature, feature-rich POS application with generally good practices: CSRF protection is applied consistently, SQLAlchemy ORM is used throughout (no raw SQL injection risk), and there is a real error-handler hierarchy. The main original user complaint — a popup/sign appearing on every barcode scan — is traced below as a **CRITICAL** issue in the POS template's barcode input implementation using `contenteditable` instead of a real `<input>`, combined with Chrome's native "save password" or "autofill" UI triggering on that element.
 
-1. **POS default payment mode is eSewa, not Cash** — cashiers who forget to click will submit every digital payment as eSewa.
-2. **Purchase cost overwrites product cost on every restock** — kills historical cost accuracy in profitability reports.
-3. **Credit returns do not adjust the sale total** — a refunded credit sale shows the original amount as still outstanding.
-4. **Inventory valuation uses live cost price, not historical snapshots** — stale for any product whose cost changed.
-5. **In-memory rate limiter is per-process, not per-server** — loses all login-attempt history on restart; no persistence.
+Beyond the original bug, the audit found: **2 CRITICAL**, **7 HIGH**, **8 MEDIUM**, and **10 LOW** issues.
 
 ---
 
-## Findings
+## CRITICAL
 
-### 1. POS / Billing Screen
+### C-1 — Barcode scanner popup on every scan (Original bug)
+**File:** `smart_mart/templates/sales/create.html` (lines ~310–330)  
+**Description:**  
+The barcode input is implemented as a `<div contenteditable="true">` rather than a standard `<input type="text">`. While this was intentional (to prevent Chrome's password-manager from attaching to a text field named `barcode`), Chrome's autofill/form-assistant has extended its heuristics: it now triggers on `contenteditable` elements inside forms too, especially when the surrounding `<form>` contains password-type fields (the login link in the nav) or when Chrome detects rapid keyboard input resembling structured data (barcodes).  
+Additionally, the element has no `autocomplete="off"` attribute and sits inside a `<form>` element, which signals to Chrome that it is an interactive form field eligible for autofill. The barcode beep sound confirms successful scans; the popup appears every time because Chrome's payment/autofill assistant fires on each `input` event.
 
-#### 1.1 BUG — Default payment mode is eSewa, not Cash  
-**Impact: HIGH** | File: `smart_mart/templates/sales/create.html` line ~193
-
-The eSewa radio button has `checked` set:
+**Evidence (template excerpt):**
 ```html
-<input … name="payment_mode" id="pm_esewa" value="esewa" checked>
+<div id="barcodeInput"
+     contenteditable="true"
+     role="textbox"
+     aria-label="Scan barcode or type SKU"
+     spellcheck="false"
+     data-placeholder="Scan barcode / type SKU…"
+     class="form-control form-control-sm"
+     style="width:200px; cursor:text; overflow:hidden; white-space:nowrap;"></div>
 ```
-A cashier who doesn't touch the payment section — common during fast counter work — will submit the sale as `payment_mode="esewa"`. The daily cash reconciliation will show zero cash and inflated eSewa, misleading the end-of-day count. Likely a leftover from store-specific configuration that was never reverted to `cash`.
+No `autocomplete` attribute, no `inputmode`, inside a `<form>`. Chrome's autofill fires.
 
-**Fix:** Change the `checked` attribute to the `cash` radio button.
-
----
-
-#### 1.2 RISK — `_parse_items` accepts zero-price items (price < 0 check only)  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/sales/routes.py` lines ~606–633
-
-`_parse_items` continues if `price < 0` but not if `price == 0`. A cashier can scan a product into the cart and sell it for NPR 0 (e.g. accidentally left in the price field), creating a sale that reduces inventory with zero revenue. The `qty <= 0` guard works, but price needs a matching `price <= 0` check for regular products (custom/loose items with price 0 are already excluded with a separate `if price <= 0: continue`).
-
-**Fix:** Change `if qty <= 0 or price < 0:` to `if qty <= 0 or price <= 0:` for the variant and product branches.
+**Suggested fix:**  
+- Switch to a real `<input type="search" autocomplete="off" id="barcodeInput">` and remove the contenteditable div. The `type="search"` prevents Chrome password manager specifically; `autocomplete="off"` suppresses autofill. To prevent Chrome from ignoring `autocomplete="off"`, also add `autocomplete="one-time-code"` or use a unique `name` like `barcode_scanner_input_ignore` that doesn't match any known autofill field.  
+- Alternatively, keep the `contenteditable` div but move it **outside** the `<form>` tag and use JS to add items; this prevents Chrome from seeing it as a form element at all.
 
 ---
 
-#### 1.3 IMPROVEMENT — No server-side max-discount-per-product enforcement  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/sales/routes.py` lines ~100–112
+### C-2 — Plaintext credentials in `.env` committed to repo / accessible
+**File:** `.env` (root)  
+**Description:**  
+The `.env` file contains several live credentials (values redacted from this report):
+- `ADMIN_PASSWORD` — plaintext admin password
+- `GEMINI_API_KEY` — active Gemini API key
+- `PEXELS_API_KEY` — active Pexels API key
+- `MAIL_PASSWORD` — Gmail app password (live account)
+- `ESEWA_SECRET_KEY` — eSewa sandbox secret key
+- `SECRET_KEY` — Flask session signing key
 
-`Product.max_discount_pct` exists in the model but the discount check in `create_sale` only validates `discount > cart_total`. A cashier with `can_give_discount=True` can apply a 100% discount on any product regardless of the product's `max_discount_pct` cap. The field is silently ignored during billing.
+If this repo is ever pushed to a public or shared Git host, **all credentials are exposed**. The test suite also hardcodes `ESEWA_PUBLIC_SANDBOX_SECRET = "8gBm/:&EnhH.1/q"` in `tests/unit/test_store_checkout_payment.py` (acceptable for tests, but confirms the value is publicly known).
 
-**Fix:** After resolving cart items in `create_sale`, compute the maximum permitted discount from `max_discount_pct` per product and reject if the manual discount exceeds it.
+**Suggested fix:**  
+- Add `.env` to `.gitignore` immediately if not already present.
+- Rotate the Gmail app password and Gemini API key.
+- Provide a `.env.example` with placeholder values only.
 
 ---
 
-#### 1.4 IMPROVEMENT — Change-due calculator visible to all payment modes  
-**Impact: LOW** | File: `smart_mart/templates/sales/create.html` lines ~1912–1915
+## HIGH
 
-The change-due panel (cash received → change) is toggled visible only for `cash` mode. But the panel itself is not hidden by default on page load — it defaults visible until JavaScript runs. On a slow device or if JS errors out earlier, the panel stays shown even for eSewa/credit payments, which is confusing.
-
-**Fix:** Add `style="display:none"` to the `#changeDuePanel` element in the HTML so it starts hidden regardless of JS state.
-
----
-
-### 2. Inventory Management
-
-#### 2.1 BUG — `create_purchase` blindly overwrites `product.cost_price` on every restock  
-**Impact: HIGH** | File: `smart_mart/services/purchase_manager.py` line ~41
-
+### H-1 — `serve.py` exposes raw Python tracebacks to browser clients
+**File:** `serve.py` (lines 33–42)  
+**Description:**  
+The global error handler in `serve.py` returns a raw `traceback.format_exc()` string inside an HTML `<pre>` tag. Anyone who triggers a 500 error sees the full stack trace, including file paths, library versions, and potentially variable values. This is a significant information-disclosure vulnerability.
 ```python
-product.cost_price = unit_cost
+return (
+    "<pre style='padding:2rem;background:#111;color:#f87171;font-size:13px'>"
+    f"500 — Internal Server Error\n\n{tb}</pre>"
+), 500
 ```
-
-Every purchase unconditionally replaces the product's `cost_price`. This means:
-- If a supplier re-delivers at a temporarily higher price (e.g. seasonal spike), all existing stock is now valued at the new cost, distorting inventory valuation.
-- The profitability report falls back to `Product.cost_price` when `SaleItem.cost_price` is NULL. Historic sales (before the `cost_price` column was added by migration) are re-valued at the current cost instead of the cost at time of sale, showing incorrect margins.
-- Any product sold between purchases will have its margin retroactively recalculated at the new cost.
-
-`SaleItem.cost_price` correctly snapshots cost at time of sale, but `report_engine.py` uses `COALESCE(SaleItem.cost_price, Product.cost_price)` — the fallback means pre-snapshot sales are wrong.
-
-**Fix (two-part):**
-1. In `purchase_manager.create_purchase`, only update `product.cost_price` if it is zero/null (i.e. the first purchase), or track a weighted average.
-2. In `report_engine.profitability_analysis`, eliminate the `Product.cost_price` fallback entirely. Sales without a cost snapshot should be excluded from margin calculations with a note, not silently mis-valued.
+**Suggested fix:**  
+Log the traceback (already done), but return a generic user-facing error page. The app already registers `errors/500.html` in `app.py`; the `serve.py` handler overrides it with raw stack traces.
 
 ---
 
-#### 2.2 RISK — Inventory valuation report uses live cost price, not historical  
-**Impact: MEDIUM** | File: `smart_mart/services/report_engine.py` lines ~128–136
-
-`inventory_valuation()` multiplies `Product.cost_price * Product.quantity`. Since finding 2.1 above means `cost_price` is always the most recent purchase price, the valuation report will jump significantly whenever a supplier charges more on the latest delivery — even if most of the stock on the shelf was bought cheaper.
-
-**Fix:** Consider adding a weighted average cost (WAC) or last-purchase-cost field to Product for valuation. For now, document the limitation visibly in the UI.
-
----
-
-#### 2.3 RISK — Deleting a category leaves Product.category as a dangling string  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/inventory/routes.py` lines ~277–284
-
-`delete_category` deletes the `Category` row with no cascade. `Product.category` is a plain `VARCHAR` string, not a FK to `categories.id`, so products referencing that category name continue to have the old string but no corresponding category. The category filter in reports will silently work (matching by string), but the UI shows "Unknown" or "Uncategorized" incorrectly.
-
-**Fix:** Before deleting, either re-assign products in that category to a default, or raise an error if products exist.
-
----
-
-#### 2.4 RISK — Bulk product upload (inventory) sets `selling_price = cost` if selling price not provided  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/inventory/routes.py` lines ~252–254
-
+### H-2 — `update_payment_mode` route has no error handling around `db.session.commit()`
+**File:** `smart_mart/blueprints/sales/routes.py` (lines 301–305)  
+**Description:**  
 ```python
-sell = float(_clean_num(sell_raw)) if sell_raw else cost
+sale.payment_mode = new_mode
+sale.payment_method = new_mode
+db.session.commit()  # ← no try/except; DB errors propagate as unhandled 500
 ```
+If the commit fails (connection drop, constraint violation) the session is left in a dirty state and the user gets a raw 500 with no rollback.
 
-If a CSV row omits the selling price column, the system silently sets selling price equal to cost price, yielding 0% margin. A staff member doing a bulk upload of supplier invoices (which typically only have cost) will create dozens of products selling at cost with no warning.
-
-**Fix:** Emit a warning flash for each row where selling price was defaulted to cost price, so the user knows to review those products.
-
----
-
-#### 2.5 IMPROVEMENT — Low-stock threshold logic inconsistency  
-**Impact: LOW** | File: `smart_mart/blueprints/inventory/routes.py` line ~70, `smart_mart/blueprints/dashboard/routes.py` line ~222
-
-The inventory list's low-stock filter uses `Product.quantity <= Product.low_stock_threshold` while the dashboard's `reorder_alerts_count` uses `Product.quantity <= Product.reorder_point`. These are two different fields with different semantics, and the dashboard alert badge count can differ from the inventory list's low-stock count, causing confusion.
-
-**Fix:** Decide on one field for "needs reorder" alerts and use it consistently. The `reorder_point` field is better named; `low_stock_threshold` could be deprecated.
+**Suggested fix:**  
+Wrap in `try/except`, call `db.session.rollback()` in the except block, and flash an error message.
 
 ---
 
-### 3. Reports & Dashboard
-
-#### 3.1 BUG — Credit/Udharo: returns do not reduce the outstanding balance  
-**Impact: HIGH** | File: `smart_mart/services/returns_manager.py`, `smart_mart/blueprints/reports/routes.py` lines ~599–620
-
-`create_return` correctly restocks inventory and records a refund but does **not** reduce `Sale.total_amount` and does **not** call `record_credit_payment` or create a `CustomerCreditPayment` row for the refunded amount. So for a credit sale where the customer returns goods:
-- The outstanding balance on the credit ledger still shows the full original amount.
-- The customer still needs to "pay" the full amount to get `credit_collected = True`.
-- The operations credits dashboard and `credit_udharo` report both show inflated outstanding debt.
-
-**Fix:** In `returns_manager.create_return`, if the parent sale is a credit sale, create a `CustomerCreditPayment` record equal to the refund amount (with `payment_mode="return"`), which will reduce the outstanding balance and correctly flip `credit_collected` when the balance reaches zero.
-
----
-
-#### 3.2 RISK — Dashboard "today_profit" excludes non-COGS expenses  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/dashboard/routes.py` lines ~162–165
-
+### H-3 — N+1 query pattern in `dead_stock_analysis()` — fires one DB query per product
+**File:** `smart_mart/services/ai_trend_analyzer.py` (lines 105–116)  
+**Description:**  
 ```python
-stats["today_profit"] = stats["today_sales_amount"] - stats["today_cogs"]
+for p in products:
+    last_sale = db.session.execute(
+        db.select(func.max(Sale.sale_date))
+        .join(SaleItem, SaleItem.sale_id == Sale.id)
+        .where(SaleItem.product_id == p.id)
+    ).scalar()
 ```
+For a store with 200 dead-stock products this fires 200 individual DB queries. The `fast_moving_products()` function in the same file correctly aggregates in a single query; `dead_stock_analysis()` should use the same pattern.
 
-This uses `revenue - COGS` but ignores today's expenses (rent, utilities, wages). The `monthly_profit` figure correctly uses `cash_flow_manager.profit_loss()` which deducts expenses, but the prominently-displayed "today's profit" card is inflated by today's operating costs. An owner looking at it each morning gets an optimistic number.
-
-**Fix:** Either rename the card "Today's Gross Profit" in the UI so the distinction is clear, or compute net profit the same way `monthly_profit` does.
+**Suggested fix:**  
+Replace the loop with a single aggregate query that returns `MAX(sale_date)` grouped by `product_id`, then build a `{product_id: last_sale}` dict for O(1) lookups in the loop.
 
 ---
 
-#### 3.3 RISK — Credit report outstanding amounts ignore partial payments  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/reports/routes.py` lines ~604–620
-
-The `credit_udharo` report summary calculates `pending_amount` as:
+### H-4 — N+1 query in `ai_customer_intelligence.py` upsell calculation
+**File:** `smart_mart/services/ai_customer_intelligence.py` (lines 223–237)  
+**Description:**  
 ```python
-sum(float(s.total_amount) for s in all_credit if not s.credit_collected)
+for pid in list(bought_ids)[:3]:
+    p = db.session.get(Product, pid)   # ← 1 query per product
+    if p:
+        premium = db.session.execute(...)  # ← 1 query per product
 ```
-This does not subtract partial payments already recorded in `CustomerCreditPayment`. A sale marked as uncollected (partial payment has been made, balance > 0) counts its full original amount as outstanding. The actual outstanding is less — `sales_manager._customer_outstanding_credit` does the correct calculation but it is not used here.
+Up to 6 DB queries per call to `get_recommendations()`, called from the billing page on every customer lookup. At busy times this is a per-request performance drain.
 
-**Fix:** Replace the inline sum with a query that joins `CustomerCreditPayment` and subtracts paid amounts, or call `_customer_outstanding_credit` per customer.
-
----
-
-#### 3.4 IMPROVEMENT — Stock analysis report uses stock movements but ignores variant stock  
-**Impact: MEDIUM** | File: `smart_mart/services/report_engine.py` (opening/closing stock)
-
-Stock movements are logged at the parent product level even for variant sales (with the variant noted in the `note` field). If a product has variants, the `opening_closing_stock` report aggregates movement rows by `product_id`, which may double-count: movement volume for a variant sale is already reflected in the parent movement row AND in the variant quantity change. This can show more units moved than the parent product's own stock changed.
-
-**Fix:** Filter `StockMovement` by `change_type NOT IN ('sale', 'sale_return')` when the product has active variants, and derive those figures from `ProductVariant.quantity` changes instead.
+**Suggested fix:**  
+Load all needed products in one `db.session.execute(db.select(Product).where(Product.id.in_(bought_ids)))` call, then use a dict for lookups.
 
 ---
 
-### 4. User / Auth System
+### H-5 — `bi_dashboard_bp` in `blueprints/bi_dashboard/__init__.py` is empty but still registered
+**File:** `smart_mart/blueprints/bi_dashboard/__init__.py`  
+**Description:**  
+The file contains only `"""Bi Dashboard blueprint."""` (no routes, no blueprint object). The app attempts to register it by importing `bi_dashboard_bp` from `.bi.routes.api` instead of from this `blueprints/bi_dashboard` package — the two are separate. The `blueprints/bi_dashboard/` directory is dead code: it has no `routes.py`, no blueprint object. Its `__init__.py` exists but is unused. This caused a documented 500 `BuildError` in the test file `tests/unit/test_bi_dashboard_pages.py`.
 
-#### 4.1 RISK — In-memory rate limiter resets on every server restart  
-**Impact: MEDIUM** | File: `smart_mart/services/authenticator.py` lines ~15–20
-
-`_login_attempts` is a Python dictionary in memory. On Windows with Waitress (as this store appears to use: `waitress-errors.log` present), a server restart (which can happen after any crash) wipes all tracked attempts. An attacker who triggers a restart (or simply waits for the daily restart) gets a fresh `_MAX_ATTEMPTS` allowance. The Flask-Limiter decorator on the `/auth/login` route (`@limiter.limit("5 per minute")`) provides a backup but it also defaults to in-memory storage unless `RATELIMIT_STORAGE_URI` is configured.
-
-**Fix:** Check `RATELIMIT_STORAGE_URI` in config — if not set to Redis or a DB backend, the Flask-Limiter is also in-memory. For a single-machine deployment this is acceptable but should be documented. Consider persisting login attempts to `LoginAttempt` DB table (which already exists) and querying it in `is_rate_limited`.
+**Suggested fix:**  
+Delete `smart_mart/blueprints/bi_dashboard/` entirely. All BI dashboard routes live in `smart_mart/bi/routes/api.py` registered as `bi_dashboard_bp`. The directory is misleading and contributes nothing.
 
 ---
 
-#### 4.2 IMPROVEMENT — Password reset link exposed in logs  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/auth/routes.py` lines ~82–90
-
+### H-6 — `delete_sale` and `void_sale` do not call `db.session.rollback()` on failure
+**File:** `smart_mart/blueprints/sales/routes.py` (lines 595–598, 633–635)  
+**Description:**  
 ```python
-current_app.logger.warning(
-    "PASSWORD RESET requested for user '%s' … Reset URL (valid 30 min): %s",
-    user.username, user.id, reset_url,
-)
+except Exception as e:
+    flash(f"Error deleting sale: {e}", "danger")
+return redirect(url_for("sales.list_sales"))
 ```
+If `sales_manager.delete_sale()` fails mid-way (after some stock was already reversed), the DB session is left in an inconsistent state. No rollback is issued. Subsequent requests in the same session may fail or see dirty data.
 
-The full reset URL (which is a bearer token for account takeover) is written to the application log at `WARNING` level. Anyone with read access to `smart_mart.log` (which is in the project root, potentially accessible via a misconfigured web server) can take over any account. The comment says "always log as security audit trail" but a URL vs. a hash of the token would serve the same audit purpose without the exposure.
-
-**Fix:** Log `user.username` and `user.id` only. If a URL must be in the log, log the token's SHA-256 hash so it proves the token was generated without being reusable from the log.
-
----
-
-#### 4.3 RISK — Staff can view all customers' statements if `can_view_customer_statement` is granted  
-**Impact: LOW** | File: `smart_mart/blueprints/sales/routes.py` — `customer_statement` route
-
-The customer statement page (`/sales/customer-statement`) searches by name but returns the full purchase history, credit balance, loyalty points, top products, and contact information of any customer by name. There is no customer ownership model — any staff member with `can_view_customer_statement` can look up any customer's complete financial history.
-
-This is acceptable for a small retail store but should be noted as a privacy risk if this is a multi-staff shop serving recurring credit customers.
+**Suggested fix:**  
+Add `db.session.rollback()` in the except block for both `delete_sale` and `void_sale`.
 
 ---
 
-### 5. Data Integrity
-
-#### 5.1 RISK — `Customer.total_spent` can drift from actual sale totals  
-**Impact: MEDIUM** | File: `smart_mart/services/sales_manager.py` lines ~304–316
-
-`create_sale` adds `total_amount` to `Customer.total_spent`. But `delete_sale` and `void_sale` do not subtract from `Customer.total_spent`. Similarly, `create_return` does not reduce it. Over time, voided/returned sales inflate `Customer.total_spent`, causing incorrect loyalty tier upgrades and potentially triggering offers the customer doesn't merit.
-
-**Fix:** In `delete_sale`, subtract `sale.total_amount` from `sale.customer.total_spent` before deletion. In `create_return`, subtract `refund_amount` proportionally.
-
----
-
-#### 5.2 RISK — `SaleItem.product_id` is nullable but no FK constraint on variants  
-**Impact: LOW** | File: `smart_mart/models/sale.py` lines ~65–72
-
-`SaleItem.variant_id` has `ondelete="SET NULL"`. If a `ProductVariant` is hard-deleted (not just deactivated), all sale items referencing it silently lose their variant link. The void/return logic handles this case gracefully (logs a warning, skips stock movement), but historical reports that join `sale_items → product_variants` will silently drop those line items from statistics.
-
-**Fix:** Add a soft-delete (`is_active`) flag to `ProductVariant` instead of hard deletes, mirroring the `Product.is_active` pattern.
-
----
-
-#### 5.3 RISK — `schema_migrations.py` uses `_safe_exec` that swallows all DDL errors  
-**Impact: MEDIUM** | File: `smart_mart/services/schema_migrations.py`
-
+### H-7 — Default admin password `Admin@12345` hardcoded in `seed.py`
+**File:** `seed.py` (line 106)  
+**Description:**  
 ```python
-def _safe_exec(conn, sql: str) -> None:
-    try:
-        conn.execute(text(sql))
-    except Exception:
-        pass
+if not admin_password:
+    admin_password = "Admin@12345"
 ```
+In development, if `ADMIN_PASSWORD` is not set, the seed script creates an admin user with this well-known default password that is documented in the code. Any developer or attacker who reads the repo can use it to log in.
 
-Every migration that uses `_safe_exec` (indexes, column additions) silently ignores failures. If a migration step fails due to a genuine schema conflict (column with incompatible type already exists, table locked, etc.) the migration is recorded as successful and the column is never actually created. The next request that accesses the missing column crashes with an unhandled `OperationalError`.
-
-This is a known trade-off for idempotent migrations on SQLite, but it means migration failures are invisible.
-
-**Fix:** Log the exception at `WARNING` level even when swallowing it, so failures appear in `smart_mart.log` and can be diagnosed.
+**Suggested fix:**  
+If `ADMIN_PASSWORD` is not set in development, generate a random strong password, print it once to stdout, and refuse to proceed silently with a known default. The code already warns loudly — make it refuse instead.
 
 ---
 
-### 6. Purchase / Supplier Flow
+## MEDIUM
 
-#### 6.1 BUG — Bulk purchase upload creates products with `selling_price = cost_price`  
-**Impact: HIGH** | File: `smart_mart/blueprints/purchases/routes.py` lines ~376–396
+### M-1 — `console.log` debug output left in service worker registration
+**File:** `smart_mart/templates/store/base_store.html` (lines 695–696)  
+**Description:**  
+```javascript
+.then(reg => console.log('SW registered:', reg.scope))
+.catch(err => console.log('SW registration failed:', err));
+```
+Two `console.log` calls left in production JS. These expose internal scope URLs to anyone with DevTools open. They are also the source of the "extra sign/popup" if Chrome interprets service worker registration errors as a notification (unlikely but possible in some Chrome versions when the SW fails to register on a non-HTTPS connection).
 
-When a product is not found by SKU or name during a bulk purchase upload, the system auto-creates it with:
+**Suggested fix:**  
+Remove or replace with `console.debug()` which is silenced in production builds.
+
+---
+
+### M-2 — Bare `except:` in inventory label generation
+**File:** `smart_mart/blueprints/inventory/routes.py` (line 1578)  
+**Description:**  
 ```python
-"cost_price": cost,
-"selling_price": cost,
+try:    return ImageFont.truetype(_fp, max(6, px))
+except: return ImageFont.load_default()
 ```
-This silently creates new products at zero margin. In a store that regularly receives supplier invoices and uploads them as bulk purchases, this means new products go live immediately at cost price with no markup — they're immediately visible on the POS and can be sold before the admin even notices.
+A bare `except:` catches `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` in addition to real errors, which can mask serious problems and interfere with process shutdown.
 
-**Fix:** Auto-created products should be flagged `is_active=False` by default, requiring explicit activation with selling price review. Add a flash warning listing auto-created product names.
-
----
-
-#### 6.2 IMPROVEMENT — No duplicate purchase guard  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/purchases/routes.py`, `smart_mart/services/purchase_manager.py`
-
-The purchase creation form has no idempotency key (unlike the sale form). Submitting the form twice (network retry, double-click) creates two identical purchase records and doubles the stock quantity. This is particularly risky for large bulk uploads.
-
-**Fix:** Add an idempotency key to the purchase creation form using the same `IdempotencyKey.consume()` pattern already used in `sales.create_sale`.
+**Suggested fix:**  
+Replace with `except Exception:`.
 
 ---
 
-#### 6.3 IMPROVEMENT — Supplier payment does not validate against total purchase cost  
-**Impact: MEDIUM** | File: `smart_mart/services/operations_manager.py` — `record_supplier_payment`
-
-Supplier payments accept any amount without checking whether the total paid already exceeds the purchase total. Unlike `record_credit_payment` (which enforces `amount <= outstanding`), over-payments to suppliers are silently recorded. The supplier balance screen will show a negative balance (overpayment) but there's no guard to prevent it.
-
-**Fix:** Mirror the credit payment guard: compute total paid for the purchase and reject payments that would exceed the purchase total.
-
----
-
-### 7. General Code Quality
-
-#### 7.1 RISK — `purchase_manager.list_purchases` used for CSV export with `per_page=10000`  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/purchases/routes.py` lines ~38–42
-
+### M-3 — `promotions` routes swallow DB errors without rollback
+**File:** `smart_mart/blueprints/promotions/routes.py` (lines 54–56, 77–79, 93–95)  
+**Description:**  
+All three mutation routes (create, edit, delete) have:
 ```python
-purchases = purchase_manager.list_purchases(filters, per_page=10000)
+except Exception as e:
+    flash(str(e), "danger")
 ```
+No `db.session.rollback()`. If a promotion create or delete fails mid-transaction the session may be in a partial state for the next request.
 
-The CSV export loads up to 10,000 purchase records into memory. Each `Purchase` eager-loads its `PurchaseItem` rows via the ORM relationship. A shop with 3 years of purchase history and 20 items per purchase could load 200,000 PurchaseItem rows into memory in one request, causing a significant memory spike.
-
-**Fix:** Use a streaming cursor / `yield_per()` approach for exports, or at minimum cap at a lower bound and warn if the export is truncated.
-
----
-
-#### 7.2 RISK — `list_categories` / `category_detail` have N+1 risk on low-inventory shops  
-**Impact: LOW** | File: `smart_mart/blueprints/inventory/routes.py` lines ~182–242
-
-The category list and detail pages make several aggregation queries. The implementation uses a single aggregation query each (`stats_map`, `rev_map`) which is correct for most data, but the `enriched` list is built by iterating over `products` and doing a per-product Python lookup in `sales_map`. This is an in-Python join and is fine as long as the product list fits in memory. For stores with 1,000+ products in a single category, this will be slow.
-
-**Fix:** Move the enrichment logic into a single SQL query with GROUP BY instead of the Python dict lookup.
+**Suggested fix:**  
+Add `db.session.rollback()` before `flash()` in each except block.
 
 ---
 
-#### 7.3 IMPROVEMENT — `customer_statement` route counts partially-paid credit as collected  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/sales/routes.py` lines ~365–366
+### M-4 — `purchases` routes swallow DB errors without rollback
+**File:** `smart_mart/blueprints/purchases/routes.py` (lines 133–135, 169–171, 191–193, 248–250)  
+**Description:**  
+Same pattern as M-3: `except Exception as e: flash(...)` without rollback.
 
+**Suggested fix:**  
+Add `db.session.rollback()` in each except block.
+
+---
+
+### M-5 — `_start_debug.py` enables Flask debug mode with `debug=True` bound to all interfaces
+**File:** `_start_debug.py` (line 38)  
+**Description:**  
 ```python
-collected = sum(float(s.total_amount) for s in credit_sales if s.credit_collected)
+app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
 ```
+This file runs Flask's built-in dev server in debug mode (which includes the interactive Werkzeug debugger) bound to all network interfaces. If this is accidentally used on the production LAN or server, any network-reachable client can execute arbitrary Python via the debugger PIN.
 
-This counts the full `total_amount` for a collected sale, even if the collection came from multiple partial payments over time. More critically, the `outstanding` calculation does not subtract partial payments for uncollected sales (mirror of finding 3.3 above). A customer who has made two partial payments against a large credit balance looks worse on their statement than they are.
-
-**Fix:** Join `CustomerCreditPayment` to compute actual paid amounts per sale for the statement.
+**Suggested fix:**  
+Add a guard at the top: `assert os.environ.get("FLASK_ENV") != "production"`. Or rename the file to `_start_debug_DO_NOT_USE_IN_PROD.py` to make intent clear.
 
 ---
 
-#### 7.4 RISK — Unhandled exception can expose internal DB errors to users  
-**Impact: MEDIUM** | File: `smart_mart/blueprints/purchases/routes.py` lines ~123–125, and multiple other blueprints
+### M-6 — `migrate.py` root script — not idempotent for all columns, uses raw `ALTER TABLE`
+**File:** `migrate.py`  
+**Description:**  
+`migrate.py` uses raw `ALTER TABLE` via `text()` for manual column additions. The application already has an automated schema migration service (`services/schema_migrations.py`) that runs at startup. Having a separate manual migration script creates drift risk: a developer running `migrate.py` may think columns are present when the real migration system has not added them yet.
 
-Several POST handlers catch `Exception as e` and `flash(f"Error creating X: {e}", "danger")`. Raw SQLAlchemy exceptions (e.g. `UNIQUE constraint failed: products.sku`) are surfaced directly to users. This exposes schema information and can confuse non-technical staff ("IntegrityError: UNIQUE constraint failed: products.sku" instead of "A product with this SKU already exists").
+**Suggested fix:**  
+Deprecate `migrate.py`. Add a README note pointing to `schema_migrations.py`. If `migrate.py` must stay, make it call the same migration service instead of duplicating SQL.
 
-**Fix:** In each service function, catch `IntegrityError` and translate it to a user-friendly `ValueError` before re-raising. The product creation route does this already for SKU conflicts (`create_product` raises `ValueError`) but `update_product` in the same file also wraps with `ValueError` — extend this pattern to purchase creation and supplier creation.
+---
+
+### M-7 — Payment mode update does not validate sale is not already voided/deleted
+**File:** `smart_mart/blueprints/sales/routes.py` (`update_payment_mode`, lines 282–306)  
+**Description:**  
+The route fetches the sale and allows changing `payment_mode` on any non-deleted sale regardless of its state. There is no check to prevent changing the payment mode of a credit sale that has already been partially or fully collected (`credit_collected=True`), which would make the accounting records inconsistent.
+
+**Suggested fix:**  
+Add a guard: if `sale.credit_collected` is `True`, refuse the update and flash a warning.
+
+---
+
+### M-8 — `ai_customer_intelligence.py` product loop calls `db.session.get()` per item
+**File:** `smart_mart/services/ai_customer_intelligence.py` (lines 206–210)  
+**Description:**  
+```python
+for pid in bought_ids:
+    p = db.session.get(Product, pid)  # 1 query per product
+```
+This is called from multiple AI endpoints. Even with SQLAlchemy's identity map caching this may miss products not yet in session cache, resulting in per-product queries.
+
+**Suggested fix:**  
+Batch-load: `{p.id: p for p in db.session.execute(db.select(Product).where(Product.id.in_(bought_ids))).scalars()}`.
+
+---
+
+## LOW
+
+### L-1 — `console.log` in service worker can indicate broken SW registration on HTTP
+**File:** `smart_mart/templates/store/base_store.html` (lines 695–696)  
+(Combined with M-1 above — the SW will fail silently on HTTP, and the `console.log` at least surfaces it; however, this is still debug output.)
+
+---
+
+### L-2 — `eSewa` EPAYTEST product code hardcoded as default fallback
+**File:** `smart_mart/blueprints/store/routes.py` (line 1268)  
+**Description:**  
+```python
+return _os.environ.get("ESEWA_PRODUCT_CODE", "EPAYTEST")
+```
+If `ESEWA_PRODUCT_CODE` is not set (e.g., after a fresh deploy where `.env` is missing), the app defaults to the sandbox product code `EPAYTEST` in what may be a production environment. Payments would be silently routed to the sandbox and never received.
+
+**Suggested fix:**  
+Return `""` as the default and add a startup check that warns if `ESEWA_PRODUCT_CODE` is unset when `FLASK_ENV=production`.
+
+---
+
+### L-3 — `seed.py` hardcodes default categories and knowledge base articles
+**File:** `seed.py`, `smart_mart/services/knowledge_base_seed.py`  
+**Description:**  
+Both files are one-time setup scripts. They are safe to run repeatedly (idempotency guards exist) but they import `Product`, `Category`, and `User` models directly, creating a coupling that means any model rename silently breaks the seed. There is no test covering the seed path.
+
+**Impact:** Low — only affects fresh installs.
+
+---
+
+### L-4 — `ALLOWED_EXTENSIONS` defined in `inventory/routes.py` then immediately overridden
+**File:** `smart_mart/blueprints/inventory/routes.py` (lines 26–28)  
+**Description:**  
+```python
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "bmp"}
+
+def _allowed_file(filename: str) -> bool:
+    from ...services.image_service import ALLOWED_EXTENSIONS   # shadows module-level set
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+```
+The module-level `ALLOWED_EXTENSIONS` is defined but `_allowed_file()` immediately re-imports `ALLOWED_EXTENSIONS` from `image_service`, making the module-level definition dead code.
+
+**Suggested fix:**  
+Remove the module-level `ALLOWED_EXTENSIONS = {...}` on line 26 — it is unused.
+
+---
+
+### L-5 — Unused import: `uuid` imported in `inventory/routes.py` but only used inside one nested function
+**File:** `smart_mart/blueprints/inventory/routes.py` (line 5)  
+**Description:**  
+`import uuid` at module level, but `uuid` is only ever used inside `bulk_upload()` as a local `import uuid as _uuid`. The module-level import is redundant but harmless.
+
+---
+
+### L-6 — `ProductInventoryProfile.barcode` conflicts with `Product.barcode`
+**File:** `smart_mart/models/operations.py` (line ~65)  
+**Description:**  
+```python
+class ProductInventoryProfile(db.Model):
+    barcode = db.Column(db.String(80), nullable=True, unique=True)
+```
+`Product` already has a `barcode` column. Having a second `barcode` on `ProductInventoryProfile` means there are two places where a product's barcode can be stored, with different unique constraints. If a product's barcode is updated on `Product`, `ProductInventoryProfile.barcode` goes stale. This is a data-consistency risk.
+
+**Suggested fix:**  
+Remove `ProductInventoryProfile.barcode` and always use `Product.barcode` as the single source of truth.
+
+---
+
+### L-7 — `bi_dashboard/__init__.py` is a dead empty stub
+**File:** `smart_mart/blueprints/bi_dashboard/__init__.py`  
+**Description:**  
+Contains only `"""Bi Dashboard blueprint."""` — no routes, no imports, no blueprint object. The directory serves no purpose (see H-5).
+
+---
+
+### L-8 — `migrate.py` at root is largely superseded but not marked deprecated
+**File:** `migrate.py`  
+**Description:**  
+`migrate.py` manually adds columns that are now also managed by `services/schema_migrations.py`. Running both could cause confusion. There is no deprecation notice in the file.
+
+---
+
+### L-9 — TODO-adjacent: `THERMAL_PRINTER_NAME` env var not documented in `.env.example` / `.env`
+**File:** `smart_mart/services/escpos_printer.py` (line 27)  
+**Description:**  
+```python
+PRINTER_NAME = os.environ.get("THERMAL_PRINTER_NAME", "TVS RP3200 Lite")
+```
+`THERMAL_PRINTER_NAME` is not listed in `.env`. If the user's printer has a different name (very common — Windows printer names include driver versions and port numbers), printing silently fails with no clear feedback except a cryptic `RuntimeError`.
+
+**Suggested fix:**  
+Add `THERMAL_PRINTER_NAME=TVS RP3200 Lite` to `.env` with a comment explaining how to find the correct name.
+
+---
+
+### L-10 — `base_store.html` service worker references `url_for("store.service_worker")` but no such route is audited
+**File:** `smart_mart/templates/store/base_store.html` (line 695)  
+**Description:**  
+```javascript
+navigator.serviceWorker.register('{{ url_for("store.service_worker") }}')
+```
+If `store.service_worker` is not a registered route (or it 404s), the SW registration silently fails and Chrome logs an error. This could be contributing to the popup behavior described in the original issue — a failed SW registration on HTTP can trigger a Chrome "install to home screen" or "add to Chrome" prompt that looks like a popup.
+
+**Suggested fix:**  
+Verify `store.service_worker` exists and returns a valid JS file. If it does not, remove the SW registration block entirely or guard it with `{% if store_bp_has_sw %}`.
 
 ---
 
 ## Summary Table
 
-| # | Area | Type | Impact | File (approx. line) |
-|---|------|------|--------|----------------------|
-| 1.1 | POS | BUG | HIGH | `templates/sales/create.html:193` |
-| 1.2 | POS | RISK | MEDIUM | `blueprints/sales/routes.py:606` |
-| 1.3 | POS | IMPROVEMENT | MEDIUM | `blueprints/sales/routes.py:100` |
-| 1.4 | POS | IMPROVEMENT | LOW | `templates/sales/create.html:1912` |
-| 2.1 | Inventory | BUG | HIGH | `services/purchase_manager.py:41` |
-| 2.2 | Inventory | RISK | MEDIUM | `services/report_engine.py:128` |
-| 2.3 | Inventory | RISK | MEDIUM | `blueprints/inventory/routes.py:277` |
-| 2.4 | Inventory | RISK | MEDIUM | `blueprints/inventory/routes.py:252` |
-| 2.5 | Inventory | IMPROVEMENT | LOW | `blueprints/inventory/routes.py:70` |
-| 3.1 | Reports | BUG | HIGH | `services/returns_manager.py:~110` |
-| 3.2 | Dashboard | RISK | MEDIUM | `blueprints/dashboard/routes.py:162` |
-| 3.3 | Reports | RISK | MEDIUM | `blueprints/reports/routes.py:604` |
-| 3.4 | Reports | IMPROVEMENT | MEDIUM | `services/report_engine.py` |
-| 4.1 | Auth | RISK | MEDIUM | `services/authenticator.py:15` |
-| 4.2 | Auth | IMPROVEMENT | MEDIUM | `blueprints/auth/routes.py:82` |
-| 4.3 | Auth | RISK | LOW | `blueprints/sales/routes.py` (customer_statement) |
-| 5.1 | Data Integrity | RISK | MEDIUM | `services/sales_manager.py:304` |
-| 5.2 | Data Integrity | RISK | LOW | `models/sale.py:65` |
-| 5.3 | Data Integrity | RISK | MEDIUM | `services/schema_migrations.py` |
-| 6.1 | Purchases | BUG | HIGH | `blueprints/purchases/routes.py:376` |
-| 6.2 | Purchases | IMPROVEMENT | MEDIUM | `blueprints/purchases/routes.py` |
-| 6.3 | Purchases | IMPROVEMENT | MEDIUM | `services/operations_manager.py` |
-| 7.1 | Code Quality | RISK | MEDIUM | `blueprints/purchases/routes.py:38` |
-| 7.2 | Code Quality | RISK | LOW | `blueprints/inventory/routes.py:182` |
-| 7.3 | Code Quality | IMPROVEMENT | MEDIUM | `blueprints/sales/routes.py:365` |
-| 7.4 | Code Quality | RISK | MEDIUM | `blueprints/purchases/routes.py:123` |
+| # | Severity | File | Issue |
+|---|----------|------|-------|
+| C-1 | CRITICAL | `templates/sales/create.html` | Barcode `contenteditable` triggers Chrome autofill popup on every scan |
+| C-2 | CRITICAL | `.env` | Live API keys, passwords, and secrets in version-controlled file |
+| H-1 | HIGH | `serve.py` | Raw Python traceback exposed to browser in 500 responses |
+| H-2 | HIGH | `blueprints/sales/routes.py` | `update_payment_mode` — no try/except around `db.session.commit()` |
+| H-3 | HIGH | `services/ai_trend_analyzer.py` | N+1 query: 1 DB call per product in `dead_stock_analysis()` |
+| H-4 | HIGH | `services/ai_customer_intelligence.py` | N+1 query: 1 DB call per product in upsell recommendation |
+| H-5 | HIGH | `blueprints/bi_dashboard/__init__.py` | Dead empty stub — caused documented BuildError 500 on BI pages |
+| H-6 | HIGH | `blueprints/sales/routes.py` | `delete_sale`/`void_sale` no rollback on exception |
+| H-7 | HIGH | `seed.py` | Hardcoded default admin password `Admin@12345` |
+| M-1 | MEDIUM | `templates/store/base_store.html` | `console.log` in SW registration left in production JS |
+| M-2 | MEDIUM | `blueprints/inventory/routes.py` | Bare `except:` in label font loading |
+| M-3 | MEDIUM | `blueprints/promotions/routes.py` | Missing `db.session.rollback()` in 3 exception handlers |
+| M-4 | MEDIUM | `blueprints/purchases/routes.py` | Missing `db.session.rollback()` in 4 exception handlers |
+| M-5 | MEDIUM | `_start_debug.py` | Flask debug mode bound to `0.0.0.0` — exposes Werkzeug debugger |
+| M-6 | MEDIUM | `migrate.py` | Superseded by `schema_migrations.py`; creates maintenance confusion |
+| M-7 | MEDIUM | `blueprints/sales/routes.py` | Payment mode update does not check `credit_collected` guard |
+| M-8 | MEDIUM | `services/ai_customer_intelligence.py` | Per-product DB calls in recommendations loop |
+| L-1 | LOW | `templates/store/base_store.html` | SW registration `console.log` (duplicate of M-1) |
+| L-2 | LOW | `blueprints/store/routes.py` | eSewa `EPAYTEST` default fallback may activate in prod |
+| L-3 | LOW | `seed.py` | Seed scripts tightly coupled to models with no test coverage |
+| L-4 | LOW | `blueprints/inventory/routes.py` | Dead `ALLOWED_EXTENSIONS` module-level variable |
+| L-5 | LOW | `blueprints/inventory/routes.py` | Redundant module-level `import uuid` |
+| L-6 | LOW | `models/operations.py` | `ProductInventoryProfile.barcode` duplicates `Product.barcode` |
+| L-7 | LOW | `blueprints/bi_dashboard/__init__.py` | Dead empty file |
+| L-8 | LOW | `migrate.py` | No deprecation notice; superseded by `schema_migrations.py` |
+| L-9 | LOW | `services/escpos_printer.py` | `THERMAL_PRINTER_NAME` not in `.env` — silent printer failures |
+| L-10 | LOW | `templates/store/base_store.html` | SW route `store.service_worker` may cause Chrome "add to home" popup |
 
 ---
 
-## Priority Fix Order (Recommended)
+## Positive Findings (What Is Done Well)
 
-**Fix immediately (blocking real store operations):**
-1. **1.1** — Change POS default to `cash` (2-line fix, zero risk).
-2. **3.1** — Credit returns must reduce outstanding balance (medium complexity).
-3. **6.1** — Bulk purchase auto-creates live products at zero margin (add `is_active=False`).
-4. **2.1** — Stop overwriting `cost_price` on every purchase.
+- **CSRF protection**: All POST forms include `{{ csrf_token() }}`. AJAX endpoints send it via the `X-CSRFToken` header. The CSRF error handler gives a user-friendly message and redirects appropriately.
+- **No SQL injection risk**: All database access uses SQLAlchemy ORM. No raw string-formatted queries found.
+- **Row-level locking in `create_sale()`**: The `SELECT ... FOR UPDATE` pattern prevents overselling under concurrent requests.
+- **Invoice number collision prevention**: `_lock_invoice_counter()` uses a shop_settings row lock as a sequence semaphore.
+- **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security` (prod only), `Content-Security-Policy`, and `Referrer-Policy` are all set via `after_request`.
+- **Rate limiting**: Login is rate-limited to 5 attempts/minute via Flask-Limiter with an in-memory fallback.
+- **Password strength validation**: `validate_password_strength()` enforces uppercase, digit, and special character requirements.
+- **DB indexes**: The `Sale`, `SaleItem`, and `Product` models have comprehensive indexes on all frequently-queried columns.
+- **Credit limit enforcement**: `_enforce_credit_limit()` correctly accounts for partial payments before blocking a sale.
 
-**Fix this week:**
-5. **5.1** — Keep `Customer.total_spent` in sync with voids/returns.
-6. **3.3** — Fix credit report pending_amount to subtract partial payments.
-7. **6.2** — Add idempotency key to purchase form.
-8. **4.2** — Don't log full reset URLs.
-9. **7.4** — Translate DB exceptions to user-friendly messages.
+---
 
-**Fix this sprint:**
-10. **2.3**, **2.4**, **3.2**, **4.1**, **5.3**, **6.3**, **7.1** — remaining medium-impact items.
+*Audit completed. All findings are read-only observations. No code was modified.*

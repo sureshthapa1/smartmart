@@ -1,6 +1,18 @@
-"""One-time migration — adds missing columns to existing tables.
+"""
+DEPRECATED — Manual migration script.
+=======================================================================
+This script is superseded by smart_mart/services/schema_migrations.py
+which runs automatically at every application startup via create_app().
 
-Usage:
+Running this script manually is UNNECESSARY and may cause confusion:
+- schema_migrations.py already handles all column additions idempotently
+- Running migrate.py in addition may produce misleading "already exists"
+  messages or, in edge cases, duplicate work
+
+If you need to add a new column, add it to schema_migrations.py instead.
+=======================================================================
+
+Legacy usage (kept for reference only):
     python migrate.py
 """
 

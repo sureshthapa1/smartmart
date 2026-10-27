@@ -131,85 +131,90 @@ def create_order():
             flash("Please add at least one item.", "danger")
             return render_template("online_orders/create.html", products=products)
 
-        subtotal = sum(i["unit_price"] * i["quantity"] for i in items_data)
-        delivery_charge = Decimal(str(request.form.get("delivery_charge", 0) or 0 or 0))
-        discount = Decimal(str(request.form.get("discount_amount", 0) or 0 or 0))
+        try:
+            subtotal = sum(i["unit_price"] * i["quantity"] for i in items_data)
+            delivery_charge = Decimal(str(request.form.get("delivery_charge", 0) or 0 or 0))
+            discount = Decimal(str(request.form.get("discount_amount", 0) or 0 or 0))
 
-        # Estimated delivery
-        est_raw = request.form.get("estimated_delivery", "")
-        est_delivery = None
-        if est_raw:
-            try:
-                est_delivery = datetime.fromisoformat(est_raw)
-            except ValueError:
-                pass
+            # Estimated delivery
+            est_raw = request.form.get("estimated_delivery", "")
+            est_delivery = None
+            if est_raw:
+                try:
+                    est_delivery = datetime.fromisoformat(est_raw)
+                except ValueError:
+                    pass
 
-        order = OnlineOrder(
-            order_number=_gen_order_number(),
-            customer_name=request.form.get("customer_name", "").strip(),
-            customer_phone=request.form.get("customer_phone", "").strip(),
-            customer_email=request.form.get("customer_email", "").strip() or None,
-            delivery_address=request.form.get("delivery_address", "").strip(),
-            delivery_area=request.form.get("delivery_area", "").strip() or None,
-            total_amount=subtotal,
-            delivery_charge=delivery_charge,
-            discount_amount=discount,
-            payment_mode=request.form.get("payment_mode", "cod"),
-            payment_status="pending",
-            status="pending",
-            notes=request.form.get("notes", "").strip() or None,
-            assigned_to=request.form.get("assigned_to", "").strip() or None,
-            order_source=request.form.get("order_source", "website"),
-            estimated_delivery=est_delivery,
-            created_by=current_user.id,
-        )
-        db.session.add(order)
-        db.session.flush()
+            order = OnlineOrder(
+                order_number=_gen_order_number(),
+                customer_name=request.form.get("customer_name", "").strip(),
+                customer_phone=request.form.get("customer_phone", "").strip(),
+                customer_email=request.form.get("customer_email", "").strip() or None,
+                delivery_address=request.form.get("delivery_address", "").strip(),
+                delivery_area=request.form.get("delivery_area", "").strip() or None,
+                total_amount=subtotal,
+                delivery_charge=delivery_charge,
+                discount_amount=discount,
+                payment_mode=request.form.get("payment_mode", "cod"),
+                payment_status="pending",
+                status="pending",
+                notes=request.form.get("notes", "").strip() or None,
+                assigned_to=request.form.get("assigned_to", "").strip() or None,
+                order_source=request.form.get("order_source", "website"),
+                estimated_delivery=est_delivery,
+                created_by=current_user.id,
+            )
+            db.session.add(order)
+            db.session.flush()
 
-        for item in items_data:
-            # Lock the row before the check-then-deduct below. The POS sale path
-            # locks; this one did not, so a concurrent sale could read the same
-            # quantity and both writes would pass their own stock check — an
-            # oversell, and a lost update on whichever committed first.
-            product = db.session.execute(
-                db.select(Product).where(Product.id == item["product_id"]).with_for_update()
-            ).scalar_one_or_none()
-            if product is None:
-                db.session.rollback()
-                flash(f"Product ID {item['product_id']} not found.", "danger")
-                return render_template("online_orders/create.html", products=products)
-            db.session.add(OnlineOrderItem(
-                order_id=order.id,
-                product_id=item["product_id"],
-                product_name=product.name,
-                quantity=item["quantity"],
-                unit_price=item["unit_price"],
-                subtotal=item["unit_price"] * item["quantity"],
-            ))
-            # Deduct stock — only if sufficient quantity available
-            if product.quantity >= item["quantity"]:
-                from ...utils.qty import qty_sub as _qty_sub
-                _qty_sub(product, item["quantity"])
-                # Ledger row, so these units are not unexplained shrinkage. The
-                # deduction happened here with no StockMovement at all, leaving
-                # products.quantity and the stock ledger permanently out of step.
-                db.session.add(StockMovement(
-                    product_id=product.id,
-                    change_amount=-item["quantity"],
-                    change_type="online_order",
-                    reference_id=order.id,
-                    note=f"Online order {order.order_number}",
-                    created_by=current_user.id,
-                    timestamp=datetime.now(timezone.utc),
+            for item in items_data:
+                # Lock the row before the check-then-deduct below. The POS sale path
+                # locks; this one did not, so a concurrent sale could read the same
+                # quantity and both writes would pass their own stock check — an
+                # oversell, and a lost update on whichever committed first.
+                product = db.session.execute(
+                    db.select(Product).where(Product.id == item["product_id"]).with_for_update()
+                ).scalar_one_or_none()
+                if product is None:
+                    db.session.rollback()
+                    flash(f"Product ID {item['product_id']} not found.", "danger")
+                    return render_template("online_orders/create.html", products=products)
+                db.session.add(OnlineOrderItem(
+                    order_id=order.id,
+                    product_id=item["product_id"],
+                    product_name=product.name,
+                    quantity=item["quantity"],
+                    unit_price=item["unit_price"],
+                    subtotal=item["unit_price"] * item["quantity"],
                 ))
-            else:
-                db.session.rollback()
-                flash(f"Insufficient stock for '{product.name}': requested {item['quantity']}, available {product.quantity}.", "danger")
-                return render_template("online_orders/create.html", products=products)
+                # Deduct stock — only if sufficient quantity available
+                if product.quantity >= item["quantity"]:
+                    from ...utils.qty import qty_sub as _qty_sub
+                    _qty_sub(product, item["quantity"])
+                    # Ledger row, so these units are not unexplained shrinkage. The
+                    # deduction happened here with no StockMovement at all, leaving
+                    # products.quantity and the stock ledger permanently out of step.
+                    db.session.add(StockMovement(
+                        product_id=product.id,
+                        change_amount=-item["quantity"],
+                        change_type="online_order",
+                        reference_id=order.id,
+                        note=f"Online order {order.order_number}",
+                        created_by=current_user.id,
+                        timestamp=datetime.now(timezone.utc),
+                    ))
+                else:
+                    db.session.rollback()
+                    flash(f"Insufficient stock for '{product.name}': requested {item['quantity']}, available {product.quantity}.", "danger")
+                    return render_template("online_orders/create.html", products=products)
 
-        db.session.commit()
-        flash(f"Online order {order.order_number} created successfully.", "success")
-        return redirect(url_for("online_orders.order_detail", order_id=order.id))
+            db.session.commit()
+            flash(f"Online order {order.order_number} created successfully.", "success")
+            return redirect(url_for("online_orders.order_detail", order_id=order.id))
+        except Exception as exc:
+            db.session.rollback()
+            flash(f"Could not create order: {exc}", "danger")
+            return render_template("online_orders/create.html", products=products)
 
     return render_template("online_orders/create.html", products=products)
 

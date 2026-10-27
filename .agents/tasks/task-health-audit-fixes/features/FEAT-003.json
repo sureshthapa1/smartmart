@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Apply schema migrations H-2/M-4, fix M-5 N+1, and fix security/LOW findings L-1, L-2, ecommerce_api auth bypass. Two new migrations are appended to schema_migrations.py. purchase_manager gets joinedload. auth/routes.py truncates the token. store/routes.py gets rate limit. ecommerce_api auth bypass is fixed. Independent of FEAT-001 and FEAT-002.",
+  "status": "completed",
+  "steps": [
+    "1. READ D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\context.json and D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\features\\FEAT-003.json FIRST.",
+    "2. READ D:\\Mart Project\\.agents\\tasks\\health-audit-fix-plan.md for the exact code for every item below.",
+    "3. Edit D:\\Mart Project\\smart_mart\\services\\schema_migrations.py — plan items 11 and 12: (a) Append the migration tuple '2026_10_26_stock_transfer_items_quantity_numeric' to the _migration_steps() list (before the closing bracket). (b) Append the migration tuple '2026_10_26_sale_cname_lower_index' after it. (c) Add the helper function _migrate_transfer_item_quantity_to_numeric(conn) immediately below _migrate_variant_quantity_to_numeric and before run_pending_migrations. The full function body is in plan item 11.",
+    "4. Edit D:\\Mart Project\\smart_mart\\services\\purchase_manager.py — plan item 20: Add 'from sqlalchemy.orm import joinedload' to imports. In list_purchases, change stmt = db.select(Purchase).order_by(Purchase.purchase_date.desc()) to use .options(joinedload(Purchase.supplier), joinedload(Purchase.creator)).",
+    "5. Edit D:\\Mart Project\\smart_mart\\blueprints\\auth\\routes.py — plan item 22: Find the line msg = f\"Reset link for '{user.username}' (valid 30 min): {reset_url}\". Replace it with token_preview = token[:8] + '…' and msg = f\"Reset link for '{user.username}' (valid 30 min) — token starts with: {token_preview}. Copy the full link from the browser address bar after visiting the URL.\"",
+    "6. Edit D:\\Mart Project\\smart_mart\\blueprints\\store\\routes.py — plan item 23: Find the @store_bp.route('/contact', methods=['GET', 'POST']) decorator. Add @limiter.limit('5 per hour', methods=['POST']) between the route decorator and the def contact(): line. Confirm limiter is imported in the file first; if not, check extensions.py for how limiter is exported and add the import.",
+    "7. Edit D:\\Mart Project\\smart_mart\\blueprints\\ecommerce_api\\routes.py — plan item 24: Replace the _is_authorized() body's 'if not configured:' block. The new logic is: if not configured: return bool(current_app.testing). Remove the os.environ.get('FLASK_ENV') check and the 'not (current_app.testing or current_app.debug)' check entirely.",
+    "8. Run python -m py_compile on every file edited in this FEAT. All must exit 0.",
+    "9. Set FEAT-003.status to 'completed' and record any deviations in findings."
+  ],
+  "acceptance_criteria": [
+    "python -m py_compile smart_mart/services/schema_migrations.py exits 0",
+    "python -m py_compile smart_mart/services/purchase_manager.py exits 0",
+    "python -m py_compile smart_mart/blueprints/auth/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/store/routes.py exits 0",
+    "python -m py_compile smart_mart/blueprints/ecommerce_api/routes.py exits 0",
+    "schema_migrations.py contains migration key '2026_10_26_stock_transfer_items_quantity_numeric'",
+    "schema_migrations.py contains migration key '2026_10_26_sale_cname_lower_index'",
+    "_migrate_transfer_item_quantity_to_numeric function exists in schema_migrations.py",
+    "list_purchases uses joinedload for supplier and creator",
+    "auth/routes.py flash message no longer contains the full reset_url token",
+    "store/routes.py /contact route has @limiter.limit decorator",
+    "ecommerce_api _is_authorized only allows fallback when current_app.testing is True"
+  ],
+  "verification": [
+    "cd 'D:\\Mart Project' && python -m py_compile smart_mart/services/schema_migrations.py smart_mart/services/purchase_manager.py smart_mart/blueprints/auth/routes.py smart_mart/blueprints/store/routes.py smart_mart/blueprints/ecommerce_api/routes.py"
+  ],
+  "blocked_reason": null,
+  "findings": "No deviations. All 5 acceptance criteria files compile clean. Migration tuples and helper function inserted exactly as specified in plan items 11/12. joinedload added inline in list_purchases per plan item 20. Token truncated to 8 chars + ellipsis per plan item 22. Rate limit decorator added to /contact per plan item 23. _is_authorized simplified to current_app.testing-only fallback per plan item 24."
+}

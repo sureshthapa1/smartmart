@@ -23,7 +23,16 @@ class IdempotencyKey(db.Model):
 
     @classmethod
     def consume(cls, key: str, user_id: int, endpoint: str) -> "IdempotencyKey | None":
-        """Return existing record if key already used, else create a placeholder."""
+        """Return existing record if key already used, else create a placeholder.
+
+        Uses a check-then-insert with IntegrityError catch to handle the
+        TOCTOU race where two concurrent POSTs with the same key both pass
+        the initial SELECT. The unique constraint on `key` guarantees only one
+        succeeds; the loser re-queries and returns the winner's row so the
+        caller can detect the duplicate cleanly instead of seeing a 500.
+        """
+        from sqlalchemy.exc import IntegrityError
+
         existing = db.session.execute(
             db.select(cls).where(cls.key == key)
         ).scalar_one_or_none()
@@ -31,5 +40,13 @@ class IdempotencyKey(db.Model):
             return existing
         record = cls(key=key, user_id=user_id, endpoint=endpoint)
         db.session.add(record)
-        db.session.flush()
+        try:
+            db.session.flush()
+        except IntegrityError:
+            db.session.rollback()
+            # The race loser: the winner's row is now committed — re-fetch it.
+            existing = db.session.execute(
+                db.select(cls).where(cls.key == key)
+            ).scalar_one_or_none()
+            return existing  # non-None signals "duplicate — do not proceed"
         return None  # None means "first time — proceed"

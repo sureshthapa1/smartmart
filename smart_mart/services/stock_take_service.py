@@ -9,27 +9,19 @@ from ..models.stock_movement import StockMovement
 from ..models.stock_take import StockTake, StockTakeItem
 
 
-def _next_reference() -> str:
-    """Race-resistant reference: uses MAX(id)+1 with timestamp suffix."""
-    from datetime import datetime, timezone as _tz
-    max_id = db.session.execute(
-        db.select(db.func.max(StockTake.id))
-    ).scalar() or 0
-    ts = datetime.now(_tz.utc).strftime("%H%M%S")
-    return f"ST-{max_id + 1:05d}-{ts}"
-
-
 def create_stock_take(user_id: int, notes: str = None,
                       product_ids: list[int] | None = None) -> StockTake:
     """Create a new stock take session, snapshotting current system quantities."""
     take = StockTake(
-        reference=_next_reference(),
+        reference="",   # placeholder; assigned after flush
         notes=notes,
         status="in_progress",
         created_by=user_id,
     )
     db.session.add(take)
     db.session.flush()
+    ts = datetime.now(timezone.utc).strftime("%H%M%S")
+    take.reference = f"ST-{take.id:05d}-{ts}"
 
     # Snapshot products
     if product_ids:
@@ -76,7 +68,9 @@ def complete_stock_take(take_id: int, user_id: int, apply_adjustments: bool = Tr
             variance = item.variance
             if variance == 0:
                 continue
-            product = db.session.get(Product, item.product_id)
+            product = db.session.execute(
+                    db.select(Product).where(Product.id == item.product_id).with_for_update()
+                ).scalar_one_or_none()
             if not product:
                 continue
             product.quantity = item.counted_qty

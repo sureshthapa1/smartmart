@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Fix all service-layer CRITICAL and HIGH transaction-safety bugs: C-1 (transfer lock), C-2 (supplier return rollback), C-3 (stock-take lock), H-1 (decimal cast), H-2 part 1 (decimal cast), H-6 (idempotency race), H-7 (waste lock), M-1 (customer upsert swallowed), M-2 (audit log dirty commit), M-6 (supplier return lock), L-3 (stock-take ref race), L-4 (supplier return ref race). These are the primary cause of 'bill printed but no sale record' and 'billing auto-failure' bugs.",
+  "status": "completed",
+  "steps": [
+    "1. READ D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\context.json and D:\\Mart Project\\.agents\\tasks\\task-health-audit-fixes\\features\\FEAT-001.json FIRST.",
+    "2. READ D:\\Mart Project\\.agents\\tasks\\health-audit-fix-plan.md for the exact before/after code for every item below.",
+    "3. Edit D:\\Mart Project\\smart_mart\\services\\transfer_manager.py — plan items 1 and 2: (a) In create_transfer, replace db.session.get(Product, int(item['product_id'])) with db.session.execute(db.select(Product).where(Product.id == int(item['product_id'])).with_for_update()).scalar_one_or_none(). (b) Add 'from decimal import Decimal' to top imports. (c) Change qty = int(item['quantity']) to qty = Decimal(str(item['quantity'])).",
+    "4. Edit D:\\Mart Project\\smart_mart\\services\\supplier_return_service.py — plan items 3, 4, 5, 6: (a) Delete the _next_reference() function entirely. (b) Add 'from decimal import Decimal' to imports. (c) In create_supplier_return, change the SupplierReturn() constructor to pass reference='' and add sr.reference = f'SR-{sr.id:05d}' immediately after db.session.flush(). (d) Change qty = int(item['quantity']) to qty = Decimal(str(item['quantity'])). (e) Replace db.session.get(Product, item['product_id']) with db.session.execute(db.select(Product).where(Product.id == item['product_id']).with_for_update()).scalar_one_or_none(). (f) Wrap the entire function body in try: ... except Exception: db.session.rollback(); raise",
+    "5. Edit D:\\Mart Project\\smart_mart\\services\\stock_take_service.py — plan items 7, 8: (a) Delete the _next_reference() function at lines 11-18. (b) In create_stock_take, change the StockTake() constructor to pass reference='' and add ts = datetime.now(timezone.utc).strftime('%H%M%S'); take.reference = f'ST-{take.id:05d}-{ts}' immediately after db.session.flush(). (c) In complete_stock_take, replace db.session.get(Product, item.product_id) with db.session.execute(db.select(Product).where(Product.id == item.product_id).with_for_update()).scalar_one_or_none().",
+    "6. Edit D:\\Mart Project\\smart_mart\\services\\sales_manager.py — plan items 9, 10: (a) In the except Exception as e: logger.warning('Customer upsert failed: %s', e) block, add db.session.rollback() and db.session.begin() after the logger.warning call. (b) In the audit-log except block, add db.session.rollback() after the logger.warning call.",
+    "7. Edit D:\\Mart Project\\smart_mart\\models\\idempotency_key.py — plan item 13: Replace the consume classmethod body with the IntegrityError-catching version shown in the plan (adds try/except IntegrityError around db.session.flush() with rollback and re-SELECT).",
+    "8. Edit D:\\Mart Project\\smart_mart\\blueprints\\waste\\routes.py — plan item 19: Replace db.get_or_404(Product, product_id) with db.session.execute(db.select(Product).where(Product.id == product_id).with_for_update()).scalar_one_or_none() and add a None guard below it.",
+    "9. Run python -m py_compile on every file edited in this FEAT. All must exit 0.",
+    "10. Set FEAT-001.status to 'completed' and record any deviations in findings."
+  ],
+  "acceptance_criteria": [
+    "python -m py_compile smart_mart/services/transfer_manager.py exits 0",
+    "python -m py_compile smart_mart/services/supplier_return_service.py exits 0",
+    "python -m py_compile smart_mart/services/stock_take_service.py exits 0",
+    "python -m py_compile smart_mart/services/sales_manager.py exits 0",
+    "python -m py_compile smart_mart/models/idempotency_key.py exits 0",
+    "python -m py_compile smart_mart/blueprints/waste/routes.py exits 0",
+    "transfer_manager.create_transfer uses with_for_update() and Decimal qty",
+    "supplier_return_service has no _next_reference() function; reference assigned post-flush from sr.id",
+    "stock_take_service has no _next_reference() function; reference assigned post-flush from take.id",
+    "sales_manager customer upsert except block calls db.session.rollback() and db.session.begin()",
+    "sales_manager audit log except block calls db.session.rollback()",
+    "IdempotencyKey.consume catches IntegrityError and re-fetches the winning row"
+  ],
+  "verification": [
+    "cd 'D:\\Mart Project' && python -m py_compile smart_mart/services/transfer_manager.py smart_mart/services/supplier_return_service.py smart_mart/services/stock_take_service.py smart_mart/services/sales_manager.py smart_mart/models/idempotency_key.py smart_mart/blueprints/waste/routes.py"
+  ],
+  "blocked_reason": null,
+  "findings": "All 12 issues fixed as specified. No deviations from the plan. transfer_manager: added Decimal import, with_for_update() lock and Decimal qty cast. supplier_return_service: removed _next_reference(), reference now assigned post-flush from sr.id, Decimal qty cast, with_for_update() lock, try/except rollback wrapper. stock_take_service: removed _next_reference(), reference now assigned post-flush from take.id with timestamp, with_for_update() lock in complete_stock_take. sales_manager: customer upsert except block now calls db.session.rollback() + db.session.begin(); audit log except block now calls db.session.rollback(). idempotency_key: consume() now catches IntegrityError on flush, rolls back and re-fetches the winning row. waste/routes: db.get_or_404 replaced with with_for_update() + None guard. All 6 files pass py_compile."
+}
