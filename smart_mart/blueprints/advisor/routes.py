@@ -67,7 +67,20 @@ def _gemini_advisor_commentary(report: dict) -> str | None:
 @login_required
 def index():
     _require_perm("can_view_advisor")
-    report = ai_business_advisor.full_advisor_report()
+    from flask import current_app, flash
+    try:
+        report = ai_business_advisor.full_advisor_report()
+    except Exception as exc:
+        current_app.logger.exception("Business advisor error: %s", exc)
+        flash("Business advisor data is temporarily unavailable. The error has been logged.", "danger")
+        report = {
+            "summary": {"revenue": {}, "margins": {}, "profit": {}, "stock": {}},
+            "recommendations": [],
+            "forecast": [],
+            "kpis": [],
+            "product_actions": [],
+            "generated_at": "",
+        }
     commentary = _gemini_advisor_commentary(report)
     return render_template("advisor/index.html", report=report, commentary=commentary)
 

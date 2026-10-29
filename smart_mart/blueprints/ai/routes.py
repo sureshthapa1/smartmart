@@ -615,11 +615,21 @@ from ...services.ai_customer_intelligence import (
 def customer_intelligence():
     _require_perm("can_view_ai_insights")
     """Customer Intelligence Dashboard."""
-    tiers = tier_customers()
-    churn = churn_prediction()
-    affinity = product_affinity_analysis()
-    combos = generate_combos()
-    profitability = customer_profitability()
+    from flask import current_app, flash
+    try:
+        tiers        = tier_customers()
+        churn        = churn_prediction()
+        affinity     = product_affinity_analysis()
+        combos       = generate_combos()
+        profitability = customer_profitability()
+    except Exception as exc:
+        current_app.logger.exception("Customer intelligence error: %s", exc)
+        flash("Customer intelligence data is temporarily unavailable. The error has been logged.", "danger")
+        tiers        = {"total": 0, "tier_counts": {}, "customers": [], "insight": ""}
+        churn        = {"churned_count": 0, "at_risk_count": 0, "churned": [], "at_risk": [], "insight": ""}
+        affinity     = {"total_pairs_found": 0, "top_pairs": [], "insight": ""}
+        combos       = {"total_combos": 0, "combos": [], "insight": ""}
+        profitability = {"total_customers": 0, "customers": [], "high_value": [], "low_margin": [], "insight": ""}
     return render_template("ai/customer_intelligence.html",
                            tiers=tiers, churn=churn,
                            affinity=affinity, combos=combos,

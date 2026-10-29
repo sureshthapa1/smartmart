@@ -791,6 +791,17 @@ def _migration_steps() -> list[MigrationStep]:
                 "ON sales (lower(customer_name))"
             ),
         ),
+        (
+            "2026_10_29_sale_items_cost_price",
+            "Ensure sale_items.cost_price column exists. The column is created by the "
+            "2026_08_02 table-rebuild migration, but databases that were initialised "
+            "before that migration ran (or via db.create_all on an older schema) may be "
+            "missing the column. Both ai_business_advisor._period_cogs() and "
+            "ai_customer_intelligence.customer_profitability() reference it, causing a "
+            "500 OperationalError on the Advisor and Customer Intelligence pages if it "
+            "is absent. _safe_add_column is a no-op when the column already exists.",
+            lambda conn: _safe_add_column(conn, "sale_items", "cost_price", "NUMERIC(10,2)"),
+        ),
     ]
 
 

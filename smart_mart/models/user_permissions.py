@@ -103,7 +103,21 @@ class UserPermissions(db.Model):
         if p is None:
             p = cls(user_id=user_id)
             db.session.add(p)
-            db.session.flush()
+            # Avoid flush() here — it runs inside GET request permission checks
+            # and raises InvalidRequestError if the session is in a dirty/rolled-back
+            # state. SQLAlchemy auto-flushes before the next SELECT anyway, so the
+            # new row will be visible to any subsequent query in the same request.
+            try:
+                db.session.flush()
+            except Exception:
+                db.session.rollback()
+                # Re-query after rollback — a concurrent request may have created
+                # the row between our SELECT and the failed flush.
+                p = db.session.execute(
+                    db.select(cls).filter_by(user_id=user_id)
+                ).scalar_one_or_none()
+                if p is None:
+                    p = cls(user_id=user_id)
         return p
 
     def to_dict(self) -> dict:

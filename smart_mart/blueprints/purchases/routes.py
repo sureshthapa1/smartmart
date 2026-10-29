@@ -131,6 +131,7 @@ def create_purchase():
         except ValueError as e:
             flash(str(e), "danger")
         except Exception as e:
+            db.session.rollback()
             flash(f"Error creating purchase: {e}", "danger")
     return render_template("purchases/create.html", suppliers=suppliers, products=products,
                            today=date.today().isoformat())
@@ -167,6 +168,7 @@ def create_supplier():
             flash(f"Supplier '{supplier.name}' created successfully.", "success")
             return redirect(url_for("purchases.list_suppliers"))
         except Exception as e:
+            db.session.rollback()
             flash(f"Error creating supplier: {e}", "danger")
     return render_template("purchases/supplier_form.html", supplier=None)
 
@@ -189,6 +191,7 @@ def edit_supplier(supplier_id):
             flash("Supplier updated successfully.", "success")
             return redirect(url_for("purchases.list_suppliers"))
         except Exception as e:
+            db.session.rollback()
             flash(str(e), "danger")
     return render_template("purchases/supplier_form.html", supplier=supplier)
 
@@ -246,6 +249,7 @@ def delete_purchase(purchase_id):
     except ValueError as e:
         flash(str(e), "danger")
     except Exception as e:
+        db.session.rollback()
         flash(f"Error deleting purchase: {e}", "danger")
     return redirect(url_for("purchases.list_purchases"))
 

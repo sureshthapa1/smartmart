@@ -160,8 +160,10 @@
      DASHAIN LUCKY DRAW VOUCHER
      Only shown for purchases >= NPR 2000 (lucky draw eligible threshold).
      Change the threshold below (2000) as needed.
+     DISABLED: Dashain offer has ended — change `false` back to
+     `sale.total_amount|float >= 2000` to re-enable.
      ================================================================ #}
-  {% if sale.total_amount|float >= 2000 %}
+  {% if false %}
   <div style="margin-top:8px">
     <!-- Tear-here scissors line -->
     <div style="display:flex;align-items:center;gap:4px;margin:6px 0;">

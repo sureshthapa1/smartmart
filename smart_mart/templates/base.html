@@ -333,6 +333,15 @@
         </a>
       </li>
 
+      {% if current_user.role == 'admin' or current_user.permissions.can_print_labels %}
+      <li class="nav-item">
+        <a class="nav-link {% if request.endpoint == 'inventory.print_labels' %}active{% endif %}"
+           href="{{ url_for('inventory.print_labels') }}">
+          <i class="bi bi-upc"></i> Print Labels
+        </a>
+      </li>
+      {% endif %}
+
       <li class="nav-item">
         <a class="nav-link submenu-toggle {% if request.blueprint in ['stock_take','transfers','waste','purchase_orders','purchases','supplier_returns'] %}active{% else %}collapsed{% endif %}"
            data-bs-toggle="collapse" href="#stockMenu" role="button">
