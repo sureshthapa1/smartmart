@@ -1533,17 +1533,19 @@ def labels_pdf():
 @inventory_bp.route("/labels/print-direct", methods=["POST"])
 @login_required
 def labels_print_direct():
-    """Print labels directly to the sticker printer via GDI SetDIBitsToDevice.
+    """Print labels via TSPL commands sent as a RAW print job.
 
-    The x-Lab printer DC reports 160×240px portrait at 203 DPI.
-    Physical sticker is 75×50mm landscape fed through the printer.
-    We draw content in LANDSCAPE orientation (240 wide × 160 tall) so text
-    reads left-to-right when the sticker exits the printer, then rotate
-    CCW 90° to get 160×240 portrait which matches the DC exactly.
+    The x-Lab printer self-test shows: Command Mode = TSPL, SIZE = 50x25mm.
+    TSPL is the native language of this printer. We send raw TSPL commands
+    directly via win32print RAW spool — no GDI, no DC pixel math, no rotation.
+
+    TSPL coordinate origin: top-left of label.
+    Units: dots at 203 DPI (1 dot = 0.125mm).
+    Label: 50mm wide × 25mm tall = 400 × 200 dots.
     """
     _require_perm("can_print_labels")
     from flask import jsonify as _json
-    import io, struct, ctypes, logging
+    import io, logging, base64, struct
 
     log  = logging.getLogger(__name__)
     data = request.get_json() or {}
@@ -1555,6 +1557,8 @@ def labels_print_direct():
     show_sku   = data.get("show_sku",    False)
     show_dates = data.get("show_dates",  True)
     printer_nm = data.get("printer", "sticker printer")
+    w_mm       = float(data.get("w_mm", 50))
+    h_mm       = float(data.get("h_mm", 25))
 
     shop_name = ""
     try:
@@ -1564,133 +1568,160 @@ def labels_print_direct():
         pass
 
     try:
-        import win32ui, win32con
+        import win32print
         from PIL import Image, ImageDraw, ImageFont
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # Read the actual DC dimensions — these are ground truth for this printer.
-        hdc = win32ui.CreateDC()
-        hdc.CreatePrinterDC(printer_nm)
-        DC_W = hdc.GetDeviceCaps(win32con.HORZRES)
-        DC_H = hdc.GetDeviceCaps(win32con.VERTRES)
-        DPI  = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 203
+        DPI    = 203
+        W_DOT  = round(w_mm / 25.4 * DPI)   # 400 dots for 50mm
+        H_DOT  = round(h_mm / 25.4 * DPI)   # 200 dots for 25mm
+        GAP_MM = 3                            # label gap from self-test
 
-        # The printer self-test reports: SIZE = 50.00mm x 25.25mm at 203 DPI.
-        # The Windows driver is misconfigured and reports wrong DC dimensions.
-        # Use the ACTUAL physical sticker pixels derived from selected label size.
-        w_mm = float(data.get("w_mm", 50))
-        h_mm = float(data.get("h_mm", 25))
-        PX_W = round(w_mm / 25.4 * DPI)   # e.g. 50mm → 400px at 203 DPI
-        PX_H = round(h_mm / 25.4 * DPI)   # e.g. 25mm → 200px at 203 DPI
+        # Font sizes in dots — scaled to label height
+        scale   = H_DOT / 200.0
+        PAD     = max(3, int(5 * scale))
+        GAP_PX  = max(1, int(3 * scale))
 
-        log.info("print_direct: DC=%dx%d DPI=%d label=%.0fx%.0fmm canvas=%dx%d",
-                 DC_W, DC_H, DPI, w_mm, h_mm, PX_W, PX_H)
+        # Text zone: left 55% of label width
+        # Barcode zone: right 45%
+        BC_X    = round(W_DOT * 0.55)
+        BC_W    = W_DOT - BC_X - PAD
+        BC_H    = H_DOT - PAD * 2
+        TEXT_W  = BC_X - PAD * 2
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(6, int(px)))
             except: return ImageFont.load_default()
 
-        # Fonts scaled to label HEIGHT (the short side = reading height).
-        # At 203 DPI: 25mm = 200px. Keep fonts tight to fit everything.
-        scale   = PX_H / 200.0
         f_shop  = _f(int(13 * scale))
-        f_name  = _f(int(19 * scale))
-        f_price = _f(int(28 * scale))
+        f_name  = _f(int(20 * scale))
+        f_price = _f(int(30 * scale))
         f_small = _f(int(11 * scale))
 
-        PAD = max(3, int(4 * scale))
-        GAP = max(1, int(2 * scale))
-
-        # Layout: text block on the LEFT, barcode on the RIGHT.
-        # Barcode takes right 42% of label width.
-        BC_W_RATIO  = 0.42
-        bc_zone_w   = int(PX_W * BC_W_RATIO)
-        text_zone_w = PX_W - bc_zone_w - PAD * 2
-
         printed = 0
-        hdc.StartDoc("Smart Mart Labels")
+        hPrinter = win32print.OpenPrinter(printer_nm)
 
-        for item in items:
-            copies  = max(1, int(item.get("copies", 1)))
-            name    = str(item.get("name", ""))
-            sku     = str(item.get("sku", ""))
-            bc_val  = str(item.get("barcode") or sku)
-            price   = float(item.get("price", 0))
-            price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
-            pkg     = str(item.get("pkg", ""))
-            exp     = str(item.get("exp", ""))
+        try:
+            for item in items:
+                copies  = max(1, int(item.get("copies", 1)))
+                name    = str(item.get("name", ""))
+                sku     = str(item.get("sku", ""))
+                bc_val  = str(item.get("barcode") or sku)
+                price   = float(item.get("price", 0))
+                price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
+                pkg     = str(item.get("pkg", ""))
+                exp_d   = str(item.get("exp", ""))
 
-            # Generate barcode bytes once per product (reused across copies)
-            bc_bytes = None
-            if show_bc:
-                try:
-                    bb = io.BytesIO()
-                    _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
-                        "write_text": False, "module_height": 10.0,
-                        "module_width": 0.4, "quiet_zone": 1.5,
-                        "font_size": 0, "text_distance": 0, "dpi": DPI,
-                    })
-                    bc_bytes = bb.getvalue()
-                except Exception:
-                    bc_bytes = None
+                # Generate barcode as PNG bytes
+                bc_bytes = None
+                if show_bc:
+                    try:
+                        bb = io.BytesIO()
+                        _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
+                            "write_text": False, "module_height": 10.0,
+                            "module_width": 0.4, "quiet_zone": 1.0,
+                            "font_size": 0, "text_distance": 0, "dpi": DPI,
+                        })
+                        bc_bytes = bb.getvalue()
+                    except Exception:
+                        bc_bytes = None
 
-            for _ in range(copies):
-                img  = Image.new("RGB", (PX_W, PX_H), "white")
+                # Build a PIL image at exact label dots
+                img  = Image.new("RGB", (W_DOT, H_DOT), "white")
                 draw = ImageDraw.Draw(img)
 
-                # ── Text block (left side) ─────────────────────────────────
+                # Draw text on the left
                 y = PAD
                 def put(text, fnt):
                     nonlocal y
                     while len(text) > 1:
-                        if draw.textlength(text, font=fnt) <= text_zone_w: break
+                        if draw.textlength(text, font=fnt) <= TEXT_W: break
                         text = text[:-1]
-                    _bb   = draw.textbbox((0, 0), "Ag", font=fnt)
-                    line_h = _bb[3] - _bb[1]
-                    if y + line_h > PX_H - PAD: return
+                    bb2    = draw.textbbox((0, 0), "Ag", font=fnt)
+                    line_h = bb2[3] - bb2[1]
+                    if y + line_h > H_DOT - PAD: return
                     draw.text((PAD, y), text, font=fnt, fill="black")
-                    y += line_h + GAP
+                    y += line_h + GAP_PX
 
                 if show_shop and shop_name: put(shop_name, f_shop)
                 put(name,    f_name)
                 put(price_s, f_price)
-                if show_mrp:            put("MRP incl. all taxes", f_small)
-                if show_dates and pkg:  put(f"PKD: {pkg}", f_small)
-                if show_dates and exp:  put(f"EXP: {exp}", f_small)
-                if show_sku:            put(sku, f_small)
+                if show_mrp:              put("MRP incl. all taxes", f_small)
+                if show_dates and pkg:    put(f"PKD: {pkg}", f_small)
+                if show_dates and exp_d:  put(f"EXP: {exp_d}", f_small)
+                if show_sku:              put(sku, f_small)
 
-                # ── Barcode (right side) ───────────────────────────────────
+                # Draw barcode on the right
                 if bc_bytes:
                     try:
                         bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
-                        # Fit barcode into the right zone with padding
-                        bc_x = PX_W - bc_zone_w + PAD
-                        bc_w = bc_zone_w - PAD * 2
-                        bc_h = PX_H - PAD * 2
-                        bc_im = bc_im.resize((bc_w, bc_h), Image.LANCZOS)
-                        img.paste(bc_im, (bc_x, PAD))
+                        bc_im = bc_im.resize((BC_W, BC_H), Image.LANCZOS)
+                        img.paste(bc_im, (BC_X, PAD))
                     except Exception:
                         pass
 
-                # Send at PHYSICAL sticker pixels — do NOT resize to DC dims.
-                # The printer gap sensor controls label boundaries, not DC size.
-                hdc.StartPage()
-                rw, rh = img.size   # 400×200 — exact physical sticker pixels
-                raw    = img.convert("RGB").tobytes("raw", "BGR")
-                bi     = struct.pack("<lllHHLLllLL",
-                                    40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
-                ctypes.windll.gdi32.SetDIBitsToDevice(
-                    hdc.GetSafeHdc(), 0, 0, rw, rh, 0, 0, 0, rh, raw, bi, 0)
-                hdc.EndPage()
-                printed += 1
+                # Convert image to 1-bit BMP for TSPL BITMAP command
+                img_bw = img.convert("1")
+                bmp_w  = W_DOT
+                bmp_h  = H_DOT
+                # TSPL BITMAP row stride must be multiple of 8 bits → bytes
+                stride = (bmp_w + 7) // 8
+                rows   = []
+                px     = img_bw.load()
+                for row in range(bmp_h):
+                    rowbits = 0
+                    byte    = 0
+                    out     = bytearray()
+                    for col in range(bmp_w):
+                        # PIL 1-bit: 0=black, 255=white. TSPL BITMAP: 1=black, 0=white.
+                        bit = 1 if px[col, row] == 0 else 0
+                        byte = (byte << 1) | bit
+                        rowbits += 1
+                        if rowbits == 8:
+                            out.append(byte)
+                            byte    = 0
+                            rowbits = 0
+                    if rowbits:
+                        out.append(byte << (8 - rowbits))
+                    rows.append(bytes(out))
 
-        hdc.EndDoc()
-        hdc.DeleteDC()
+                # Build TSPL command string for each copy
+                for _ in range(copies):
+                    cmd = bytearray()
+                    def w(s):
+                        cmd.extend(s.encode() if isinstance(s, str) else s)
+                        cmd.extend(b"\r\n")
+
+                    w(f"SIZE {w_mm} mm,{h_mm} mm")
+                    w(f"GAP {GAP_MM} mm,0 mm")
+                    w("DIRECTION 0")          # 0 = top-of-label first
+                    w("CLS")                  # clear buffer
+                    # BITMAP x,y,width_bytes,height,mode,data
+                    bmp_cmd = f"BITMAP 0,0,{stride},{bmp_h},0,".encode()
+                    bmp_data = b"".join(rows)
+                    cmd.extend(bmp_cmd)
+                    cmd.extend(bmp_data)
+                    cmd.extend(b"\r\n")
+                    w("PRINT 1,1")            # print 1 label, 1 copy
+
+                    # Send as RAW job
+                    hJob = win32print.StartDocPrinter(hPrinter, 1,
+                                                      ("Smart Mart Label", None, "RAW"))
+                    win32print.StartPagePrinter(hPrinter)
+                    win32print.WritePrinter(hPrinter, bytes(cmd))
+                    win32print.EndPagePrinter(hPrinter)
+                    win32print.EndDocPrinter(hPrinter)
+                    printed += 1
+
+        finally:
+            win32print.ClosePrinter(hPrinter)
+
         return _json({"ok": True, "printed": printed,
-                      "debug": {"DC_W": DC_W, "DC_H": DC_H, "DPI": DPI,
-                                "layout": f"text 0..{PX_W-bc_zone_w}px | barcode {PX_W-bc_zone_w}..{PX_W}px"}})
+                      "debug": {"method": "TSPL RAW",
+                                "label": f"{w_mm}x{h_mm}mm",
+                                "canvas": f"{W_DOT}x{H_DOT}dots"}})
 
     except ImportError as exc:
         return _json({"ok": False, "error": f"Missing: {exc}. Install pywin32 or use Download PDF."}), 400
