@@ -1630,14 +1630,14 @@ def labels_print_direct():
                 if show_sku and y < 185:
                     lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(sku)}"')
 
-                # Barcode — right 45% of label, full label height for readability
+                # Barcode — right 45% of label, full height, human-readable below
                 # BARCODE x,y,type,height,readable,rotation,narrow,wide,"data"
-                # narrow=3,wide=3 → wider bars for better readability
-                # height=170 dots to fill most of the 200-dot label height
+                # readable=1 prints the value below bars (helps verify scan)
+                # narrow=2,wide=2 — correct ratio for Code 128
                 if show_bc and bc_val:
-                    bc_x = 215   # ~54% of 400-dot width
+                    bc_x = 215
                     lines.append(
-                        f'BARCODE {bc_x},10,"128",170,0,0,2,4,"{esc(bc_val)}"'
+                        f'BARCODE {bc_x},10,"128",150,1,0,2,2,"{esc(bc_val)}"'
                     )
 
                 # PRINT copies,1 — standard TSPL print command
