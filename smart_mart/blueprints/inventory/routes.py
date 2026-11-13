@@ -1576,13 +1576,11 @@ def labels_print_direct():
         DC_H = hdc.GetDeviceCaps(win32con.VERTRES)   # 240
         DPI  = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 203
 
-        # The DC is portrait (160×240). The sticker is landscape (75×50mm).
-        # Draw content in landscape: canvas = (DC_H × DC_W) = (240 × 160).
-        # Then rotate CW 90° to get (160 × 240) = DC dimensions.
-        # This maps: canvas-left→label-top, canvas-right→label-bottom,
-        #            canvas-top→label-left, canvas-bottom→label-right.
-        PX_W = DC_H   # 240 — landscape width (long side of sticker)
-        PX_H = DC_W   # 160 — landscape height (short side of sticker)
+        # The x-Lab DC is 400×560px at 203 DPI = 50×70mm portrait.
+        # The sticker feeds portrait through the printer (50mm wide, 70mm tall).
+        # Draw content in portrait directly — no rotation needed.
+        PX_W = DC_W   # 400
+        PX_H = DC_H   # 560
 
         log.info("print_direct: DC=%dx%d DPI=%d canvas=%dx%d",
                  DC_W, DC_H, DPI, PX_W, PX_H)
@@ -1592,16 +1590,16 @@ def labels_print_direct():
             try:    return ImageFont.truetype(_fp, max(6, int(px)))
             except: return ImageFont.load_default()
 
-        # Scale fonts to the canvas width (240px ≈ 75mm at 80px/inch equiv)
-        scale   = PX_W / 240.0   # 1.0 at 240px wide
-        f_shop  = _f(int(14 * scale))
-        f_name  = _f(int(20 * scale))
-        f_price = _f(int(30 * scale))
-        f_small = _f(int(12 * scale))
+        # Scale fonts to canvas width (400px = 50mm wide at 203 DPI)
+        scale   = PX_W / 400.0   # 1.0 at 400px
+        f_shop  = _f(int(16 * scale))
+        f_name  = _f(int(24 * scale))
+        f_price = _f(int(36 * scale))
+        f_small = _f(int(14 * scale))
 
-        PAD      = max(4, int(6 * scale))
-        GAP      = max(1, int(2 * scale))
-        BC_RATIO = 0.38   # barcode zone = bottom 38% of canvas height
+        PAD      = max(5, int(8 * scale))
+        GAP      = max(2, int(3 * scale))
+        BC_RATIO = 0.30   # barcode zone = bottom 30% of canvas height (portrait sticker)
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1667,8 +1665,8 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Rotate CW 90°: landscape (240×160) → portrait (160×240) = DC size
-                img_out = img.rotate(-90, expand=True)
+                # No rotation needed — canvas is already portrait matching DC
+                img_out = img
                 # Sanity check — must be DC_W × DC_H exactly
                 if img_out.size != (DC_W, DC_H):
                     img_out = img_out.resize((DC_W, DC_H), Image.LANCZOS)
