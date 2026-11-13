@@ -19,10 +19,10 @@
     .qin { width:52px; border:1px solid #e2e8f0; border-radius:6px; padding:.15rem .35rem; font-size:.8rem; text-align:center; }
     #prevSheet { display:flex; flex-wrap:wrap; gap:3mm; padding:4mm; }
     .lbl { box-sizing:border-box; border:1.5px solid #333; background:#fff; font-family:Arial,sans-serif; display:flex; flex-direction:column; overflow:hidden; }
-    .lbl.s50x70  { width:50mm;  height:70mm;  padding:2mm 3mm; }  /* ★ Your sticker */
+    .lbl.s50x25  { width:50mm;  height:25mm;  padding:1mm 2mm; }  /* ★ Your sticker */
+    .lbl.s50x70  { width:50mm;  height:70mm;  padding:2mm 3mm; }
     .lbl.s50x80  { width:50mm;  height:80mm;  padding:2mm 3mm; }
     .lbl.s100x70 { width:100mm; height:70mm;  padding:3mm 4mm; }
-    .lbl.s100x80 { width:100mm; height:80mm;  padding:3mm 4mm; }
     .lbl.s100x150{ width:100mm; height:150mm; padding:3mm 4mm; }
     .lbl .ltxt { flex:1; overflow:hidden; }
     .lbl .lshop  { font-size:7pt;  font-weight:700; color:#000; }
@@ -115,10 +115,10 @@
         <h6 class="fw-bold mb-3">Options</h6>
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="text-muted small fw-semibold align-self-center">Size:</span>
-          <button class="sbtn on" data-s="s50x70" onclick="setSize('s50x70')">★ 50×70mm (Your sticker)</button>
+          <button class="sbtn on" data-s="s50x25" onclick="setSize('s50x25')">★ 50×25mm (Your sticker)</button>
+          <button class="sbtn" data-s="s50x70"  onclick="setSize('s50x70')">50×70mm</button>
           <button class="sbtn" data-s="s50x80"  onclick="setSize('s50x80')">50×80mm</button>
           <button class="sbtn" data-s="s100x70" onclick="setSize('s100x70')">100×70mm</button>
-          <button class="sbtn" data-s="s100x80" onclick="setSize('s100x80')">100×80mm</button>
           <button class="sbtn" data-s="s100x150" onclick="setSize('s100x150')">100×150mm</button>
         </div>
 
@@ -180,13 +180,13 @@
   const BC = { ...PRE_BC };
 
   const SIZES = {
-    s50x70:  { w:50,  h:70,  tip:'50 × 70 mm (Your sticker)' },
+    s50x25:  { w:50,  h:25,  tip:'50 × 25 mm (Your sticker)' },
+    s50x70:  { w:50,  h:70,  tip:'50 × 70 mm'  },
     s50x80:  { w:50,  h:80,  tip:'50 × 80 mm'  },
     s100x70: { w:100, h:70,  tip:'100 × 70 mm' },
-    s100x80: { w:100, h:80,  tip:'100 × 80 mm' },
     s100x150:{ w:100, h:150, tip:'100 × 150 mm'},
   };
-  let cur = 's50x70';  // default — matches LABEL(50mm x 70mm) in driver
+  let cur = 's50x25';  // default — matches actual physical sticker 50×25mm
 
   function injectPageCSS(s) {
     const dim = SIZES[s] || SIZES['s50x25'];
@@ -328,7 +328,7 @@
       r.style.display=(r.dataset.n.includes(q)||r.dataset.c.includes(q))?'':'none';
     });
   }
-  document.addEventListener('DOMContentLoaded', ()=>{ setSize('s50x70'); });
+  document.addEventListener('DOMContentLoaded', ()=>{ setSize('s50x25'); });
 
   async function showPrinterInfo() {
     try {

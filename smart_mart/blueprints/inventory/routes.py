@@ -1576,35 +1576,38 @@ def labels_print_direct():
         DC_H = hdc.GetDeviceCaps(win32con.VERTRES)
         DPI  = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 203
 
-        # Draw directly at DC_W × DC_H — no rotation, no mm conversion.
-        # The driver already handles the physical orientation of the sticker.
-        # DC_W is the WIDE side (along label feed direction).
-        PX_W = DC_W   # wide side  (e.g. 560px = 70mm)
-        PX_H = DC_H   # short side (e.g. 400px = 50mm)
+        # The printer self-test reports: SIZE = 50.00mm x 25.25mm at 203 DPI.
+        # The Windows driver is misconfigured and reports wrong DC dimensions.
+        # Use the ACTUAL physical sticker pixels derived from selected label size.
+        w_mm = float(data.get("w_mm", 50))
+        h_mm = float(data.get("h_mm", 25))
+        PX_W = round(w_mm / 25.4 * DPI)   # e.g. 50mm → 400px at 203 DPI
+        PX_H = round(h_mm / 25.4 * DPI)   # e.g. 25mm → 200px at 203 DPI
 
-        log.info("print_direct: DC=%dx%d DPI=%d", DC_W, DC_H, DPI)
+        log.info("print_direct: DC=%dx%d DPI=%d label=%.0fx%.0fmm canvas=%dx%d",
+                 DC_W, DC_H, DPI, w_mm, h_mm, PX_W, PX_H)
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(6, int(px)))
             except: return ImageFont.load_default()
 
-        # Fonts scaled to label height (short side) — that's the reading height.
-        # Reference: 400px = 50mm at 203 DPI.
-        scale   = PX_H / 400.0
-        f_shop  = _f(int(16 * scale))
-        f_name  = _f(int(28 * scale))
-        f_price = _f(int(42 * scale))
-        f_small = _f(int(15 * scale))
+        # Fonts scaled to label HEIGHT (the short side = reading height).
+        # At 203 DPI: 25mm = 200px. Scale relative to that.
+        scale   = PX_H / 200.0
+        f_shop  = _f(int(11 * scale))
+        f_name  = _f(int(16 * scale))
+        f_price = _f(int(24 * scale))
+        f_small = _f(int(10 * scale))
 
-        PAD = max(5, int(10 * scale))
-        GAP = max(2, int(4  * scale))
+        PAD = max(3, int(5 * scale))
+        GAP = max(1, int(2 * scale))
 
         # Layout: text block on the LEFT, barcode on the RIGHT.
-        # Barcode takes right 40% of label width.
-        BC_W_RATIO = 0.42
-        bc_zone_w  = int(PX_W * BC_W_RATIO)
-        text_zone_w = PX_W - bc_zone_w - PAD  # available width for text
+        # Barcode takes right 42% of label width.
+        BC_W_RATIO  = 0.42
+        bc_zone_w   = int(PX_W * BC_W_RATIO)
+        text_zone_w = PX_W - bc_zone_w - PAD * 2
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1671,10 +1674,13 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Send directly — DC is already in the correct orientation
+                # Resize to DC dimensions before sending (driver may expect DC_W×DC_H)
+                img_out = img if img.size == (DC_W, DC_H) else img.resize((DC_W, DC_H), Image.LANCZOS)
+
+                # Send directly — no rotation needed
                 hdc.StartPage()
-                rw, rh = img.size
-                raw    = img.convert("RGB").tobytes("raw", "BGR")
+                rw, rh = img_out.size
+                raw    = img_out.convert("RGB").tobytes("raw", "BGR")
                 bi     = struct.pack("<lllHHLLllLL",
                                     40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
                 ctypes.windll.gdi32.SetDIBitsToDevice(
