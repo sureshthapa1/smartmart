@@ -1629,12 +1629,27 @@ def labels_print_direct():
                     bc_bytes = None
 
             bc_h         = int(PX_H * BC_RATIO) if bc_bytes else 0
-            text_ceiling = PX_H - bc_h - PAD   # text must stay above barcode
+            # Barcode at TOP of portrait canvas (→ right side in landscape after CW rotation)
+            bc_top       = 0
+            bc_bottom    = bc_h
+            # Text zone starts below barcode, text drawn top-down in this zone
+            text_start   = bc_bottom + PAD
+            text_ceiling = PX_H - PAD   # text must stay above bottom edge
 
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), "white")
                 draw = ImageDraw.Draw(img)
-                y    = PAD
+
+                # Draw barcode at the TOP of the canvas
+                if bc_bytes:
+                    try:
+                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
+                        bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
+                        img.paste(bc_im, (0, bc_top))
+                    except Exception:
+                        pass
+
+                y = text_start
 
                 def put(text, fnt):
                     nonlocal y
@@ -1656,19 +1671,10 @@ def labels_print_direct():
                 if show_dates and exp:  put(f"EXP: {exp}", f_small)
                 if show_sku:            put(sku, f_small)
 
-                # Barcode anchored to bottom
-                if bc_bytes:
-                    try:
-                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
-                        bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        img.paste(bc_im, (0, PX_H - bc_h))
-                    except Exception:
-                        pass
-
-                # Content drawn portrait is rotated 90° CCW by the driver.
-                # Compensate by rotating CW 90° before sending.
+                # Rotate CW 90°: portrait top→landscape right, portrait bottom→landscape left.
+                # We want text on LEFT and barcode on RIGHT in landscape.
+                # So: draw text at portrait BOTTOM, barcode at portrait TOP.
                 img_out = img.rotate(-90, expand=True)
-                # After CW rotation: 400×560 → 560×400, resize back to DC dims
                 if img_out.size != (DC_W, DC_H):
                     img_out = img_out.resize((DC_W, DC_H), Image.LANCZOS)
 
