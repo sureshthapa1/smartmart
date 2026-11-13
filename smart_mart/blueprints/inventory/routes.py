@@ -1640,8 +1640,8 @@ def labels_print_direct():
                         f'BARCODE {bc_x},10,"128",170,0,0,2,4,"{esc(bc_val)}"'
                     )
 
-                # PRINT copies,0 — 0 means no extra feed/gap after printing
-                lines.append(f'PRINT {copies},0')
+                # PRINT copies,1 — standard TSPL print command
+                lines.append(f'PRINT {copies},1')
 
                 tspl = "\r\n".join(lines) + "\r\n"
                 raw  = tspl.encode("ascii", errors="replace")
