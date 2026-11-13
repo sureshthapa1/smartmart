@@ -1572,34 +1572,39 @@ def labels_print_direct():
         # Read the actual DC dimensions — these are ground truth for this printer.
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
-        DC_W = hdc.GetDeviceCaps(win32con.HORZRES)   # 160
-        DC_H = hdc.GetDeviceCaps(win32con.VERTRES)   # 240
+        DC_W = hdc.GetDeviceCaps(win32con.HORZRES)
+        DC_H = hdc.GetDeviceCaps(win32con.VERTRES)
         DPI  = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 203
 
-        # The x-Lab DC is 400×560px at 203 DPI = 50×70mm portrait.
-        # The sticker feeds portrait through the printer (50mm wide, 70mm tall).
-        # Draw content in portrait directly — no rotation needed.
-        PX_W = DC_W   # 400
-        PX_H = DC_H   # 560
+        # Draw directly at DC_W × DC_H — no rotation, no mm conversion.
+        # The driver already handles the physical orientation of the sticker.
+        # DC_W is the WIDE side (along label feed direction).
+        PX_W = DC_W   # wide side  (e.g. 560px = 70mm)
+        PX_H = DC_H   # short side (e.g. 400px = 50mm)
 
-        log.info("print_direct: DC=%dx%d DPI=%d canvas=%dx%d",
-                 DC_W, DC_H, DPI, PX_W, PX_H)
+        log.info("print_direct: DC=%dx%d DPI=%d", DC_W, DC_H, DPI)
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
             try:    return ImageFont.truetype(_fp, max(6, int(px)))
             except: return ImageFont.load_default()
 
-        # Scale fonts to canvas width (400px = 50mm wide at 203 DPI)
-        scale   = PX_W / 400.0   # 1.0 at 400px
+        # Fonts scaled to label height (short side) — that's the reading height.
+        # Reference: 400px = 50mm at 203 DPI.
+        scale   = PX_H / 400.0
         f_shop  = _f(int(16 * scale))
-        f_name  = _f(int(24 * scale))
-        f_price = _f(int(36 * scale))
-        f_small = _f(int(14 * scale))
+        f_name  = _f(int(28 * scale))
+        f_price = _f(int(42 * scale))
+        f_small = _f(int(15 * scale))
 
-        PAD      = max(5, int(8 * scale))
-        GAP      = max(2, int(3 * scale))
-        BC_RATIO = 0.30   # barcode zone = bottom 30% of canvas height (portrait sticker)
+        PAD = max(5, int(10 * scale))
+        GAP = max(2, int(4  * scale))
+
+        # Layout: text block on the LEFT, barcode on the RIGHT.
+        # Barcode takes right 40% of label width.
+        BC_W_RATIO = 0.42
+        bc_zone_w  = int(PX_W * BC_W_RATIO)
+        text_zone_w = PX_W - bc_zone_w - PAD  # available width for text
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1620,46 +1625,28 @@ def labels_print_direct():
                 try:
                     bb = io.BytesIO()
                     _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
-                        "write_text": False, "module_height": 8.0,
-                        "module_width": 0.35, "quiet_zone": 1.0,
+                        "write_text": False, "module_height": 10.0,
+                        "module_width": 0.4, "quiet_zone": 1.5,
                         "font_size": 0, "text_distance": 0, "dpi": DPI,
                     })
                     bc_bytes = bb.getvalue()
                 except Exception:
                     bc_bytes = None
 
-            bc_h         = int(PX_H * BC_RATIO) if bc_bytes else 0
-            # Barcode at TOP of portrait canvas (→ right side in landscape after CW rotation)
-            bc_top       = 0
-            bc_bottom    = bc_h
-            # Text zone starts below barcode, text drawn top-down in this zone
-            text_start   = bc_bottom + PAD
-            text_ceiling = PX_H - PAD   # text must stay above bottom edge
-
             for _ in range(copies):
                 img  = Image.new("RGB", (PX_W, PX_H), "white")
                 draw = ImageDraw.Draw(img)
 
-                # Draw barcode at the TOP of the canvas
-                if bc_bytes:
-                    try:
-                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
-                        bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        img.paste(bc_im, (0, bc_top))
-                    except Exception:
-                        pass
-
-                y = text_start
-
+                # ── Text block (left side) ─────────────────────────────────
+                y = PAD
                 def put(text, fnt):
                     nonlocal y
-                    avail = PX_W - PAD * 2
                     while len(text) > 1:
-                        if draw.textlength(text, font=fnt) <= avail: break
+                        if draw.textlength(text, font=fnt) <= text_zone_w: break
                         text = text[:-1]
                     _bb   = draw.textbbox((0, 0), "Ag", font=fnt)
                     line_h = _bb[3] - _bb[1]
-                    if y + line_h > text_ceiling: return
+                    if y + line_h > PX_H - PAD: return
                     draw.text((PAD, y), text, font=fnt, fill="black")
                     y += line_h + GAP
 
@@ -1671,16 +1658,23 @@ def labels_print_direct():
                 if show_dates and exp:  put(f"EXP: {exp}", f_small)
                 if show_sku:            put(sku, f_small)
 
-                # Rotate CW 90°: portrait top→landscape right, portrait bottom→landscape left.
-                # We want text on LEFT and barcode on RIGHT in landscape.
-                # So: draw text at portrait BOTTOM, barcode at portrait TOP.
-                img_out = img.rotate(-90, expand=True)
-                if img_out.size != (DC_W, DC_H):
-                    img_out = img_out.resize((DC_W, DC_H), Image.LANCZOS)
+                # ── Barcode (right side) ───────────────────────────────────
+                if bc_bytes:
+                    try:
+                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
+                        # Fit barcode into the right zone with padding
+                        bc_x = PX_W - bc_zone_w + PAD
+                        bc_w = bc_zone_w - PAD * 2
+                        bc_h = PX_H - PAD * 2
+                        bc_im = bc_im.resize((bc_w, bc_h), Image.LANCZOS)
+                        img.paste(bc_im, (bc_x, PAD))
+                    except Exception:
+                        pass
 
+                # Send directly — DC is already in the correct orientation
                 hdc.StartPage()
-                rw, rh = img_out.size
-                raw    = img_out.convert("RGB").tobytes("raw", "BGR")
+                rw, rh = img.size
+                raw    = img.convert("RGB").tobytes("raw", "BGR")
                 bi     = struct.pack("<lllHHLLllLL",
                                     40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
                 ctypes.windll.gdi32.SetDIBitsToDevice(
@@ -1692,7 +1686,7 @@ def labels_print_direct():
         hdc.DeleteDC()
         return _json({"ok": True, "printed": printed,
                       "debug": {"DC_W": DC_W, "DC_H": DC_H, "DPI": DPI,
-                                "canvas": f"{PX_W}x{PX_H}"}})
+                                "layout": f"text 0..{PX_W-bc_zone_w}px | barcode {PX_W-bc_zone_w}..{PX_W}px"}})
 
     except ImportError as exc:
         return _json({"ok": False, "error": f"Missing: {exc}. Install pywin32 or use Download PDF."}), 400
