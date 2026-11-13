@@ -1597,49 +1597,51 @@ def labels_print_direct():
                 lines.append('CLS')
 
                 # Text layout — left side, top-down
-                # TSPL font sizes (dots): "1"=8px "2"=12px "3"=16px "4"=24px
-                y = 4
-                x = 4
+                # TSPL TEXT: x,y,font,rotation,xmul,ymul,"text"
+                # With DIRECTION 1, coordinates are mirrored — origin is bottom-right
+                # Font "3"=16px, "4"=24px; xmul/ymul multiply the size (1-10)
+                y = 8
+                x = 8
 
                 if show_shop and shop_name:
                     lines.append(f'TEXT {x},{y},"2",0,1,1,"{esc(shop_name)}"')
+                    y += 20
+
+                # Product name — font 3, xmul=1,ymul=2 → 32px tall
+                lines.append(f'TEXT {x},{y},"3",0,1,2,"{esc(name)}"')
+                y += 36
+
+                # Price — font 4, xmul=1,ymul=2 → 48px tall
+                lines.append(f'TEXT {x},{y},"4",0,1,2,"{esc(price_s)}"')
+                y += 52
+
+                if show_mrp and y < 170:
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"MRP incl.taxes"')
                     y += 16
 
-                # Product name — font 3 (16px tall)
-                lines.append(f'TEXT {x},{y},"3",0,1,1,"{esc(name)}"')
-                y += 20
+                if show_dates and pkg and y < 170:
+                    lines.append(f'TEXT {x},{y},"2",0,1,1,"PKD:{esc(pkg)}"')
+                    y += 20
 
-                # Price — font 4 (24px tall), bold via xmul=1,ymul=1
-                lines.append(f'TEXT {x},{y},"4",0,1,1,"{esc(price_s)}"')
-                y += 28
+                if show_dates and exp_d and y < 170:
+                    lines.append(f'TEXT {x},{y},"2",0,1,1,"EXP:{esc(exp_d)}"')
+                    y += 20
 
-                if show_mrp:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"MRP incl.taxes"')
-                    y += 12
-
-                if show_dates and pkg:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"PKD:{esc(pkg)}"')
-                    y += 12
-
-                if show_dates and exp_d:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"EXP:{esc(exp_d)}"')
-                    y += 12
-
-                if show_sku:
+                if show_sku and y < 185:
                     lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(sku)}"')
 
-                # Barcode — right side
-                # BARCODE x,y,"128",height,0,0,2,2,"data"
-                # height=100 dots, narrow=2, wide=2
+                # Barcode — right 45% of label, full label height for readability
+                # BARCODE x,y,type,height,readable,rotation,narrow,wide,"data"
+                # narrow=3,wide=3 → wider bars for better readability
+                # height=170 dots to fill most of the 200-dot label height
                 if show_bc and bc_val:
-                    bc_x = 220   # start at ~55% of 400-dot width
-                    bc_h = 90    # height in dots
-                    bc_y = (200 - bc_h) // 2   # vertically centred
+                    bc_x = 215   # ~54% of 400-dot width
                     lines.append(
-                        f'BARCODE {bc_x},{bc_y},"128",{bc_h},0,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE {bc_x},10,"128",170,0,0,2,4,"{esc(bc_val)}"'
                     )
 
-                lines.append(f'PRINT {copies},1')   # print N copies
+                # PRINT copies,0 — 0 means no extra feed/gap after printing
+                lines.append(f'PRINT {copies},0')
 
                 tspl = "\r\n".join(lines) + "\r\n"
                 raw  = tspl.encode("ascii", errors="replace")
