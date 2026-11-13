@@ -1549,7 +1549,10 @@
   const barcodeInput = document.getElementById('barcodeInput');
 
   // ── Contenteditable placeholder behaviour ────────────────────────────
-  function barcodeGetValue() { return barcodeInput.textContent.trim(); }
+  function barcodeGetValue() {
+    // Strip all whitespace including newlines injected by contenteditable on Enter
+    return barcodeInput.textContent.replace(/[\r\n\s]+/g, ' ').trim();
+  }
   function barcodeClear()    { barcodeInput.textContent = ''; }
   function barcodeSetPlaceholder(text) { barcodeInput.dataset.placeholder = text; }
   // Refocus without triggering Windows Credential / Chrome password UI.
@@ -1669,10 +1672,13 @@
   let barcodeTimer = null;
 
   barcodeInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault();
       clearTimeout(barcodeTimer);
-      handleBarcodeScan(barcodeGetValue());
+      // Grab value BEFORE any newline can be inserted by the browser
+      const val = barcodeInput.textContent.replace(/[\r\n\t]+/g, '').trim();
+      barcodeClear();
+      if (val) handleBarcodeScan(val);
     }
   });
 
