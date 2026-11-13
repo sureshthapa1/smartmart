@@ -1533,19 +1533,15 @@ def labels_pdf():
 @inventory_bp.route("/labels/print-direct", methods=["POST"])
 @login_required
 def labels_print_direct():
-    """Print labels via TSPL commands sent as a RAW print job.
+    """Print labels via TSPL RAW commands using native TEXT and BARCODE commands.
 
-    The x-Lab printer self-test shows: Command Mode = TSPL, SIZE = 50x25mm.
-    TSPL is the native language of this printer. We send raw TSPL commands
-    directly via win32print RAW spool — no GDI, no DC pixel math, no rotation.
-
-    TSPL coordinate origin: top-left of label.
-    Units: dots at 203 DPI (1 dot = 0.125mm).
-    Label: 50mm wide × 25mm tall = 400 × 200 dots.
+    Self-test: SIZE=50x25mm, GAP=3mm, Command Mode=TSPL, DPI=203.
+    Label is 50mm wide × 25mm tall = 400 × 200 dots at 203 DPI.
+    TSPL origin is top-left. DIRECTION 0 = top of label first.
     """
     _require_perm("can_print_labels")
     from flask import jsonify as _json
-    import io, logging, base64, struct
+    import io, logging
 
     log  = logging.getLogger(__name__)
     data = request.get_json() or {}
@@ -1569,39 +1565,11 @@ def labels_print_direct():
 
     try:
         import win32print
-        from PIL import Image, ImageDraw, ImageFont
-        import barcode as _bc
-        from barcode.writer import ImageWriter
 
-        DPI    = 203
-        W_DOT  = round(w_mm / 25.4 * DPI)   # 400 dots for 50mm
-        H_DOT  = round(h_mm / 25.4 * DPI)   # 200 dots for 25mm
-        GAP_MM = 3                            # label gap from self-test
+        GAP_MM = 3    # from printer self-test
 
-        # Font sizes in dots — scaled to label height
-        scale   = H_DOT / 200.0
-        PAD     = max(3, int(5 * scale))
-        GAP_PX  = max(1, int(3 * scale))
-
-        # Text zone: left 55% of label width
-        # Barcode zone: right 45%
-        BC_X    = round(W_DOT * 0.55)
-        BC_W    = W_DOT - BC_X - PAD
-        BC_H    = H_DOT - PAD * 2
-        TEXT_W  = BC_X - PAD * 2
-
-        _fp = r"C:\Windows\Fonts\arial.ttf"
-        def _f(px):
-            try:    return ImageFont.truetype(_fp, max(6, int(px)))
-            except: return ImageFont.load_default()
-
-        f_shop  = _f(int(13 * scale))
-        f_name  = _f(int(20 * scale))
-        f_price = _f(int(30 * scale))
-        f_small = _f(int(11 * scale))
-
-        printed = 0
-        hPrinter = win32print.OpenPrinter(printer_nm)
+        printed   = 0
+        hPrinter  = win32print.OpenPrinter(printer_nm)
 
         try:
             for item in items:
@@ -1614,114 +1582,84 @@ def labels_print_direct():
                 pkg     = str(item.get("pkg", ""))
                 exp_d   = str(item.get("exp", ""))
 
-                # Generate barcode as PNG bytes
-                bc_bytes = None
-                if show_bc:
-                    try:
-                        bb = io.BytesIO()
-                        _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
-                            "write_text": False, "module_height": 10.0,
-                            "module_width": 0.4, "quiet_zone": 1.0,
-                            "font_size": 0, "text_distance": 0, "dpi": DPI,
-                        })
-                        bc_bytes = bb.getvalue()
-                    except Exception:
-                        bc_bytes = None
+                # Escape double-quotes in strings for TSPL TEXT command
+                def esc(s): return s.replace('"', "'")
 
-                # Build a PIL image at exact label dots
-                img  = Image.new("RGB", (W_DOT, H_DOT), "white")
-                draw = ImageDraw.Draw(img)
+                # Build TSPL command block for one label
+                # TEXT  x,y,font,rotation,xmul,ymul,"text"
+                #   font "3" = built-in 16px, "4" = 24px
+                #   rotation: 0=normal, 90/180/270
+                # BARCODE x,y,type,height,readable,rotation,narrow,wide,"data"
+                lines = []
+                lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
+                lines.append(f'GAP {GAP_MM} mm,0 mm')
+                lines.append('DIRECTION 0')
+                lines.append('CLS')
 
-                # Draw text on the left
-                y = PAD
-                def put(text, fnt):
-                    nonlocal y
-                    while len(text) > 1:
-                        if draw.textlength(text, font=fnt) <= TEXT_W: break
-                        text = text[:-1]
-                    bb2    = draw.textbbox((0, 0), "Ag", font=fnt)
-                    line_h = bb2[3] - bb2[1]
-                    if y + line_h > H_DOT - PAD: return
-                    draw.text((PAD, y), text, font=fnt, fill="black")
-                    y += line_h + GAP_PX
+                # Text layout — left side, top-down
+                # TSPL font sizes (dots): "1"=8px "2"=12px "3"=16px "4"=24px
+                y = 4
+                x = 4
 
-                if show_shop and shop_name: put(shop_name, f_shop)
-                put(name,    f_name)
-                put(price_s, f_price)
-                if show_mrp:              put("MRP incl. all taxes", f_small)
-                if show_dates and pkg:    put(f"PKD: {pkg}", f_small)
-                if show_dates and exp_d:  put(f"EXP: {exp_d}", f_small)
-                if show_sku:              put(sku, f_small)
+                if show_shop and shop_name:
+                    lines.append(f'TEXT {x},{y},"2",0,1,1,"{esc(shop_name)}"')
+                    y += 16
 
-                # Draw barcode on the right
-                if bc_bytes:
-                    try:
-                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
-                        bc_im = bc_im.resize((BC_W, BC_H), Image.LANCZOS)
-                        img.paste(bc_im, (BC_X, PAD))
-                    except Exception:
-                        pass
+                # Product name — font 3 (16px tall)
+                lines.append(f'TEXT {x},{y},"3",0,1,1,"{esc(name)}"')
+                y += 20
 
-                # Convert image to 1-bit BMP for TSPL BITMAP command
-                img_bw = img.convert("1")
-                bmp_w  = W_DOT
-                bmp_h  = H_DOT
-                # TSPL BITMAP row stride must be multiple of 8 bits → bytes
-                stride = (bmp_w + 7) // 8
-                rows   = []
-                px     = img_bw.load()
-                for row in range(bmp_h):
-                    rowbits = 0
-                    byte    = 0
-                    out     = bytearray()
-                    for col in range(bmp_w):
-                        # PIL 1-bit: 0=black, 255=white. TSPL BITMAP: 1=black, 0=white.
-                        bit = 1 if px[col, row] == 0 else 0
-                        byte = (byte << 1) | bit
-                        rowbits += 1
-                        if rowbits == 8:
-                            out.append(byte)
-                            byte    = 0
-                            rowbits = 0
-                    if rowbits:
-                        out.append(byte << (8 - rowbits))
-                    rows.append(bytes(out))
+                # Price — font 4 (24px tall), bold via xmul=1,ymul=1
+                lines.append(f'TEXT {x},{y},"4",0,1,1,"{esc(price_s)}"')
+                y += 28
 
-                # Build TSPL command string for each copy
-                for _ in range(copies):
-                    cmd = bytearray()
-                    def w(s):
-                        cmd.extend(s.encode() if isinstance(s, str) else s)
-                        cmd.extend(b"\r\n")
+                if show_mrp:
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"MRP incl.taxes"')
+                    y += 12
 
-                    w(f"SIZE {w_mm} mm,{h_mm} mm")
-                    w(f"GAP {GAP_MM} mm,0 mm")
-                    w("DIRECTION 0")          # 0 = top-of-label first
-                    w("CLS")                  # clear buffer
-                    # BITMAP x,y,width_bytes,height,mode,data
-                    bmp_cmd = f"BITMAP 0,0,{stride},{bmp_h},0,".encode()
-                    bmp_data = b"".join(rows)
-                    cmd.extend(bmp_cmd)
-                    cmd.extend(bmp_data)
-                    cmd.extend(b"\r\n")
-                    w("PRINT 1,1")            # print 1 label, 1 copy
+                if show_dates and pkg:
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"PKD:{esc(pkg)}"')
+                    y += 12
 
-                    # Send as RAW job
-                    hJob = win32print.StartDocPrinter(hPrinter, 1,
-                                                      ("Smart Mart Label", None, "RAW"))
-                    win32print.StartPagePrinter(hPrinter)
-                    win32print.WritePrinter(hPrinter, bytes(cmd))
-                    win32print.EndPagePrinter(hPrinter)
-                    win32print.EndDocPrinter(hPrinter)
-                    printed += 1
+                if show_dates and exp_d:
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"EXP:{esc(exp_d)}"')
+                    y += 12
+
+                if show_sku:
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(sku)}"')
+
+                # Barcode — right side
+                # BARCODE x,y,"128",height,0,0,2,2,"data"
+                # height=100 dots, narrow=2, wide=2
+                if show_bc and bc_val:
+                    bc_x = 220   # start at ~55% of 400-dot width
+                    bc_h = 90    # height in dots
+                    bc_y = (200 - bc_h) // 2   # vertically centred
+                    lines.append(
+                        f'BARCODE {bc_x},{bc_y},"128",{bc_h},0,0,2,2,"{esc(bc_val)}"'
+                    )
+
+                lines.append(f'PRINT {copies},1')   # print N copies
+
+                tspl = "\r\n".join(lines) + "\r\n"
+                raw  = tspl.encode("ascii", errors="replace")
+
+                log.info("TSPL job: %d bytes, %d copies", len(raw), copies)
+
+                hJob = win32print.StartDocPrinter(hPrinter, 1,
+                                                  ("Smart Mart Label", None, "RAW"))
+                win32print.StartPagePrinter(hPrinter)
+                win32print.WritePrinter(hPrinter, raw)
+                win32print.EndPagePrinter(hPrinter)
+                win32print.EndDocPrinter(hPrinter)
+                printed += copies
 
         finally:
             win32print.ClosePrinter(hPrinter)
 
         return _json({"ok": True, "printed": printed,
-                      "debug": {"method": "TSPL RAW",
-                                "label": f"{w_mm}x{h_mm}mm",
-                                "canvas": f"{W_DOT}x{H_DOT}dots"}})
+                      "debug": {"method": "TSPL TEXT+BARCODE",
+                                "label": f"{w_mm}x{h_mm}mm"}})
 
     except ImportError as exc:
         return _json({"ok": False, "error": f"Missing: {exc}. Install pywin32 or use Download PDF."}), 400
