@@ -1665,9 +1665,10 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # No rotation needed — canvas is already portrait matching DC
-                img_out = img
-                # Sanity check — must be DC_W × DC_H exactly
+                # Content drawn portrait is rotated 90° CCW by the driver.
+                # Compensate by rotating CW 90° before sending.
+                img_out = img.rotate(-90, expand=True)
+                # After CW rotation: 400×560 → 560×400, resize back to DC dims
                 if img_out.size != (DC_W, DC_H):
                     img_out = img_out.resize((DC_W, DC_H), Image.LANCZOS)
 
