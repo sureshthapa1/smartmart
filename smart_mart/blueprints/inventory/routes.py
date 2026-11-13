@@ -1593,14 +1593,14 @@ def labels_print_direct():
             except: return ImageFont.load_default()
 
         # Fonts scaled to label HEIGHT (the short side = reading height).
-        # At 203 DPI: 25mm = 200px. Scale relative to that.
+        # At 203 DPI: 25mm = 200px. Keep fonts tight to fit everything.
         scale   = PX_H / 200.0
-        f_shop  = _f(int(11 * scale))
-        f_name  = _f(int(16 * scale))
-        f_price = _f(int(24 * scale))
-        f_small = _f(int(10 * scale))
+        f_shop  = _f(int(13 * scale))
+        f_name  = _f(int(19 * scale))
+        f_price = _f(int(28 * scale))
+        f_small = _f(int(11 * scale))
 
-        PAD = max(3, int(5 * scale))
+        PAD = max(3, int(4 * scale))
         GAP = max(1, int(2 * scale))
 
         # Layout: text block on the LEFT, barcode on the RIGHT.
@@ -1674,13 +1674,11 @@ def labels_print_direct():
                     except Exception:
                         pass
 
-                # Resize to DC dimensions before sending (driver may expect DC_W×DC_H)
-                img_out = img if img.size == (DC_W, DC_H) else img.resize((DC_W, DC_H), Image.LANCZOS)
-
-                # Send directly — no rotation needed
+                # Send at PHYSICAL sticker pixels — do NOT resize to DC dims.
+                # The printer gap sensor controls label boundaries, not DC size.
                 hdc.StartPage()
-                rw, rh = img_out.size
-                raw    = img_out.convert("RGB").tobytes("raw", "BGR")
+                rw, rh = img.size   # 400×200 — exact physical sticker pixels
+                raw    = img.convert("RGB").tobytes("raw", "BGR")
                 bi     = struct.pack("<lllHHLLllLL",
                                     40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
                 ctypes.windll.gdi32.SetDIBitsToDevice(
