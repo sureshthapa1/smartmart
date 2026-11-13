@@ -1533,18 +1533,27 @@ def labels_pdf():
 @inventory_bp.route("/labels/print-direct", methods=["POST"])
 @login_required
 def labels_print_direct():
-    """Print labels directly to the Windows sticker printer via GDI SetDIBitsToDevice."""
+    """Print labels directly to the sticker printer via GDI SetDIBitsToDevice.
+
+    The x-Lab printer DC reports 160×240px portrait at 203 DPI.
+    Physical sticker is 75×50mm landscape fed through the printer.
+    We draw content in LANDSCAPE orientation (240 wide × 160 tall) so text
+    reads left-to-right when the sticker exits the printer, then rotate
+    CCW 90° to get 160×240 portrait which matches the DC exactly.
+    """
     _require_perm("can_print_labels")
     from flask import jsonify as _json
-    import io, struct, ctypes
+    import io, struct, ctypes, logging
 
-    data       = request.get_json() or {}
+    log  = logging.getLogger(__name__)
+    data = request.get_json() or {}
+
     items      = data.get("items", [])
     show_bc    = data.get("show_barcode", True)
-    show_shop  = data.get("show_shop", True)
-    show_mrp   = data.get("show_mrp", True)
-    show_sku   = data.get("show_sku", False)
-    show_dates = data.get("show_dates", True)
+    show_shop  = data.get("show_shop",   True)
+    show_mrp   = data.get("show_mrp",    True)
+    show_sku   = data.get("show_sku",    False)
+    show_dates = data.get("show_dates",  True)
     printer_nm = data.get("printer", "sticker printer")
 
     shop_name = ""
@@ -1560,28 +1569,39 @@ def labels_print_direct():
         import barcode as _bc
         from barcode.writer import ImageWriter
 
-        # Printer DC reports 160x240px. Use those exact dimensions.
-        # DC is portrait (160w x 240h). Sticker is landscape (50x25mm).
-        # Strategy: draw content in DC-landscape (240w x 160h), rotate CCW 90°
-        # to get DC-portrait (160w x 240h), send at 1:1 — no stretching.
+        # Read the actual DC dimensions — these are ground truth for this printer.
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_nm)
         DC_W = hdc.GetDeviceCaps(win32con.HORZRES)   # 160
         DC_H = hdc.GetDeviceCaps(win32con.VERTRES)   # 240
-        # Draw in landscape orientation matching the DC dimensions when rotated
-        PX_W = DC_H   # 240 — landscape width = DC height
-        PX_H = DC_W   # 160 — landscape height = DC width
+        DPI  = hdc.GetDeviceCaps(win32con.LOGPIXELSX) or 203
+
+        # The DC is portrait (160×240). The sticker is landscape (75×50mm).
+        # Draw content in landscape: canvas = (DC_H × DC_W) = (240 × 160).
+        # Then rotate CW 90° to get (160 × 240) = DC dimensions.
+        # This maps: canvas-left→label-top, canvas-right→label-bottom,
+        #            canvas-top→label-left, canvas-bottom→label-right.
+        PX_W = DC_H   # 240 — landscape width (long side of sticker)
+        PX_H = DC_W   # 160 — landscape height (short side of sticker)
+
+        log.info("print_direct: DC=%dx%d DPI=%d canvas=%dx%d",
+                 DC_W, DC_H, DPI, PX_W, PX_H)
 
         _fp = r"C:\Windows\Fonts\arial.ttf"
         def _f(px):
-            try:    return ImageFont.truetype(_fp, max(6, px))
-            except Exception: return ImageFont.load_default()
+            try:    return ImageFont.truetype(_fp, max(6, int(px)))
+            except: return ImageFont.load_default()
 
-        # Font sizes scaled to 240px wide landscape canvas
-        f_shop  = _f(16)
-        f_name  = _f(22)
-        f_price = _f(32)
-        f_small = _f(13)
+        # Scale fonts to the canvas width (240px ≈ 75mm at 80px/inch equiv)
+        scale   = PX_W / 240.0   # 1.0 at 240px wide
+        f_shop  = _f(int(14 * scale))
+        f_name  = _f(int(20 * scale))
+        f_price = _f(int(30 * scale))
+        f_small = _f(int(12 * scale))
+
+        PAD      = max(4, int(6 * scale))
+        GAP      = max(1, int(2 * scale))
+        BC_RATIO = 0.38   # barcode zone = bottom 38% of canvas height
 
         printed = 0
         hdc.StartDoc("Smart Mart Labels")
@@ -1593,92 +1613,89 @@ def labels_print_direct():
             bc_val  = str(item.get("barcode") or sku)
             price   = float(item.get("price", 0))
             price_s = f"NPR {int(price) if price == int(price) else f'{price:.2f}'}"
+            pkg     = str(item.get("pkg", ""))
+            exp     = str(item.get("exp", ""))
 
-            # Generate barcode bytes ONCE per item, reuse for each copy.
-            # write_text=False to avoid the double-barcode-text bug.
+            # Generate barcode bytes once per product (reused across copies)
             bc_bytes = None
             if show_bc:
                 try:
                     bb = io.BytesIO()
-                    code = _bc.get("code128", bc_val, writer=ImageWriter())
-                    code.write(bb, options={
-                        "write_text": False, "module_height": 10.0,
-                        "module_width": 0.4, "quiet_zone": 1.0,
-                        "font_size": 0, "text_distance": 0, "dpi": 203,
+                    _bc.get("code128", bc_val, writer=ImageWriter()).write(bb, options={
+                        "write_text": False, "module_height": 8.0,
+                        "module_width": 0.35, "quiet_zone": 1.0,
+                        "font_size": 0, "text_distance": 0, "dpi": DPI,
                     })
                     bc_bytes = bb.getvalue()
                 except Exception:
                     bc_bytes = None
 
+            bc_h         = int(PX_H * BC_RATIO) if bc_bytes else 0
+            text_ceiling = PX_H - bc_h - PAD   # text must stay above barcode
+
             for _ in range(copies):
-                img  = Image.new("RGB", (PX_W, PX_H), (255, 255, 255))
+                img  = Image.new("RGB", (PX_W, PX_H), "white")
                 draw = ImageDraw.Draw(img)
-                pad  = 6
-                gap  = 3
-                y    = pad
+                y    = PAD
 
                 def put(text, fnt):
                     nonlocal y
+                    avail = PX_W - PAD * 2
                     while len(text) > 1:
-                        bb = draw.textbbox((pad, y), text, font=fnt)
-                        if bb[2] <= PX_W - pad: break
+                        if draw.textlength(text, font=fnt) <= avail: break
                         text = text[:-1]
-                    draw.text((pad, y), text, font=fnt, fill=(0, 0, 0))
-                    bb = draw.textbbox((pad, y), text, font=fnt)
-                    y += (bb[3] - bb[1]) + gap
+                    _bb   = draw.textbbox((0, 0), "Ag", font=fnt)
+                    line_h = _bb[3] - _bb[1]
+                    if y + line_h > text_ceiling: return
+                    draw.text((PAD, y), text, font=fnt, fill="black")
+                    y += line_h + GAP
 
                 if show_shop and shop_name: put(shop_name, f_shop)
-                put(name, f_name)
+                put(name,    f_name)
                 put(price_s, f_price)
-                if show_mrp: put("MRP incl. taxes", f_small)
-                if show_dates:
-                    pkg = str(item.get("pkg", ""))
-                    exp = str(item.get("exp", ""))
-                    if pkg: put(f"PKD: {pkg}", f_small)
-                    if exp: put(f"EXP: {exp}", f_small)
-                if show_sku: put(sku, f_small)
+                if show_mrp:            put("MRP incl. all taxes", f_small)
+                if show_dates and pkg:  put(f"PKD: {pkg}", f_small)
+                if show_dates and exp:  put(f"EXP: {exp}", f_small)
+                if show_sku:            put(sku, f_small)
 
-                # Barcode at bottom — fresh Image from bytes each copy
+                # Barcode anchored to bottom
                 if bc_bytes:
                     try:
-                        bc_im = Image.open(io.BytesIO(bc_bytes))
-                        bc_im.load()
-                        bc_im = bc_im.convert("RGB")
-                        bc_h  = int(PX_H * 0.38)   # ~38% of label height for barcode
+                        bc_im = Image.open(io.BytesIO(bc_bytes)).convert("RGB")
                         bc_im = bc_im.resize((PX_W, bc_h), Image.LANCZOS)
-                        bc_y  = min(y + 4, PX_H - bc_h)
-                        img.paste(bc_im, (0, bc_y))
+                        img.paste(bc_im, (0, PX_H - bc_h))
                     except Exception:
                         pass
 
-                # Rotate CW 90° → portrait 160x240 matching printer DC exactly
-                img_rotated = img.rotate(-90, expand=True)
+                # Rotate CW 90°: landscape (240×160) → portrait (160×240) = DC size
+                img_out = img.rotate(-90, expand=True)
+                # Sanity check — must be DC_W × DC_H exactly
+                if img_out.size != (DC_W, DC_H):
+                    img_out = img_out.resize((DC_W, DC_H), Image.LANCZOS)
 
-                # Send 1:1 to printer DC — no stretching needed
                 hdc.StartPage()
-                rw, rh = img_rotated.size   # should be DC_W x DC_H (160x240)
-                raw    = img_rotated.convert("RGB").tobytes("raw", "BGR")
-                bi_hdr = struct.pack("<lllHHLLllLL",
-                    40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
+                rw, rh = img_out.size
+                raw    = img_out.convert("RGB").tobytes("raw", "BGR")
+                bi     = struct.pack("<lllHHLLllLL",
+                                    40, rw, -rh, 1, 24, 0, len(raw), 0, 0, 0, 0)
                 ctypes.windll.gdi32.SetDIBitsToDevice(
-                    hdc.GetSafeHdc(),
-                    0, 0, rw, rh,
-                    0, 0, 0, rh,
-                    raw, bi_hdr, 0
-                )
+                    hdc.GetSafeHdc(), 0, 0, rw, rh, 0, 0, 0, rh, raw, bi, 0)
                 hdc.EndPage()
                 printed += 1
 
         hdc.EndDoc()
         hdc.DeleteDC()
-        return _json({"ok": True, "printed": printed})
+        return _json({"ok": True, "printed": printed,
+                      "debug": {"DC_W": DC_W, "DC_H": DC_H, "DPI": DPI,
+                                "canvas": f"{PX_W}x{PX_H}"}})
 
     except ImportError as exc:
-        return _json({"ok": False, "error": f"Missing: {exc}. Use Download PDF instead."}), 400
+        return _json({"ok": False, "error": f"Missing: {exc}. Install pywin32 or use Download PDF."}), 400
     except Exception as exc:
         import logging, traceback
         logging.getLogger(__name__).error("print_direct: %s\n%s", exc, traceback.format_exc())
         return _json({"ok": False, "error": str(exc)}), 500
+
 
 def _generate_barcode_b64(value: str) -> str:
     """Generate a Code128 barcode as base64 PNG — scannable by any barcode scanner."""
@@ -1714,6 +1731,36 @@ def _generate_barcode_b64(value: str) -> str:
             return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
         except Exception:
             return ""
+
+
+@inventory_bp.route("/labels/printer-info")
+@login_required
+def labels_printer_info():
+    """Debug: return raw printer DC capabilities so layout can be tuned."""
+    _require_perm("can_print_labels")
+    from flask import jsonify as _json
+    printer_nm = request.args.get("printer", "sticker printer")
+    try:
+        import win32ui, win32con
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(printer_nm)
+        info = {
+            "printer":        printer_nm,
+            "HORZRES":        hdc.GetDeviceCaps(win32con.HORZRES),
+            "VERTRES":        hdc.GetDeviceCaps(win32con.VERTRES),
+            "PHYSICALWIDTH":  hdc.GetDeviceCaps(win32con.PHYSICALWIDTH),
+            "PHYSICALHEIGHT": hdc.GetDeviceCaps(win32con.PHYSICALHEIGHT),
+            "PHYSICALOFFSETX":hdc.GetDeviceCaps(win32con.PHYSICALOFFSETX),
+            "PHYSICALOFFSETY":hdc.GetDeviceCaps(win32con.PHYSICALOFFSETY),
+            "LOGPIXELSX":     hdc.GetDeviceCaps(win32con.LOGPIXELSX),
+            "LOGPIXELSY":     hdc.GetDeviceCaps(win32con.LOGPIXELSY),
+        }
+        hdc.DeleteDC()
+        return _json(info)
+    except ImportError:
+        return _json({"error": "win32ui not available"}), 400
+    except Exception as exc:
+        return _json({"error": str(exc)}), 500
 
 
 @inventory_bp.route("/bulk-upload/sample")

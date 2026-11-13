@@ -71,6 +71,10 @@
             style="background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;">
       <i class="bi bi-printer-fill me-1"></i>Print Direct
     </button>
+    <button onclick="showPrinterInfo()" class="btn btn-sm fw-semibold"
+            style="background:#64748b;color:#fff;border:none;border-radius:8px;padding:.35rem 1rem;">
+      <i class="bi bi-info-circle me-1"></i>Printer Info
+    </button>
   </div>
 </div>
 
@@ -121,8 +125,9 @@
         <div class="alert alert-success py-2 px-3 mb-3" style="font-size:.8rem;">
           <strong>✅ Recommended:</strong> Click <strong>Download PDF</strong> → open in PDF viewer →
           print with <strong>Actual Size, No margins</strong>.<br>
-          <strong>⚡ Or:</strong> Click <strong>Print Direct</strong> to send straight to
-          <em>sticker printer</em> — no dialog needed.
+          <strong>⚡ Or:</strong> Click <strong>Print Direct</strong> — sends image directly to sticker printer.<br>
+          <strong>⚠️ Important:</strong> Make sure your printer driver paper size matches your physical sticker.
+          Go to <em>Windows Settings → Printers → sticker printer → Printing Preferences</em> and set paper size to <strong>75 × 50 mm</strong>.
         </div>
 
         <div class="d-flex flex-wrap gap-3">
@@ -292,7 +297,11 @@
         body: JSON.stringify(payload)
       });
       const d = await r.json();
-      if (d.ok) { alert(`✅ Sent ${d.printed} label(s) to sticker printer.`); }
+      if (d.ok) {
+        let msg = `✅ Sent ${d.printed} label(s) to sticker printer.`;
+        if (d.debug) msg += `\n\nDebug: DC=${d.debug.dc_w}×${d.debug.dc_h}px, PDF=${d.debug.pdf_w_mm}×${d.debug.pdf_h_mm}mm, orient=${d.debug.orient_flag}`;
+        alert(msg);
+      }
       else { alert('Print failed: ' + (d.error||'unknown error')); }
     } catch(e) { alert('Error: '+e.message); }
   }
@@ -322,6 +331,22 @@
     });
   }
   document.addEventListener('DOMContentLoaded', ()=>{ setSize('s75x50'); });
+
+  async function showPrinterInfo() {
+    try {
+      const r = await fetch('/inventory/labels/printer-info?printer=sticker+printer');
+      const d = await r.json();
+      if (d.error) { alert('Error: ' + d.error); return; }
+      alert(
+        `Printer DC info for "${d.printer}":\n\n` +
+        `Printable area : ${d.HORZRES} × ${d.VERTRES} px\n` +
+        `Physical page  : ${d.PHYSICALWIDTH} × ${d.PHYSICALHEIGHT} px\n` +
+        `Physical offset: ${d.PHYSICALOFFSETX}, ${d.PHYSICALOFFSETY} px\n` +
+        `DPI (X / Y)    : ${d.LOGPIXELSX} / ${d.LOGPIXELSY}\n\n` +
+        `Share this with the developer to fix label alignment.`
+      );
+    } catch(e) { alert('Could not reach server: ' + e.message); }
+  }
 </script>
 </body>
 </html>
