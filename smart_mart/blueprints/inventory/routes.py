@@ -1642,7 +1642,7 @@ def labels_print_direct():
                 tspl = "\r\n".join(lines) + "\r\n"
                 raw  = tspl.encode("ascii", errors="replace")
 
-                log.info("TSPL job: %d bytes, %d copies", len(raw), copies)
+                log.info("TSPL job: %d bytes, %d copies\n%s", len(raw), copies, tspl)
 
                 hJob = win32print.StartDocPrinter(hPrinter, 1,
                                                   ("Smart Mart Label", None, "RAW"))
