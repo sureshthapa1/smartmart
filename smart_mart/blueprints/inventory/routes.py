@@ -1613,44 +1613,40 @@ def labels_print_direct():
                 lines.append('DIRECTION 1')
                 lines.append('CLS')
 
-                # Confirmed perfect layout (DIRECTION 1: y=0=bottom, y=200=top):
-                # Barcode at bottom (low y), text stacked above (high y).
-                # From top to bottom on printed label: name → price → dates → barcode
+                # Confirmed clean layout (tested and approved):
+                # DIRECTION 1: y=0=bottom edge, y=200=top edge
+                # From top to bottom on printed label:
+                #   Almonds        y=124 font3
+                #   NPR 219        y=108 font2
+                #   SKU: 100 gram  y=96  font1
+                #   PKD:.. EXP:..  y=84  font1
+                #   [barcode]      y=20  h=60 readable=0
 
-                # Barcode — full width, y=16, height=100 (confirmed scannable)
+                # Barcode — compact, no readable text below bars
                 if show_bc and bc_val:
                     lines.append(
-                        f'BARCODE 0,16,"128",100,1,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE 0,20,"128",60,0,0,2,2,"{esc(bc_val)}"'
                     )
 
-                # Confirmed working coordinates (tested: 3 copies, all aligned)
-                # dates y=124, sku y=136, price y=148, name y=163
-                ty = 124
+                # Dates line
                 if show_dates and (pkg or exp_d):
-                    date_line = ""
                     if pkg and exp_d:
-                        date_line = f"PKD:{esc(pkg)} EXP:{esc(exp_d)}"
+                        date_line = f"PKD:{esc(pkg)}  EXP:{esc(exp_d)}"
                     elif pkg:
                         date_line = f"PKD:{esc(pkg)}"
                     else:
                         date_line = f"EXP:{esc(exp_d)}"
-                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"{date_line}"')
-                    ty += 12
+                    lines.append(f'TEXT 4,84,"1",0,1,1,"{date_line}"')
 
-                if show_mrp:
-                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"MRP incl.taxes"')
-                    ty += 12
-
+                # SKU
                 if show_sku:
-                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"{esc(sku)}"')
-                    ty += 15
+                    lines.append(f'TEXT 4,96,"1",0,1,1,"{esc(sku)}"')
 
-                # Price — font 2
-                lines.append(f'TEXT 4,{ty},"2",0,1,1,"{esc(price_s)}"')
-                ty += 17
+                # Price
+                lines.append(f'TEXT 4,108,"2",0,1,1,"{esc(price_s)}"')
 
-                # Product name — font 3 (topmost)
-                lines.append(f'TEXT 4,{ty},"3",0,1,1,"{esc(name)}"')
+                # Product name — largest, topmost
+                lines.append(f'TEXT 4,124,"3",0,1,1,"{esc(name)}"')
 
                 # PRINT copies,1 — standard TSPL print command
                 lines.append(f'PRINT {copies},1')
