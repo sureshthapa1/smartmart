@@ -1608,7 +1608,9 @@ def labels_print_direct():
                     )
 
                 # Text rows from bottom-up (lower y = closer to barcode)
-                ty = 130
+                # Total available: y=126..200 = 74 dots for text
+                # dates(10) + mrp(10) + sku(10) + price(14) + name(16) = 60 dots with gaps
+                ty = 124
                 if show_dates and (pkg or exp_d):
                     date_line = ""
                     if pkg and exp_d:
@@ -1618,21 +1620,21 @@ def labels_print_direct():
                     else:
                         date_line = f"EXP:{esc(exp_d)}"
                     lines.append(f'TEXT 4,{ty},"1",0,1,1,"{date_line}"')
-                    ty += 14
+                    ty += 12
 
                 if show_mrp:
                     lines.append(f'TEXT 4,{ty},"1",0,1,1,"MRP incl.taxes"')
-                    ty += 14
+                    ty += 12
 
                 if show_sku:
                     lines.append(f'TEXT 4,{ty},"1",0,1,1,"{esc(sku)}"')
-                    ty += 14
+                    ty += 12
 
-                # Price — font 2
+                # Price — font 2 (12px)
                 lines.append(f'TEXT 4,{ty},"2",0,1,1,"{esc(price_s)}"')
-                ty += 16
+                ty += 15
 
-                # Product name — font 3 (topmost line)
+                # Product name — font 3 (16px, topmost line)
                 lines.append(f'TEXT 4,{ty},"3",0,1,1,"{esc(name)}"')
 
                 # PRINT copies,1 — standard TSPL print command
