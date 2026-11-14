@@ -1604,7 +1604,9 @@ def labels_print_direct():
                 x = 6
 
                 if show_shop and shop_name:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(shop_name)}"')
+                    # Truncate shop name to 20 chars to prevent overflow
+                    shop_disp = shop_name[:20]
+                    lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(shop_disp)}"')
                     y += 14
 
                 lines.append(f'TEXT {x},{y},"3",0,1,1,"{esc(name)}"')
