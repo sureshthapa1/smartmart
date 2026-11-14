@@ -1594,7 +1594,6 @@ def labels_print_direct():
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
                 lines.append('DIRECTION 1')
-                lines.append('SET TEAR OFF')
                 lines.append('CLS')
 
                 # Confirmed perfect layout (DIRECTION 1: y=0=bottom, y=200=top):
@@ -1607,9 +1606,8 @@ def labels_print_direct():
                         f'BARCODE 0,8,"128",100,1,0,2,2,"{esc(bc_val)}"'
                     )
 
-                # Text rows from bottom-up (lower y = closer to barcode)
-                # Total available: y=126..200 = 74 dots for text
-                # dates(10) + mrp(10) + sku(10) + price(14) + name(16) = 60 dots with gaps
+                # Confirmed working coordinates (tested: 3 copies, all aligned)
+                # dates y=124, sku y=136, price y=148, name y=163
                 ty = 124
                 if show_dates and (pkg or exp_d):
                     date_line = ""
@@ -1628,13 +1626,13 @@ def labels_print_direct():
 
                 if show_sku:
                     lines.append(f'TEXT 4,{ty},"1",0,1,1,"{esc(sku)}"')
-                    ty += 12
+                    ty += 15
 
-                # Price — font 2 (12px)
+                # Price — font 2
                 lines.append(f'TEXT 4,{ty},"2",0,1,1,"{esc(price_s)}"')
-                ty += 15
+                ty += 17
 
-                # Product name — font 3 (16px, topmost line)
+                # Product name — font 3 (topmost)
                 lines.append(f'TEXT 4,{ty},"3",0,1,1,"{esc(name)}"')
 
                 # PRINT copies,1 — standard TSPL print command
