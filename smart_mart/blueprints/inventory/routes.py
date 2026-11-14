@@ -1593,6 +1593,7 @@ def labels_print_direct():
                 lines = []
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
+                lines.append('OFFSET 3 mm')
                 lines.append('DIRECTION 1')
                 lines.append('CLS')
 
