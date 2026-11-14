@@ -1572,6 +1572,23 @@ def labels_print_direct():
         hPrinter  = win32print.OpenPrinter(printer_nm)
 
         try:
+            # Calibrate gap sensor once before printing.
+            # This feeds one label to measure the gap — the first real label
+            # then starts perfectly aligned.
+            cal = (
+                f"SIZE {w_mm} mm,{h_mm} mm\r\n"
+                f"GAP {GAP_MM} mm,0 mm\r\n"
+                "GAPDETECT\r\n"
+                "CALIBRATE\r\n"
+            ).encode("ascii")
+            hJob = win32print.StartDocPrinter(hPrinter, 1, ("Calibrate", None, "RAW"))
+            win32print.StartPagePrinter(hPrinter)
+            win32print.WritePrinter(hPrinter, cal)
+            win32print.EndPagePrinter(hPrinter)
+            win32print.EndDocPrinter(hPrinter)
+
+            import time as _time
+            _time.sleep(3)   # wait for calibration feed to complete
             for item in items:
                 copies  = max(1, int(item.get("copies", 1)))
                 name    = str(item.get("name", ""))
@@ -1593,7 +1610,6 @@ def labels_print_direct():
                 lines = []
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
-                lines.append('OFFSET 3 mm')
                 lines.append('DIRECTION 1')
                 lines.append('CLS')
 
@@ -1601,10 +1617,10 @@ def labels_print_direct():
                 # Barcode at bottom (low y), text stacked above (high y).
                 # From top to bottom on printed label: name → price → dates → barcode
 
-                # Barcode — full width, y=8, height=100 (confirmed scannable)
+                # Barcode — full width, y=16, height=100 (confirmed scannable)
                 if show_bc and bc_val:
                     lines.append(
-                        f'BARCODE 0,8,"128",100,1,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE 0,16,"128",100,1,0,2,2,"{esc(bc_val)}"'
                     )
 
                 # Confirmed working coordinates (tested: 3 copies, all aligned)
