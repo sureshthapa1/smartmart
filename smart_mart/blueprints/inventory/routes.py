@@ -15,6 +15,10 @@ from ...services import inventory_manager
 from ...services.decorators import admin_required, login_required
 
 inventory_bp = Blueprint("inventory", __name__, url_prefix="/inventory")
+# Calibration flag — False at server start; set True after first successful
+# GAPDETECT+CALIBRATE so the sensor-feed sticker is wasted only once per
+# server lifetime, not once per print job.
+inventory_bp._label_calibrated = False
 
 def _require_perm(perm: str):
     from flask import abort
@@ -1365,8 +1369,8 @@ def labels_pdf():
 
     data        = request.get_json() or {}
     items       = data.get("items", [])
-    w_mm        = float(data.get("w_mm", 75))
-    h_mm        = float(data.get("h_mm", 50))
+    w_mm        = float(data.get("w_mm", 50))
+    h_mm        = float(data.get("h_mm", 25))
     show_bc     = data.get("show_barcode", True)
     show_shop   = data.get("show_shop", True)
     show_mrp    = data.get("show_mrp", True)
@@ -1572,23 +1576,28 @@ def labels_print_direct():
         hPrinter  = win32print.OpenPrinter(printer_nm)
 
         try:
-            # Calibrate gap sensor once before printing.
-            # This feeds one label to measure the gap — the first real label
-            # then starts perfectly aligned.
-            cal = (
-                f"SIZE {w_mm} mm,{h_mm} mm\r\n"
-                f"GAP {GAP_MM} mm,0 mm\r\n"
-                "GAPDETECT\r\n"
-                "CALIBRATE\r\n"
-            ).encode("ascii")
-            hJob = win32print.StartDocPrinter(hPrinter, 1, ("Calibrate", None, "RAW"))
-            win32print.StartPagePrinter(hPrinter)
-            win32print.WritePrinter(hPrinter, cal)
-            win32print.EndPagePrinter(hPrinter)
-            win32print.EndDocPrinter(hPrinter)
+            # Calibrate gap sensor only once per server lifetime.
+            # GAPDETECT+CALIBRATE feeds one blank label to measure the gap;
+            # doing it on every job wastes one sticker per job.
+            # inventory_bp._label_calibrated is set False at module load and
+            # persists in memory across requests until the process restarts.
+            if not inventory_bp._label_calibrated:
+                cal = (
+                    f"SIZE {w_mm} mm,{h_mm} mm\r\n"
+                    f"GAP {GAP_MM} mm,0 mm\r\n"
+                    "GAPDETECT\r\n"
+                    "CALIBRATE\r\n"
+                ).encode("ascii")
+                hJob = win32print.StartDocPrinter(hPrinter, 1, ("Calibrate", None, "RAW"))
+                win32print.StartPagePrinter(hPrinter)
+                win32print.WritePrinter(hPrinter, cal)
+                win32print.EndPagePrinter(hPrinter)
+                win32print.EndDocPrinter(hPrinter)
 
-            import time as _time
-            _time.sleep(3)   # wait for calibration feed to complete
+                import time as _time
+                _time.sleep(3)   # wait for calibration feed to complete
+                inventory_bp._label_calibrated = True
+
             for item in items:
                 copies  = max(1, int(item.get("copies", 1)))
                 name    = str(item.get("name", ""))
@@ -1648,8 +1657,12 @@ def labels_print_direct():
                 # Product name — largest, topmost
                 lines.append(f'TEXT 4,124,"3",0,1,1,"{esc(name)}"')
 
-                # PRINT copies,1 — standard TSPL print command
-                lines.append(f'PRINT {copies},1')
+                # PRINT copies,0 — standard TSPL print command.
+                # The second argument is the "cut/tear" after-job feed count.
+                # 0 = no extra feed after the last label; gap alignment is
+                # handled by CALIBRATE (run once at server start), so the
+                # extra advance is not needed and wastes one sticker.
+                lines.append(f'PRINT {copies},0')
 
                 tspl = "\r\n".join(lines) + "\r\n"
                 raw  = tspl.encode("ascii", errors="replace")
