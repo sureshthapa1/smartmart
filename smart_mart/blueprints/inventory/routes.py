@@ -1597,34 +1597,43 @@ def labels_print_direct():
                 lines.append('SET TEAR OFF')
                 lines.append('CLS')
 
-                # Layout confirmed working:
-                # - No shop name (too long, wastes space)
-                # - 3 text lines in top 65 dots
-                # - Barcode full width at y=70, height=100 (scannable minimum)
-                x = 6
+                # Confirmed perfect layout (DIRECTION 1: y=0=bottom, y=200=top):
+                # Barcode at bottom (low y), text stacked above (high y).
+                # From top to bottom on printed label: name → price → dates → barcode
 
-                lines.append(f'TEXT {x},6,"3",0,1,1,"{esc(name)}"')
-                lines.append(f'TEXT {x},26,"4",0,1,1,"{esc(price_s)}"')
-
-                # PKD + EXP on one line to save space
-                date_line = ""
-                if show_dates and pkg and exp_d:
-                    date_line = f"PKD:{esc(pkg)} EXP:{esc(exp_d)}"
-                elif show_dates and pkg:
-                    date_line = f"PKD:{esc(pkg)}"
-                elif show_dates and exp_d:
-                    date_line = f"EXP:{esc(exp_d)}"
-                if date_line:
-                    lines.append(f'TEXT {x},54,"1",0,1,1,"{date_line}"')
-
-                if show_sku:
-                    lines.append(f'TEXT {x},66,"1",0,1,1,"{esc(sku)}"')
-
-                # Barcode — full width, y=70, height=100 dots (confirmed scannable)
+                # Barcode — full width, y=8, height=100 (confirmed scannable)
                 if show_bc and bc_val:
                     lines.append(
-                        f'BARCODE 0,70,"128",100,1,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE 0,8,"128",100,1,0,2,2,"{esc(bc_val)}"'
                     )
+
+                # Text rows from bottom-up (lower y = closer to barcode)
+                ty = 130
+                if show_dates and (pkg or exp_d):
+                    date_line = ""
+                    if pkg and exp_d:
+                        date_line = f"PKD:{esc(pkg)} EXP:{esc(exp_d)}"
+                    elif pkg:
+                        date_line = f"PKD:{esc(pkg)}"
+                    else:
+                        date_line = f"EXP:{esc(exp_d)}"
+                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"{date_line}"')
+                    ty += 14
+
+                if show_mrp:
+                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"MRP incl.taxes"')
+                    ty += 14
+
+                if show_sku:
+                    lines.append(f'TEXT 4,{ty},"1",0,1,1,"{esc(sku)}"')
+                    ty += 14
+
+                # Price — font 2
+                lines.append(f'TEXT 4,{ty},"2",0,1,1,"{esc(price_s)}"')
+                ty += 16
+
+                # Product name — font 3 (topmost line)
+                lines.append(f'TEXT 4,{ty},"3",0,1,1,"{esc(name)}"')
 
                 # PRINT copies,1 — standard TSPL print command
                 lines.append(f'PRINT {copies},1')
