@@ -1594,48 +1594,36 @@ def labels_print_direct():
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
                 lines.append('DIRECTION 1')
+                lines.append('SET TEAR OFF')
                 lines.append('CLS')
 
-                # Layout: text on TOP, barcode FULL WIDTH on bottom
-                # Label = 400 dots wide × 200 dots tall at 203 DPI
-                # Text zone: y 0..105  (top ~52%)
-                # Barcode zone: y 108..200 (bottom ~46%, full 400-dot width)
-                y = 6
+                # Layout confirmed working:
+                # - No shop name (too long, wastes space)
+                # - 3 text lines in top 65 dots
+                # - Barcode full width at y=70, height=100 (scannable minimum)
                 x = 6
 
-                if show_shop and shop_name:
-                    # Truncate shop name to 20 chars to prevent overflow
-                    shop_disp = shop_name[:20]
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(shop_disp)}"')
-                    y += 14
+                lines.append(f'TEXT {x},6,"3",0,1,1,"{esc(name)}"')
+                lines.append(f'TEXT {x},26,"4",0,1,1,"{esc(price_s)}"')
 
-                lines.append(f'TEXT {x},{y},"3",0,1,1,"{esc(name)}"')
-                y += 20
+                # PKD + EXP on one line to save space
+                date_line = ""
+                if show_dates and pkg and exp_d:
+                    date_line = f"PKD:{esc(pkg)} EXP:{esc(exp_d)}"
+                elif show_dates and pkg:
+                    date_line = f"PKD:{esc(pkg)}"
+                elif show_dates and exp_d:
+                    date_line = f"EXP:{esc(exp_d)}"
+                if date_line:
+                    lines.append(f'TEXT {x},54,"1",0,1,1,"{date_line}"')
 
-                lines.append(f'TEXT {x},{y},"4",0,1,1,"{esc(price_s)}"')
-                y += 28
+                if show_sku:
+                    lines.append(f'TEXT {x},66,"1",0,1,1,"{esc(sku)}"')
 
-                if show_mrp and y < 100:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"MRP incl.taxes"')
-                    y += 12
-
-                if show_dates and pkg and y < 100:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"PKD:{esc(pkg)}"')
-                    y += 12
-
-                if show_dates and exp_d and y < 100:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"EXP:{esc(exp_d)}"')
-                    y += 12
-
-                if show_sku and y < 100:
-                    lines.append(f'TEXT {x},{y},"1",0,1,1,"{esc(sku)}"')
-
-                # Barcode — full 400-dot width, bottom of label
-                # height=72 dots + ~16 for readable text = fits in remaining space
-                # narrow=2,wide=2 correct for Code128
+                # Barcode — full width, y=70, height=100 dots (confirmed scannable)
                 if show_bc and bc_val:
                     lines.append(
-                        f'BARCODE 0,108,"128",72,1,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE 0,70,"128",100,1,0,2,2,"{esc(bc_val)}"'
                     )
 
                 # PRINT copies,1 — standard TSPL print command
