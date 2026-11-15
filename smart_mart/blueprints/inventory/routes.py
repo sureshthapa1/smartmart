@@ -1,11 +1,13 @@
 """Inventory blueprint — product CRUD, stock adjustment, and category management."""
 
 from decimal import Decimal
+import logging
 import os
 import uuid
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app, abort
 from flask_login import current_user
+from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models.product import Product
@@ -127,7 +129,7 @@ def list_products():
         except Exception:
             _threshold = 10
         term = search.strip().lower() if search else None
-        stmt_products = db.select(Product).where(
+        stmt_products = db.select(Product).options(joinedload(Product.supplier)).where(
             Product.is_active == True,
             Product.quantity <= db.func.coalesce(Product.low_stock_threshold, _threshold),
         ).order_by(Product.quantity.asc(), Product.name.asc())
@@ -1624,6 +1626,24 @@ def labels_print_direct():
                 # narrow=1 makes thinner bars but fits longer values in 400 dots
                 bc_narrow = 2 if len(bc_val) <= 15 else 1
 
+                # Barcode width safety: Code128 approximate dots = (chars * 11 + 35) * narrow
+                narrow_width = bc_narrow  # bc_narrow is already set at this point
+                _bc_dots = (len(bc_val) * 11 + 35) * narrow_width
+                if _bc_dots > 390:
+                    narrow_width = 1
+                    _bc_dots = (len(bc_val) * 11 + 35) * narrow_width
+                if _bc_dots > 390:
+                    # Truncate bc_val to fit at narrow=1
+                    max_chars = (390 // 11) - 3  # conservative cap
+                    if len(bc_val) > max_chars:
+                        logging.getLogger(__name__).warning(
+                            "Barcode value too wide for 50mm label, truncating %r to %d chars",
+                            bc_val, max_chars
+                        )
+                        bc_val = bc_val[:max_chars]
+                    narrow_width = 1
+                bc_narrow = narrow_width
+
                 lines = []
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
@@ -1642,7 +1662,6 @@ def labels_print_direct():
                     lines.append(
                         f'BARCODE 0,20,"128",60,0,0,{bc_narrow},2,"{esc(bc_val)}"'
                     )
-
                 # Dates line
                 if show_dates and (pkg or exp_d):
                     if pkg and exp_d:
@@ -1715,7 +1734,8 @@ def _generate_barcode_b64(value: str) -> str:
             "text_distance": 1.0,
         })
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).warning("Code128 generation failed for %r: %s", value, e)
         # Fallback: QR code (always works, readable by phone but not handheld scanner)
         try:
             import qrcode, io, base64

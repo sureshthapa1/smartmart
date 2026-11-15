@@ -117,6 +117,7 @@ def index():
                 )
             )
             .select_from(SaleItem)
+            # INNER JOIN intentionally excludes custom-label items (product_id=NULL) which have no cost price
             .join(Product, Product.id == SaleItem.product_id)
             .join(Sale, Sale.id == SaleItem.sale_id)
             .where(Sale.sale_date.between(today, today_end))
@@ -155,15 +156,15 @@ def index():
             "total_sales_count":   int(agg_row.total_count),
             "total_revenue":       total_revenue,
             "today_cogs":          float(today_cogs),
-            "today_profit":        0,  # placeholder; corrected below using today_sales_amount
+            "today_gross_profit":  0,  # placeholder; corrected below using today_sales_amount
             "cash_balance":        float(monthly_profit),  # month net profit (meaningful for daily ops)
             "stock_value":         float(stock_value),
             "monthly_profit":      float(monthly_profit),
             "waste_cost_month":    waste_cost_month,
             "total_products":      int(total_products),
         }
-        # Use today_sales_amount for today_profit (correct figure)
-        stats["today_profit"] = stats["today_sales_amount"] - stats["today_cogs"]
+        # Use today_sales_amount for today_gross_profit (correct figure)
+        stats["today_gross_profit"] = stats["today_sales_amount"] - stats["today_cogs"]
         _cache_set(_stats_key, stats, ttl=60)
 
     today_sales_amount   = stats["today_sales_amount"]
@@ -174,7 +175,7 @@ def index():
     monthly_sales_count  = stats["monthly_sales_count"]
     total_sales_count    = stats["total_sales_count"]
     total_revenue        = stats["total_revenue"]
-    today_profit         = stats["today_profit"]
+    today_profit         = stats["today_gross_profit"]
     cash_balance         = stats["cash_balance"]
     stock_value          = stats["stock_value"]
     monthly_profit       = stats["monthly_profit"]
@@ -248,6 +249,8 @@ def index():
     # ── Reorder alerts (products at or below reorder point) ──────────────
     reorder_alerts_count = db.session.execute(
         db.select(func.count(Product.id))
+        .where(Product.reorder_point.isnot(None))
+        .where(Product.reorder_point > 0)
         .where(Product.quantity <= Product.reorder_point)
         .where(Product.quantity >= 0)
     ).scalar() or 0
