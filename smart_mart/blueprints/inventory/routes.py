@@ -1608,33 +1608,39 @@ def labels_print_direct():
                 pkg     = str(item.get("pkg", ""))
                 exp_d   = str(item.get("exp", ""))
 
-                # Escape double-quotes in strings for TSPL TEXT command
+                # Escape double-quotes and truncate strings for TSPL
                 def esc(s): return s.replace('"', "'")
 
-                # Build TSPL command block for one label
-                # TEXT  x,y,font,rotation,xmul,ymul,"text"
-                #   font "3" = built-in 16px, "4" = 24px
-                #   rotation: 0=normal, 90/180/270
-                # BARCODE x,y,type,height,readable,rotation,narrow,wide,"data"
+                # TSPL font 1 = 8px wide per char → max ~46 chars in 400 dots
+                # TSPL font 2 = 12px wide per char → max ~30 chars
+                # TSPL font 3 = 16px wide per char → max ~22 chars
+                def trunc(s, max_chars): return s[:max_chars]
+
+                name_disp  = trunc(name, 20)   # font 3: max 20 chars safely
+                sku_disp   = trunc(sku, 38)    # font 1: max 38 chars
+                price_disp = trunc(price_s, 28) # font 2: max 28 chars
+
+                # Barcode narrow width: use narrow=2 for ≤15 chars, narrow=1 for longer
+                # narrow=1 makes thinner bars but fits longer values in 400 dots
+                bc_narrow = 2 if len(bc_val) <= 15 else 1
+
                 lines = []
                 lines.append(f'SIZE {w_mm} mm,{h_mm} mm')
                 lines.append(f'GAP {GAP_MM} mm,0 mm')
                 lines.append('DIRECTION 1')
                 lines.append('CLS')
 
-                # Confirmed clean layout (tested and approved):
-                # DIRECTION 1: y=0=bottom edge, y=200=top edge
-                # From top to bottom on printed label:
-                #   Almonds        y=124 font3
-                #   NPR 219        y=108 font2
-                #   SKU: 100 gram  y=96  font1
-                #   PKD:.. EXP:..  y=84  font1
-                #   [barcode]      y=20  h=60 readable=0
+                # Layout (DIRECTION 1: y=0=bottom, y=200=top):
+                #   y=124: product name  (font 3, top)
+                #   y=108: price         (font 2)
+                #   y=96:  SKU           (font 1, optional)
+                #   y=84:  PKD/EXP dates (font 1)
+                #   y=20:  barcode       (h=60, no readable text)
 
-                # Barcode — compact, no readable text below bars
+                # Barcode — full width, auto narrow width for long values
                 if show_bc and bc_val:
                     lines.append(
-                        f'BARCODE 0,20,"128",60,0,0,2,2,"{esc(bc_val)}"'
+                        f'BARCODE 0,20,"128",60,0,0,{bc_narrow},2,"{esc(bc_val)}"'
                     )
 
                 # Dates line
@@ -1645,24 +1651,21 @@ def labels_print_direct():
                         date_line = f"PKD:{esc(pkg)}"
                     else:
                         date_line = f"EXP:{esc(exp_d)}"
-                    lines.append(f'TEXT 4,84,"1",0,1,1,"{date_line}"')
+                    lines.append(f'TEXT 4,84,"1",0,1,1,"{trunc(date_line, 46)}"')
 
                 # SKU
                 if show_sku:
-                    lines.append(f'TEXT 4,96,"1",0,1,1,"{esc(sku)}"')
+                    lines.append(f'TEXT 4,96,"1",0,1,1,"{esc(sku_disp)}"')
 
                 # Price
-                lines.append(f'TEXT 4,108,"2",0,1,1,"{esc(price_s)}"')
+                lines.append(f'TEXT 4,108,"2",0,1,1,"{esc(price_disp)}"')
 
                 # Product name — largest, topmost
-                lines.append(f'TEXT 4,124,"3",0,1,1,"{esc(name)}"')
+                lines.append(f'TEXT 4,124,"3",0,1,1,"{esc(name_disp)}"')
 
-                # PRINT copies,0 — standard TSPL print command.
-                # The second argument is the "cut/tear" after-job feed count.
-                # 0 = no extra feed after the last label; gap alignment is
-                # handled by CALIBRATE (run once at server start), so the
-                # extra advance is not needed and wastes one sticker.
-                lines.append(f'PRINT {copies},0')
+                # PRINT copies,1 — print N labels, feed 1 to tear bar.
+                # PRINT N,0 causes no printing on this x-Lab printer model.
+                lines.append(f'PRINT {copies},1')
 
                 tspl = "\r\n".join(lines) + "\r\n"
                 raw  = tspl.encode("ascii", errors="replace")
